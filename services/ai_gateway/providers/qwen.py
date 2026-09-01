@@ -249,5 +249,5 @@ def embed(
     dim: int = 768,
     timeout_s: int = 120,
 ) -> ProviderOutcome:
-    """知识库向量车道没走过千问,不声称支持(声称了就会有人把它当默认后端)。"""
+    """Qwen provider 暂不支持向量接口。"""
     return ProviderOutcome(ok=False, error_kind="unsupported", model=NAME)

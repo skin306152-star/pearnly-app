@@ -2,8 +2,8 @@
 """销项商品主数据 DAL(PO-2 · docs/sales-module/docs/13)。
 
 纯参数化 SQL 叶子:每个函数收路由层传入的 cursor + tenant_id。租户隔离双保险——
-db.get_cursor_rls 设 app.current_tenant_id,这里每条语句再 WHERE tenant_id(镜像
-services/knowledge/dal.py)。列名只来自内部白名单,值一律占位符,杜绝注入。
+db.get_cursor_rls 设 app.current_tenant_id,这里每条语句再 WHERE tenant_id。
+列名只来自内部白名单,值一律占位符,杜绝注入。
 """
 
 from __future__ import annotations

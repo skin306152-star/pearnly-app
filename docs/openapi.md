@@ -48,7 +48,6 @@ FastAPI 默认生成:
 | `me_routes.py` | `/api/me` | `GET /` · `GET /lang` · `PUT /lang` · `PUT /password` | unit + spec 13 | 当前用户信息 / 改密 |
 | `tenant_routes.py` | `/api/tenant` | `GET /companies` · `PUT /active` | unit | 多公司账套切换 |
 | `workspace_routes.py` | `/api/workspace` | 工作区 / role 管理 | unit | 员工 / 老板 / 超管 |
-| `console_team_routes.py` / `console_invite_routes.py` | `/api/team` | 成员/角色/邀请/转移(批5 后唯一团队管理面) | unit | 控制台管成员 |
 | `settings_routes.py` | `/api/settings` | dup_check / ERP push mode / Gemini key | unit | 用户级设置 |
 
 ### 📸 OCR / 上传识别(高敏热路径)
@@ -73,6 +72,7 @@ FastAPI 默认生成:
 | 文件 | 主路径 prefix | 关键 endpoint | 兜底测试 | 备注 |
 |---|---|---|---|---|
 | `erp_routes.py` | `/api/erp` | endpoints CRUD · push · listing | unit + spec 08-erp-push | 1206 行 · 待拆 |
+| `erp_team_routes.py` | `/api/erp/team` | ERP 员工、最小权限、LINE 绑定 | unit | ERP 团队专用；不属于已下线的通用权限管理 |
 | `erp_mappings_routes.py` | `/api/erp/mappings` | 字段映射 | unit | 走 `services/erp/mappings_store` |
 | `erp_xero_routes.py` | `/api/erp/xero` | Xero OAuth 推送 | unit | |
 | `import_routes.py` | `/api/import` | 万能导入器(D4 / ADR-006)| unit | 走 `services/importer/template_learning` |

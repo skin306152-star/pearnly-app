@@ -104,7 +104,7 @@ function applySidebarVisibility() {
     // REFACTOR-C1 · 老套餐 v109.3 IIFE 已删(计费迁移收尾 step2)· renderTrialBanner 不复存在 ·
     //   原 window.renderTrialBanner 兜底赋值随之移除(否则引用已删函数会 ReferenceError)。
     // v0.15 · 扁平权限 · 所有用户看到相同的侧栏
-    // v118.12 · 全部改用 6 原子函数(isSuperAdmin / isOwner / isEmployee / shouldHideMoney / canManageTeam / canManageApiKey)
+    // v118.12 · 角色显隐统一走 permissions.ts 的原子函数。
     const u = _userInfo;
     if (!u) return;
     const _hideMoney = shouldHideMoney(u);
@@ -131,7 +131,7 @@ function applySidebarVisibility() {
     // REFACTOR-C1 · 顶栏超管下拉(#admin-dropdown)+ 老 home.html admin 布局已下线 · 超管走独立 /admin SPA
 
     // ============================================================
-    // v118.12 · 设置页 tab 显隐(原子函数驱动)· 团队管理 tab 已下线(→ /console)
+    // v118.12 · 设置页 tab 显隐(原子函数驱动)
     // ============================================================
     // API & 密钥:仅买断 owner / 超管
     const apiTab = document.querySelector('.settings-tab[data-tab="api"]') as HTMLElement | null;

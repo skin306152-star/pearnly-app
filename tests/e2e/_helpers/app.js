@@ -72,8 +72,7 @@ async function getModules(page) {
 }
 
 // 业态导航门控 spec(24 pos_only / 25 firm)共用的选择器表 + 切业态 + 展开折叠组。
-// SIDEBAR 取两 spec 超集(含 24 独有的 knowledge 键 · 25 不引用无害);各 spec 的白名单
-// 期望列表各自留在 spec 里(两业态本就不同)。
+// 各 spec 的白名单期望列表留在对应 spec 里(两业态本就不同)。
 const SIDEBAR = {
     dashboard: '.nav-item[data-route="dashboard"]',
     cowork: '[data-collapsible="firm"]',
@@ -88,11 +87,9 @@ const SIDEBAR = {
     exceptions: '.nav-item[data-route="exceptions"]',
     integrations: '#nav-integrations',
     enroll: '#nav-enroll',
-    knowledge: '#nav-knowledge',
 };
 const AVATAR = {
     settings: '#avatar-menu-settings',
-    console: '#avatar-menu-console',
     billing: '#avatar-menu-billing',
     shortcuts: '#avatar-menu-shortcuts',
     theme: '#avatar-menu-theme',

@@ -35,10 +35,11 @@ class SnapshotIsTheFactSourceTests(unittest.TestCase):
         # 要么是有人拿名单糊闸,两种都得在 review 里被看见。
         self.assertEqual(gate.KNOWN_UNCOVERED, {})
 
-    def test_retired_tables_are_only_the_disconnected_cowork_line_set(self):
+    def test_retired_tables_are_only_disconnected_features(self):
         self.assertEqual(
             gate.RETIRED_TABLES_PENDING_DROP,
             {
+                "invitations",
                 "line_client_bind_codes",
                 "line_client_contacts",
                 "line_client_questions",
@@ -47,6 +48,7 @@ class SnapshotIsTheFactSourceTests(unittest.TestCase):
                 "line_pending_entry",
                 "notification_logs",
                 "notification_rules",
+                "ownership_transfers",
             },
         )
 

@@ -93,7 +93,7 @@ class PlatformOnboardingE2E(unittest.TestCase):
         self.assertTrue(body.get("ok"), body)
         mods = body["data"]["modules"]
         self.assertEqual(body["data"]["business_type"], "firm")
-        for on in ("sales", "expense", "recon", "knowledge"):
+        for on in ("sales", "expense", "recon"):
             self.assertTrue(mods[on]["enabled"], f"firm 应开 {on}")
         for off in ("inventory", "pos", "receivable"):
             self.assertFalse(mods[off]["enabled"], f"firm 应关 {off}")
@@ -105,7 +105,7 @@ class PlatformOnboardingE2E(unittest.TestCase):
         self.assertEqual(body["data"]["business_type"], "retail")
         for on in ("sales", "inventory", "pos"):
             self.assertTrue(mods[on]["enabled"], f"retail 应开 {on}")
-        for off in ("expense", "recon", "receivable", "knowledge"):
+        for off in ("expense", "recon", "receivable"):
             self.assertFalse(mods[off]["enabled"], f"retail 应关 {off}")
 
     def test_switch_business_type_overwrites(self):
@@ -114,9 +114,8 @@ class PlatformOnboardingE2E(unittest.TestCase):
         mods = body["data"]["modules"]
         self.assertEqual(body["data"]["business_type"], "service")
         self.assertTrue(mods["expense"]["enabled"])
-        # firm 开过的 recon/knowledge,切到 service 后应被关
+        # firm 开过的 recon,切到 service 后应被关
         self.assertFalse(mods["recon"]["enabled"])
-        self.assertFalse(mods["knowledge"]["enabled"])
 
     def test_toggle_module_off_then_on(self):
         off = self.client.put(

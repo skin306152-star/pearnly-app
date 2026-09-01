@@ -19,14 +19,12 @@ export interface NavPreset {
 }
 
 // 头像下拉菜单在两个锁死壳里的白名单(Zihao 2026-07-10):按菜单项 id 隐。
-// settings(设置)/billing(账户 & 余额)/shortcuts(键盘快捷键)两壳都砍;
-// console(团队与权限)仅 pos_only 再砍。theme/help/logout 两壳都留。
+// settings(设置)/billing(账户 & 余额)/shortcuts(键盘快捷键)两壳都砍;theme/help/logout 留。
 // admin(管理员后台)不在此列:它归 data-show-if-admin 超管门控,超管非普通客户,不锁。
 const FIRM_AVATAR_HIDE = ['avatar-menu-settings', 'avatar-menu-billing', 'avatar-menu-shortcuts'];
-const POS_AVATAR_HIDE = [...FIRM_AVATAR_HIDE, 'avatar-menu-console'];
+const POS_AVATAR_HIDE = [...FIRM_AVATAR_HIDE];
 
 // 受业态白名单管辖的顶层节点:key → CSS 选择器。
-// knowledge 不在此:由 knowledge-center.ts 的 kbProbe 独占门控(抢同一元素会回归)。
 // 结构性元素(分隔线 / 「主数据」小标题)不管辖,两业态都保留。
 export const NAV_NODES: Record<string, string> = {
     dashboard: '.nav-item[data-route="dashboard"]',
@@ -48,7 +46,7 @@ export const NAV_NODES: Record<string, string> = {
     guide: '[data-collapsible="guide"]', // 使用教程(父栏 → 主题)· 只对会计版有意义
 };
 
-// 会计版(firm / 未选业态老租户):首页 + Cowork + 采购 + 商品 + 客户/公司/(知识) + 销售 + 集成。
+// 会计版(firm / 未选业态老租户):首页 + Cowork + 采购 + 商品 + 客户/公司 + 销售 + 集成。
 export const FIRM_PRESET: NavPreset = {
     show: [
         'dashboard',
@@ -125,8 +123,8 @@ function redirectOffHidden(home: string): void {
 // 子项另有外部门控(角色/开通)的折叠组:整组显隐由清单处理、子项 display 交 applyPosRoles,
 // applyNavPreset 不复位其 [data-module] 子项(否则强显 owner-only 项)。新增此类组往这里加,
 // 别再往下面的判定堆 key !== '…' 字面量链。
-// 2026-08-26 · master(主数据)入 SSOT:其子项有 pos-sheets(data-module=pos)/knowledge(kbProbe)
-// 外部门控,不复位,防强显 owner-only 项。
+// 2026-08-26 · master(主数据)入 SSOT:其子项有 pos-sheets(data-module=pos)外部门控,
+// 不复位,防强显 owner-only 项。
 const CHILD_GATED_GROUPS = new Set(['cashier', 'perm', 'master']);
 
 // 按清单显隐顶层节点。显示的折叠组顺带复位子项 display(切业态往返时清残留),

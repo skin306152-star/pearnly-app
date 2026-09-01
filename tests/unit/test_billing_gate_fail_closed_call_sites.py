@@ -203,42 +203,6 @@ class VatExcelBuildTests(unittest.TestCase):
         _assert_lookup_503(self, ctx)
 
 
-class KnowledgeAskTests(unittest.TestCase):
-    """routes/knowledge_ask_routes.ask_question(知识库问答 · 每答扣 ฿0.50)。"""
-
-    def _ask(self, gate):
-        from routes import knowledge_ask_routes as kar
-
-        identity = mock.Mock(user_id="u1", tenant_id="t1")
-        embedded = []
-        with (
-            mock.patch.object(kar, "require_perm", lambda *a, **k: _USER),
-            mock.patch.object(kar, "resolve_caller", lambda request: (identity, [1])),
-            mock.patch.object(kar.db, "get_billing_status_combined", gate),
-            mock.patch.object(kar.embedding, "embed_texts", lambda *a, **k: embedded.append(1)),
-        ):
-            body = kar.AskRequest(question="ภาษีซื้อเดือนนี้เท่าไร")
-            try:
-                kar.ask_question(None, body)
-            finally:
-                self.embedded = embedded
-
-    def test_lookup_error_returns_503_before_calling_the_model(self):
-        with self.assertRaises(HTTPException) as ctx:
-            self._ask(lambda *a, **k: _LOOKUP_ERROR_STATUS)
-        _assert_lookup_503(self, ctx)
-        self.assertEqual(self.embedded, [])  # 一次模型都没调
-
-    def test_lookup_exception_returns_503(self):
-        def _boom(*a, **k):
-            raise RuntimeError("db down")
-
-        with self.assertRaises(HTTPException) as ctx:
-            self._ask(_boom)
-        _assert_lookup_503(self, ctx)
-        self.assertEqual(self.embedded, [])
-
-
 class RecognizeCoreTests(unittest.TestCase):
     """services/ocr/recognize/core.run_recognition_core(识别中心主端点 · 流量最大的付费口)。"""
 

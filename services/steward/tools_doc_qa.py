@@ -55,7 +55,7 @@ SUPPORTED_EXTS = (".pdf",) + _IMAGE_EXTS + _TABLE_EXTS + _RAW_TEXT_EXTS
 
 # 常见编码级联(同 services.recon.bank_table_io._load_csv_sheets 的顺序:UTF-8 BOM → UTF-8 →
 # 泰文 cp874 → 中文 gbk → latin-1 兜底),纯文本没有 openpyxl 那样的结构探针,只能按序试解码。
-# 不并轨 services.knowledge.ingest.TEXT_DECODE_ORDER:那份序刻意不含 gbk,语义不同。
+# 这条读取链服务文档问答,不与其它导入器的编码顺序共用。
 _TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp874", "gbk", "latin-1")
 
 # 提示词预算:整份文一次性喂给模型的字符上限。电子台账/长合同动辄十几万字,原样塞满一是撑爆

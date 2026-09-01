@@ -19,7 +19,7 @@ from services.authz.deps import is_owner_role
 from services.erp import team_access
 from services.erp import team_members
 from services.line_erp import store as line_store
-from services.team import console_store
+from services.team.seat_usage import seat_usage
 
 router = APIRouter(prefix="/api/erp/team", tags=["erp-team"])
 
@@ -84,7 +84,7 @@ async def erp_team_access(request: Request):
 async def erp_team_members(request: Request):
     user, tenant_id, workspace_id = _owner(request)
     plan = PLAN_CONFIG.get(str(user.get("plan") or ""), PLAN_CONFIG["credits"])
-    usage = console_store.seat_usage(tenant_id)
+    usage = seat_usage(tenant_id)
     return {
         "ok": True,
         "data": {
@@ -107,7 +107,7 @@ async def erp_team_member_create(req: MemberCreate, request: Request):
     if password_error:
         raise HTTPException(400, detail=password_error)
     plan = PLAN_CONFIG.get(str(user.get("plan") or ""), PLAN_CONFIG["credits"])
-    if console_store.seat_usage(tenant_id)["used"] >= int(plan["seats_max"]):
+    if seat_usage(tenant_id)["used"] >= int(plan["seats_max"]):
         raise HTTPException(422, detail="team.seat_limit")
     erp_config = None
     if req.erp_system == "mrerp" and not req.erp_endpoint_id:

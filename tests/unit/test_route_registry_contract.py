@@ -5,14 +5,11 @@
 只会让某个入口 404 或让匹配优先级悄悄改变。三条机器闸:
 ① ROUTERS 里没有重复对象;② include_all 挂的条数与 ROUTERS 一致、顺序一致;
 ③ ROUTERS 每个 router 的每条 path 都真出现在 app.app.routes 里(app 真的用了这张表)。
-知识库四条走 KNOWLEDGE_ENABLED 条件挂载,默认不挂 —— 一并锁住,免得哪天默认开了没人发现。
 """
 
 from __future__ import annotations
 
-import os
 import unittest
-from unittest import mock
 
 from routes import registry
 
@@ -32,16 +29,8 @@ class RoutersTableTests(unittest.TestCase):
 
     def test_include_all_mounts_every_router_in_order(self):
         app = _RecordingApp()
-        with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("KNOWLEDGE_ENABLED", None)
-            registry.include_all(app)
+        registry.include_all(app)
         self.assertEqual(app.included, list(registry.ROUTERS))
-
-    def test_knowledge_routes_are_off_unless_env_says_so(self):
-        app = _RecordingApp()
-        with mock.patch.dict(os.environ, {"KNOWLEDGE_ENABLED": "1"}):
-            registry.include_all(app)
-        self.assertEqual(len(app.included), len(registry.ROUTERS) + 4)
 
 
 class MountedInRealAppTests(unittest.TestCase):
@@ -58,6 +47,14 @@ class MountedInRealAppTests(unittest.TestCase):
             for route in router.routes:
                 # route.path 已含 router.prefix,别再拼一次
                 self.assertIn(getattr(route, "path", ""), self.mounted, route)
+
+    def test_retired_features_stay_unmounted_while_erp_team_remains(self):
+        retired_prefixes = ("/api/knowledge", "/api/team", "/api/invitations")
+        retired_pages = {"/console", "/console/{rest:path}", "/invite/{token}"}
+        self.assertFalse(sorted(path for path in self.mounted if path.startswith(retired_prefixes)))
+        self.assertTrue(retired_pages.isdisjoint(self.mounted))
+        self.assertIn("/api/erp/team/access", self.mounted)
+        self.assertIn("/api/erp/team/members", self.mounted)
 
 
 if __name__ == "__main__":

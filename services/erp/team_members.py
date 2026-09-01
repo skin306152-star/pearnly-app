@@ -131,7 +131,7 @@ def create_member(
             role_key=role_key,
             granted_by=invited_by,
             scope_mode="assigned",
-            allow_custom=True,
+            allow_erp_team_role=True,
             allow_owner=False,
         ):
             raise RuntimeError("ERP team membership could not be created")

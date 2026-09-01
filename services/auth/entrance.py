@@ -42,11 +42,11 @@ ALL_ENTRANCES = (MAIN, POS, AI, DMS, DAILY, COWORK, ERP)
 #   - pos = {pos}:收银专属。
 #   - tax = {main, ai, cowork}:会计主壳报税中心与 AI SPA 工单都调 tax.*;cowork 随 main;ERP 不碰。
 #   - acct/recon = {main, cowork}:做账/对账主壳专属(AI 工单内部对账走 tax.filing.*);ERP 不碰。
-#   - stockcard/kb/ar = {main, cowork, erp}:应收/知识库/商品收发存按客户账套出的主壳能力;ERP 获此三前缀。
+#   - stockcard/ar = {main, cowork, erp}:应收/商品收发存按客户账套出的主壳能力;ERP 获这两个前缀。
 #   - sales/inv/intake = {main, pos, cowork, erp}:POS 商户也做销售开票 / 盘点 / 收料。
 #   - purchase = {main, pos, ai, cowork, erp}:采购/供应商数据跨会计/POS/AI(AI 客户画像也调 purchase.*)。
 #   - cowork 与 main 等价:凡原来含 main 的集合都并入 cowork(协同工作台继承会计主壳能力)。
-#   - ERP 门仅获 sales/purchase/inv/intake/stockcard/kb/ar 与 erp 八前缀(erp_portal 邀请
+#   - ERP 门仅获 sales/purchase/inv/intake/stockcard/ar 与 erp 前缀(erp_portal 邀请
 #     业务作用域);erp.* 仅 main/cowork/erp 可用,DMS 复用旧路由不因此获得 F1 权限码。
 #     ERP 不碰 pos/tax/acct/recon;ai/dms/daily 是各自独立门,不在 ERP 派生范围。
 _ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
@@ -55,7 +55,6 @@ _ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
     "acct": frozenset({MAIN, COWORK}),
     "recon": frozenset({MAIN, COWORK}),
     "stockcard": frozenset({MAIN, COWORK, ERP}),
-    "kb": frozenset({MAIN, COWORK, ERP}),
     "ar": frozenset({MAIN, COWORK, ERP}),
     "sales": frozenset({MAIN, POS, COWORK, ERP}),
     "purchase": frozenset(
@@ -70,9 +69,7 @@ _ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
 # registry 里 module_of=None 的横切中性前缀(未归任何入口 · entrance_of_code 返 None 短路放行)。
 # 与 _ENTRANCE_BY_PREFIX 互补:test_entrance_scope 断言 registry 每个码前缀二者必居其一,防新增
 # 模块前缀漏分类导致 entrance_of_code 静默 fail-open。仅服务测试断言,不进 entrance_of_code 运行判定。
-_NEUTRAL_PREFIXES: frozenset[str] = frozenset(
-    {"team", "billing", "ownership", "settings", "audit", "field"}
-)
+_NEUTRAL_PREFIXES: frozenset[str] = frozenset({"billing", "settings", "field"})
 
 
 def entrance_of_code(code: str) -> Optional[frozenset[str]]:

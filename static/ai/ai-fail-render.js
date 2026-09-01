@@ -57,7 +57,7 @@
      * 这一类失败没有"换个地方点"的出路,原地重试就是全部出路。
      *
      * insufficient_balance 是全站计费闸的统一码(services/billing/account_status.py
-     * 单一事实源,recon/vat_excel/knowledge 等端点以 402 + detail.code 出线)。
+     * 单一事实源,recon/vat_excel 等端点以 402 + detail.code 出线)。
      *
      * 谁会真的送来 402:/ai 的两条入料路径都会,它们共用同一条闸
      * (services/workorder/steps/ocr_balance.batch_denial —— 整批预估不够就整批拒,
@@ -115,7 +115,7 @@
      *
      * detail = 402 的 detail 体(services/workorder/steps/ocr_balance.batch_denial 给全套);
      * fileCount = 这批传了几个文件,不知道就别传。每句独立降级:同一个 402 码另有六个端点
-     * 在返(recon / vat_excel / knowledge …),它们只带其中一两个数,缺哪个就少说哪一句,
+     * 在返(recon / vat_excel …),它们只带其中一两个数,缺哪个就少说哪一句,
      * 绝不为凑一句话补一个来路不明的数(同 ai-blocked-notice.js sentences 的成例)。
      */
     function creditsFactsHtml(detail, fileCount) {

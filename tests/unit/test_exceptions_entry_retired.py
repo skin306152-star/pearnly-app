@@ -3,8 +3,7 @@
 
 下线不是删码:页面模块 / /api/exceptions 路由 / 历史数据全留着,靠「入口恒隐 + 路由摘表
 + 引擎开关默认关」三层断电,复活按 src/home/route-table.ts 的下线注释走。本钉盯的是
-断电三层别被下一次改动悄悄接回去,以及别把该活着的东西连坐砍了(集成页「推送异常」tab、
-客户知识页「管理客户规矩」入口——它俩跟异常栏是两回事,后者原先只是把按钮寄生在异常页头部)。
+断电三层别被下一次改动悄悄接回去,以及别把集成页「推送异常」tab 连坐砍了。
 
 E2E 侧的对应闸在 tests/e2e/05-exceptions.spec.js(真浏览器验侧栏/深链/命令面板),
 CI 无凭据时那条会跳过,故这里用源码级断言兜底。
@@ -109,14 +108,6 @@ class NotCollateralDamageTests(unittest.TestCase):
         # 下线≠删码:留着才能一键复活。
         self.assertTrue((PROJECT_ROOT / "routes/exceptions_routes.py").exists())
         self.assertTrue((PROJECT_ROOT / "src/home/exceptions.ts").exists())
-
-    def test_client_rules_entry_lives_on_knowledge_page(self):
-        # 「管理客户规矩」原先把按钮注入异常页头部,现在只认客户知识页「规则」tab 这一处。
-        self.assertTrue("kb-open-rules" in _read("src/home/page-knowledge.ts"))
-        self.assertTrue("openRulesSettings" in _read("src/home/knowledge-center.ts"))
-        rules = _read("src/home/rules-settings.ts")
-        self.assertTrue("window.openRulesSettings" in rules)
-        self.assertFalse("page-exceptions" in rules, "规矩设置又去寄生异常页了")
 
     def test_erp_push_exception_tab_untouched(self):
         # 集成页的「推送异常」(ERP 推送失败修复)跟异常栏是两码事,不在下线范围。

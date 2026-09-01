@@ -23,11 +23,11 @@ from services.modules import store
 # pos_only = POS 独立板块商家(Earn 邀请制 · Zihao 2026-07-11 拍板:被邀请即全功能可用,
 # 不再有二道开关)。模块集合须覆盖 POS 老板后台壳(src/home/nav-presets.ts POS_PRESET 侧栏
 # 白名单)暴露的全部功能——商品/发票(sales)、费用/采购(expense)、库存、收银、
-# 无头记账引擎(accounting · 全业态惯例,后台记账不进侧栏)。knowledge/recon/receivable
+# 无头记账引擎(accounting · 全业态惯例,后台记账不进侧栏)。recon/receivable
 # 不在壳内,仍不开。不进自助业态选择器(平台业态自选板块已下架)——只走运营侧
 # Earn 开通,不给客户自选。
 BUSINESS_PRESETS: dict[str, list[str]] = {
-    "firm": ["sales", "expense", "recon", "knowledge", "accounting"],
+    "firm": ["sales", "expense", "recon", "accounting"],
     "retail": ["sales", "inventory", "pos", "accounting"],
     "pharmacy": ["sales", "inventory", "pos", "accounting"],
     "restaurant": ["sales", "inventory", "pos", "accounting"],

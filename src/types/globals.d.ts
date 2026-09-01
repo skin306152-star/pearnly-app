@@ -244,7 +244,6 @@ interface Window {
     // ── C5 批9 桥(exceptions / erp / recon / workspace / ocr-doc-mode 等遗留边界)──
     // 零参/取值桥用精确类型;带参或多态的遗留桥用 LegacyBridge 避免逆变失配。
     loadExceptionsPage?: () => void;
-    openRulesSettings?: () => void;
     refreshExcBadge?: () => void;
     _refreshExcClientFilter?: () => void;
     _excState?: Record<string, unknown>;
@@ -294,7 +293,6 @@ interface Window {
     __reconcileBound?: boolean;
     setCurrentClientId?: LegacyBridge;
     loadClientsPage?: () => void;
-    loadKnowledgePage?: () => void;
     loadSalesWorkbench?: () => void;
     loadSalesRecords?: () => void;
     loadSalesRecordDetail?: () => void;
@@ -314,13 +312,10 @@ interface Window {
     // 用户引导闭环 · 注册后向导(主体→账务→完成 · 业态默认静默套 firm)+ 公司资料页 + 品牌 logo URL(暗夜垫底)
     startOnboardingFlow?: () => void;
     loadCompanyProfile?: () => void;
-    openClientAssign?: (client: { id: number; name: string }) => void;
     showWorkspaceGate?: () => void;
     enforceWorkspaceGate?: () => void;
     // pos_only 收银壳:静默落套账放门(替代 enforceWorkspaceGate),不弹强制选套账弹窗。
     autoSatisfyWorkspaceGate?: () => void;
-    // pos_only 收银壳把客户知识入口排除白名单外:置旗让 knowledge-center 的 kbProbe reveal 不显。
-    _navShellHidesKnowledge?: boolean;
     // 当前租户业态(module-nav apply 写)· 退出登录按壳分流用:pos_only→/pos 其余→/login。
     _businessType?: string;
     // 登录入口记号(pos-login.html / 主站登录写 'pos'|'main' · module-nav apply 每次登录后同步)
@@ -400,19 +395,6 @@ interface Window {
     editSalesDraft?: (doc: unknown) => void;
     openSalesSettings?: () => void;
     _wsHeader?: () => Record<string, string>;
-    _knowledgeProbed?: boolean;
-    _kbRenderDocs?: () => void;
-    _kbRenderAsk?: () => void;
-    _kbOpenSource?: (citation: {
-        chunk_id?: number;
-        document_id?: number;
-        filename?: string;
-        score?: number;
-    }) => void;
-    _kbWireAsk?: (threadEl: HTMLElement, inputEl: HTMLInputElement, sendBtn: HTMLElement) => void;
-    _kbFabSetEnabled?: (on: boolean) => void;
-    _kbFabEnabled?: () => boolean;
-    _kbOpenInfo?: () => void;
     getHistoryClientFilter?: () => unknown;
     fillCategoryDatalist?: () => void;
     _tcApplyVisibility?: () => void;

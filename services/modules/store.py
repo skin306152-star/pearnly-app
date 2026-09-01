@@ -8,7 +8,7 @@ policy 只是给未来最小权限角色的兜底——prod 现以 postgres(BYPA
 值一律占位符。
 
 默认值约定(get_modules / is_enabled):无显式行的模块回落 DEFAULT_ENABLED——既有租户保持
-今天的导航(sales/expense/recon/knowledge 默认开),POS/inventory 默认关到 onboarding 才开。
+今天的导航(sales/expense/recon 默认开),POS/inventory 默认关到 onboarding 才开。
 """
 
 from __future__ import annotations
@@ -29,7 +29,6 @@ KNOWN_MODULES = (
     "expense",
     "recon",
     "receivable",
-    "knowledge",
     "accounting",
 )
 
@@ -40,7 +39,6 @@ DEFAULT_ENABLED = {
     "expense": True,
     "recon": True,
     "receivable": True,
-    "knowledge": True,
     "inventory": False,
     "pos": False,
     # 新模块默认关(opt-in):老租户不悄悄长出凭证数据,开通才记账

@@ -25,9 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_WHITELIST = (
     "/static/dist/",
     "/static/i18n-data.js",  # 715KB 纯数据 · 故意独立 · 见 build-home-js.mjs 注释
-    "/static/console/console-i18n.js",  # console 纯翻译数据(window.CI18N)· 同 i18n-data 故意独立
     "/static/admin/",  # admin SPA 专属 JS · 超管页防抄需求低 · 故意留独立(同 admin.html 不 minify)
-    "/static/pos/pos-i18n.js",  # POS 纯翻译数据(window.POS_I18N)· 同 console-i18n 故意独立
+    "/static/pos/pos-i18n.js",  # POS 纯翻译数据(window.POS_I18N)· 同 i18n-data 故意独立
     "cdnjs.cloudflare.com",  # jsPDF
     "cloudflareinsights.com",  # CF beacon(部署注入)
 )
@@ -42,8 +41,6 @@ SOURCE_HTML = [
     "home.html",
     "login.html",
     "static/admin/admin.html",
-    "static/console/console.html",
-    "static/console/invite.html",
     "static/pos/pos.html",
 ]
 
@@ -77,7 +74,7 @@ def manifest(script_name):
 
 
 def _check_spa_bundled(fails, css_manifest, js_manifest, name, skip_js):
-    """SPA 目录(console/pos)的 CSS/JS 必须都在打包清单里。skip_js = 故意独立的白名单
+    """SPA 目录的 CSS/JS 必须都在打包清单里。skip_js = 故意独立的白名单
     (纯翻译数据 *-i18n.js、按 URL 注册不可打包的 pos-sw.js)。"""
     d = ROOT / "static" / name
     if not d.exists():
@@ -118,8 +115,7 @@ def check_manifest_complete(fails):
                     f"static/landing/{f.name}: 不在 build-home-js.mjs 的 landing files — 加进去"
                 )
 
-    # SPA(console/pos):CSS 全进打包清单 + JS 逻辑全进 bundle;纯数据/SW 白名单跳过。
-    _check_spa_bundled(fails, css_manifest, js_manifest, "console", {"console-i18n.js"})
+    # POS:CSS 全进打包清单 + JS 逻辑全进 bundle;纯数据/SW 白名单跳过。
     # pos-sw.js(老 /pos 作用域)+ cashier-sw.js(新 /cashier 作用域)都按 URL 注册的 Service
     # Worker,不可打进 bundle;pos-i18n.js 纯翻译数据。三者白名单跳过。
     _check_spa_bundled(

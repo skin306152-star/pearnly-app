@@ -73,7 +73,7 @@ class SalesCoreMigrationContractTests(unittest.TestCase):
             )
 
     def test_no_postgres_rls_policy_in_migration(self):
-        """仓库隔离靠 get_cursor_rls + DAL · 迁移不建 policy(与知识库迁移一致)。"""
+        """仓库隔离靠 get_cursor_rls + DAL · 迁移不直接建 policy。"""
         self.assertNotIn("CREATE POLICY", self.src)
         self.assertNotIn("ROW LEVEL SECURITY", self.src)
 

@@ -69,8 +69,8 @@ function normTax(v: unknown): string {
     return String(v == null ? '' : v).replace(/[\s-]/g, '');
 }
 
-// 泰国 13 位税号 MOD-11 校验。与后端 services/knowledge/rules/validity.py
-// `valid_thai_tax_id` 同源:前 12 位按权重 13..2 加权求和,check=(11-sum%11)%10,末位相等。
+// 泰国 13 位税号 MOD-11 校验:前 12 位按权重 13..2 加权求和,
+// check=(11-sum%11)%10,末位相等。
 function validThaiTaxId(v: unknown): boolean {
     const s = normTax(v);
     if (!/^\d{13}$/.test(s)) return false;

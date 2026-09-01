@@ -70,9 +70,8 @@ CORE_ROUTES = {
     "ERP推送/erp": [
         "/api/erp/endpoints",
     ],
-    "客户团队/clients-team": [
+    "客户/clients": [
         "/api/clients",
-        "/api/team/members",
     ],
     # 2026-05-30 扩 · A 拆 app.py 后稳定的高敏用户可见 path(铁律 #16)
     "登录/login": [

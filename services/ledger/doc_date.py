@@ -45,7 +45,6 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Mapping, Optional, Tuple
 
-from services.knowledge.rules.validity import parse_invoice_date
 from services.ledger.fields import pick_text
 
 REASON_NO_DATE = "ไม่พบวันที่ในเอกสาร · ต้องระบุวันที่ก่อนลงบัญชี"
@@ -62,6 +61,23 @@ _OUT_MARKS = ("out", "ออก")
 
 # 票面文本进得来的两个口子:date_raw 是「日期原样」,notes 是模型倒剩余文本的地方。
 _TEXT_FIELDS = ("date_raw", "notes")
+
+
+def parse_invoice_date(raw: str) -> Optional[date]:
+    """解析票面常见日期,兼容泰国佛历年份。"""
+    if not raw:
+        return None
+    match = re.search(r"(\d{1,4})\D(\d{1,2})\D(\d{1,4})", raw.strip())
+    if not match:
+        return None
+    first, middle, last = (int(value) for value in match.groups())
+    year, month, day = (first, middle, last) if first > 31 else (last, middle, first)
+    if year >= 2400:
+        year -= 543
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)

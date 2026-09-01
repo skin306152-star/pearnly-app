@@ -102,10 +102,9 @@ function renderSellerList() {
             const current = isActive
                 ? `<span class="cust-badge-current"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5l3.2 3.2L12 4"/></svg>${escapeHtml(t('seller-current'))}</span>`
                 : `<button class="cust-row-btn primary" data-saction="activate" data-wid="${c.id}">${escapeHtml(t('seller-set-current'))}</button>`;
-            // S9 4-bis:行内最多 2 个按钮 · 归档(危险)收进 ⋯ 菜单(确认弹窗在 archiveWsClient)
+            // 归档是危险操作,收进 ⋯ 菜单并在 archiveWsClient 二次确认。
             const ownerBtns = owner
                 ? `
-            <button class="cust-row-btn" data-saction="assign" data-wid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 12v-1a2 2 0 00-2-2h-4a2 2 0 00-2 2v1"/><circle cx="5.5" cy="4.5" r="2"/><path d="M11 4.5h2.5M12.25 3.25v2.5"/></svg><span>${escapeHtml(t('casg-assign'))}</span></button>
             <button class="cust-row-btn" data-saction="edit" data-wid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l3 3-7 7H2v-3z"/></svg><span>${escapeHtml(t('client-card-edit'))}</span></button>
             <div class="more-wrap">
                 <button class="cust-row-btn" data-saction="more" data-wid="${c.id}" aria-label="more">${MORE_SVG}</button>

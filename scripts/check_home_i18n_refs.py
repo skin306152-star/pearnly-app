@@ -30,14 +30,13 @@ missing」—— 那道闸只对拍四个语言块之间齐不齐,从没问过"�
   · 全局 t(key, params) —— core.ts 定义 + `window.t = t`,62 个文件写 `/* global t */` 裸调。
   · 本地包装 _t / _bt / T —— 各模块自己的轻桥,转发 window.t。⚠️ 它们大多写成
     `window.t(k) || fb`,而 window.t 取不到时返回的是 key 本身(真值)→ fb 永远轮不上,
-    症状跟裸调 t() 完全一样。只有 kbT / workspace-switcher 那两个判了 `s !== key`。
-  · 共享包装 kbT(key, fallback) —— knowledge-api.ts 导出,知识库 6 个模块 import 着用。
+    症状跟裸调 t() 完全一样。workspace-switcher 的包装会额外判断 `s !== key`。
   · data-i18n / data-i18n-placeholder 属性 —— 写在 src/home/*.ts 的模板串和 home.html 里,
     由 core-boot.ts 的 applyLang 喂给 I18N;只扫 JS 调用会漏掉大半(本树 702 处属性)。
   · I18N[lang]['字面量'] 直接下标(core-boot.ts 取 lang-name 那种)。
 
 扫源不扫产物:src/home/*.ts 经 vite(esbuild minify)打成 static/dist/main.js,字符串
-字面量原样进包,但本地包装函数名会被压掉(_t/T/kbT 全变单字母)—— 在产物上认取词入口
+字面量原样进包,但本地包装函数名会被压掉(_t/T 全变单字母)—— 在产物上认取词入口
 只能靠猜。源是人改的地方,也是唯一能给出可修行号的地方;产物由「build+dist 一致」那道
 闸保证跟源同步,不必在这里重扫一遍。static/{recon-mapping,recon-review,erp-mrerp-connect,
 erp-log-enhance}.js 虽然也打进 home 页的 pre/post bundle,但它们各带各的自含字典
@@ -86,7 +85,7 @@ BASELINE = ROOT / "scripts" / "home_i18n_refs_baseline.txt"
 _KEY = re.compile(r"^[A-Za-z_$][\w.$-]*$")
 
 _GLOBAL_GETTER = "t"
-_WRAPPERS = ("_t", "_bt", "kbT", "T")
+_WRAPPERS = ("_t", "_bt", "T")
 
 _HEAD_TPL = r"(?<![\w.$])(?:(?:window|self|globalThis)\.)?(?:%s)\("
 _GLOBAL_HEAD = re.compile(_HEAD_TPL % _GLOBAL_GETTER)
@@ -151,7 +150,7 @@ def documents(root):
 
 
 def exported_getters(docs):
-    """全树扫一遍:哪些名字是 `export function` 出去的取词桥(今天只有 kbT)。"""
+    """全树扫一遍:哪些名字是 `export function` 出去的取词桥。"""
     names = set()
     for _rel, text in docs:
         for name in _WRAPPERS:
@@ -343,7 +342,7 @@ def main(argv=None):
     fixed = sorted(base - live)
 
     print("=" * 70)
-    print("/home 词典引用闸(t()/_t()/kbT()/data-i18n 的字面量键 → 必须在 window.I18N 里)")
+    print("/home 词典引用闸(t()/_t()/data-i18n 的字面量键 → 必须在 window.I18N 里)")
     print("=" * 70)
     if added:
         for rel, line, key in added:

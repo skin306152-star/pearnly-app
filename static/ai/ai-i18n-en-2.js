@@ -452,7 +452,7 @@ Object.assign(window.__AI_I18N_EN__, {
     purge_back: 'Back',
     purge_warn_title: 'This cannot be undone. Cleared data cannot be recovered.',
     purge_warn_body:
-        'Everything under this entity will be wiped: documents and OCR history, work orders, invoices and purchases, inventory and POS, ledger entries, tax filings, knowledge base, reconciliation, plus uploaded images and files. Only the entity name and tax ID remain. Other entities are unaffected.',
+        'Everything under this entity will be wiped: documents and OCR history, work orders, invoices and purchases, inventory and POS, ledger entries, tax filings, reconciliation, plus uploaded images and files. Only the entity name and tax ID remain. Other entities are unaffected.',
     purge_confirm: 'Clear data',
     purge_running: 'Clearing…',
     purge_progress: 'Clearing {done}/{total} · {table}',

@@ -14,7 +14,7 @@
 | `/cashier` 收银台 | `static/dist/pos.html` | `static/pos/pos.html` + `static/pos/*.js` | 老设备旧 PWA 认 /pos,靠页头 guard 自动接驳;SW 双轨 /pos-sw.js(旧)+/cashier-sw.js(新)勿动旧字节 |
 | `/earn` 超管登录 | `static/dist/earn-login.html` | `static/earn/earn-login.html` | **routes/earn_login_page.py 已删** |
 | `/admin/*` Earn 后台 | `static/dist/admin.html` | `static/admin/admin.html/.js/admin-i18n.js` | **改 admin.js/i18n 必 bump admin.html 里 `?v`**(CDN 按旧键回旧文件·缓存闸盲区)+ build 出 dist/admin.html |
-| `/ai` `/console` `/invite` `/reset` `/terms` `/privacy` | 各自 `static/dist/*.html` | `static/ai/ai.html` / `static/console/*.html` / 根 `reset.html` / `static/terms\|privacy.html` | 全部源→产物映射的唯一权威=`scripts/build-html-minify.mjs` 的 TARGETS |
+| `/ai` `/reset` `/terms` `/privacy` | 各自 `static/dist/*.html` | `static/ai/ai.html` / 根 `reset.html` / `static/terms\|privacy.html` | 全部源→产物映射的唯一权威=`scripts/build-html-minify.mjs` 的 TARGETS |
 
 | `/liff/dms-booking` LINE 订车编辑 | `static/dist/dms-booking-edit.html` | `static/dms-booking-edit/*` | 改 JS/CSS 必须 bump 源 HTML 的 `?v` + build；数据 API 需 DMS JWT + `booking_review` nonce |
 

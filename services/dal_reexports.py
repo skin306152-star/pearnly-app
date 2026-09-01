@@ -22,20 +22,11 @@ _REEXPORTS = {
         "ensure_daily_tables",
         "ensure_daily_rls",
     ],
-    "services.knowledge.rules_dal": [
-        "ensure_client_rules_rls",
-    ],
     "services.automation.schema": [
         "ensure_automation_rls",
     ],
     "services.etax.schema": [
         "ensure_etax_rls",
-    ],
-    "services.knowledge.risk_check": [
-        "ensure_risk_check_rls",
-    ],
-    "services.knowledge.rls": [
-        "ensure_knowledge_rls",
     ],
     "services.erp.credentials_rls": [
         "ensure_erp_credentials_rls",
@@ -255,9 +246,6 @@ _REEXPORTS = {
     ],
     "services.membership.store": [
         "get_visible_client_ids_for_user",
-        "list_assignments_by_employees",
-        "set_employee_assignments",
-        "auto_assign_client_to_creator",
         "get_user_tenant_id",
         "migrate_to_membership_model",
         "list_orphan_users",

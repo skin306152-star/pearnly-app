@@ -18,6 +18,7 @@ from typing import Any, Optional
 from services.authz.registry import ALL_CODES, ASSIGNABLE_ROLE_KEYS, ROLE_PERMISSIONS
 
 logger = logging.getLogger("mr-pilot")
+_ERP_TEAM_ROLE_PREFIX = "custom:erp-team-"
 
 
 @dataclass(frozen=True)
@@ -102,10 +103,12 @@ def _resolve_with_cursor(cur, user: dict, tenant_id: str, *, lock: bool = False)
         return Authz(role_key=key, permissions=ROLE_PERMISSIONS.get(key, frozenset()))
 
     role_key = row["role_key"]
-    custom_role_valid = not role_key.startswith("custom:") or (
-        str(row.get("role_tenant_id")) == tenant_id and row.get("role_is_active") is True
+    tenant_role_valid = not role_key.startswith("custom:") or (
+        role_key.startswith(_ERP_TEAM_ROLE_PREFIX)
+        and str(row.get("role_tenant_id")) == tenant_id
+        and row.get("role_is_active") is True
     )
-    perms = perms_from_jsonb(row["permissions"]) if custom_role_valid else frozenset()
+    perms = perms_from_jsonb(row["permissions"]) if tenant_role_valid else frozenset()
     scope_mode = row.get("scope_mode") or "all"
     workspace_ids: Optional[frozenset] = None
     if scope_mode == "assigned":
@@ -145,11 +148,11 @@ def _assignable_role_id(
     role_key: str,
     *,
     allow_owner: bool = False,
-    allow_custom: bool = True,
+    allow_erp_team_role: bool = False,
 ) -> Optional[str]:
-    """Resolve an explicitly assignable system role or an active tenant custom role."""
-    if role_key.startswith("custom:"):
-        if not allow_custom:
+    """Resolve an explicitly assignable system role or ERP team role."""
+    if role_key.startswith(_ERP_TEAM_ROLE_PREFIX):
+        if not allow_erp_team_role:
             return None
         cur.execute(
             "SELECT id FROM roles WHERE key = %s AND tenant_id = %s "
@@ -158,6 +161,8 @@ def _assignable_role_id(
         )
         row = cur.fetchone()
         return str(row["id"]) if row else None
+    if role_key.startswith("custom:"):
+        return None
     allowed = set(ASSIGNABLE_ROLE_KEYS)
     if allow_owner:
         allowed.add("owner")
@@ -174,19 +179,19 @@ def create_membership(
     role_key: str,
     granted_by: Optional[str] = None,
     scope_mode: str = "all",
-    allow_custom: bool = False,
+    allow_erp_team_role: bool = False,
     allow_owner: bool = True,
 ) -> bool:
     """建号点调(注册建 owner / 邀请入组)。幂等(已有行不动)。用调用方事务。
 
-    自定义角色只允许显式调用方开启；无论系统或自定义角色都走同一可分配角色校验。
+    ERP 团队角色只允许显式调用方开启；系统角色与 ERP 团队角色都走同一分配校验。
     """
     role_id = _assignable_role_id(
         cur,
         str(tenant_id),
         role_key,
         allow_owner=allow_owner,
-        allow_custom=allow_custom,
+        allow_erp_team_role=allow_erp_team_role,
     )
     if not role_id:
         logger.warning("create_membership: role %r is not assignable", role_key)
@@ -222,10 +227,9 @@ def set_membership_role(
     role_key: str,
     granted_by: Optional[str] = None,
 ) -> bool:
-    """改角色(批3 接口/转移流用)。membership 必须已存在且属本租户。
-    role_key 可为系统预设或 custom:<slug>(G3 自定义角色 · 后者按本租户解析)。"""
+    """更新 ERP 团队角色。membership 必须已存在且属本租户。"""
     role_id = _assignable_role_id(
-        cur, str(tenant_id), role_key, allow_owner=True, allow_custom=True
+        cur, str(tenant_id), role_key, allow_owner=False, allow_erp_team_role=True
     )
     if not role_id:
         return False
@@ -243,43 +247,3 @@ def set_membership_role(
         (_legacy_role_value(role_key), str(user_id)),
     )
     return True
-
-
-def set_membership_role_resolved(
-    cur,
-    *,
-    user_id: str,
-    tenant_id: str,
-    role_id: str,
-    role_key: str,
-    granted_by: Optional[str] = None,
-) -> bool:
-    """Apply a role id already validated and locked by the caller."""
-    cur.execute(
-        """
-        UPDATE memberships SET role_id = %s, granted_by = %s, granted_at = NOW()
-        WHERE user_id = %s AND tenant_id = %s
-        """,
-        (str(role_id), granted_by, str(user_id), str(tenant_id)),
-    )
-    if cur.rowcount == 0:
-        return False
-    cur.execute(
-        "UPDATE users SET role = %s WHERE id = %s",
-        (_legacy_role_value(role_key), str(user_id)),
-    )
-    return True
-
-
-def count_active_owners(cur, tenant_id: str) -> int:
-    """本租户 active owner 数(最后一个 owner 拦截用)。"""
-    cur.execute(
-        """
-        SELECT COUNT(*) AS c FROM memberships m
-        JOIN roles r ON r.id = m.role_id
-        WHERE m.tenant_id = %s AND m.status = 'active' AND r.key = 'owner'
-        """,
-        (str(tenant_id),),
-    )
-    row = cur.fetchone()
-    return int(row["c"] if isinstance(row, dict) else row[0])

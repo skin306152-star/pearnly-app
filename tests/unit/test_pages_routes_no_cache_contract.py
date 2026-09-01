@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """页面外壳 no-cache 契约闸。
 
-根治"改了源码 view-source 还看旧版":SPA 外壳(home/console/invite/admin/pos…)
+根治"改了源码 view-source 还看旧版":SPA 外壳(home/admin/pos…)
 必须带 no-cache,否则浏览器缓存旧壳 → 内部 ?v= bump 失效。本闸用 TestClient
 真发请求验响应头(等价 curl -I),防回归。
 """
@@ -22,8 +22,6 @@ SHELL_ROUTES = [
     "/home",
     "/cowork",
     "/erp",
-    "/console",
-    "/invite/x",
     "/terms",
     "/privacy",
 ]

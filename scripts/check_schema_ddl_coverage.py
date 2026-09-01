@@ -53,9 +53,10 @@ _CREATE_RE = re.compile(r"create\s+table\s+(?:if\s+not\s+exists\s+)?[\"']?([a-z0
 # 记债时有个透明位置(条目要写清欠的是什么、谁还),不是为了给人塞新债。
 KNOWN_UNCOVERED: Dict[str, str] = {}
 
-# 已从运行时代码断开的旧 Cowork LINE 表。它们暂留生产库只为分批核验后安全删除，
+# 已从运行时代码断开的退役功能表。它们暂留生产库只为分批核验后安全删除，
 # 不属于“生产在用的表”，因此不要求把已删除的业务 DDL 重新塞回产品代码。
 RETIRED_TABLES_PENDING_DROP = {
+    "invitations",
     "line_client_bind_codes",
     "line_client_contacts",
     "line_client_questions",
@@ -64,6 +65,7 @@ RETIRED_TABLES_PENDING_DROP = {
     "line_pending_entry",
     "notification_logs",
     "notification_rules",
+    "ownership_transfers",
 }
 
 

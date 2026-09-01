@@ -4,7 +4,7 @@
 // pos_only 的"免门"改动没破坏会计版多套账用户的【强制选套账】现有行为。
 //   侧栏留:首页 / Pearnly Cowork / 采购系统 / 客户 / 公司 / 异常 / 销售系统 / 集成 + 账号块;
 //   收起:商品系统 / 做账 / 收银业务 / 可开启功能。
-//   头像留 4:团队与权限 / 暗夜模式 / 帮助 & 反馈 / 退出登录。
+//   头像留 3:暗夜模式 / 帮助 & 反馈 / 退出登录。
 //   关键解耦:firm 后端默认开 accounting,但「做账/商品」按白名单收起 —— 证明与模块开关脱钩。
 // ============================================================
 /* global window, document */
@@ -39,7 +39,7 @@ test.describe('会计版 firm · 侧栏 + 头像 + 强制门回归', () => {
         if (originalBusinessType) await setBusinessType(page, originalBusinessType);
     });
 
-    test('firm:侧栏 8 项白名单 + 头像留团队与权限 + 强制选套账门不破', async ({ page }) => {
+    test('firm:侧栏 8 项白名单 + 头像三项白名单 + 强制选套账门不破', async ({ page }) => {
         const guard = attachConsoleGuard(page);
         await enterApp(page);
 
@@ -129,10 +129,10 @@ test.describe('会计版 firm · 侧栏 + 头像 + 强制门回归', () => {
             }
         }
 
-        // 头像菜单:留 4(含团队与权限)· 砍 3(设置/账户余额/键盘快捷键)。
+        // 头像菜单:留 3 · 砍 3(设置/账户余额/键盘快捷键)。
         await page.locator('#avatar-btn').click();
         await expect(page.locator('#avatar-popup')).toHaveClass(/show/);
-        for (const key of ['console', 'theme', 'help', 'logout']) {
+        for (const key of ['theme', 'help', 'logout']) {
             await expect(page.locator(AVATAR[key]), `头像 ${key} 应可见`).toBeVisible();
         }
         for (const key of ['settings', 'billing', 'shortcuts']) {

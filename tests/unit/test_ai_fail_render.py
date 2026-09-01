@@ -234,7 +234,7 @@ class CreditsFactsTests(unittest.TestCase):
         self.assertNotIn("个文件", out["text"])
 
     def test_body_without_shortfall_degrades_instead_of_inventing_one(self):
-        # 另外六个 402 端点(recon / vat_excel / knowledge …)不带 shortfall。
+        # 其它 402 端点(recon / vat_excel 等)不带 shortfall。
         body = dict(self._FULL)
         del body["shortfall"]
         out = self._text(body, file_count=1)
@@ -423,7 +423,7 @@ class UploadDetailReachesTheCardTests(unittest.TestCase):
         self.assertIn('href="#/settings?focus=billing"', html)
 
     def test_a_402_with_no_body_still_renders_a_clean_card(self):
-        # 别的端点的 402(recon / vat_excel / knowledge)不带这些数:少说几句,不出空壳。
+        # 别的端点的 402(recon / vat_excel)不带这些数:少说几句,不出空壳。
         out = self._upload_failing_with({"code": "insufficient_balance", "status": 402})
         html = out["html"]
         self.assertIsNone(out["batches"][0]["detail"])

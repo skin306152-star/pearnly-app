@@ -4,8 +4,8 @@
 两层:
   1. entrance_of_code 前缀 → 允许入口【集合】(pos={pos} / tax={main,ai,cowork} /
      sales·purchase·inv·intake={main,pos,cowork,erp} 共用 / acct·recon={main,cowork} /
-     kb·ar·stockcard={main,cowork,erp} / 中性 None)。cowork 随 main 等价;
-     erp 只入 sales/purchase/inv/intake/stockcard/kb/ar,不入 pos/tax/acct/recon。
+     ar·stockcard={main,cowork,erp} / 中性 None)。cowork 随 main 等价;
+     erp 只入 sales/purchase/inv/intake/stockcard/ar,不入 pos/tax/acct/recon。
   2. deps._check 入口闸:entrance_api_scope 开时 token.entry ∉ 码入口集 → entrance_scope 拒;
      中性横切码短路放行(bootstrap 不崩);闸关零行为变化;超管/收银员不回归。
 
@@ -78,9 +78,9 @@ class EntranceOfCodeTests(unittest.TestCase):
             self.assertEqual(entrance_of_code(code), frozenset({"main", "cowork"}), code)
             self.assertNotIn("erp", entrance_of_code(code), code)
 
-    def test_kb_ar_stockcard_span_main_cowork_erp(self):
-        # 知识库/应收/商品收发存 = 会计主壳专属;cowork 随 main;erp 入列(ERP 业务作用域)
-        for code in ("kb.doc.view", "ar.view", "stockcard.report.view"):
+    def test_ar_stockcard_span_main_cowork_erp(self):
+        # 应收/商品收发存 = 会计主壳专属;cowork 随 main;erp 入列(ERP 业务作用域)
+        for code in ("ar.view", "stockcard.report.view"):
             self.assertEqual(entrance_of_code(code), frozenset({"main", "cowork", "erp"}), code)
 
     def test_erp_denied_pos_tax_acct_recon(self):
@@ -99,9 +99,6 @@ class EntranceOfCodeTests(unittest.TestCase):
             "settings.modules.manage",
             "billing.view",
             "billing.manage",
-            "team.member.view",
-            "ownership.transfer",
-            "audit.log.view",
             "field.cost.view",
         ):
             self.assertIsNone(entrance_of_code(code), code)
@@ -171,17 +168,15 @@ class EntranceScopeDenyTests(unittest.TestCase):
         with _scope(True):
             self.assertEqual(_entrance_deny(_user(entry="pos"), "settings.modules.manage"), "")
             self.assertEqual(_entrance_deny(_user(entry="pos"), "billing.view"), "")
-            self.assertEqual(_entrance_deny(_user(entry="main"), "team.member.view"), "")
 
     def test_gate_on_cowork_entry_keeps_main_capability(self):
-        # cowork 与 main 等价:cowork-entry 打 main 能打的码(acct/recon/tax/kb/ar/stockcard/sales)
+        # cowork 与 main 等价:cowork-entry 打 main 能打的码(acct/recon/tax/ar/stockcard/sales)
         # 全放行,pos 收银专属仍拒。
         with _scope(True):
             for code in (
                 "acct.entry.view",
                 "recon.view",
                 "tax.filing.view",
-                "kb.doc.view",
                 "ar.view",
                 "stockcard.report.view",
                 "sales.doc.view",
@@ -192,7 +187,7 @@ class EntranceScopeDenyTests(unittest.TestCase):
             )
 
     def test_gate_on_erp_entry_allows_erp_prefixes(self):
-        # erp 门放行 sales/purchase/inv/intake/stockcard/kb/ar(ERP 业务作用域)
+        # erp 门放行 sales/purchase/inv/intake/stockcard/ar(ERP 业务作用域)
         with _scope(True):
             for code in (
                 "sales.doc.view",
@@ -200,7 +195,6 @@ class EntranceScopeDenyTests(unittest.TestCase):
                 "inv.view",
                 "intake.upload",
                 "stockcard.report.view",
-                "kb.doc.view",
                 "ar.view",
             ):
                 self.assertEqual(_entrance_deny(_user(entry="erp"), code), "", code)

@@ -139,9 +139,6 @@ const LANDING_CSS = [
     'landing/landing-tour-cards.css',
 ];
 
-// 管理控制台 SPA + 邀请页:主题令牌在前,组件样式在后(固化原 DOM 顺序)。
-const CONSOLE_CSS = ['console/console-theme.css', 'console/console.css'];
-
 // POS 收银 SPA:零售/药房基础样式在前,餐厅作用域样式在后(固化原 pos.html 顺序)。
 // pos-scan.css(摄像头连扫层)吃 pos.css 的 :root 令牌,排在它之后即可;类名 .bscan-* 自成
 // 一族,不与任何屏的作用域类同名,放末尾不覆盖谁。pos-taxinv.css(G2 税票弹窗+补开视图)
@@ -269,7 +266,6 @@ const BUNDLES = [
     { list: HOME_CSS, out: 'static/dist/home.css' },
     { list: ADMIN_CSS, out: 'static/dist/admin.css' },
     { list: LANDING_CSS, out: 'static/dist/landing.css' },
-    { list: CONSOLE_CSS, out: 'static/dist/console.css' },
     { list: POS_CSS, out: 'static/dist/pos.css' },
     { list: AI_CSS, out: 'static/dist/ai.css' },
     { list: DMS_CSS, out: 'static/dist/dms.css' },

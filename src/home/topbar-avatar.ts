@@ -4,7 +4,7 @@
 // 来源:home.js L17087-17447 · verbatim 0 改逻辑(仅 prettier 重排)。
 // 加载顺序:home.js(sync)暴露公共全局 → 本 module(Vite bundle · defer)后跑 · bare 调全局不 import。
 // ============================================================
-/* global isSuperAdmin routeTo canManageTeam shouldHideMoney openSettingsModal switchSettingsTab */
+/* global isSuperAdmin routeTo shouldHideMoney openSettingsModal switchSettingsTab */
 
 // =================================================================
 // NAV-IA Phase 1 · 顶栏头像下拉菜单(2026-05-15 拍板)
@@ -20,15 +20,10 @@
     // 防止普通账号刚登录的窗口期看到"管理员后台"按钮
     window.applyRoleVisibility = function applyRoleVisibility() {
         var u = window._userInfo;
-        var canTeam = false,
-            hideMoney = true,
+        var hideMoney = true,
             isSuper = false,
             isTest = false;
         if (u) {
-            canTeam =
-                typeof canManageTeam === 'function'
-                    ? canManageTeam(u)
-                    : !!(u.role === 'owner' || u.is_super_admin);
             hideMoney =
                 typeof shouldHideMoney === 'function'
                     ? shouldHideMoney(u)
@@ -36,11 +31,6 @@
             isSuper = typeof isSuperAdmin === 'function' ? isSuperAdmin(u) : !!u.is_super_admin;
         }
 
-        document.querySelectorAll<HTMLElement>('[data-show-if-team]').forEach(function (
-            el: HTMLElement
-        ) {
-            el.style.display = canTeam ? '' : 'none';
-        });
         document.querySelectorAll<HTMLElement>('[data-show-if-money]').forEach(function (
             el: HTMLElement
         ) {
@@ -65,8 +55,8 @@
 
         // 业态白名单收缩头像菜单(module-nav 据 business_type 写 _avatarShellHide · nav-presets 定名单)。
         // 本函数在 i18n 切换时重跑,故收缩要在这里(role 逻辑之后)兜底,免得被复位显回。
-        // settings/shortcuts 无其它门控 → 由本壳独家开关;billing/console 各有 money/team 门控(上方已算),
-        // 壳只朝"隐"覆盖,不越权把它们显回来。
+        // settings/shortcuts 无其它门控 → 由本壳独家开关;billing 有 money 门控,
+        // 壳只朝"隐"覆盖,不越权把它显回来。
         var shellHide = window._avatarShellHide || [];
         // 壳独家双向开关:这两项无其它门控 → 命中则隐、未命中则显回,壳是唯一事实源。
         var SHELL_TOGGLE = ['avatar-menu-settings', 'avatar-menu-shortcuts'];
@@ -74,8 +64,8 @@
             var el = document.getElementById(id);
             if (el) el.style.display = shellHide.indexOf(id) >= 0 ? 'none' : '';
         });
-        // 只朝"隐"覆盖:这两项各有 money/team 门控(上方 role 逻辑已算),壳命中才压隐,绝不显回越权。
-        var SHELL_HIDE_ONLY = ['avatar-menu-billing', 'avatar-menu-console'];
+        // 只朝"隐"覆盖:billing 另有 money 门控(上方 role 逻辑已算),壳命中才压隐。
+        var SHELL_HIDE_ONLY = ['avatar-menu-billing'];
         SHELL_HIDE_ONLY.forEach(function (id) {
             if (shellHide.indexOf(id) < 0) return;
             var el = document.getElementById(id);

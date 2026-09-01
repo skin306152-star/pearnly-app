@@ -27,7 +27,7 @@ class CostVisibleTests(unittest.TestCase):
         self.assertTrue(field_mask.cost_visible(_req(authz)))
 
     def test_hidden_without_code(self):
-        authz = Authz(role_key="custom:floor", permissions=frozenset({"inv.report.view"}))
+        authz = Authz(role_key="custom:erp-team-g", permissions=frozenset({"inv.report.view"}))
         self.assertFalse(field_mask.cost_visible(_req(authz)))
 
     def test_no_snapshot_means_super_admin_visible(self):

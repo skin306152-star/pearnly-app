@@ -129,7 +129,7 @@ pearnly_project/                       # FastAPI 后端 + Vite/TypeScript 前端
 ├── services/                          # 业务逻辑主体(~60 域 · ~845 文件)
 │   ├── ocr/ recon/ sales/ purchase/ expense/ pos/ erp/
 │   ├── vat/ tax/ rd/ etax/            # 泰国报税
-│   ├── line_binding/ agent/ ai_gateway/ knowledge/   # LINE / AI Agent
+│   ├── line_binding/ agent/ ai_gateway/              # LINE / AI Agent
 │   ├── workorder/ inventory/ products/ clients/
 │   ├── billing/ credits/ usage/ membership/          # 计费
 │   └── auth/ authz/ security/ rls_boot/ notification/ …

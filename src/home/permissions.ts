@@ -1,6 +1,6 @@
 /* REFACTOR-C1-home-batch8 · 用户角色原子判断(全局唯一来源)
  * 从 home.js verbatim 抽出(0 逻辑改):isSuperAdmin / isOwner / isEmployee /
- * isTrial / isLifetime / shouldHideMoney / canManageTeam / canManageApiKey
+ * isTrial / isLifetime / shouldHideMoney / canManageApiKey
  * + isMoneyHidden 兼容别名。
  *
  * 所有 UI 显隐 / 权限判断都基于这几个原子函数 · 不再散落写 if (role==='xxx')。
@@ -34,9 +34,6 @@ function isLifetime(u?: AppUser | null) {
 function shouldHideMoney(u?: AppUser | null) {
     return isEmployee(u);
 }
-function canManageTeam(u?: AppUser | null) {
-    return isOwner(u);
-}
 function canManageApiKey(u?: AppUser | null) {
     return isOwner(u) && isLifetime(u);
 }
@@ -51,5 +48,4 @@ window.isEmployee = isEmployee;
 window.isTrial = isTrial;
 window.isLifetime = isLifetime;
 window.shouldHideMoney = shouldHideMoney;
-window.canManageTeam = canManageTeam;
 window.canManageApiKey = canManageApiKey;

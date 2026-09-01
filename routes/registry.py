@@ -12,9 +12,6 @@ tests/unit/test_route_registry_contract.py 与 tests/integration/test_core_route
 
 from __future__ import annotations
 
-import logging
-import os
-
 from routes.accounting_bank_routes import router as accounting_bank_router
 from routes.accounting_books_routes import router as accounting_books_router
 from routes.accounting_routes import router as accounting_router
@@ -36,9 +33,6 @@ from routes.categories_routes import router as categories_router
 from routes.client_import_routes import router as client_import_router
 from routes.clients_routes import router as clients_router
 from routes.companion_installer_routes import router as companion_installer_router
-from routes.console_invite_routes import router as console_invite_router
-from routes.console_roles_routes import router as console_roles_router
-from routes.console_team_routes import router as console_team_router
 from routes.cowork_line_binding_routes import router as cowork_line_binding_router
 from routes.cowork_line_intake_routes import router as cowork_line_intake_router
 from routes.cowork_line_webhook_routes import router as cowork_line_webhook_router
@@ -123,8 +117,6 @@ from routes.workorder_routes import router as workorder_router
 from routes.workspace_routes import router as workspace_router
 from services.auth.auth_signup import router as signup_router
 
-logger = logging.getLogger("mr-pilot")
-
 # 注册顺序 = 匹配优先级,逐条沿用搬迁前的顺序,别按字母重排。
 ROUTERS = (
     reports_router,
@@ -173,9 +165,6 @@ ROUTERS = (
     sales_settings_router,
     sales_send_router,
     uploads_router,
-    console_team_router,
-    console_invite_router,
-    console_roles_router,
     erp_mappings_router,
     email_ingest_router,
     rd_router,  # 泰国 RD 税务
@@ -237,33 +226,7 @@ ROUTERS = (
 )
 
 
-def _include_knowledge(app) -> None:
-    """知识库(RAG + 死规则检查)· 从 pearnly-knowledge 沙盒迁入。
-
-    KNOWLEDGE_ENABLED 默认未设 → 路由不挂载(线上隐身 · 现有用户零影响);
-    仅挂载时注册真实 host provider,让契约层有真实后端接线。"""
-    if os.environ.get("KNOWLEDGE_ENABLED") != "1":
-        return
-    from routes.knowledge_ask_routes import router as knowledge_ask_router
-    from routes.knowledge_risk_routes import router as knowledge_risk_router
-    from routes.knowledge_routes import router as knowledge_router
-    from routes.knowledge_rules_routes import router as knowledge_rules_router
-    from services.knowledge import contract as kb_contract
-    from services.knowledge.host_provider import MainHostProvider
-
-    kb_contract.use_provider(MainHostProvider())
-    for router in (
-        knowledge_router,
-        knowledge_rules_router,
-        knowledge_ask_router,
-        knowledge_risk_router,
-    ):
-        app.include_router(router)
-    logger.info("knowledge base routes mounted (KNOWLEDGE_ENABLED=1)")
-
-
 def include_all(app) -> None:
     """把全部路由挂到 app 上(顺序即 ROUTERS 顺序)。"""
     for router in ROUTERS:
         app.include_router(router)
-    _include_knowledge(app)

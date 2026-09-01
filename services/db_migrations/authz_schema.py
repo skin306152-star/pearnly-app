@@ -7,8 +7,8 @@
   2. memberships 加列(scope_mode/granted_by/granted_at)+ 存量回填:
      有 tenant 的用户人手一行(owner/invited_by空 → owner;受邀 member → accountant
      · 拍板点#6 不降档);旧 manager/staff 行(key 为空的遗留角色)按同口径重映射。
-  3. member_scopes + invitations 建表(workspace_client_id 是 BIGINT ·
-     workspace_clients.id 为 BIGSERIAL,01 图纸笔误 uuid 以库为准)。
+  3. member_scopes + erp_team_members 建表(workspace_client_id 是 BIGINT ·
+     workspace_clients.id 为 BIGSERIAL)。
 
 注意 memberships 现有 UNIQUE(user_id)(1 人 1 租户)保持不动。
 """
@@ -31,9 +31,8 @@ def _seed_roles(cur) -> None:
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_roles_system_key "
         "ON roles(key) WHERE tenant_id IS NULL"
     )
-    # 自定义角色(G3)落位:display_name 人话名 / is_active 停用位 / version 乐观锁。
-    # custom 行 name 走 custom:<tenant>:<slug> 命名空间(全局唯一 · 撞不上系统 name),
-    # (tenant_id, key) 唯一保每租户 slug 不重 + 分配时按 (key,tenant) 单行命中。零迁移,回滚即删。
+    # ERP 团队最小权限角色:display_name / is_active / version / created_by。
+    # 角色行以 tenant_id 隔离,(tenant_id, key) 唯一保证每种 ERP 权限组合单行命中。
     cur.execute("ALTER TABLE roles ADD COLUMN IF NOT EXISTS display_name TEXT")
     cur.execute(
         "ALTER TABLE roles ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"
@@ -132,52 +131,6 @@ def _create_tables(cur) -> None:
 
     apply_tenant_rls(cur, "member_scopes")
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS invitations (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            tenant_id UUID NOT NULL,
-            email TEXT,
-            line_target TEXT,
-            role_key TEXT NOT NULL,
-            scope_mode TEXT NOT NULL DEFAULT 'all',
-            workspace_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
-            token_hash TEXT NOT NULL,
-            invited_by UUID NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL,
-            accepted_at TIMESTAMPTZ,
-            accepted_user_id UUID,
-            revoked_at TIMESTAMPTZ,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-        """)
-    cur.execute(
-        "CREATE INDEX IF NOT EXISTS ix_invitations_tenant "
-        "ON invitations(tenant_id, created_at DESC)"
-    )
-    cur.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_invitations_token_hash " "ON invitations(token_hash)"
-    )
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS ownership_transfers (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            tenant_id UUID NOT NULL,
-            from_user_id UUID NOT NULL,
-            to_user_id UUID NOT NULL,
-            token_hash TEXT NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL,
-            completed_at TIMESTAMPTZ,
-            cancelled_at TIMESTAMPTZ,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-        """)
-    cur.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_ownership_transfers_token "
-        "ON ownership_transfers(token_hash)"
-    )
-    # B8 RLS:invitations/ownership_transfers 均 tenant_id NOT NULL、无 user_id → 纯 tenant。
-    # force=False:console 读/邀请创建走 owner、公开接受页(find_by_token/accept·无登录态)与
-    # ownership accept(by-token)裸 owner 绕过不破·policy 仅二道防线。
-    apply_tenant_rls(cur, "invitations", "ownership_transfers")
-    cur.execute("""
         CREATE TABLE IF NOT EXISTS erp_team_members (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -203,11 +156,11 @@ def _create_tables(cur) -> None:
 
 def ensure_authz_schema() -> None:
     """startup 调 · 幂等。三步各自独立事务:一步失败(如脏数据撞 FK)不连坐
-    其余——roles 种子缺失会让批3 控制台瘫,绝不能被回填的孤儿行拖下水。"""
+    其余——roles 种子缺失会让业务权限校验失效,绝不能被回填的孤儿行拖下水。"""
     for step, label in (
         (_seed_roles, "roles 种子"),
         (_migrate_memberships, "memberships 回填"),
-        (_create_tables, "scopes/invitations/transfers 建表"),
+        (_create_tables, "scopes/ERP team 建表"),
     ):
         try:
             with db.get_cursor(commit=True) as cur:

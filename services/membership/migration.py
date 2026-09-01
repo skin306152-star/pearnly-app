@@ -76,9 +76,9 @@ def migrate_to_membership_model(dry_run: bool = True) -> Dict[str, Any]:
                     continue
                 # 老 users.role 是 'owner' / 'member' / NULL · 映射到新 roles 表
                 old_role = (r.get("role") or "owner").strip().lower()
-                # member → staff(新模型用 staff 表示员工)
-                new_role_name = "staff" if old_role == "member" else old_role
-                if new_role_name not in ("owner", "manager", "staff"):
+                # member → accountant(当前系统预设角色)
+                new_role_name = "accountant" if old_role == "member" else old_role
+                if new_role_name not in ("owner", "admin", "accountant", "clerk", "viewer"):
                     new_role_name = "owner"  # 兜底:NULL / 未知都视为 owner
                 role_count[new_role_name] = role_count.get(new_role_name, 0) + 1
                 if new_role_name not in role_map:
@@ -239,7 +239,7 @@ def fix_orphan_users(dry_run: bool = True) -> Dict[str, Any]:
                 out["errors"].append(
                     {
                         "user_id": None,
-                        "msg": "owner_role_not_found · run ensure_membership_tables() first",
+                        "msg": "owner_role_not_found · run ensure_authz_schema() first",
                     }
                 )
                 return out

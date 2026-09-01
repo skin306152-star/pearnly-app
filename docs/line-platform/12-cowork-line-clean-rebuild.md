@@ -57,7 +57,7 @@ Pearnly Cowork LINE 不是聊天机器人。它只完成票据识别、复核、
 
 裁决：老板只邀请和授权，所有人都自行绑定自己的 LINE。
 
-- `/console` 保留成员、角色、账套范围、席位、撤回和审计。
+- 通用 `/console` 团队与权限入口已下线；本流程不再依赖通用邀请、角色或账套分配 UI。
 - 删除“LINE 联系人称呼/LINE 邀请”假发送语义；统一为邮件邀请或复制邀请链接。
 - 老板不能代绑员工，不能从联系人名字猜 LINE 身份。
 - 主账号与员工走同一条“连接我的 LINE”流程。
@@ -113,7 +113,7 @@ Pearnly Cowork LINE 不是聊天机器人。它只完成票据识别、复核、
 - 新建 `services/cowork_line/schema.py`、`identity_store.py`。
 - 新建 `routes/cowork_line_binding_routes.py`。
 - 新建 `src/home/cowork-line/identity-panel.ts`。
-- 收窄 `/console` 邀请 UI；成员行只显示 LINE 状态，绑定按钮只对本人出现。
+- 绑定入口只显示当前登录人的 LINE 状态，不提供通用团队邀请或角色管理。
 - 同一提交删除旧 Cowork binding API、旧绑定面板和 OAuth 自动绑定分支。
 
 真机验收：老板与一名员工各自绑定成功；交叉绑定、停用成员、非成员全部拒绝；DMS/ERP LINE 正常。

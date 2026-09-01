@@ -83,12 +83,6 @@ _ENTRY_ASSETS = {
         "/static/admin/admin-i18n.js",
         "/static/pearnly-ui.css",
     ),
-    "static/console/console.html": (
-        "/static/dist/console.js",
-        "/static/dist/console.css",
-        "/static/console/console-i18n.js",
-        "/static/pearnly-ui.css",
-    ),
     "static/dms/dms.html": (
         "/static/dist/dms.js",
         "/static/dist/dms.css",
@@ -139,11 +133,6 @@ _ENTRY_ASSETS = {
     "login.html": (
         "/static/dist/landing.js",
         "/static/dist/landing.css",
-    ),
-    "static/console/invite.html": (
-        "/static/dist/invite.js",
-        "/static/dist/console.css",
-        "/static/console/console-i18n.js",
     ),
     "static/landing/portal.dc.html": (
         "/static/landing/vendor/three.min.js",

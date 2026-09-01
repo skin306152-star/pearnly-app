@@ -63,7 +63,7 @@ def _resolve_model(tier: str) -> str:
 
 
 def _embed_model() -> str:
-    # 默认与 aistudio 同一向量空间(gemini-embedding-001)→ 知识库无需重建索引
+    # 默认与 aistudio 使用同一个 embedding 模型。
     return (
         os.environ.get("VERTEX_EMBED_MODEL", "gemini-embedding-001").strip()
         or "gemini-embedding-001"

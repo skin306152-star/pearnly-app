@@ -141,7 +141,7 @@ async def admin_cost_daily_trend(request: Request, days: int = 30):
 
 @router.get("/api/admin/cost/ai-usage")
 async def admin_cost_ai_usage(request: Request):
-    """AI 网关全量调用成本(ai_usage · Agent 对话/LINE 语音/知识库问答 + OCR)· 近 30 天。
+    """AI 网关全量调用成本(ai_usage · Agent 对话/LINE 语音/OCR)· 近 30 天。
 
     ⚠️ 独立口径,别跟上面 ocr_cost_log 系列数字相加:ai_usage 是网关唯一写点
     (services/ai_gateway/logging.py::log_call)落的账,OCR 走 multimodal_to_json 也经

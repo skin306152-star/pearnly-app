@@ -35,7 +35,6 @@ const ROUTES = [
     'pos-cashiers',
     'pos-tables',
     'pos-payment',
-    'knowledge',
     'integrations',
 ];
 

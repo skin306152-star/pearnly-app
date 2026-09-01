@@ -10,15 +10,15 @@
 
 | 维度 | 数量 | 说明 |
 |---|---:|---|
-| **前端 App / SPA** | **8** | 7 生产(home / pos / ai / dms / console / admin / landing)+ 1 实验(pos-next,**未接后端路由**);另有 1 个原生小助手(companion,无 web 面) |
-| **用户可达屏幕(生产)** | **93** | home 44 · pos 10 · ai 19 · dms 5 · console 3 · admin 10 · landing 2 |
+| **前端 App / SPA** | **7** | 6 生产(home / pos / ai / dms / admin / landing)+ 1 实验(pos-next,**未接后端路由**);另有 1 个原生小助手(companion,无 web 面) |
+| **用户可达屏幕(生产)** | **89** | home 43 · pos 10 · ai 19 · dms 5 · admin 10 · landing 2 |
 | ├ 实验屏幕(pos-next) | +6 | 仅 `/static/_posnext/index.html` 直达 |
 | └ 占位/隐藏页(不可达或空壳) | +3 | home 的 `cloud`(空)/ `test-center` / `automation`(display:none) |
 | **入口 / 辅助面(entry-aux)** | **≈32** | 登录/OAuth/法务/邮件/PDF打印/SW/重定向/LINE卡/小助手/静态挂载/错误处理 |
 | **组件类型** | **37** | 见组件矩阵。设计系统「建成」6 个、「桩」5 个、「零实现」26 个 |
 | **设计系统组件真实采用率** | **0%** | `.pu-*` 组件类在**全部生产标记里出现 0 次**(只被当 token 用) |
 
-**一句话结论**:表面上「6 站接入 pearnly-ui.css」,但接入的只是 **token**(`var(--pu-*)`/`var(--accent)`);组件层(`.pu-btn`/`.pu-modal`/…)**定义了但零采用**,37 类组件在实操中**站站自写**。这就是设计系统剩余工作的真身。
+**一句话结论**:表面上「5 站接入 pearnly-ui.css」,但接入的只是 **token**(`var(--pu-*)`/`var(--accent)`);组件层(`.pu-btn`/`.pu-modal`/…)**定义了但零采用**,37 类组件在实操中**站站自写**。这就是设计系统剩余工作的真身。
 
 ---
 
@@ -27,13 +27,13 @@
 ### 1.1 home(会计/商户主 SPA · 最大)
 - **壳**:`home.html`(根)→ `static/dist/home.html`;`routes/pages_routes.py`(`/home`,`_NO_CACHE`)。前端版本锚点从 home.html 读(`app.py:485`)。
 - **设计系统**:链 `static/pearnly-ui.css` ✔(消费 token);组件全 bespoke(`static/home-*.css` 56 个文件)。
-- **路由源**:`src/home/route-table.ts`(`VALID_ROUTES` 45 项 + `ROUTE_LOADERS`);侧栏 `src/home/app-shell-sidebar-html.ts`;`page-*` 段在 `home.html`。
-- **44 个可达屏幕**(hash-driven SPA 路由,非后端路由):
+- **路由源**:`src/home/route-table.ts`(`VALID_ROUTES` + `ROUTE_LOADERS`);侧栏 `src/home/app-shell-sidebar-html.ts`;`page-*` 段在 `home.html`。
+- **43 个可达屏幕**(hash-driven SPA 路由,非后端路由):
 
 | 分组 | 屏幕(route id) |
 |---|---|
 | 总览/记录 | dashboard(首页/订阅)· history(识别记录)· push-logs(推送日志)· exceptions(异常栏)· reconcile(对账中心) |
-| 录入/集成 | dms-intake(录入工作台)· integrations(集成)· templates(推送模板)· api-keys(API密钥)· knowledge(客户知识,flag-gated) |
+| 录入/集成 | dms-intake(录入工作台)· integrations(集成)· templates(推送模板)· api-keys(API密钥) |
 | 客户/公司 | clients(客户管理)· company(公司资料)· settings(设置,内含 general/system/archive/rules/notifications 5 面板) |
 | 采购/进项 | purchase · purchase-suppliers · purchase-settings · purchase-form · purchase-detail · purchase-export · purchase-capture |
 | 销售/商品 | sales-invoices(发票工作台)· sales-products · expense-data · sales-account(账套/开票资料) |
@@ -65,25 +65,18 @@
 - **companion**:car-select/paint pick(见 entry-aux `/dms-pick`)。
 - **组件**:card ~16 · modal 12(全站最多)· stepper `.dx-stepper`/`.dx-step`(录入向导)。
 
-### 1.5 console(权限/团队管理 SPA)
-- **壳**:`static/console/console.html` → `static/dist/console.html`;`/console` + `/console/{rest}`。紫主题;前端 `can(team.member.view)` gate。
-- **设计系统**:链 pearnly-ui.css ✔ + `console-theme.css`/`console.css` bespoke。
-- **3 个屏幕**(`data-view`):members(团队 :29)· roles(:46)· security(:63)。
-- **入口**:`/invite/{token}`(公开邀请接受页 `invite.html`,**bespoke,不在 pearnly-ui**)——归属 console 但壳独立。
-- **组件**:唯一带 `.pu-skeleton` 级 skeleton bespoke 的站(1 处);check-card。
-
-### 1.6 admin(Earn 超管 SPA)
+### 1.5 admin(Earn 超管 SPA)
 - **壳**:`static/admin/admin.html` → `static/dist/admin.html`;`/admin` → **301** `/admin/cost`;`/admin/{rest}` 兜底。`admin.js` 经 `/api/me` `is_super_admin` 门控,非超管 → `/`。
 - **入口**:`/earn`(超管后台登录 `earn-login.html`,bespoke);`admin.js` 失败 auth 弹回这里。
 - **设计系统**:链 pearnly-ui.css ✔ + `admin.css` bespoke。**注意**:`dist/admin.css`(416KB)与 `dist/home.css` 共享 2345/2579 类——admin 是建在 home CSS 基座上的子应用,源 `admin.css` 仅 22KB。
 - **10 个屏幕**(`admin.html` `#page-admin-*`):cost(成本/用量 :308,默认)· users(:606)· topup(:734)· monitor(:781)· settings(:890)· engine(识别/引擎 :981)· agent(:1067)· pos(:1114)· pearnly-ai(:1214)· dms(:1312)。
 
-### 1.7 landing(品牌门户 / 营销)
+### 1.6 landing(品牌门户 / 营销)
 - **壳**:`static/landing/portal.dc.html`(129KB)→ `static/dist/portal.html`;`/`(公开,无 auth,`_NO_CACHE`)。**`<!-- ui-lint: standalone -->` 完全 bespoke**:自托管字体 + WebGL runtime + 自有 `landing.css`/mascot/auth-modal——**不在 pearnly-ui.css**。
 - **2 个屏幕/面**:hero + 产品 tour(`landing-tour*.js` + `landing-tour-cards/phone.css` + `mascot-scene.js`)· 内嵌 auth modal/SSO(`auth-modal.css`/`auth-sso.css`/`landing-auth.css`,登录/注册/SSO)。
 - **是 4 产品分流门户**:把用户导向 home/pos/ai/dms 各入口。
 
-### 1.8 pos-next(实验 SPA · ⚠ 未接后端路由)
+### 1.7 pos-next(实验 SPA · ⚠ 未接后端路由)
 - **壳**:`src/pos-next/index.html`(标题「POS-Next · 批1 收银主屏」)→ 构建产物 `static/_posnext/index.html`(`vite.pos-next.config.mjs`)。
 - **⚠ 可达性**:`grep posnext routes/ = 0 命中`——**没有任何 FastAPI 路由**,仅经 `/static` 挂载直达 `/static/_posnext/index.html`。是 vendored Odoo OWL POS 的批-0 实验,大概率非面向用户的生产面。
 - **设计系统**:链 pearnly-ui.css ✔(唯一链它但非生产路由的壳)。
@@ -103,7 +96,6 @@
 | 3 | `/pos` 老板登录 | login-gate | pages_routes → dist/pos-login.html | pos | BESPOKE |
 | 4 | `/earn` 超管登录 | login-gate | pages_routes → dist/earn-login.html | admin | BESPOKE |
 | 5 | `/reset` 改密页 | login-gate | pages_routes → dist/reset.html(`test_reset_page_static.py` 覆盖) | home | BESPOKE |
-| 6 | `/invite/{token}` 邀请接受 | entrance | pages_routes → dist/invite.html(源 console/invite.html) | console | BESPOKE |
 | 7 | `/dms-pick` 选车/配色 webview | embedded-webview | `dms_pick_routes.py:72-78` → dist/dms-pick.html;LINE 一次性 `?t=` token,`/api/dms/pick/*` 校验,`no-store` | dms | BESPOKE(本地 rgb token 镜像 dms-shell) |
 | 8 | `/terms` 服务条款 | legal | pages_routes → dist/terms.html | landing | BESPOKE |
 | 9 | `/privacy` 隐私政策 | legal | pages_routes → dist/privacy.html | landing | BESPOKE |
@@ -116,11 +108,10 @@
 | 16 | Google OAuth 错误页(授权失败/过期/换令牌) | error | `google_oauth_routes.py:137,141,145`(400/502 inline 片段) | — | 裸 `<p>` 无样式 |
 | 17 | `/pos-sw.js` 遗留收银 PWA SW | PWA asset | `pages_routes.py:157-163`(scope /pos) | pos | n/a(JS) |
 | 18 | `/cashier-sw.js` 新收银 PWA SW | PWA asset | `pages_routes.py:166-172`(scope /cashier) | pos | n/a(JS) |
-| 19 | `/static/*` 原生挂载 | raw static | `app.py:493` StaticFiles | 全部 | 混合——**直达未压缩源壳**(admin/ai/pos/dms/console/portal/earn-login)+ 全 dist + `_posnext/index.html` |
+| 19 | `/static/*` 原生挂载 | raw static | `app.py:493` StaticFiles | 全部 | 混合——**直达未压缩源壳**(admin/ai/pos/dms/portal/earn-login)+ 全 dist + `_posnext/index.html` |
 | 20 | 小助手安装包下载 | companion | `companion_installer_routes.py:20-30`(auth-gated exe;目录未在 = 未发布) | companion | N/A(原生 Windows,无 web 面) |
 | 21 | LINE bot 图/Flex 卡 + onboarding 卡 | companion-cards | `static/line-cards/*.jpg`(A1-welcome/A2..A11 状态/A12-onboard-1..6/B-banner-*);经 `line_card_image_routes.py:31` | companion | 预渲染 JPG,非 HTML |
 | 22 | 邮件:验证码(注册) | email | `auth_email_code_routes.py:123-150`(4 语 inline HTML,紫渐变) | — | BESPOKE inline-style |
-| 23 | 邮件:团队邀请 | email | `services/team/invitations.py:243-247` | — | BESPOKE inline-style |
 | 24 | 邮件+LINE:密码重置 | email | `auth_password_routes.py:64-72`(email)+ `:36`(LINE 文本) | — | BESPOKE inline-style |
 | 25 | 邮件:销售单据带 PDF 附件 | email | `services/sales/send.py:36-72`;路由 `sales_send_routes.py` | — | BESPOKE inline-style |
 | 26 | POS 热敏小票 PDF(58/80mm) | print-receipt | `services/pos/receipt_pdf.py:16` → `services/sales/pdf_thermal.py`;`pos_sales_routes.py:139` | pos | N/A(热敏 PDF) |
@@ -135,6 +126,8 @@
 
 ## 3. 组件矩阵(37 类)× 设计系统状态 × 分布
 
+> 分布分母与 bespoke 数是 2026-07-24 的历史盘点快照，未因本次删除重新做全站 class 统计；现役 App/路由以 §0-2 为准。
+
 > 图例:**建成-未采用** = pearnly-ui.css 里有 `.pu-*` 类但生产标记 0 引用;**桩** = 只有注释占位(B4/B5),未实现;**零** = 设计系统里完全没有。
 > `bespoke~N` = 各 SPA 自写的 distinct class 家族数(工程量级代理,非精确)。
 
@@ -145,9 +138,9 @@
 | Toast | 建成-未采用 | `.pu-toast` :325 / stack :297(B3.1) | 6/8(DMS `toast()` 复制 ~7 文件) | ~35 |
 | Empty state | 建成-未采用 | `.pu-empty` :547(B3.3) | 6/8(home 82 · ai 10) | ~90 |
 | Error/retry | 建成-未采用 | `.pu-error` :585(B3.4) | 5/8(home 35) | ~35 |
-| Skeleton | 建成-未采用(近乎 net-new) | `.pu-skeleton` :626(B3.5) | 1/8 bespoke(仅 console) | ~1 |
+| Skeleton | 建成-未采用(近乎 net-new) | `.pu-skeleton` :626(B3.5) | 0/7 bespoke | 0 |
 | **Table/data-table** | **桩**(B4,未建) | `:629` 注释 `.pu-table` | 4/8(home 44) | ~49 |
-| **Pagination/pager** | **桩**(B4,未建) | `:629` 注释 `.pu-pager` | 4/8(admin/console/dms/home) | ~33 |
+| **Pagination/pager** | **桩**(B4,未建) | `:629` 注释 `.pu-pager` | 3/7(admin/dms/home) | ~33 |
 | **Text input/field** | **桩**(B5,未建;`--ctrl-*` :65-67 已留) | `:630` 注释 `.pu-field/.pu-input` | 5/8(home 48) | ~66 |
 | **Select/combobox** | **桩**(B5) | `:630` `.pu-select` | 3/8 + 大量 native | ~29 |
 | **Checkbox** | **桩**(B5) | `:630` `.pu-check` | 5/8 | ~37 |
@@ -191,11 +184,11 @@
 | **G1** | `.pu-*` 组件类**零生产采用** | COMPONENTS 声称「0 production markup」 | ✅**证实**:`grep pu-btn` 只命中 `pearnly-ui.css`(定义本身)+ `tests/e2e/_artifacts/ds_layout`(测试产物)。生产 html/js/ts **0 引用**。 | **设计系统组件层 0% 落地**——这才是「剩余设计系统工作」的真相,不是「还差 B4/B5」而是「已建的 B2/B3 也是货架货」 |
 | **G2** | home `cloud` 页可达性 | SCREENS 说「`cloud` **不在** VALID_ROUTES → latent/unreachable」 | ❌**说反了**:`cloud` **在** VALID_ROUTES(`route-table.ts:30`),但**无 ROUTE_LOADER** → URL `#cloud` 会被接受、路由通过,只是渲染空的 `page-cloud`。是「**可路由但空**」,非「不可达」。 | 归类订正:cloud = 可达空壳;真正不可达的是 `test-center`(不在 VALID_ROUTES)与 `automation`(display:none) |
 | **G3** | pos-next 是不是生产 SPA | SCREENS 当它是完整 SPA(壳+6 屏);ENTRY/ROUTES 说「无后端路由」 | ✅**证实无路由**:`grep posnext routes/ app.py = 0`。仅 `/static/_posnext/index.html` 直达。 | pos-next = **影子 SPA**:真代码在、链 pearnly-ui.css、但没接路由,用户正常路径**到不了**。别把它算进生产屏幕(本清单单列实验) |
-| **G4** | 「6 站 vs 7 站接入设计系统」 | ROUTES 说「6 壳链 pearnly-ui.css」;SCREENS 说 pos-next 也链 | 两者都对但表述冲突:**7 个源壳** `grep` 到 pearnly-ui/ai-theme(home/pos/ai/dms/console/admin/**pos-next**),但只 **6 个是生产路由**。 | 口径统一:6 生产 + 1 实验(pos-next)= 7 文件链它;landing/login/reset/pos-login/earn-login/invite/terms/privacy/dms-pick **全不链** |
-| **G5** | home 44 屏在 ROUTES 里「消失」 | ROUTES 只列 `/home` 一个壳 | 非缺口,是**粒度差**:44 屏是 `route-table.ts` 的 hash 路由,不是后端路由。 | 提醒:别把 `/home` 当「一个屏幕」——它下面 44 个可达页 + 3 占位 |
+| **G4** | 「5 站 vs 6 文件接入设计系统」 | 生产壳有 5 个链 pearnly-ui.css，pos-next 实验壳也链 | **6 个源壳** `grep` 到 pearnly-ui/ai-theme(home/pos/ai/dms/admin/**pos-next**),其中 **5 个是生产路由**。 | 口径统一:5 生产 + 1 实验(pos-next)= 6 文件链它;landing/login/reset/pos-login/earn-login/terms/privacy/dms-pick **全不链** |
+| **G5** | home 43 屏在 ROUTES 里「消失」 | ROUTES 只列 `/home` 一个壳 | 非缺口,是**粒度差**:43 屏是 `route-table.ts` 的 hash 路由,不是后端路由。 | 提醒:别把 `/home` 当「一个屏幕」——它下面 43 个可达页 + 3 占位 |
 | **G6** | SCREENS 里 route-table.ts 行号自相撞 | 多条引 `:29`/`:33`(reconcile 与 sales-account 都标 :29;inventory 与 pos-onboarding 都标 :33) | 行号是近似/串号。**权威源 = 本清单 §1.1 的 VALID_ROUTES 全表**(已读真文件)。 | 引用 home 路由行号时以 `route-table.ts` 实文件为准,别信勘察里的行号 |
 | **G7** | 原始 `/static` 挂载暴露**未压缩源壳** | ROUTES 与 SCREENS 都提到 | ✅ `app.py:493` StaticFiles(directory=static)→ `static/admin/admin.html` 等源壳、`_posnext/index.html` 均可直接 GET。 | 既是一致性面(源壳 ≠ dist),也是可达性/安全提醒:view-source 压外壳的前提被 `/static` 直达绕过 |
-| **G8** | AI `desk` / home `knowledge` / dms 全站 = flag-gated | SCREENS 有标,ROUTES 未强调 | 证实:`pearnly_ai_front_desk`(desk)、knowledge flag、`dms_portal` 默认 off。 | 这些屏「默认看不到」——盘点 UI/验收时零配置账号根本走不到,易漏 |
+| **G8** | AI `desk` / dms 全站 = flag-gated | SCREENS 有标,ROUTES 未强调 | 证实:`pearnly_ai_front_desk`(desk)、`dms_portal` 默认 off。 | 这些屏「默认看不到」——盘点 UI/验收时零配置账号根本走不到,易漏 |
 | **G9** | settings 是 1 路由含 5 内部面板 | SCREENS 单列 settings | general/system/archive/rules/notifications 是 `settings-panels.ts` 内 tab,不是独立路由。 | 若要逐面盘点,settings 要拆 5 子面(本清单按 1 屏计) |
 | **G10** | 无自定义 404/维护页 | ENTRY 提到 | ✅ 只有 `app.py:469` 的 500 exception handler(JSON/快照),**没有任何 404/维护 HTML**。 | 错误态是设计系统真空区——想统一错误页得从零起 |
 | **G11** | `/dms-` 前缀故意避开 `/dms/{rest}` 兜底 | ROUTES 提到 | 证实:`/dms-pick` 走 `dms_pick_routes.py` 独立路由,不落 `/dms/{rest}` catch-all。 | 新增 `/dms-xxx` 面时别以为被 DMS SPA 兜住 |
@@ -206,9 +199,9 @@
 
 本次 4 路勘察扫的是「**后端页路由 + 壳 HTML + 路由表 + CSS 类家族**」。以下模态**没被逐一枚举**,是下一个「哎呀漏了」的高发区:
 
-1. **SPA 内的 modal/drawer/wizard 子态**:`src/home/*-html.ts` 有约十几个注入式 HTML 模块(`app-shell-html` / `confirm-modals-html` / `cmdk-mask-html` / `bank-cand-drawer-html` 等),AI 的 sales-wizard 步、dms-intake confirm 步、POS numpad/桌台对话框、welcome/onboarding 向导、knowledge FAB——都是**屏内状态**,未作独立屏枚举。**闭合法**:对每个 SPA 跑一次「打开所有 modal/drawer/向导步」的真浏览器遍历,截图存档。
+1. **SPA 内的 modal/drawer/wizard 子态**:`src/home/*-html.ts` 有约十几个注入式 HTML 模块(`app-shell-html` / `confirm-modals-html` / `cmdk-mask-html` / `bank-cand-drawer-html` 等),AI 的 sales-wizard 步、dms-intake confirm 步、POS numpad/桌台对话框、welcome/onboarding 向导——都是**屏内状态**,未作独立屏枚举。**闭合法**:对每个 SPA 跑一次「打开所有 modal/drawer/向导步」的真浏览器遍历,截图存档。
 2. **LINE Flex-card / bot 会话 UI**:`services/line_binding/*.py`、`services/line_dms/cards.py` 的 Flex JSON 消息布局是聊天里的 UI,非 HTML,本次没解析。**闭合法**:单列一份 LINE 卡片清单(消息模板级)。
-3. **flag/角色门控屏**:超管专属、`dms_portal`/`pearnly_ai_front_desk`/knowledge 等默认 off 的屏,零配置账号走不到。**闭合法**:用开全 flag 的 fixture 账号 + 超管账号各跑一遍旅程。
+3. **flag/角色门控屏**:超管专属、`dms_portal`/`pearnly_ai_front_desk` 等默认 off 的屏,零配置账号走不到。**闭合法**:用开全 flag 的 fixture 账号 + 超管账号各跑一遍旅程。
 4. **打印/PDF 输出**(热敏小票、泰式税票、对账 PDF、报表导出):服务端渲染,非 DOM 屏,设计系统管不到。**闭合法**:单列打印物清单 + 各出一张样张。
 5. **邮件模板(4 个)**:邮件客户端渲染,inline-style,与 web 设计系统天然隔离。**闭合法**:邮件模板单独立项统一。
 6. **JS/canvas/SVG 绘制的图表**:AI dashboard 的数据可视化没有 CSS 类家族,组件矩阵里被低计。**闭合法**:按 JS 渲染器(非 CSS)另盘。

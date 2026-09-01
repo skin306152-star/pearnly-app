@@ -43,7 +43,6 @@ TOKEN_FILES = {
     "home-44-pos-cashiers.css",
     "home-48-recon-redesign.css",
     "home-49-dms-intake.css",
-    "console-theme.css",
 }
 
 # 入口页:viewport meta 必须在(防回归删除)。
@@ -70,7 +69,6 @@ CHECK_KEYS = ["暗夜:3位hex", "暗夜:white/black关键字", "暗夜:不透明
 def _css_files() -> list[Path]:
     files = sorted((ROOT / "static").glob("home-*.css"))
     files += sorted((ROOT / "static" / "pos").glob("*.css"))
-    files += sorted((ROOT / "static" / "console").glob("*.css"))
     return [f for f in files if f.name not in TOKEN_FILES]
 
 

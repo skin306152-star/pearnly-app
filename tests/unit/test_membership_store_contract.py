@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-"""REFACTOR-B2 守门 · 成员/权限分配 DAL 抽到 services/membership/store.py
+"""REFACTOR-B2 守门 · 成员访问范围与迁移 DAL。
 
-验证 9 个函数都在 service 模块 · 全部经 db.get_cursor()(可被 patch)·
-读类断言 SQL 形状(命中的表/字段)+ 返回结构;写类断言 INSERT/UPDATE 形状 + 参数顺序 + 提交行为。
+验证保留函数都在 service 模块 · 全部经 db.get_cursor()(可被 patch)。
 """
 
 import unittest
@@ -13,9 +12,6 @@ from tests.unit._cursor_patch import patch_both
 
 _MOVED = [
     "get_visible_client_ids_for_user",
-    "list_assignments_by_employees",
-    "set_employee_assignments",
-    "auto_assign_client_to_creator",
     "get_user_tenant_id",
     "migrate_to_membership_model",
     "list_orphan_users",
@@ -89,25 +85,6 @@ class MembershipStoreContractTests(unittest.TestCase):
         self.assertIn("WHERE user_id = %s", sql)
         self.assertEqual(params, ("u1",))
 
-    def test_list_assignments_groups_by_employee(self):
-        cur = _FakeCursor(
-            fetchall_queue=[
-                [
-                    {"user_id": "u1", "client_id": 1},
-                    {"user_id": "u1", "client_id": 2},
-                    {"user_id": "u2", "client_id": 3},
-                ]
-            ]
-        )
-        with _patch_cursor(cur):
-            out = store.list_assignments_by_employees("t1")
-        self.assertEqual(out, {"u1": [1, 2], "u2": [3]})
-        sql, params = cur.calls[0]
-        self.assertIn("client_assignments", sql)
-        self.assertIn("JOIN users", sql)
-        self.assertIn("u.tenant_id = %s", sql)
-        self.assertEqual(params, ("t1",))
-
     def test_get_user_tenant_id_prefers_memberships(self):
         cur = _FakeCursor(fetchone_queue=[{"tenant_id": "tA"}])
         with _patch_cursor(cur):
@@ -154,48 +131,6 @@ class MembershipStoreContractTests(unittest.TestCase):
         self.assertIn("is_super_admin", sql)
 
     # ---------- 写类:INSERT/UPDATE 形状 + 参数顺序 + 提交行为 ----------
-    def test_auto_assign_inserts_with_on_conflict(self):
-        cur = _FakeCursor()
-        with _patch_cursor(cur) as m:
-            ok = store.auto_assign_client_to_creator("u1", 42)
-        self.assertTrue(ok)
-        sql, params = cur.calls[0]
-        self.assertIn("INSERT INTO client_assignments", sql)
-        self.assertIn("ON CONFLICT", sql)
-        self.assertEqual(params, ("u1", 42, "u1"))
-        # 提交语义:走 commit=True 游标
-        self.assertTrue(m.called)
-        self.assertEqual(m.call_args.kwargs.get("commit"), True)
-
-    def test_set_employee_assignments_rejects_cross_tenant(self):
-        # 员工 tenant 与传入 tenant 不一致 → 直接 False · 不删不插
-        cur = _FakeCursor(fetchone_queue=[{"tenant_id": "OTHER"}])
-        with _patch_cursor(cur):
-            ok = store.set_employee_assignments("emp", [1], "boss", "t1")
-        self.assertFalse(ok)
-        # 只查了一次员工归属 · 没有 DELETE / INSERT
-        self.assertEqual(len(cur.calls), 1)
-        self.assertNotIn("DELETE", cur.executed_sql)
-        self.assertNotIn("INSERT", cur.executed_sql)
-
-    def test_set_employee_assignments_replaces_and_validates(self):
-        # 员工归属正确 → DELETE 现有 → 校验 client_ids 归属 → 批插合法的
-        cur = _FakeCursor(
-            fetchone_queue=[{"tenant_id": "t1"}],
-            fetchall_queue=[[{"id": 5}]],  # 校验后只有 client 5 合法
-        )
-        with _patch_cursor(cur) as m:
-            ok = store.set_employee_assignments("emp", [5, 999], "boss", "t1")
-        self.assertTrue(ok)
-        all_sql = cur.executed_sql
-        self.assertIn("DELETE FROM client_assignments", all_sql)
-        self.assertIn("INSERT INTO client_assignments", all_sql)
-        self.assertEqual(m.call_args.kwargs.get("commit"), True)
-        # 插入的是校验后合法的 client 5(越权的 999 被过滤)
-        insert_calls = [c for c in cur.calls if "INSERT INTO client_assignments" in c[0]]
-        self.assertEqual(len(insert_calls), 1)
-        self.assertEqual(insert_calls[0][1], ("emp", 5, "boss"))
-
     def test_migrate_dry_run_does_not_insert(self):
         cur = _FakeCursor(
             fetchall_queue=[
@@ -234,7 +169,7 @@ class MembershipStoreContractTests(unittest.TestCase):
                         "already": False,
                     }
                 ],
-                [{"id": "r-staff", "name": "staff"}],
+                [{"id": "r-accountant", "name": "accountant"}],
             ],
             rowcount=1,
         )
@@ -244,9 +179,9 @@ class MembershipStoreContractTests(unittest.TestCase):
         self.assertEqual(out["inserted"], 1)
         self.assertIn("INSERT INTO memberships", cur.executed_sql)
         self.assertEqual(m.call_args.kwargs.get("commit"), True)
-        # member → staff role 映射
+        # member → accountant role 映射
         ins = [c for c in cur.calls if "INSERT INTO memberships" in c[0]][0]
-        self.assertEqual(ins[1], ("u1", "t1", "r-staff"))
+        self.assertEqual(ins[1], ("u1", "t1", "r-accountant"))
 
     def test_backfill_dry_run_counts_only(self):
         # 第一个 cursor: 发现表;后续 cursor 复用同一 fake → COUNT 查询

@@ -411,16 +411,6 @@ export const SIDEBAR_HTML = `
         <span class="nav-label" data-i18n="nav-pos-sheets">Google Sheet 留档</span>
     </div>
 
-    <!-- KNOWLEDGE · 客户知识中心入口(放「客户管理」下方)· 探针门控(知识库 flag 开才显示 · knowledge-center.ts) -->
-    <div class="nav-item nav-sub-item" data-route="knowledge" id="nav-knowledge" style="display:none;">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="10" cy="10" r="7.5"/>
-            <path d="M7.8 7.6a2.2 2.2 0 114.4 0c0 1.3-2.2 1.7-2.2 3"/>
-            <line x1="10" y1="14" x2="10" y2="14.01"/>
-        </svg>
-        <span class="nav-label" data-i18n="nav-knowledge">客户知识</span>
-    </div>
-
     <!-- 异常栏 · 2026-07-26 下线(Zihao:实际使用毫无用处)。DOM 留着不删,恒隐;
          路由/红点轮询/后端规则同批掐断,恢复见 route-table.ts 的下线注释。 -->
     <div class="nav-item nav-sub-item" data-route="exceptions" style="display:none;">

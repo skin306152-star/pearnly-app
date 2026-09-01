@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""入口壳品牌 favicon 契约 —— dms / console / invite / erp 四页必须引用统一品牌图标。
+"""入口壳品牌 favicon 契约 —— dms / erp 必须引用统一品牌图标。
 
 防回归:任何入口壳换掉 favicon 路径或漏掉 apple-touch-icon 即红。
 纯文件解析,不起服务、不碰库。
@@ -15,8 +15,6 @@ _REPO = Path(__file__).resolve().parents[2]
 
 SHELLS = {
     "dms": _REPO / "static" / "dms" / "dms.html",
-    "console": _REPO / "static" / "console" / "console.html",
-    "invite": _REPO / "static" / "console" / "invite.html",
     "erp": _REPO / "static" / "erp" / "erp.html",
 }
 

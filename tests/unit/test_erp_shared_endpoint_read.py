@@ -309,8 +309,8 @@ class SharedAccessTests(unittest.TestCase):
         self.assertNotIn("tenant_id", items[0])
         self.assertNotIn("workspace_client_id", items[0])
 
-    def test_admin_and_custom_get_safe_projection_even_for_own_legacy_row(self):
-        for role_name in ("admin", "custom:clerk"):
+    def test_admin_and_erp_team_member_get_safe_projection_even_for_own_legacy_row(self):
+        for role_name in ("admin", "custom:erp-team-p"):
             with self.subTest(role=role_name):
                 row = _endpoint(owner=ACTOR, shared_scope=False)
                 with (
@@ -431,7 +431,7 @@ class SharedStoreTests(unittest.TestCase):
             membership_id="membership-owner",
         )
         self.assertTrue(self._load(owner)[2][2])
-        for role_name in ("admin", "custom:clerk"):
+        for role_name in ("admin", "custom:erp-team-p"):
             authz = Authz(
                 role_key=role_name,
                 permissions=frozenset({"erp.endpoint.view", "erp.endpoint.manage"}),

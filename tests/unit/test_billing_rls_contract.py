@@ -2,7 +2,7 @@
 """B8 RLS wave3 3d 契约:钱写入/读取 DAL 必须穿租户上下文走 get_cursor_rls,且绝不 bypass。
 
 铁律 #26 高敏:tenant_credits / credit_transactions / monthly_page_usage / ocr_cost_log 是钱表。
-- charge_ocr / deduct_thb(扣费写入)→ get_cursor_rls(tenant_id=...) · bypass 必须不为 True。
+- charge_ocr(扣费写入)→ get_cursor_rls(tenant_id=...) · bypass 必须不为 True。
 - log_ocr_cost(成本记账写入)→ get_cursor_rls(tenant_id=..., user_id=...)(tenant_or_user)。
 - get_billing_status_combined(扣费前余额闸)→ get_cursor_rls(tenant_id=...)。
 超管聚合(get_cost_*/get_credits_*)走 owner 的 bare get_cursor(BYPASSRLS 通道),不在本契约内。
@@ -62,20 +62,6 @@ class ChargeRlsContract(unittest.TestCase):
             mock.patch("core.db.get_cursor", side_effect=AssertionError("钱写入禁用 owner 裸游标")),
         ):
             r = charge.charge_ocr(USER, TENANT, "excel", 1000)
-        self.assertTrue(r["ok"])
-        _no_bypass(self, calls)
-        self.assertEqual(calls[0].get("tenant_id"), TENANT)
-
-    def test_deduct_thb_threads_tenant_no_bypass(self):
-        from services.billing import charge
-
-        calls, fake = _capture(fetchone_seq=[{"balance_thb": "50.00"}, {"id": 2}])
-        with (
-            mock.patch.object(charge.db, "is_user_billing_exempt", return_value=False),
-            mock.patch.object(charge.db, "get_cursor_rls", fake),
-            mock.patch("core.db.get_cursor", side_effect=AssertionError("钱写入禁用 owner 裸游标")),
-        ):
-            r = charge.deduct_thb(USER, TENANT, 1.0, "rag")
         self.assertTrue(r["ok"])
         _no_bypass(self, calls)
         self.assertEqual(calls[0].get("tenant_id"), TENANT)

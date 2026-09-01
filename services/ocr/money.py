@@ -36,7 +36,7 @@ def normalize_id(v: Any) -> str:
 
 def valid_thai_tax_id(v: Any) -> bool:
     """泰国 13 位税号 MOD-11 校验位:末位 = 前 12 位加权和的校验码。先归一去分隔符;
-    非 13 位纯数字一律 False。算法同 services/knowledge/rules/validity(各域独立·不跨域耦合)。"""
+    非 13 位纯数字一律 False。"""
     s = normalize_id(v)
     if len(s) != 13:
         return False

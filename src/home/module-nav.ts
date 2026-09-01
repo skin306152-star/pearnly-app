@@ -4,7 +4,6 @@
 //      firm 后端默认开 accounting 却要收起做账/商品)。以拍板清单为唯一事实源,不再逐 if 算。
 //   ② 其余商户业态(retail/pharmacy/restaurant/service/b2b)= 按 GET /api/me/modules 逐模块动态显隐。
 // 隐藏≠删:全程 display 控制,DOM 保留,切业态即复现(深链路由不封 · 菜单收缩是导航减负非权限)。
-// knowledge 例外:由 knowledge-center.ts kbProbe 独占门控,两路都不碰(抢同一元素会回归)。
 /* global apiGet */
 
 import {
@@ -20,7 +19,6 @@ interface ModuleFlag {
     enabled?: boolean;
 }
 
-// 商户业态动态门控的模块 key(knowledge 除外 · 见文件头)。
 const GATEABLE = ['sales', 'expense', 'recon', 'inventory', 'pos', 'receivable', 'accounting'];
 
 function qs(sel: string): HTMLElement | null {
@@ -265,16 +263,9 @@ function apply(
 
     const preset = resolvePreset(businessType, on('pos'));
 
-    // 客户知识入口由 knowledge-center 的 kbProbe 按"有没有知识库"独立显隐(异步),module-nav 不抢。
-    // 唯 pos_only 收银壳 + cowork/erp 两个 lock 壳要它彻底消失(不在白名单)→ 置旗让 kbProbe 的
-    // reveal 不再显(竞态双保险)。
-    window._navShellHidesKnowledge =
-        businessType === 'pos_only' || window._entry === 'cowork' || window._entry === 'erp';
-
     if (preset) {
         applyNavPreset(preset);
         show(document.getElementById('nav-sales-records'), preset === ERP_PRESET);
-        if (businessType === 'pos_only') show(document.getElementById('nav-knowledge'), false);
         // 首页=计费面板,员工不给(隐藏 + 若正停在首页则落业务首页;非员工由清单决定首页显隐)。
         if (emp) {
             show(qs('.nav-item[data-route="dashboard"]'), false);

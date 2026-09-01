@@ -29,8 +29,6 @@ SHELL_ROUTES = [
     "/pos",
     "/earn",
     "/cashier",
-    "/console",
-    "/invite/x",
     "/ai",
     "/daily",
     "/reset",

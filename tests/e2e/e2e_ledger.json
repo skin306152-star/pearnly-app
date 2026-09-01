@@ -1008,7 +1008,7 @@
         "static/i18n-data.js",
         "tests/e2e/_helpers/**"
       ],
-      "only_e2e": ["firm 侧栏 8 项白名单、头像留团队与权限、强制选套账门不破"]
+      "only_e2e": ["firm 侧栏 8 项白名单、头像留 3 项、强制选套账门不破"]
     },
     "26-entrance-token-isolation.spec.js": {
       "covers": [
@@ -1286,19 +1286,6 @@
     "_empty_states_local.spec.js": {
       "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
       "only_e2e": ["空态 idle/empty/error 三态 data-state 与左色条真区分"]
-    },
-    "_f1_erp_permissions_console_local.spec.js": {
-      "covers": [
-        "static/console/console-i18n.js",
-        "static/console/console.html",
-        "static/console/console.js",
-        "static/dist/console.html",
-        "static/dist/console.js",
-        "tests/e2e/_local_static_server.js"
-      ],
-      "only_e2e": [
-        "真实 Console 自定义角色向导展开 ERP 权限组后四项均可见，且 owner-only 的管理 ERP 连接真呈锁定且不可选择；不覆盖 Express 真机或生产权限写入"
-      ]
     },
     "_f1_steward_attach_local.spec.js": {
       "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],

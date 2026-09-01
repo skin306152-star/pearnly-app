@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """AI 网关调用成本落库(ai_usage)· 数据访问层。
 
-唯一写点 = services/ai_gateway/logging.py::log_call —— Agent 对话/LINE 语音/知识库问答/
-OCR 全部经网关(run_task + transport 4 形态)的调用都汇到 log_call,这里落库即全覆盖。
+唯一写点 = services/ai_gateway/logging.py::log_call —— Agent 对话/LINE 语音/OCR
+经网关(run_task + transport)的调用都汇到 log_call,这里落库即全覆盖。
 
 与 ocr_cost_log(services/cost/store.py)口径不同、有重叠(OCR 走 multimodal_to_json 也经
 本表)—— 两表统计口径不一致,不可直接相加,取数见 routes/admin_cost_routes.py 对应端点。

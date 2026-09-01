@@ -234,7 +234,7 @@ def embed(
     dim: int = 768,
     timeout_s: int = 120,
 ) -> ProviderOutcome:
-    """text → 向量。走 batchEmbedContents REST,与知识库旧实现字节级一致(向量空间不漂)。"""
+    """text → 向量。走 batchEmbedContents REST。"""
     if not texts:
         return ProviderOutcome(ok=True, data=[])
     if not api_key:

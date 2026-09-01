@@ -75,9 +75,9 @@ def collect(
     except Exception:  # noqa: BLE001
         logger.warning("[purge-files] ocr_history 收集失败", exc_info=True)
 
-    # ② 知识库文档 / ④ 采购附件:都不带账期,只在整套账清除时收 —— 按期清不该动它们。
+    # 历史已下线文档与采购附件都不带账期,只在整套账清除时收 —— 按期清不该动它们。
     if scope is None:
-        # 知识库:相对 PDF_STORAGE_DIR/knowledge(见 services/knowledge/host_provider)
+        # 保留退役数据的文件回收,避免删除账套后遗留用户文件。
         try:
             for r in _rows(
                 cur,

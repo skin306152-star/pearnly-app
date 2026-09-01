@@ -5,7 +5,7 @@ REFACTOR-B1 守门测试 · OCR 异常检测 + 智能提醒链从 app.py 抽到 
 锁定(防搬迁回归 + 防重复拷贝):
   1. app.py 与 exception_checks 用同一份 _async_run_exception_checks / _parse_money
      (单一来源 · OCR/LINE 上传路由 + history PUT 共用 · 不许各自拷一份漂移)
-  2. confidence_low 规则码值不变(DB rule_code 契约 · 发票规则已统一进知识库引擎)
+  2. confidence_low 规则码值不变(DB rule_code 契约)
   3. _parse_money 行为契约不变
 """
 
@@ -31,7 +31,7 @@ class ExceptionChecksContractTests(unittest.TestCase):
         )
 
     def test_rule_code_constants(self):
-        """confidence_low 规则码值不变;发票规则码现由知识库引擎(R-*)统一产出"""
+        """confidence_low 规则码值不变。"""
         self.assertEqual(exception_checks.EXC_RULE_CONFIDENCE_LOW, "confidence_low")
 
     def test_parse_money_behavior(self):

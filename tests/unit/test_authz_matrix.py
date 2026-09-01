@@ -30,7 +30,7 @@ def _expected(role, code):
     if code in ERP:
         return role == "admin" and code != "erp.endpoint.manage"
     if role == "admin":
-        return code not in {"billing.manage", "ownership.transfer", "erp.endpoint.manage"}
+        return code not in {"billing.manage", "erp.endpoint.manage"}
     if role == "cashier":
         return code in {"pos.sale.operate", "pos.shift.operate"}
     if role == "viewer":
@@ -43,7 +43,7 @@ def _expected(role, code):
             }
         )
     if role == "clerk":
-        if code in {"kb.ask", "intake.upload"}:
+        if code == "intake.upload":
             return True
         return code in BUSINESS - POS and _verb(code) in {"view", "create", "edit", "delete"}
     if role == "accountant":
@@ -88,7 +88,7 @@ class MatrixInvariantTests(unittest.TestCase):
         missing = ALL - registry.ROLE_PERMISSIONS["admin"]
         self.assertEqual(
             missing,
-            {"billing.manage", "ownership.transfer", "erp.endpoint.manage"},
+            {"billing.manage", "erp.endpoint.manage"},
         )
 
     def test_erp_permissions_are_explicit_by_system_role(self):
@@ -119,10 +119,9 @@ class MatrixInvariantTests(unittest.TestCase):
             {"pos.sale.operate", "pos.shift.operate"},
         )
 
-    def test_no_role_touches_team_below_admin(self):
+    def test_non_admin_roles_cannot_manage_billing_or_settings(self):
         for role in ("accountant", "clerk", "viewer", "cashier"):
             for code in registry.ROLE_PERMISSIONS[role]:
-                self.assertFalse(code.startswith("team."), f"{role} 不可管团队: {code}")
                 self.assertFalse(code.startswith("billing."), f"{role} 不可碰计费: {code}")
                 self.assertFalse(code.startswith("settings."), f"{role} 不可碰设置: {code}")
 

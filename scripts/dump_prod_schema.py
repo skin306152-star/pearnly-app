@@ -45,7 +45,7 @@ HEADER = """-- Pearnly · 生产库表结构快照(自动生成 · 只读参照 
 --
 -- 空库重放(扩展得先自己装 · 本文件不建):
 --   psql -d <空库> -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto'      -- gen_random_uuid()
---                  -c 'CREATE EXTENSION IF NOT EXISTS vector'        -- knowledge_embeddings
+--                  -c 'CREATE EXTENSION IF NOT EXISTS vector'
 --                  -f prod-schema.sql
 """
 

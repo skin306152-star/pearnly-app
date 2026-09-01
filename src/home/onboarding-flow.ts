@@ -146,7 +146,6 @@ function done(): string {
         [true, t('onbf-cl-subject'), t('onbf-cl-subject-d'), ''],
         [false, t('onbf-cl-invoice'), t('onbf-cl-invoice-d'), 'sales-invoices'],
         [false, t('onbf-cl-expense'), t('onbf-cl-expense-d'), 'purchase'],
-        [false, t('onbf-cl-invite'), t('onbf-cl-invite-d'), 'console'],
     ];
     const list = items
         .map(
@@ -365,8 +364,7 @@ async function saveAcctThenPick(): Promise<void> {
 
 function gotoAndClose(to: string): void {
     finish();
-    if (to === 'console') window.location.href = '/console';
-    else if (typeof window.routeTo === 'function') window.routeTo(to);
+    if (typeof window.routeTo === 'function') window.routeTo(to);
 }
 
 // 完成/跳过:关向导 → 刷新导航与右上角切换器,让新主体即时可用。

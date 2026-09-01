@@ -4,9 +4,9 @@ services/membership/schema.py · 多租户 P0 memberships/roles/client_assignmen
 启动期建表(REFACTOR-B2)
 
 从 db.py 抽出的「v118.27.7 多租户改造 P0 数据层」schema 初始化(启动期幂等):
-- roles 表(RBAC 预留 · 3 系统角色 owner/manager/staff)
+- roles 表(业务授权与 ERP 团队权限的基础表)
 - memberships 表(用户挂事务所 · UNIQUE(user_id) · 1 人 1 事务所)
-- client_assignments 表(老板分客户给员工 · 限员工可见客户)
+- client_assignments 表(只读兼容历史员工可见范围,避免权限意外扩大)
 - tenants.tenant_type_v2 列(s_micro/m_business/f_firm 经营层 · NULL=待分类)
 
 注意:本文件只负责 schema 初始化 · 不动 RLS 基础设施代码内部(_is_rls_enabled /
@@ -25,10 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 def ensure_membership_tables():
-    """启动时建 3 张表 + 灌系统角色 + ALTER 老表加列 · 幂等"""
+    """启动时建 3 张基础表 + ALTER 老表加列 · 幂等。"""
     try:
         with db.get_cursor(commit=True) as cur:
-            # ── 1. roles 表(RBAC 预留 · 现在不接逻辑只建表)
+            # ── 1. roles 表(具体系统角色由 authz_schema 统一种子)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS roles (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -38,15 +38,6 @@ def ensure_membership_tables():
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
             """)
-            # 灌 3 个系统角色(幂等)
-            cur.execute("""
-                INSERT INTO roles (name, permissions, is_system) VALUES
-                    ('owner',   '{"all": true}'::jsonb,                                              TRUE),
-                    ('manager', '{"manage_team": true, "view_all_clients": true}'::jsonb,           TRUE),
-                    ('staff',   '{"view_assigned_clients": true}'::jsonb,                           TRUE)
-                ON CONFLICT (name) DO NOTHING;
-            """)
-
             # ── 2. memberships 表(用户挂事务所 + 角色 + 状态)
             # Q1 砍 M:N · UNIQUE(user_id) · 1 人 1 事务所
             cur.execute("""
@@ -63,7 +54,7 @@ def ensure_membership_tables():
                 CREATE INDEX IF NOT EXISTS idx_memberships_status ON memberships(status) WHERE status = 'active';
             """)
 
-            # ── 3. client_assignments 表(谁能看哪个客户 · 所长授权)
+            # ── 3. client_assignments 表(历史员工可见范围只读兼容)
             # 注意:clients.id 是 BIGSERIAL(BIGINT)· 不是 UUID
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS client_assignments (
@@ -79,8 +70,8 @@ def ensure_membership_tables():
             """)
 
             # B8 RLS:client_assignments 是 user 维度(user_id NOT NULL·无 tenant_id)。force=False:
-            # 授权 resolver(get_visible_client_ids_for_user·先有鸡)、console 老板分配、建客户自动分配
-            # 全走 owner,绕过不破·policy 仅二道防线。roles/memberships 是根表(超管/授权基座)不 enroll。
+            # 授权 resolver(get_visible_client_ids_for_user·先有鸡)走 owner,绕过不破·policy 仅二道防线。
+            # roles/memberships 是根表(超管/授权基座)不 enroll。
             from core.rls import apply_user_rls
 
             apply_user_rls(cur, "client_assignments")
@@ -94,9 +85,7 @@ def ensure_membership_tables():
 
             # ── 5. clients 表 · tenant_id 列已存在(v107 ensure_clients_table 已建)· 不重复 ALTER
 
-            logger.info(
-                "✅ v118.27.7 · memberships / client_assignments / roles 表已就绪 · 3 系统角色已灌入"
-            )
+            logger.info("✅ v118.27.7 · memberships / client_assignments / roles 表已就绪")
     except Exception as e:
         logger.error(f"ensure_membership_tables failed: {e}")
 

@@ -44,15 +44,6 @@ export function render() {
 }
 """
 
-SHARED_GETTER = """export function kbT(key, fallback) {
-    if (typeof window.t === 'function') {
-        const s = window.t(key);
-        if (s && s !== key) return s;
-    }
-    return fallback;
-}
-"""
-
 
 class GateFixture(unittest.TestCase):
     """每个用例一份最小 /home 树:一份 window.I18N + 若干源文件。"""
@@ -132,14 +123,6 @@ class CounterEvidenceTests(GateFixture):
             " ? w.t(k) : k;\n}\nconst s = T('ghost-key');\n",
         )
         self.assertRed("ghost-key")
-
-    def test_imported_shared_getter_with_unknown_key_fails(self):
-        self.src("knowledge-api.ts", SHARED_GETTER)
-        self.src(
-            "knowledge-ask.ts",
-            "import { kbT } from './knowledge-api.js';\nconst s = kbT('ghost-key', '兜底');\n",
-        )
-        self.assertIn("knowledge-ask.ts:2", self.assertRed("ghost-key"))
 
     def test_data_i18n_attribute_with_unknown_key_fails(self):
         self.src("x.ts", 'const html = `<div data-i18n="ghost-key">连接</div>`;\n')

@@ -181,7 +181,7 @@ class EnrollmentPromotionPgSmokeTests(unittest.TestCase):
         c.execute(
             "INSERT INTO roles (id,key,name,permissions,tenant_id) VALUES "
             "(%s,'owner','owner','{\"all\":true}',NULL),(%s,'admin','admin','[]',NULL),"
-            "(%s,'custom:staff','custom:staff','[]',%s)",
+            "(%s,'custom:erp-team-p','custom:erp-team-p','[]',%s)",
             (OWNER_ROLE, ADMIN_ROLE, CUSTOM_ROLE, TENANT_A),
         )
         c.execute(

@@ -3,8 +3,7 @@
 项目统一用 unittest(CI 跑 `unittest discover`;pytest 不在任何 requirements)。
 凡引入 pytest 的测试,本地能过(因本地恰好装了 pytest),却在 CI 抛 ModuleNotFoundError
 把 master 弄红 —— 本地假绿、CI 才爆,几乎每个窗口都踩。这道测试把规则机器化,
-任何窗口都无法再引入这个坑。pytest 风格的迁移函数走
-tests/unit/knowledge/_pytest_adapter.py 桥接到 unittest,运行期不依赖 pytest。
+任何窗口都无法再引入这个坑。测试统一直接使用 unittest。
 """
 
 import re
@@ -33,5 +32,5 @@ class NoPytestDependencyTests(unittest.TestCase):
             offenders,
             [],
             "测试文件禁止 import pytest(CI 不装 pytest → 本地假绿 / master 红)· "
-            "改用 unittest 风格或 _pytest_adapter 桥接 · 命中:" + ", ".join(offenders),
+            "改用 unittest 风格 · 命中:" + ", ".join(offenders),
         )

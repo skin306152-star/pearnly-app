@@ -42,19 +42,3 @@ def test_drawer_mounts_cowork_identity_instead_of_the_legacy_bot_panel():
     assert "window._loadLineBotPanel" not in source
     assert "line: 'linebot'" not in source
     assert not (ROOT / "src/home/line-panel.ts").exists()
-
-
-def test_console_invites_by_email_and_keeps_the_copy_link_result():
-    source = read("static/console/console.js")
-    assert 'data-ch="line"' not in source
-    assert "inv_target_line" not in source
-    assert "channel: 'email'" in source
-    assert "j.invite_url" in source
-    assert "navigator.clipboard.writeText(j.invite_url)" in source
-
-
-def test_console_invite_copy_has_no_line_contact_keys_in_any_language():
-    source = read("static/console/console-i18n.js")
-    for key in ("inv_channel", "inv_line", "inv_target_line", "inv_line_tip"):
-        assert key + ":" not in source
-    assert source.count("inv_target_email:") == 4

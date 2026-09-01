@@ -41,7 +41,7 @@ class MembershipSchemaReExportTests(unittest.TestCase):
 
 
 class EnsureMembershipTablesTests(unittest.TestCase):
-    def test_builds_three_tables_and_seeds_roles(self):
+    def test_builds_three_base_tables_without_legacy_role_seeds(self):
         from services.membership import schema
 
         cur = _FakeCursor()
@@ -55,8 +55,7 @@ class EnsureMembershipTablesTests(unittest.TestCase):
         self.assertTrue(
             any("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tenant_type_v2" in s for s in sqls)
         )
-        # 3 系统角色 seed
-        self.assertTrue(any("INSERT INTO roles" in s and "'owner'" in s for s in sqls))
+        self.assertFalse(any("INSERT INTO roles" in s for s in sqls))
 
     def test_db_error_swallowed_not_raised(self):
         """ensure_membership_tables 失败仅 log error · 不抛(启动期不阻塞主流程)"""

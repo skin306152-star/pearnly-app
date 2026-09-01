@@ -182,8 +182,8 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 POS schema 失败: {e}")
 
-    # 权限整顿批1 schema(roles 激活+种子 / memberships 加列+回填 / member_scopes /
-    # invitations · docs/permissions/01)。NEW-DEBT-EXEMPT: 启动自愈式迁移同上口径。
+    # 业务权限与 ERP 团队 schema(roles / memberships / member_scopes / erp_team_members)。
+    # NEW-DEBT-EXEMPT: 启动自愈式迁移同上口径。
     try:
         from services.db_migrations.authz_schema import ensure_authz_schema
 

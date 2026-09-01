@@ -24,7 +24,7 @@ from typing import Dict, NamedTuple, Tuple
 
 from services.ai_gateway.providers.openai import taxops_intent_model, taxops_verdict_model
 from services.ai_gateway.providers import qwen as qwen_provider
-from services.ai_gateway.providers.vertex import _embed_model, _location, _location_for_model
+from services.ai_gateway.providers.vertex import _location_for_model
 from services.ocr import engine_policy, gemini_models
 
 
@@ -78,7 +78,6 @@ EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     # 前门意图解析(front_desk.interpret):独立旋钮 TAXOPS_INTENT_MODEL,默认同 verdict(luna)。
     # 与 verdict 各是各的车道——改意图档不连坐裁决档/对话档/OCR,反向亦然(契约测试锁死)。
     "taxops.intent": Route("openai/gpt-5.6-luna", "", "openai"),
-    "knowledge.embedding": Route("gemini-embedding-001", "asia-southeast1"),
     # direct35 = 直通档(空覆写),四档如实等于 env 默认——银行对账单钉的就是它。
     "ocr.direct35.flash": Route("gemini-3.5-flash", "asia-southeast1"),
     "ocr.direct35.flash_lite": Route("gemini-3.5-flash", "asia-southeast1"),
@@ -116,7 +115,6 @@ def resolve_routes() -> "OrderedDict[str, Route]":
     routes["agent.best"] = _route(gemini_models.best())
     routes["taxops.verdict"] = Route(taxops_verdict_model(), "", "openai")
     routes["taxops.intent"] = Route(taxops_intent_model(), "", "openai")
-    routes["knowledge.embedding"] = Route(_embed_model(), _location())
     for mode in engine_policy.CONCRETE_MODES:
         backend = engine_policy.MODE_BACKENDS.get(mode)
         if backend:

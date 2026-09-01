@@ -127,9 +127,8 @@ def create_member_user(
 ) -> str:
     """在既有事务游标上建一个 member 用户(role='member' · bcrypt 密码 · is_active)· 返回新 user_id。
 
-    可复用的建员工用户原语(不含 membership/scopes —— 那些由邀请接受流程另按需装配):
-    邀请接受(services/team/invitations.accept)自带 membership + 邮箱去重,走它自己的一体
-    事务;本原语专给「无 membership 的租户内用户」场景(如波3 DMS 操作员——只用 LINE、不进
+    可复用的建员工用户原语(不含 membership/scopes)。本原语专给「无 membership 的租户内
+    用户」场景(如波3 DMS 操作员——只用 LINE、不进
     网页门户、不需要权限作用域),避免那类调用点各自手抄 users INSERT。调用方负责事务边界
     与用户名唯一性(唯一约束撞了在此抛,由调用方回滚兜底)。
     """

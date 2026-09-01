@@ -282,9 +282,6 @@
                 </div>
             </div>
 
-            <!-- 团队管理 tab 已下线(2026-06-10):团队/权限统一收口到 /console(avatar 菜单「团队与权限」)·
-                 旧 tab 调的 /api/team/* 接口已随权限批5删除 · 删 tab 防点开载入失败 -->
-
             <!-- v118.19.1 · Tab · 归档规则(从识别中心右上角移过来 · 低频功能) -->
             <div class="settings-pane" data-pane="archive">
                 <div class="card">

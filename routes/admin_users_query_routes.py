@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from core import db
 from core.route_helpers import _require_super_admin
 from services.export.csv_safe import SafeCsvWriter
-from services.team import console_store
+from services.team.employee_query import list_employees
 
 logger = logging.getLogger("mr-pilot")
 
@@ -164,9 +164,7 @@ async def admin_user_detail(user_id: str, request: Request):
     if not user:
         raise HTTPException(404, detail="admin.user_not_found")
     tenant = db.get_tenant(str(user["tenant_id"])) if user.get("tenant_id") else None
-    employees = (
-        console_store.list_employees(str(user["tenant_id"])) if user.get("tenant_id") else []
-    )
+    employees = list_employees(str(user["tenant_id"])) if user.get("tenant_id") else []
 
     # 累计 OCR · 最近识别 · 付款次数
     cumulative_ocr = 0

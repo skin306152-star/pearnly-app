@@ -9,7 +9,7 @@ CI(tests/unit/test_model_routing_matrix.py)锁的是代码默认路由表;本脚
 
 用法:
     python scripts/smoke_model_routes.py            # 只解析,不联网,零成本
-    python scripts/smoke_model_routes.py --fire     # 大脑/主力/economy读取臂/embedding 各一发
+    python scripts/smoke_model_routes.py --fire     # 大脑/主力/economy读取臂各一发
 """
 
 from __future__ import annotations
@@ -87,17 +87,6 @@ def _fire_one(label: str, tier: str, mode: str | None) -> None:
     print(f"{label:<26} {status:<12} model={out.model or '?':<26} {ms}ms")
 
 
-def _fire_embedding() -> None:
-    t0 = time.time()
-    try:
-        out = backends.get_provider().embed(["ping"])
-        ms = int((time.time() - t0) * 1000)
-        status = "OK" if out.ok else f"FAIL({out.error_kind})"
-        print(f"{'knowledge.embedding':<26} {status:<12} model={out.model or '?':<26} {ms}ms")
-    except Exception as e:  # noqa: BLE001 — 冒烟工具:任何炸法都要落成一行可读结果
-        print(f"{'knowledge.embedding':<26} FAIL(raise)  {type(e).__name__}: {str(e)[:100]}")
-
-
 def _fire_selfhost() -> None:
     """自部署档一发:走 selfhost provider(SELFHOST_OCR_* 未配 → FAIL(auth),即"端点没接上"信号)。"""
     from services.ai_gateway import backends
@@ -141,7 +130,6 @@ def fire_all() -> None:
     # 千问两臂分模型 —— 只打一发看不出升级臂通不通
     _fire_qwen("flash")
     _fire_qwen("escalate")
-    _fire_embedding()
 
 
 def main() -> None:

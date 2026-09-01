@@ -15,13 +15,13 @@ const ROOTS = ['src/home', 'static'];
 // 设计系统"实物源/令牌定义"文件——允许裸 hex(它们就是令牌来源),扫描时跳过 hex 检查。
 // dms-shell.css / dms-intake.css 是 /dms 独立 SPA 的令牌源:该 SPA 只加载自身 bundle,不接
 // 主站 emerald 令牌基建,:root / .dmsx 块里的 hex 即令牌定义本身(文件头注释「走 TOKEN_CSS
-// 白名单」),与 ai-theme.css/console-theme.css 同类,故一并豁免 hex 检查(其余检查照常)。
+// 白名单」),与 ai-theme.css 同类,故一并豁免 hex 检查(其余检查照常)。
 // pearnly-ui.css 是全站设计系统的令牌源本身(Layer 1 的 violet/gray 原色阶 + Layer 2 语义
 // 令牌即 hex 定义处),与 ai-theme.css/home-01-base.css 同类,故一并豁免 hex 检查。
 // admin-viz.css 是超管后台图表的令牌源:分类色板要过色觉障碍分离度校验、状态色要与分类色
 // 不同族,取不出品牌紫的色阶,:root 块里的 hex 即令牌定义本身(同 ai-theme.css / dms-shell.css)。
 const TOKEN_SOURCE =
-    /kit-final\.html|templates\.html|dashboard-final\.html|a\.html|b\.html|c\.html|kit\.html|i18n-data|sales-wizard-i18n|home-01-base\.css|console-theme\.css|home-48-recon-redesign\.css|ai-theme\.css|dms-shell\.css|dms-intake\.css|pearnly-ui\.css|admin-viz\.css/i;
+    /kit-final\.html|templates\.html|dashboard-final\.html|a\.html|b\.html|c\.html|kit\.html|i18n-data|sales-wizard-i18n|home-01-base\.css|home-48-recon-redesign\.css|ai-theme\.css|dms-shell\.css|dms-intake\.css|pearnly-ui\.css|admin-viz\.css/i;
 const SKIP_DIR = /node_modules|[\\/]dist[\\/]|_mock|\.map$/i;
 // vendor/ 是自托管的第三方运行时(React/THREE/GSAP/support.js/字体 + static/vendor 的 ZXing),
 // 不是 Pearnly 应用设计系统的一部分,且成百上千个 minified 文件无法逐个加标记 → 只能按目录整块

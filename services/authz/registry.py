@@ -2,7 +2,7 @@
 """权限码 registry · 合法权限码与角色码集的单一来源(docs/permissions/02)。
 
 码形如 <模块>.<资源>.<动作>,动词收敛(view/create/edit/delete/approve/export/
-manage/operate;acct.entry.review/kb.ask/tax.filing.review/tax.filing.file 是图纸
+manage/operate;acct.entry.review/tax.filing.review/tax.filing.file 是图纸
 钦定的特例——四权分立命名贴 RD 实务动作,不硬凑收敛动词)。
 roles 表的 permissions JSONB 每次启动按本文件刷新;JSONB 出现 registry 没有的码
 = selfcheck() 报错(防漂移)。
@@ -13,20 +13,12 @@ from __future__ import annotations
 # ── 权限码全集(按模块分组 · 改这里必同步 docs/permissions/02 与矩阵单测)
 
 CROSS_CODES = (
-    "team.member.view",
-    "team.member.invite",
-    "team.member.edit_role",
-    "team.member.scope",
-    "team.member.remove",
-    "team.member.toggle",
     "billing.view",
     "billing.manage",
-    "ownership.transfer",
     "settings.org.view",
     "settings.org.edit",
     "settings.modules.manage",
     "settings.workspace.manage",
-    "audit.log.view",
 )
 
 SALES_CODES = (
@@ -82,13 +74,6 @@ AR_CODES = (
     "ar.edit",
 )
 
-KB_CODES = (
-    "kb.doc.view",
-    "kb.doc.create",
-    "kb.doc.delete",
-    "kb.ask",
-)
-
 INV_CODES = (
     "inv.view",
     "inv.create",
@@ -122,7 +107,7 @@ ERP_CODES = (
 )
 
 # 敏感字段可见性(G4 · 字段级遮蔽,非模块动作)。缺码 → 成本/工资列读侧返 null。
-# 不挂任何模块开关(横切),预设角色除收银员外按现状全开;自定义角色可关。
+# 不挂任何模块开关(横切),预设角色除收银员外按现状全开;ERP 团队角色按分工授予。
 FIELD_CODES = (
     "field.cost.view",
     "field.payroll.view",
@@ -136,7 +121,6 @@ ALL_CODES: frozenset[str] = frozenset(
     + TAX_CODES
     + RECON_CODES
     + AR_CODES
-    + KB_CODES
     + INV_CODES
     + POS_CODES
     + INTAKE_CODES
@@ -155,17 +139,13 @@ _PREFIX_MODULE = {
     "tax": None,
     "recon": "recon",
     "ar": "receivable",
-    "kb": "knowledge",
     "inv": "inventory",
     "pos": "pos",
     "intake": "expense",
     "stockcard": "accounting",
     "erp": None,
-    "team": None,
     "billing": None,
-    "ownership": None,
     "settings": None,
-    "audit": None,
     "field": None,
 }
 
@@ -192,12 +172,11 @@ _VIEW_EXPORT = (
     "recon.view",
     "recon.export",
     "ar.view",
-    "kb.doc.view",
     "inv.view",
     "inv.report.view",
     "pos.report.view",
     "stockcard.report.view",
-    # 预设角色按现状可见成本/工资(G4:默认全开,自定义角色才关)
+    # 预设角色按现状可见成本/工资;ERP 团队角色默认不授予
     "field.cost.view",
     "field.payroll.view",
 )
@@ -220,10 +199,6 @@ _CLERK = (
     "ar.view",
     "ar.create",
     "ar.edit",
-    "kb.doc.view",
-    "kb.doc.create",
-    "kb.doc.delete",
-    "kb.ask",
     "inv.view",
     "inv.create",
     "inv.report.view",
@@ -256,7 +231,7 @@ _ACCOUNTANT = _CLERK + (
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     # owner 在 roles 表存 {"all": true},此处展开全集供矩阵单测逐格断言
     "owner": ALL_CODES,
-    "admin": ALL_CODES - {"billing.manage", "ownership.transfer", "erp.endpoint.manage"},
+    "admin": ALL_CODES - {"billing.manage", "erp.endpoint.manage"},
     "accountant": frozenset(_ACCOUNTANT),
     "clerk": frozenset(_CLERK),
     "viewer": frozenset(_VIEW_EXPORT),

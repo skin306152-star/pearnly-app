@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """Pearnly · OCR 异常检测服务模块。
 
-OCR 完成后异步跑异常规则。发票规则(算术 / 税号 / 查重 / 完整性 / 客户规矩)由
-统一的知识库死规则引擎(services.knowledge)产出,写进现有异常存储——单一来源。
-本模块只保留不属于发票规则的 confidence_low OCR 质量信号。
+OCR 完成后异步跑异常规则。本模块只保留 confidence_low OCR 质量信号。
 """
 
 from __future__ import annotations
@@ -81,17 +79,5 @@ async def _async_run_exception_checks(
                     total_amount=total_amount,
                     detail={"confidence": confidence},
                 )
-        # ── 发票规则:统一引擎产出 findings → 写异常(查重 / 算术 / 税号 / 完整性 / 客户规矩)
-        from services.exceptions import knowledge_bridge
-
-        knowledge_bridge.run_and_record(
-            history_id=history_id,
-            user_id=user_id,
-            tenant_id=tenant_id,
-            seller_name=seller_name,
-            invoice_no=invoice_no,
-            total_amount=total_amount,
-            fields=fields,
-        )
     except Exception as e:
         logger.warning(f"_async_run_exception_checks failed (hid={history_id}): {e}")

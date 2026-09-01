@@ -49,7 +49,7 @@ class PresetTableTests(unittest.TestCase):
     def test_pos_only_opens_five_modules(self):
         # Zihao 2026-07-11 拍板:被邀请的 POS 商家开通即全功能可用(写死),不再有二道开关。
         # 五模块覆盖 POS 老板后台壳(nav-presets.ts POS_PRESET)暴露的全部功能;
-        # knowledge/recon/receivable 不在壳内,仍不开。
+        # recon/receivable 不在壳内,仍不开。
         self.assertEqual(
             set(presets.BUSINESS_PRESETS["pos_only"]),
             {"pos", "inventory", "sales", "expense", "accounting"},
@@ -73,11 +73,10 @@ class ApplyPresetTests(unittest.TestCase):
                 # set_module(config=None) 形态:params = (tenant, module_key, enabled)
                 if params[1] in store.KNOWN_MODULES:
                     toggled[params[1]] = params[2]
-        # firm 预设:sales/expense/recon/knowledge 开;inventory/pos/receivable 关
+        # firm 预设:sales/expense/recon/accounting 开;inventory/pos/receivable 关
         self.assertEqual(toggled["sales"], True)
         self.assertEqual(toggled["expense"], True)
         self.assertEqual(toggled["recon"], True)
-        self.assertEqual(toggled["knowledge"], True)
         self.assertEqual(toggled["inventory"], False)
         self.assertEqual(toggled["pos"], False)
         self.assertEqual(toggled["receivable"], False)

@@ -262,9 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast(t('seller-activated').replace('{name}', ws ? ws.name : ''), 'success');
             } else if (act === 'edit') {
                 if (ws) openWsClientModal(ws);
-            } else if (act === 'assign') {
-                if (ws && typeof window.openClientAssign === 'function')
-                    window.openClientAssign({ id: wid, name: ws.name });
             } else if (act === 'archive') {
                 S.editingWsClientId = wid as unknown as string;
                 archiveWsClient();

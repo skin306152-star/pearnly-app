@@ -49,13 +49,9 @@ const BUNDLES = [
             'landing/landing-tour.js',
         ],
     },
-    // 管理控制台 SPA · 邀请接受公开页:plain-script 逻辑 minify 进 dist(view-source 只见外壳)。
-    // console-i18n.js 是纯翻译数据(window.CI18N · 同 home 的 i18n-data.js),保留独立 raw 在 HTML 先加载。
-    { out: 'static/dist/console.js', files: ['console/console.js'] },
-    { out: 'static/dist/invite.js', files: ['console/invite.js'] },
     // POS 收银 SPA(零售/药房/餐厅三业态):8 个 plain-script 逻辑文件按 DOM 顺序拼成一个
     // bundle(pos.js 原是 defer · 整 bundle 在 pos.html 以 defer 加载,执行时序不变)。
-    // pos-i18n.js 是纯翻译数据(window.POSI18N · 同 console-i18n),保留独立 raw 先加载。
+    // pos-i18n.js 是纯翻译数据(window.POSI18N),保留独立 raw 先加载。
     // 离线链路(pos-offline outbox / pos-totals 本地算价)只是被打包,逻辑零改;pos-sw
     // cache-first 缓存此 bundle,bump CACHE 名即让旧的按文件缓存失效。
     {
@@ -86,7 +82,7 @@ const BUNDLES = [
         ],
     },
     // Pearnly AI SPA(M1-W3)· 纯函数模块在前,DOM 编排模块在后,boot(ai.js)收尾。
-    // ai-i18n.js 是纯翻译数据(window.AII18N · 同 console-i18n/pos-i18n),独立 <script> 先加载。
+    // ai-i18n.js 是纯翻译数据(window.AII18N · 同 pos-i18n),独立 <script> 先加载。
     // ai-board.js(分列/摘要纯函数)必须排在 ai-kanban-render.js(用它渲染)之前;
     // ai-kanban-render.js 必须排在 ai-dashboard.js(用它渲染看板)之前。
     // ai-viewer.js(原件查看器框架,零依赖)必须排在 ai-review-render.js(拼查看器骨架 HTML)
@@ -417,7 +413,7 @@ const BUNDLES = [
     // Pearnly Daily SPA(收支周记 · 独立入口壳):纯逻辑/状态 core 在前(daily-core.js 定义
     // window.DailyCore · UMD 导出纯函数供 node 单测),门禁层 daily-gate.js 次之,UI 主壳
     // daily.js 最后加载(读 DailyCore/DailyGate)。i18n 数据(daily-i18n.js)是独立 <script>
-    // 先加载(同 console-i18n 范式),不并入 bundle。
+    // 先加载,不并入 bundle。
     {
         out: 'static/dist/daily.js',
         files: [

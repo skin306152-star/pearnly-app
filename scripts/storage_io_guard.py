@@ -60,7 +60,6 @@ _ALLOWLIST = {
     "core/file_crypto.py",
     "services/workorder/storage.py",
     "services/ocr/pdf_storage.py",
-    "services/knowledge/host_provider.py",
     "services/line_binding/line_intake_staging.py",
     "routes/vat_excel_routes.py",
     "scripts/ops/encrypt_storage_backfill.py",

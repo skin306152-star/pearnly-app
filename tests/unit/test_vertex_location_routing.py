@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Vertex per-model 区域路由:2.5/3.1/3.6 只在 global 端点跑得通(实测 2.5 返 404、
 3.1-lite 返空 JSON、3.6-flash 在 asia-se1 与 us-central1 均 404),必须自动落 global;
-embedding 留就近区域,不被 global-only 档的路由牵连(否则知识库换区/延迟劣化)。"""
+embedding 留就近区域,不被 global-only 档的路由牵连。"""
 
 from __future__ import annotations
 

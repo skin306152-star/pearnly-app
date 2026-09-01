@@ -72,9 +72,6 @@ const TARGETS = [
     { src: 'login.html', out: 'static/dist/login.html' },
     // 脸0 品牌门户(dc-runtime 营销页 · 路由 /)· 源逐字保真在 static/landing/,产物压成外壳。
     { src: 'static/landing/portal.dc.html', out: 'static/dist/portal.html' },
-    // 管理控制台 / 邀请接受页:壳成品化(JS/CSS 早已进 dist · 此处收口 HTML 外壳)。
-    { src: 'static/console/console.html', out: 'static/dist/console.html' },
-    { src: 'static/console/invite.html', out: 'static/dist/invite.html' },
     // POS 收银 SPA:壳成品化(8 逻辑 JS 已合 dist/pos.js · 2 CSS 已合 dist/pos.css)。
     { src: 'static/pos/pos.html', out: 'static/dist/pos.html' },
     // POS 老板后台登录页(路由 /pos)· 原内联 routes/pos_login_page.py 常量 → 挪成可读源 + dist 产物。

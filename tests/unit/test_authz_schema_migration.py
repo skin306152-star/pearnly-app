@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""authz ensure 迁移守门:种子 6 角色 / 加列 / 回填幂等 / 建表(docs/permissions/01)。
+"""authz ensure 迁移守门:种子 6 角色 / 加列 / 回填幂等 / ERP 团队建表。
 
 内存假游标拦 SQL · 不触真库(同 test_numbering_workspace_migration 套路)。
 """
@@ -78,9 +78,10 @@ class AuthzMigrationTests(unittest.TestCase):
         self.assertIn("u.role = 'owner' OR u.invited_by IS NULL", joined)
         self.assertIn("ELSE 'accountant'", joined)
 
-    def test_creates_scope_and_invitation_tables(self):
+    def test_creates_scope_and_erp_team_tables(self):
         joined = " || ".join(self._run().sql)
         self.assertIn("CREATE TABLE IF NOT EXISTS member_scopes", joined)
         self.assertIn("workspace_client_id BIGINT NOT NULL", joined)
-        self.assertIn("CREATE TABLE IF NOT EXISTS invitations", joined)
-        self.assertIn("uq_invitations_token_hash", joined)
+        self.assertIn("CREATE TABLE IF NOT EXISTS erp_team_members", joined)
+        self.assertNotIn("CREATE TABLE IF NOT EXISTS invitations", joined)
+        self.assertNotIn("CREATE TABLE IF NOT EXISTS ownership_transfers", joined)

@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 """B8 RLS · settings 杂项域真表端到端隔离(REFACTOR-B8)。
 
-覆盖 6 张表 3 种模板,在真 postgres 上验隔离:
+覆盖 4 张表 2 种模板,在真 postgres 上验隔离:
 - tenant_or_user:user_settings / api_keys(user_id NOT NULL + tenant_id 可空·含 user-only 兜底分支)
-- tenant:invitations / ownership_transfers(tenant_id NOT NULL·无 user_id)
 - user:payment_pending / client_assignments(user_id NOT NULL·无 tenant_id)
 
 仓库无真 DDL(legacy 孤儿表)或建表散在多个 ensure,测试自带最小建表(列对齐 prod \\d)并直接调
-各自的 enroll 入口(ensure_settings_misc_rls / 内联进 ensure_authz/membership 的 apply_*)。CI 默认
+各自的 enroll 入口(ensure_settings_misc_rls / membership 的 apply_user_rls)。CI 默认
 skip,本地跑:
 
     set PEARNLY_INTEGRATION_DB=1
@@ -37,17 +36,6 @@ _DDL = {
         "id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL, "
         "key_prefix TEXT NOT NULL, key_hash TEXT NOT NULL, name TEXT NOT NULL, tenant_id UUID"
     ),
-    "invitations": (
-        "id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL, "
-        "role_key TEXT NOT NULL, scope_mode TEXT NOT NULL DEFAULT 'all', "
-        "workspace_ids JSONB NOT NULL DEFAULT '[]'::jsonb, token_hash TEXT NOT NULL, "
-        "invited_by UUID NOT NULL, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
-    ),
-    "ownership_transfers": (
-        "id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL, "
-        "from_user_id UUID NOT NULL, to_user_id UUID NOT NULL, token_hash TEXT NOT NULL, "
-        "expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
-    ),
     "payment_pending": (
         "id BIGSERIAL PRIMARY KEY, user_id UUID NOT NULL, target_plan TEXT NOT NULL, "
         "amount_thb NUMERIC NOT NULL, status TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
@@ -58,7 +46,6 @@ _DDL = {
     ),
 }
 
-_TENANT_TABLES = ("invitations", "ownership_transfers")
 _USER_TABLES = ("payment_pending", "client_assignments")
 _TOU_TABLES = ("user_settings", "api_keys")
 
@@ -80,7 +67,6 @@ class SettingsMiscRlsTests(unittest.TestCase):
                 cur.execute(f"CREATE TABLE {table} ({cols})")
             # 直接 enroll(对齐各域真实落点的模板,不依赖外部表 FK)。
             rls.apply_tenant_or_user_rls(cur, *_TOU_TABLES)
-            rls.apply_tenant_rls(cur, *_TENANT_TABLES)
             rls.apply_user_rls(cur, *_USER_TABLES)
             for table in _DDL:
                 cur.execute(f"GRANT SELECT,INSERT,UPDATE,DELETE ON {table} TO pearnly_app")
@@ -98,26 +84,6 @@ class SettingsMiscRlsTests(unittest.TestCase):
         with self.db.get_cursor_rls(bypass=True, commit=True) as cur:
             for table in _DDL:
                 cur.execute(f"TRUNCATE {table} RESTART IDENTITY CASCADE")
-
-    def test_tenant_tables_scoped(self):
-        with self.db.get_cursor_rls(bypass=True, commit=True) as cur:
-            cur.execute(
-                "INSERT INTO invitations (tenant_id, role_key, token_hash, invited_by, expires_at) "
-                "VALUES (%s,'staff','h1',%s,now()),(%s,'staff','h2',%s,now())",
-                (A, UA, B, UB),
-            )
-            cur.execute(
-                "INSERT INTO ownership_transfers (tenant_id, from_user_id, to_user_id, token_hash, expires_at) "
-                "VALUES (%s,%s,%s,'t1',now()),(%s,%s,%s,'t2',now())",
-                (A, UA, UB, B, UB, UA),
-            )
-        for table in _TENANT_TABLES:
-            with self.db.get_cursor_rls(tenant_id=A) as cur:
-                cur.execute(f"SELECT count(*) n FROM {table}")
-                self.assertEqual(cur.fetchone()["n"], 1, f"{table}: A 应只见 1 行")
-            with self.db.get_cursor_rls(tenant_id=FAKE) as cur:
-                cur.execute(f"SELECT count(*) n FROM {table}")
-                self.assertEqual(cur.fetchone()["n"], 0, f"{table}: 陌生租户应见 0 行")
 
     def test_user_tables_scoped(self):
         with self.db.get_cursor_rls(bypass=True, commit=True) as cur:
@@ -154,17 +120,6 @@ class SettingsMiscRlsTests(unittest.TestCase):
         with self.db.get_cursor_rls(tenant_id=None, user_id=FAKE) as cur:
             cur.execute("SELECT count(*) n FROM user_settings")
             self.assertEqual(cur.fetchone()["n"], 0, "陌生无租户用户见 0 行")
-
-    def test_with_check_blocks_cross_tenant(self):
-        import psycopg2
-
-        with self.db.get_cursor_rls(tenant_id=A, commit=True) as cur:
-            with self.assertRaises(psycopg2.errors.Error):
-                cur.execute(
-                    "INSERT INTO invitations (tenant_id, role_key, token_hash, invited_by, expires_at) "
-                    "VALUES (%s,'staff','x',%s,now())",
-                    (B, UA),
-                )
 
     def test_owner_bypass_sees_all(self):
         with self.db.get_cursor_rls(bypass=True, commit=True) as cur:

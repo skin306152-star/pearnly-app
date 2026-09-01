@@ -104,7 +104,6 @@ def main():
         erp_endpoints_routes,
         exceptions_routes,
         history_routes,
-        knowledge_routes,
         me_routes,
         recon_routes_bankv2,
         tenant_routes,
@@ -132,7 +131,6 @@ def main():
         status=None,
         period=None,
     )
-    _run("/api/knowledge/bases", knowledge_routes.list_bases, request=req)
 
 
 class _Resp:

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""模型路由总表契约:全车道(大脑/OCR 两档/embedding)最终模型+区域逐行锁死。
+"""模型路由总表契约:全车道(大脑/OCR 两档)最终模型+区域逐行锁死。
 
 治"改 OCR 把大脑搞坏"这类连坐:区域路由按模型名前缀生效(vertex),车道却按业务划分。
 任何改动牵动别的车道路由 → 本套断言红;有意改路由必须同 PR 更新 EXPECTED_DEFAULT_ROUTES。
@@ -82,13 +82,12 @@ class RoutingMatrixContractTests(unittest.TestCase):
         self.assertEqual(routes["taxops.intent"], rm.EXPECTED_DEFAULT_ROUTES["taxops.intent"])
 
     def test_vertex_location_env_does_not_move_global_only_lanes(self):
-        # VERTEX_LOCATION 只该挪非 global-only 模型(3.5/embedding);2.5/3.1 前缀的档不动。
+        # VERTEX_LOCATION 只该挪非 global-only 模型(3.5);2.5/3.1 前缀的档不动。
         with scrubbed_env(VERTEX_LOCATION="us-central1"):
             routes = rm.resolve_routes()
         self.assertEqual(routes["agent.brain"].vertex_location, "global")
         self.assertEqual(routes["ocr.economy.flash_lite"].vertex_location, "global")
         self.assertEqual(routes["ocr.direct35.flash"].vertex_location, "us-central1")
-        self.assertEqual(routes["knowledge.embedding"].vertex_location, "us-central1")
 
     def test_vertex_location_25_also_moves_brain_documented_coupling(self):
         # ★已知连坐(如实锁死,不是背书):VERTEX_LOCATION_25 按模型名前缀生效,
@@ -100,7 +99,7 @@ class RoutingMatrixContractTests(unittest.TestCase):
         self.assertEqual(routes["ocr.economy.flash_lite"].vertex_location, "asia-southeast1")
 
     def test_mode_maps_touch_ocr_tiers_only(self):
-        # engine_policy 的档位覆写永远只许碰 OCR 四档;谁往里塞 brain/embedding 直接红
+        # engine_policy 的档位覆写永远只许碰 OCR 四档;谁往里塞 brain 直接红
         for mode, mapping in ep.MODE_MODEL_MAPS.items():
             self.assertLessEqual(
                 set(mapping),

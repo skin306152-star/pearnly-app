@@ -6,8 +6,6 @@ REFACTOR-B1 守门测试 · 静态页面 + 公开 meta 路由从 app.py 抽到 p
   1. router 注册的 18 条路由 path+method 契约不变(防丢路由 / 改 URL)
      · REFACTOR-WA-B4 新增 /api/ready 真探活端点(铁律 #23.7)
      · PO-B3 新增 /pos · /pos/{rest:path} 收银前台 SPA 页面路由
-     · 权限批3 新增 /console · /console/{rest:path}(管理控制台 SPA)+
-       /invite/{token}(邀请接受公开页)· 都从 static/console 出
      · M1-W2 新增 /ai · /ai/{rest:path}(Pearnly AI SPA · 出 static/dist/ai.html)
   2. app.py 通过 include_router 真挂上了全部 18 条(防漏挂)
   3. /api/version **不在** pages_routes(在 meta_aliases · 读 PEARNLY_FRONTEND_VERSION
@@ -43,12 +41,9 @@ EXPECTED = {
     ("GET", "/cashier-sw.js"),
     ("GET", "/cashier"),
     ("GET", "/cashier/{rest:path}"),
-    ("GET", "/console"),
-    ("GET", "/console/{rest:path}"),
-    ("GET", "/invite/{token}"),
     # EN-2:超管后台专属登录页(admin.js 未登录统一甩回本页)
     ("GET", "/earn"),
-    # M1-W2 新增:Pearnly AI SPA 友好路由(照 /console 先例 · 出 static/dist/ai.html)
+    # M1-W2 新增:Pearnly AI SPA 友好路由(出 static/dist/ai.html)
     ("GET", "/ai"),
     ("GET", "/ai/{rest:path}"),
     # 批2 新增:Pearnly DMS SPA 友好路由(照 /ai 先例 · 出 static/dist/dms.html)
@@ -92,18 +87,11 @@ class PagesRoutesContractTests(unittest.TestCase):
         app_paths = {r.path for r in app.app.routes if hasattr(r, "path")}
         self.assertIn("/api/version", app_paths)
 
-    def test_console_routes_serve_console_assets(self):
-        """/console 双路由出成品化 dist/console.html · /invite/{token} 出 dist/invite.html(防接错文件)"""
+    def test_product_spas_serve_their_dist_assets(self):
         import asyncio
 
         from routes import pages_routes
 
-        console = "static/dist/console.html"
-        self.assertEqual(asyncio.run(pages_routes.console_page()).path, console)
-        self.assertEqual(asyncio.run(pages_routes.console_layout_page("team")).path, console)
-        self.assertEqual(
-            asyncio.run(pages_routes.invite_page("tok")).path, "static/dist/invite.html"
-        )
         ai = "static/dist/ai.html"
         self.assertEqual(asyncio.run(pages_routes.ai_page()).path, ai)
         self.assertEqual(asyncio.run(pages_routes.ai_layout_page("client/1/wo")).path, ai)

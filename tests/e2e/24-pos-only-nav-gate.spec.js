@@ -3,7 +3,7 @@
 // pos_only 是运营侧显式打标的拆卖收银店壳。本测试把一个真账号临时切到 pos_only,验证:
 //   ① 登录不弹「强制选套账」门,静默落套账直接进工作台(收银老板无多套账概念);
 //   ② 侧栏只留【采购系统 / 商品系统 / 收银系统 / 权限管理系统 / 发票系统 / 主数据(客户·公司·Sheet) + 底部账号块】;
-//   ③ 头像菜单只留【暗夜模式 / 帮助 & 反馈 / 退出登录】(团队与权限也砍)。
+//   ③ 头像菜单只留【暗夜模式 / 帮助 & 反馈 / 退出登录】。
 //   清单外一律 isVisible=false(真浏览器 getComputedStyle,不数 class)。afterEach 幂等复原业态。
 //
 // 解耦要点:pos_only 后端只开 pos+inventory,却要出「采购/销售」菜单 —— 证明菜单可见性由
@@ -76,7 +76,7 @@ test.describe('pos_only 收银壳 · 侧栏 + 头像 + 免门', () => {
 
         // 等新代码把头像白名单写好(=module-nav 按 pos_only 跑完 · 也抓 CDN 旧缓存)。
         await page.waitForFunction(
-            () => Array.isArray(window._avatarShellHide) && window._avatarShellHide.length === 4,
+            () => Array.isArray(window._avatarShellHide) && window._avatarShellHide.length === 3,
             null,
             { timeout: 20000 }
         );
@@ -102,7 +102,6 @@ test.describe('pos_only 收银壳 · 侧栏 + 头像 + 免门', () => {
             'exceptions',
             'integrations',
             'enroll',
-            'knowledge',
         ]) {
             await expect(page.locator(SIDEBAR[key]), `${key} 应隐藏`).toBeHidden();
         }
@@ -141,19 +140,19 @@ test.describe('pos_only 收银壳 · 侧栏 + 头像 + 免门', () => {
             }
         }
 
-        // ③ 头像菜单:3 留 4 砍(团队与权限也砍)。
+        // ③ 头像菜单:3 留 3 砍。
         await page.locator('#avatar-btn').click();
         await expect(page.locator('#avatar-popup')).toHaveClass(/show/);
         for (const key of ['theme', 'help', 'logout']) {
             await expect(page.locator(AVATAR[key]), `头像 ${key} 应可见`).toBeVisible();
         }
-        for (const key of ['settings', 'billing', 'shortcuts', 'console']) {
+        for (const key of ['settings', 'billing', 'shortcuts']) {
             await expect(page.locator(AVATAR[key]), `头像 ${key} 应隐藏`).toBeHidden();
         }
 
         await page.screenshot({ path: path.join(OUT, 'pos_only.png'), fullPage: true });
 
-        // 切业态过渡的诚实 403 豁免:pos_only 关掉 knowledge/recon 后 boot 探针被服务端 403 拒
+        // 切业态过渡的诚实 403 豁免:pos_only 关掉 recon 后 boot 探针被服务端 403 拒
         // (模块门控在工作),浏览器把 4xx 资源载入记成 console.error(消息不含 URL,无法按端点滤)。
         assertNoConsoleErrors(expect, guard, { allow: [/Failed to load resource.*403/] });
     });

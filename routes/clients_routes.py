@@ -137,11 +137,6 @@ async def api_create_client(req: ClientCreateRequest, request: Request):
     )
     if not new_id:
         raise HTTPException(400, detail="client.create_failed")
-    # v118.28.1 · 创建者自动获得分配(让员工身份创建客户后能看到)
-    try:
-        db.auto_assign_client_to_creator(str(user["id"]), int(new_id))
-    except Exception as e:
-        logger.warning(f"[client_create] auto_assign 失败: {e}")
     client = db.get_client(str(user["id"]), new_id, tenant_id=_tid(user))
     return {"ok": True, "client": _serialize_client(client) if client else {"id": new_id}}
 

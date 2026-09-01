@@ -48,7 +48,7 @@ class MastersCacheTests(unittest.TestCase):
     def tearDown(self):
         self.es.close()
 
-    def _fetch_masters(self, ep):
+    def _fetch_masters(self, ep, **kwargs):
         self.masters_calls += 1
         return {k: [list(r) for r in v] for k, v in _MASTERS.items()}
 
@@ -105,6 +105,11 @@ class MastersCacheTests(unittest.TestCase):
             out = mc.get_masters(_EP, force_refresh=True)
         self.assertEqual(out, {})
 
+    def test_strict_force_refresh_is_forwarded_to_login_fetch(self):
+        with mock.patch.object(mc, "_fetch_masters_via_login", return_value=_MASTERS) as fetch:
+            mc.get_masters(_EP, force_refresh=True, require_complete=True)
+        fetch.assert_called_once_with(_EP, require_complete=True)
+
     def test_login_fail_serves_stale(self):
         mc.get_masters(_EP)
         self.mem.rows["E1"]["age"] = 13 * 3600
@@ -129,6 +134,16 @@ class MastersCacheTests(unittest.TestCase):
             self.assertEqual(mc.get_paints(_EP, "c1"), [])
         self.assertNotIn("paints_by_car", self.mem.rows["E1"]["masters"])
         self.assertEqual(mc.get_paints(_EP, "c1"), _PAINTS)  # 恢复后照常取到
+
+    def test_strict_paint_fetch_failure_raises_and_is_not_cached(self):
+        from services.erp.mrerp_dms_client_base import DMSClientError
+
+        mc.get_masters(_EP)
+        with mock.patch.object(mc, "_fetch_paints_via_login", return_value=None):
+            with self.assertRaises(DMSClientError) as ctx:
+                mc.get_paints(_EP, "c1", require_complete=True)
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
+        self.assertNotIn("paints_by_car", self.mem.rows["E1"]["masters"])
 
     def test_full_refresh_preserves_paints(self):
         mc.get_masters(_EP)
@@ -167,6 +182,25 @@ class PaintFetchLayerTests(unittest.TestCase):
         ):
             out = mc._fetch_masters_via_login(_EP)
         self.assertEqual(out["company_banks"], [["1", "SCB", "SCB"]])
+
+    def test_strict_master_fetch_reaches_client(self):
+        from services.erp import erp_dms_intake
+
+        client = mock.Mock()
+        client.fetch_masters.return_value = {"cars": []}
+
+        def run(endpoint, fn):
+            return fn(client, object())
+
+        with (
+            mock.patch.object(erp_dms_intake, "_run_logged_in", side_effect=run),
+            mock.patch(
+                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
+                return_value=[],
+            ),
+        ):
+            mc._fetch_masters_via_login(_EP, require_complete=True)
+        client.fetch_masters.assert_called_once_with(strict=True)
 
     def test_paints_fetched_paged_with_car_id(self):
         """颜色主档走翻页取全(带 car_id):第 2 页起的颜色不静默丢失。"""

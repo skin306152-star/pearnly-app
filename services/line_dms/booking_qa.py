@@ -23,10 +23,12 @@ from services.line_dms import (
     booking_qa_payment,
     booking_qa_sync,
     commands,
+    masters_cache,
     qa_cards,
     store,
 )
 from services.line_dms._out import _send, _thr
+from services.line_dms.master_contract import MasterSyncError, build_snapshot
 from services.line_dms.qa_util import (
     CHANNEL_EXTRA_SHAPE,
     car_label,
@@ -68,8 +70,25 @@ async def start(
     """
     ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
     advisor, dms_username = (None, "")
+    snapshot = None
     if ep:
-        advisor, dms_username = await _thr(dms_advisor.resolve_operator_advisor, ep)
+        try:
+            live_masters = await _thr(
+                masters_cache.get_masters,
+                ep,
+                force_refresh=True,
+                require_complete=True,
+            )
+            snapshot = build_snapshot(live_masters)
+        except MasterSyncError as exc:
+            await _thr(store.clear_session, tenant_id, line_user_id)
+            _send(line_user_id, qa_cards.master_problem(exc.code))
+            return
+        advisor, dms_username = await _thr(
+            dms_advisor.resolve_operator_advisor,
+            ep,
+            masters=live_masters,
+        )
     if advisor is None:
         # 开不了单就别留着上一阶段的复述卡会话,否则用户下一句话撞在旧卡上(客户档已落定,不受影响)。
         await _thr(store.clear_session, tenant_id, line_user_id)
@@ -91,6 +110,7 @@ async def start(
         "payments": [],
         "pending_channel": {},
         "audit": [],
+        "master_snapshot": snapshot,
     }
     await _persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, "place", reply_token)
@@ -99,17 +119,21 @@ async def start(
 # ── 每步发问(内部 · slip_after 复用) ─────────────────────────────────────
 async def send_step(tenant_id, line_user_id, qa, step, reply_token=None) -> None:
     """按步发问。reply_token 有则 reply,无则 push(逐问可被 postback / 收料两种上下文调)。"""
-    if step in ("place", "paint", "term", "regis", "pay_dst"):  # 这些步发问前要取主档
-        # 闭包绑定 tenant_id,让 booking_qa_sync 首次 live 拉取后能把 masters_synced 落会话
-        msg = await booking_qa_pages.question(
-            line_user_id,
-            qa,
-            step,
-            lambda luid, q, key: booking_qa_sync.masters(tenant_id, luid, q, key, persist=_persist),
-            lambda luid, q: booking_qa_sync.paints(tenant_id, luid, q, persist=_persist),
-        )
-    else:
-        msg = booking_qa_pages.static_question(step, qa)
+    try:
+        if step in ("place", "paint", "term", "regis", "pay_dst"):
+            msg = await booking_qa_pages.question(
+                line_user_id,
+                qa,
+                step,
+                lambda luid, q, key: booking_qa_sync.masters(
+                    tenant_id, luid, q, key, persist=_persist
+                ),
+                lambda luid, q: booking_qa_sync.paints(tenant_id, luid, q, persist=_persist),
+            )
+        else:
+            msg = booking_qa_pages.static_question(step, qa)
+    except MasterSyncError as exc:
+        msg = qa_cards.master_problem(exc.code)
     _send(line_user_id, msg, reply_token)
 
 
@@ -124,7 +148,10 @@ async def handle_text(tenant_id, line_user_id, text, reply_token, sess=None) -> 
     step = qa.get("step") or ""
     await _audit(tenant_id, line_user_id, qa, step, text)
     handler = _TEXT_HANDLERS.get(step, _reask)
-    await handler(tenant_id, line_user_id, qa, text, reply_token)
+    try:
+        await handler(tenant_id, line_user_id, qa, text, reply_token)
+    except MasterSyncError as exc:
+        _send(line_user_id, qa_cards.master_problem(exc.code), reply_token)
     return True
 
 
@@ -169,6 +196,14 @@ _POSTBACK_ACTIONS = {
 
 
 async def handle_postback(tenant_id, line_user_id, data, params, reply_token) -> bool:
+    try:
+        return await _handle_postback(tenant_id, line_user_id, data, params, reply_token)
+    except MasterSyncError as exc:
+        _send(line_user_id, qa_cards.master_problem(exc.code), reply_token)
+        return True
+
+
+async def _handle_postback(tenant_id, line_user_id, data, params, reply_token) -> bool:
     """处理所有 "qa:" 前缀 postback;datetimepicker 的 params 携带所选日期。"""
     qa = await _qa(tenant_id, line_user_id)
     if qa is None or not (data or "").startswith("qa:"):

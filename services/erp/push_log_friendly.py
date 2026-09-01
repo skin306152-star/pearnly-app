@@ -66,6 +66,18 @@ _DMS_PUSH_FRIENDLY: Dict[str, Dict[str, str]] = {
         "th": "อ่านข้อมูลหลักของ DMS ไม่ได้ชั่วคราว จึงหยุดสร้างใบจอง กรุณาลองใหม่ภายหลัง",
         "ja": "DMS のマスターデータを一時的に読み取れず、予約作成を停止しました。しばらくしてから再試行してください。",
     },
+    "ERR_DMS_MASTER_EMPTY": {
+        "zh": "DMS 尚未配置这个主档选项 · 已暂停建单 · 请让管理员添加后重试",
+        "en": "This DMS master option has not been configured; booking was paused. Ask an admin to add it, then retry.",
+        "th": "ยังไม่ได้ตั้งค่าตัวเลือกข้อมูลหลักนี้ใน DMS จึงหยุดสร้างใบจอง กรุณาให้ผู้ดูแลเพิ่มข้อมูลแล้วลองใหม่",
+        "ja": "この DMS マスター項目が未設定のため、予約作成を停止しました。管理者が追加してから再試行してください。",
+    },
+    "ERR_DMS_MASTER_CHANGED": {
+        "zh": "DMS 主档刚刚发生变化 · 系统已更新摘要 · 请重新核对并再次确认",
+        "en": "DMS master data just changed. The summary has been updated; review it and confirm again.",
+        "th": "ข้อมูลหลักของ DMS เพิ่งมีการเปลี่ยนแปลง ระบบอัปเดตสรุปแล้ว กรุณาตรวจสอบและยืนยันอีกครั้ง",
+        "ja": "DMS マスターデータが変更されました。更新後の概要を確認し、もう一度確定してください。",
+    },
     "ERR_DMS_MASTER_UNMATCHED": {
         "zh": "所选项目在 DMS 主档里已变更或不存在 · 已暂停建单 · 请返回重新选择后再提交",
         "en": "The selected item is no longer in the DMS master data; booking was paused. Go back and re-select it, then submit again.",

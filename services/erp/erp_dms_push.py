@@ -142,6 +142,20 @@ _DMS_FRIENDLY = {
         "zh_TW": "DMS 主檔暫時無法讀取 · 請稍後重試",
         "ja": "DMS のマスターデータを一時的に読み取れません · しばらくしてから再試行してください",
     },
+    "ERR_DMS_MASTER_EMPTY": {
+        "zh": "DMS 尚未配置这个主档选项 · 请让管理员在 DMS 添加后重试",
+        "en": "This DMS master option has not been configured. Ask an admin to add it in DMS, then retry.",
+        "th": "ยังไม่ได้ตั้งค่าตัวเลือกข้อมูลหลักนี้ใน DMS กรุณาให้ผู้ดูแลเพิ่มข้อมูลใน DMS แล้วลองใหม่อีกครั้ง",
+        "zh_TW": "DMS 尚未設定這個主檔選項 · 請讓管理員在 DMS 新增後重試",
+        "ja": "この DMS マスター項目は未設定です。管理者が DMS に追加してから再試行してください",
+    },
+    "ERR_DMS_MASTER_CHANGED": {
+        "zh": "DMS 主档刚刚发生变化 · 系统已更新摘要 · 请重新核对并再次确认",
+        "en": "DMS master data just changed. The summary has been updated; review it and confirm again.",
+        "th": "ข้อมูลหลักของ DMS เพิ่งมีการเปลี่ยนแปลง ระบบอัปเดตสรุปแล้ว กรุณาตรวจสอบและยืนยันอีกครั้ง",
+        "zh_TW": "DMS 主檔剛剛發生變更 · 系統已更新摘要 · 請重新核對並再次確認",
+        "ja": "DMS マスターデータが変更されました。更新後の概要を確認し、もう一度確定してください",
+    },
     "ERR_DMS_MASTER_UNMATCHED": {
         "zh": "所选项目在 DMS 主档里已变更或不存在 · 请返回重新选择后重试",
         "en": "The selected item is no longer in the DMS master data — go back, re-select it, and retry",

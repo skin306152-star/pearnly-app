@@ -14,6 +14,7 @@ from services.erp.dms_masters_cache import get_masters, get_paints
 from services.erp.mrerp_dms_company_banks import company_bank_label
 from services.line_dms import booking_payments, qa_cards, store
 from services.line_dms._out import _send
+from services.line_dms.master_contract import MasterSyncError, build_paint_snapshot, build_snapshot
 from services.line_dms.qa_util import car_label, find_row, row_name
 
 MASTER_FIELDS = {
@@ -100,11 +101,31 @@ def _form(qa: dict) -> dict:
     }
 
 
+def _live_masters(endpoint: dict) -> dict:
+    masters = get_masters(endpoint, force_refresh=True, require_complete=True)
+    try:
+        build_snapshot(masters)
+    except MasterSyncError as exc:
+        raise BookingEditError("dms_booking.master_unavailable", 503) from exc
+    if not masters.get("prefixes"):
+        raise BookingEditError("dms_booking.master_unavailable", 503)
+    return masters
+
+
+def _live_paints(endpoint: dict, car_id: str, masters: dict) -> list:
+    try:
+        return get_paints(endpoint, car_id, masters, require_complete=True)
+    except Exception as exc:
+        if getattr(exc, "error_code", "") == "ERR_DMS_MASTER_UNAVAILABLE":
+            raise BookingEditError("dms_booking.master_unavailable", 503) from exc
+        raise
+
+
 def load(user: dict, nonce: str) -> dict:
     _, payload, endpoint = _review(user, nonce)
     qa = payload.get("qa") or {}
     # 编辑页展示的是用户即将确认的主档,不能让 12 小时前的银行/车型快照继续占位。
-    masters = get_masters(endpoint, force_refresh=True)
+    masters = _live_masters(endpoint)
     prefix_rows = masters.get("prefixes") or []
     car_id = str(((qa.get("answers") or {}).get("car") or {}).get("id") or "")
     return {
@@ -112,7 +133,7 @@ def load(user: dict, nonce: str) -> dict:
         "masters": {
             "places": _options(masters.get("place_books") or []),
             "cars": _options(masters.get("cars") or [], car_label),
-            "paints": _options(get_paints(endpoint, car_id, masters)) if car_id else [],
+            "paints": (_options(_live_paints(endpoint, car_id, masters)) if car_id else []),
             "terms": _options(masters.get("term_sales") or []),
             "regis": _options(masters.get("regis_behalfs") or []),
             "company_banks": _options(masters.get("company_banks") or [], company_bank_label),
@@ -124,10 +145,10 @@ def load(user: dict, nonce: str) -> dict:
 def paints(user: dict, nonce: str, car_id: str) -> list[dict]:
     _, _, endpoint = _review(user, nonce)
     # 颜色选项同 load:映射当前 DMS 主档,不拿 12h 快照(旧色会错配已下架车型)。
-    masters = get_masters(endpoint, force_refresh=True)
+    masters = _live_masters(endpoint)
     if find_row(masters.get("cars"), car_id) is None:
         raise BookingEditError("dms_booking.invalid_master")
-    return _options(get_paints(endpoint, car_id, masters))
+    return _options(_live_paints(endpoint, car_id, masters))
 
 
 def geo(user: dict, nonce: str, level: str, parent_id: str = "") -> list[dict]:
@@ -220,7 +241,7 @@ def save(user: dict, nonce: str, submitted: dict) -> str:
     qa = dict(payload.get("qa") or {})
     original_customer = _form(qa)["customer"]
     # 保存校验按当前 DMS 主档判(称谓/地点/车型/条件/登记/银行都可能被 12h 快照带偏)。
-    masters = get_masters(endpoint, force_refresh=True)
+    masters = _live_masters(endpoint)
     customer = _customer(dict(submitted.get("customer") or {}))
     customer_changed = any(
         str(customer.get(field) or "") != str(original_customer.get(field) or "")
@@ -229,7 +250,7 @@ def save(user: dict, nonce: str, submitted: dict) -> str:
     customer.update(_customer_master_labels(endpoint, customer))
     raw_answers = dict(submitted.get("answers") or {})
     car = _pick(masters, "car", raw_answers.get("car_id"))
-    paint_rows = get_paints(endpoint, car["id"], masters)
+    paint_rows = _live_paints(endpoint, car["id"], masters)
     paint_row = find_row(paint_rows, str(raw_answers.get("paint_id") or ""))
     if paint_row is None:
         raise BookingEditError("dms_booking.invalid_master")
@@ -251,6 +272,9 @@ def save(user: dict, nonce: str, submitted: dict) -> str:
         "regis": _pick(masters, "regis", raw_answers.get("regis_id")),
         "regis_name": _required(raw_answers.get("regis_name"), "dms_booking.invalid_regis_name"),
     }
+    qa["master_snapshot"] = build_snapshot(masters)
+    qa["paint_snapshots"] = {car["id"]: build_paint_snapshot(car["id"], paint_rows)}
+    qa.pop("masters_synced", None)
     qa["payments"] = _payments(list(submitted.get("payments") or []), masters)
     files = dict(qa.get("files") or {})
     keep = dict(submitted.get("keep_files") or {})

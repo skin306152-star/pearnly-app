@@ -19,6 +19,7 @@ from services.erp.dms_masters_cache import (  # noqa: F401  LINE 侧沿用原命
     refresh_from_client,
 )
 from services.line_dms._out import _thr
+from services.line_dms.master_contract import MasterSyncError, build_snapshot
 
 
 async def qa_endpoint(line_user_id: str, endpoint_id: Any) -> Optional[Dict[str, Any]]:
@@ -34,7 +35,12 @@ async def qa_endpoint(line_user_id: str, endpoint_id: Any) -> Optional[Dict[str,
 
 
 async def qa_masters(
-    line_user_id: str, endpoint_id: Any, key: str, *, force_refresh: bool = False
+    line_user_id: str,
+    endpoint_id: Any,
+    key: str,
+    *,
+    force_refresh: bool = False,
+    require_complete: bool = False,
 ) -> List[list]:
     """某类主档(cars/place_books/…)。端点解不出就给空表 —— 发问层据此重问,不炸会话。
 
@@ -44,12 +50,33 @@ async def qa_masters(
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         return []
-    masters = await _thr(get_masters, ep, force_refresh=force_refresh)
+    masters = await _thr(
+        get_masters,
+        ep,
+        force_refresh=force_refresh,
+        require_complete=require_complete,
+    )
     return masters.get(key) or []
 
 
+async def qa_snapshot(line_user_id: str, endpoint_id: Any) -> Dict[str, Any]:
+    """新订车会话的权威主档快照；失败时绝不回退旧缓存。"""
+    ep = await qa_endpoint(line_user_id, endpoint_id)
+    if not ep:
+        raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "endpoint")
+    masters = await _thr(get_masters, ep, force_refresh=True, require_complete=True)
+    if not masters:
+        raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "snapshot")
+    return build_snapshot(masters)
+
+
 async def qa_paints(
-    line_user_id: str, endpoint_id: Any, car_id: str, *, force_refresh: bool = False
+    line_user_id: str,
+    endpoint_id: Any,
+    car_id: str,
+    *,
+    force_refresh: bool = False,
+    require_complete: bool = False,
 ) -> List[list]:
     """某车型的颜色主档(逐问选完车才有 car_id)。force_refresh 语义同 qa_masters。
 
@@ -62,7 +89,21 @@ async def qa_paints(
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         return []
-    masters = await _thr(get_masters, ep, force_refresh=force_refresh)
+    masters = await _thr(
+        get_masters,
+        ep,
+        force_refresh=force_refresh,
+        require_complete=require_complete,
+    )
     if not masters:
+        if require_complete:
+            raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "snapshot")
         return []
-    return (await _thr(get_paints, ep, car_id, masters)) or []
+    try:
+        return (
+            await _thr(get_paints, ep, car_id, masters, require_complete=require_complete)
+        ) or []
+    except Exception as exc:
+        if require_complete and getattr(exc, "error_code", "") == "ERR_DMS_MASTER_UNAVAILABLE":
+            raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "paints") from exc
+        raise

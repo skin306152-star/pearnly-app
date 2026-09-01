@@ -21,8 +21,9 @@ from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.session_lock import mrerp_booking_lock
 from services.line_platform import client as line_client
-from services.line_dms import _out, cards, masters_cache, qa_cards, store
+from services.line_dms import _out, cards, master_contract, masters_cache, qa_cards, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _send, _thr
+from services.line_dms.qa_util import find_row
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,9 @@ async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> N
         return
     attach_files, attach_failed = await _download_attach_files(qa)
     result = await _thr(_book_in_session, ep, payload, attach_files, attach_failed)
+    if result.get("preflight"):
+        await _resume_after_master_change(binding, line_user_id, payload, result)
+        return
     await _thr(_log_booking, user_id, ep, payload, result)
     if result.get("ok"):
         answers = qa.get("answers") or {}
@@ -119,6 +123,36 @@ async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> N
                 )
                 return
         _push(line_user_id, fr.get("th") or cards.TXT_BOOKING_FAIL)
+
+
+async def _resume_after_master_change(
+    binding: dict, line_user_id: str, payload: dict, result: dict
+) -> None:
+    """确认瞬间主档有变化：改名重发摘要，删除则退回对应步骤重选。"""
+    from services.line_dms import booking_qa
+
+    tenant = binding["tenant_id"]
+    qa = result.get("qa") or payload.get("qa") or {}
+    if result.get("preflight") == "changed":
+        nonce = secrets.token_hex(8)
+        await _thr(
+            store.set_session,
+            tenant,
+            line_user_id,
+            "booking_review",
+            {**payload, "qa": qa, "nonce": nonce},
+        )
+        _send(line_user_id, qa_cards.master_changed())
+        _send(line_user_id, qa_cards.preview_card(qa, nonce))
+        return
+
+    code = str(result.get("error_code") or "ERR_DMS_MASTER_UNMATCHED")
+    _send(line_user_id, qa_cards.master_problem(code))
+    if result.get("field") == "advisor":
+        await _thr(store.clear_session, tenant, line_user_id)
+        return
+    await _thr(store.set_session, tenant, line_user_id, "booking_qa", {"qa": qa})
+    await booking_qa.send_step(tenant, line_user_id, qa, qa.get("step") or "place")
 
 
 def _retryable_result(result: Dict[str, Any]) -> bool:
@@ -225,7 +259,36 @@ def _book_in_session(
 
     def _do(cl, adapter):
         from services.erp.mrerp_dms_booking_customer import card_from_customer
-        from services.erp.mrerp_dms_company_banks import validate_company_bank_payments
+        from services.erp.mrerp_dms_client_base import DMSClientError
+        from services.erp.mrerp_dms_company_banks import (
+            fetch_company_banks,
+            validate_company_bank_payments,
+        )
+
+        live_masters = {
+            **cl.fetch_masters(strict=True),
+            "company_banks": fetch_company_banks(adapter),
+        }
+        selected_car_id = str((answers.get("car") or {}).get("id") or "")
+        selected_car = find_row(live_masters.get("cars"), selected_car_id)
+        live_paints = []
+        if selected_car is not None:
+            live_paints = cl._bshsd_all("txtcarpaint", idcar=selected_car_id)
+            if live_paints is None:
+                raise DMSClientError(
+                    f"DMS paint master unavailable for car {selected_car_id!r}",
+                    "ERR_DMS_MASTER_UNAVAILABLE",
+                )
+        preflight = master_contract.reconcile(qa, live_masters, live_paints)
+        if preflight["status"] != "ok":
+            return {
+                "ok": False,
+                "preflight": preflight["status"],
+                "field": preflight.get("field", ""),
+                "error_code": preflight.get("code", "ERR_DMS_MASTER_CHANGED"),
+                "qa": preflight["qa"],
+            }
+        payload["qa"] = preflight["qa"]
 
         if qa.get("customer_dirty"):
             draft = dict(qa.get("draft") or {})
@@ -337,6 +400,11 @@ def _log_booking(user_id: str, ep: dict, payload: dict, result: dict) -> None:
             ],
             "earnest_total": str(qa_cards.deposit_total(payments)),
             "slip_attached": bool((qa.get("files") or {}).get("slip_mid")),
+            "master_snapshot_version": str((qa.get("master_snapshot") or {}).get("version") or ""),
+            "master_snapshot_at": str((qa.get("master_snapshot") or {}).get("captured_at") or ""),
+            "master_validated_at": str(
+                (qa.get("master_validation") or {}).get("validated_at") or ""
+            ),
         },
     }
     response_body = {

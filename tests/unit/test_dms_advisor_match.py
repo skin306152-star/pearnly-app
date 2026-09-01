@@ -256,6 +256,25 @@ class ResolveOperatorAdvisorTests(unittest.TestCase):
             advisor, _ = dms_advisor.resolve_operator_advisor(ep)
         self.assertEqual((advisor or {}).get("id"), "297")  # 名字回头由建单层解析
 
+    def test_live_bundle_refreshes_pinned_name(self):
+        ep = {
+            "id": "E1",
+            "config": {"booking_defaults": {"advisor_id": "297", "advisor_name": "Old Name"}},
+        }
+        advisor, _ = dms_advisor.resolve_operator_advisor(
+            ep,
+            masters={"advisors": [["297", "SALE01", "Current Name"]]},
+        )
+        self.assertEqual(advisor, {"id": "297", "name": "Current Name"})
+
+    def test_live_bundle_blocks_deleted_pinned_advisor(self):
+        ep = {
+            "id": "E1",
+            "config": {"booking_defaults": {"advisor_id": "297", "advisor_name": "Old Name"}},
+        }
+        advisor, _ = dms_advisor.resolve_operator_advisor(ep, masters={"advisors": []})
+        self.assertIsNone(advisor)
+
     def test_credential_decrypt_failure_blocks_without_guessing(self):
         with (
             mock.patch.object(erp_dms_push, "_dms_resolve_creds", side_effect=ValueError("boom")),

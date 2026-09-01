@@ -242,6 +242,18 @@ class FetchMastersTests(unittest.TestCase):
         # 员工表拿不到不该拖垮整份主档:落 [],顾问匹配自己退化到启发层。
         self.assertEqual(out["employees"], [])
 
+    def test_strict_fetch_blocks_when_any_required_master_is_unavailable(self):
+        cl = _FakeClient({"txtusers": _ADVISORS, "txtcar": None})
+        with self.assertRaises(DMSClientError) as ctx:
+            cl.fetch_masters(strict=True)
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
+
+    def test_strict_fetch_blocks_when_advisor_master_is_unavailable(self):
+        cl = _FakeClient({"txtusers": None})
+        with self.assertRaises(DMSClientError) as ctx:
+            cl.fetch_masters(strict=True)
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
+
 
 class BshsdPagingTests(unittest.TestCase):
     """_bshsd_all:翻页取全 + 失败传播 + 截断留痕(顾问名册靠它才拿得到第 11 个人)。"""

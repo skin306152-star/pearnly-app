@@ -20,6 +20,15 @@ logger = logging.getLogger(__name__)
 
 CACHE_TTL_SECONDS = 12 * 3600
 _TABLE = "dms_masters_cache"
+_COMPLETE_KEYS = (
+    "cars",
+    "place_books",
+    "term_sales",
+    "branches",
+    "regis_behalfs",
+    "advisors",
+    "company_banks",
+)
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS dms_masters_cache (
@@ -102,14 +111,19 @@ def _write(endpoint_id: str, masters: Dict[str, Any]) -> None:
 
 
 # ── 登录抓取(失败即软回退) ──────────────────────────────────────────────
-def _fetch_masters_via_login(endpoint: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _fetch_masters_via_login(
+    endpoint: Dict[str, Any], *, require_complete: bool = False
+) -> Optional[Dict[str, Any]]:
     """登录 DMS 抓全量主档;登录/抓取失败(_run_logged_in 回 _err dict)→ None。"""
     from services.erp.erp_dms_intake import _run_logged_in
 
     def _fetch(client, adapter):
         from services.erp.mrerp_dms_company_banks import fetch_company_banks
 
-        return {**client.fetch_masters(), "company_banks": fetch_company_banks(adapter)}
+        return {
+            **client.fetch_masters(strict=require_complete),
+            "company_banks": fetch_company_banks(adapter),
+        }
 
     res = _run_logged_in(endpoint, _fetch)
     if isinstance(res, dict) and res.get("ok") is False:
@@ -128,7 +142,9 @@ def _fetch_paints_via_login(endpoint: Dict[str, Any], car_id: str) -> Optional[L
 
 
 # ── 对外:主档 / 颜色 ────────────────────────────────────────────────────
-def get_masters(endpoint: Dict[str, Any], *, force_refresh: bool = False) -> Dict[str, Any]:
+def get_masters(
+    endpoint: Dict[str, Any], *, force_refresh: bool = False, require_complete: bool = False
+) -> Dict[str, Any]:
     """主档:缓存 <12h 直接回;过期/缺失 → 登录抓全量 + 落缓存。
 
     普通读取登录失败时回退陈旧缓存(状态诚实优先于报错),都没有则空 dict；强制刷新失败
@@ -139,10 +155,16 @@ def get_masters(endpoint: Dict[str, Any], *, force_refresh: bool = False) -> Dic
     颜色被旧色遮住),失败时返回空 dict(fail closed,不拿旧主档冒充刷新过)。"""
     eid = str(endpoint.get("id") or "")
     cached = _read(eid)
-    cache_has_banks = cached and "company_banks" in cached["masters"]
-    if not force_refresh and cache_has_banks and cached["age_seconds"] < CACHE_TTL_SECONDS:
+    cache_usable = cached and "company_banks" in cached["masters"]
+    if require_complete and cache_usable:
+        cache_usable = all(isinstance(cached["masters"].get(key), list) for key in _COMPLETE_KEYS)
+    if not force_refresh and cache_usable and cached["age_seconds"] < CACHE_TTL_SECONDS:
         return cached["masters"]
-    fresh = _fetch_masters_via_login(endpoint)
+    fresh = (
+        _fetch_masters_via_login(endpoint, require_complete=True)
+        if require_complete
+        else _fetch_masters_via_login(endpoint)
+    )
     if fresh is None:
         if force_refresh:
             return {}
@@ -168,7 +190,11 @@ def read_fresh_masters(endpoint: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def get_paints(
-    endpoint: Dict[str, Any], car_id: str, masters: Optional[Dict[str, Any]] = None
+    endpoint: Dict[str, Any],
+    car_id: str,
+    masters: Optional[Dict[str, Any]] = None,
+    *,
+    require_complete: bool = False,
 ) -> List[list]:
     """某车型的颜色主档(惰性)。已缓存直接回;否则登录抓 + 并入 paints_by_car 落缓存。
 
@@ -183,6 +209,13 @@ def get_paints(
         return pbc[car_id]
     paints = _fetch_paints_via_login(endpoint, car_id)
     if paints is None:
+        if require_complete:
+            from services.erp.mrerp_dms_client_base import DMSClientError
+
+            raise DMSClientError(
+                f"DMS paint master unavailable for car {car_id!r}",
+                "ERR_DMS_MASTER_UNAVAILABLE",
+            )
         return []
     pbc[car_id] = paints
     _write(eid, {**masters, "paints_by_car": pbc})

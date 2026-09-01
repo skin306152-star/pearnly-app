@@ -75,8 +75,23 @@ class _FakeClient:
         self.rec["attach_files"] = list(files)
         return {"ok": True, "attached": len(files), "failed": []}
 
-    def fetch_masters(self):
-        return {}
+    def fetch_masters(self, *, strict=False):
+        self.rec["strict_masters"] = strict
+        return {
+            "cars": [["c1", "DMX", "D-Max"]],
+            "place_books": [["pl1", "PL", "สาขาบางนา"]],
+            "term_sales": [["t1", "T", "เงินสด"]],
+            "branches": [["br1", "BR", "สำนักงานใหญ่"]],
+            "regis_behalfs": [["r1", "R", "บริษัท"]],
+            "advisors": [["335", "sale02", "sale02"]],
+            "prefixes": [["17", "นาย", "นาย"]],
+            "employees": [],
+        }
+
+    def _bshsd_all(self, elemname, **kwargs):
+        if elemname == "txtcarpaint":
+            return [["p1", "WHITE", "ขาว"]]
+        return []
 
 
 def _qa_payload(**over):
@@ -101,7 +116,11 @@ def _qa_payload(**over):
             {
                 "channel": "transfer",
                 "amount": "5000.00",
-                "extra": {"src": "SCB", "dst_id": "1", "dst": "old"},
+                "extra": {
+                    "src": "SCB",
+                    "dst_id": "1",
+                    "dst": "SCB · 1234567890123 · ระยอง",
+                },
             }
         ],
         "pending_channel": {},
@@ -155,6 +174,85 @@ class _Env:
 
 
 class BookingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_confirm_revalidates_renamed_master_before_any_write(self):
+        rec = {}
+
+        class ChangedClient(_FakeClient):
+            def fetch_masters(self, *, strict=False):
+                masters = super().fetch_masters(strict=strict)
+                masters["cars"][0][2] = "D-Max Updated"
+                return masters
+
+        def fake_run(ep, do):
+            return do(ChangedClient(rec), object())
+
+        payload = _review()
+        with (
+            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
+                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
+            ),
+        ):
+            result = bf._book_in_session({"id": "E1", "config": {}}, payload)
+
+        self.assertEqual(result["preflight"], "changed")
+        self.assertEqual(result["qa"]["answers"]["car"]["label"], "DMX D-Max Updated")
+        self.assertNotIn("customer_save", rec)
+        self.assertNotIn("customer_id", rec)
+        self.assertNotIn("booking", rec)
+
+    async def test_confirm_revalidates_deleted_master_and_returns_to_selection(self):
+        rec = {}
+
+        class DeletedClient(_FakeClient):
+            def fetch_masters(self, *, strict=False):
+                masters = super().fetch_masters(strict=strict)
+                masters["term_sales"] = []
+                return masters
+
+        def fake_run(ep, do):
+            return do(DeletedClient(rec), object())
+
+        with (
+            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
+                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
+            ),
+        ):
+            result = bf._book_in_session({"id": "E1", "config": {}}, _review())
+
+        self.assertEqual(result["preflight"], "unmatched")
+        self.assertEqual(result["field"], "term")
+        self.assertEqual(result["qa"]["step"], "term")
+        self.assertNotIn("customer_save", rec)
+        self.assertNotIn("booking", rec)
+
+    async def test_changed_master_rearms_review_without_booking_log(self):
+        qa = _qa_payload()
+        qa["answers"]["car"]["label"] = "DMX D-Max Updated"
+        result = {
+            "ok": False,
+            "preflight": "changed",
+            "error_code": "ERR_DMS_MASTER_CHANGED",
+            "qa": qa,
+        }
+        with _Env(book_result=result) as env:
+            env.store.set_session("T1", "L1", "booking_review", _review())
+            await bf.handle_postback(
+                _BINDING, _LUID, "rt", cards.ACT_CONFIRM_BOOKING, {"nonce": "N1"}
+            )
+            await env.drain()
+
+        self.assertEqual(env.session()["state"], "booking_review")
+        self.assertNotEqual(env.session()["payload"]["nonce"], "N1")
+        self.assertEqual(env.insert_log.call_count, 0)
+        self.assertEqual(env.push_msgs.call_count, 2)
+        self.assertEqual(
+            env.push_msgs.call_args_list[0].args[1][0]["text"], qa_cards.TXT_MASTER_CHANGED
+        )
+
     async def test_browser_customer_edits_are_written_before_booking(self):
         rec = {}
 

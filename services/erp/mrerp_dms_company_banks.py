@@ -54,7 +54,8 @@ def fetch_company_banks(adapter: Any, *, timeout_ms: int = 10000) -> List[list]:
     screenshot = _failure_screenshot(adapter)
     raise DMSClientError(
         "company bank master did not become ready"
-        f"; screenshot={screenshot}; cause={type(failure).__name__}"
+        f"; screenshot={screenshot}; cause={type(failure).__name__}",
+        "ERR_DMS_MASTER_UNAVAILABLE",
     )
 
 

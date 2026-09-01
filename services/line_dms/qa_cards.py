@@ -35,9 +35,7 @@ from services.line_dms.qa_util import car_label as _car_label
 from services.line_dms.qa_util import row_name as _name
 
 # ── 文案(业主逐条确认 · 逐字不改) ─────────────────────────────────────────
-TXT_ASK_SLIP = (
-    "ส่งสลิปโอนเงินจอง (ใบโอนเงิน) ได้เลยครับ · ถ้าลูกค้าจ่ายเงินสด พิมพ์ เงินสด เพื่อข้ามขั้นนี้"
-)
+TXT_ASK_SLIP = "ส่งสลิปโอนเงินจอง (ใบโอนเงิน) ได้เลยครับ · ถ้าลูกค้าจ่ายเงินสด พิมพ์ เงินสด เพื่อข้ามขั้นนี้"
 TXT_ASK_PLACE = "สถานที่รับจอง — กดเลือกด้านล่าง"
 TXT_ASK_CAR = "รุ่นรถ — พิมพ์ชื่อรุ่นสั้น ๆ เพื่อค้นหา เช่น dmax"
 TXT_CAR_PICK = "เลือกรุ่นรถ (พบ {n} รายการ)"
@@ -61,13 +59,13 @@ PAY_LABELS = {
 }
 TXT_ASK_AMOUNT = "ยอดเงิน ({channel}) — พิมพ์จำนวนเงิน เช่น 5000"
 TXT_BAD_AMOUNT = "จำนวนเงินไม่ถูกต้อง พิมพ์เป็นตัวเลข เช่น 5000 หรือ 5,000.50"
-TXT_ASK_PAY_SRC = (
-    "บัญชีต้นทาง — พิมพ์ ธนาคาร | เลขบัญชี เช่น SCB | 1234567890 หรือพิมพ์ - เพื่อข้าม"
-)
+TXT_ASK_PAY_SRC = "บัญชีต้นทาง — พิมพ์ ธนาคาร | เลขบัญชี เช่น SCB | 1234567890 หรือพิมพ์ - เพื่อข้าม"
 TXT_ASK_PAY_DST = "บัญชีปลายทาง (บัญชีบริษัท) — กดเลือกจากธนาคารของบริษัทด้านล่าง"
-TXT_NO_COMPANY_BANK = (
-    "ยังไม่มีข้อมูลธนาคารของบริษัท กรุณาให้ผู้ดูแลตั้งค่าใน DMS แล้วลองใหม่อีกครั้ง"
-)
+TXT_NO_COMPANY_BANK = "ยังไม่มีข้อมูลธนาคารของบริษัท กรุณาให้ผู้ดูแลตั้งค่าใน DMS แล้วลองใหม่อีกครั้ง"
+TXT_MASTER_UNAVAILABLE = _DMS_FRIENDLY["ERR_DMS_MASTER_UNAVAILABLE"]["th"]
+TXT_MASTER_EMPTY = _DMS_FRIENDLY["ERR_DMS_MASTER_EMPTY"]["th"]
+TXT_MASTER_CHANGED = _DMS_FRIENDLY["ERR_DMS_MASTER_CHANGED"]["th"]
+TXT_MASTER_UNMATCHED = _DMS_FRIENDLY["ERR_DMS_MASTER_UNMATCHED"]["th"]
 TXT_ASK_CHEQUE_REF = "พิมพ์ เลขที่เช็ค | ธนาคาร เช่น 123456 | SCB"
 TXT_ASK_CARD_REF = "พิมพ์ ธนาคาร | ประเภทบัตร เช่น SCB | VISA"
 TXT_ASK_OTHER_REF = "รายละเอียดช่องทาง — พิมพ์"
@@ -76,9 +74,7 @@ TXT_ASK_MORE = "มีช่องทางอื่นอีกไหม"
 BTN_MORE_DONE = "ครบแล้ว"
 BTN_MORE_ADD = "เพิ่มช่องทาง"
 TXT_NEED_SLIP = "มีช่องทางเงินโอน กรุณาส่งสลิปโอนเงินก่อนดูสรุปครับ"
-TXT_SLIP_CONFLICT = (
-    "พบสลิปโอนเงินแนบอยู่ แต่ยังไม่มีช่องทางเงินโอน กรุณาเพิ่มเงินโอนหรือลบสลิปก่อนดูสรุปครับ"
-)
+TXT_SLIP_CONFLICT = "พบสลิปโอนเงินแนบอยู่ แต่ยังไม่มีช่องทางเงินโอน กรุณาเพิ่มเงินโอนหรือลบสลิปก่อนดูสรุปครับ"
 BTN_ADD_TRANSFER = "เพิ่มเงินโอน"
 BTN_REMOVE_SLIP = "ลบสลิปแล้วไปต่อ"
 TXT_PREVIEW_TITLE = "สรุปใบจอง — ตรวจสอบก่อนยืนยัน"
@@ -97,14 +93,10 @@ TXT_ATTACH_FAIL = "แนบไฟล์ไม่ครบ กรุณาแน
 _TH_ADVISOR_UNMATCHED = _DMS_FRIENDLY["ERR_DMS_ADVISOR_UNMATCHED"]["th"]
 _TH_RETRY = " แล้วลองใหม่อีกครั้ง"
 TXT_ADVISOR_BLOCK = (
-    "ยังเปิดใบจองไม่ได้ครับ · บัญชี DMS ที่ใช้อยู่คือ «{username}»\n"
-    + _TH_ADVISOR_UNMATCHED
-    + _TH_RETRY
+    "ยังเปิดใบจองไม่ได้ครับ · บัญชี DMS ที่ใช้อยู่คือ «{username}»\n" + _TH_ADVISOR_UNMATCHED + _TH_RETRY
 )
 TXT_ADVISOR_BLOCK_NO_USER = (
-    "ยังเปิดใบจองไม่ได้ครับ · ระบบยังอ่านบัญชี DMS ของผู้ใช้นี้ไม่ได้\n"
-    + _TH_ADVISOR_UNMATCHED
-    + _TH_RETRY
+    "ยังเปิดใบจองไม่ได้ครับ · ระบบยังอ่านบัญชี DMS ของผู้ใช้นี้ไม่ได้\n" + _TH_ADVISOR_UNMATCHED + _TH_RETRY
 )
 
 # 预览卡行标签(与确认后建单要回显的字段一一对应)。客户资料区不在此列:
@@ -122,6 +114,7 @@ LBL_ATTACH_SLIP = "ใบโอนเงินจอง"
 VAL_ATTACHED = "แนบแล้ว"
 
 _MAX_BTN = 20  # quick reply 按钮标签截断(display 宽度)
+_MAX_FULL_LABEL = 160
 
 # LINE quick reply 硬上限 13 项;主档每页 11 项,余 2 格给上一页/下一页导航。
 # 翻页 postback 走内部 token "__page:<n>"(带本步 action);DMS 主档 id 是纯数字,永不冲突。
@@ -151,15 +144,28 @@ def _pick_rows(rows: List[list], action: str, label_fn, page: int = 0) -> List[D
     last_page = (n - 1) // QR_PAGE_SIZE if n else 0
     page = max(0, min(int(page or 0), last_page))
     start = page * QR_PAGE_SIZE
-    items = [
-        _qr_item(label_fn(r)[:_MAX_BTN], f"qa:{action}:{r[0]}")
-        for r in rows[start : start + QR_PAGE_SIZE]
-    ]
+    items = []
+    for offset, row in enumerate(rows[start : start + QR_PAGE_SIZE], start + 1):
+        label = f"{offset}. {label_fn(row)}"
+        items.append(_qr_item(label[:_MAX_BTN], f"qa:{action}:{row[0]}"))
     if start > 0:
         items.insert(0, _qr_item(BTN_PAGE_PREV, f"qa:{action}:{PAGE_TOKEN}{page - 1}"))
     if start + QR_PAGE_SIZE < n:
         items.append(_qr_item(BTN_PAGE_NEXT, f"qa:{action}:{PAGE_TOKEN}{page + 1}"))
     return items
+
+
+def _option_text(text: str, rows: List[list], label_fn, page: int = 0) -> str:
+    """正文列出本页完整值，补足 quick reply 标签的 20 字限制。"""
+    rows = [row for row in (rows or []) if row and row[0] is not None]
+    last_page = (len(rows) - 1) // QR_PAGE_SIZE if rows else 0
+    page = max(0, min(int(page or 0), last_page))
+    visible = rows[page * QR_PAGE_SIZE : (page + 1) * QR_PAGE_SIZE]
+    labels = [str(label_fn(row))[:_MAX_FULL_LABEL] for row in visible]
+    if not labels:
+        return text
+    start = page * QR_PAGE_SIZE + 1
+    return text + "\n" + "\n".join(f"{index}. {label}" for index, label in enumerate(labels, start))
 
 
 def _plus_years(d: date, years: int) -> date:
@@ -197,7 +203,10 @@ def slip_only_image() -> Dict[str, Any]:
 
 def ask_place(place_books: List[list], page: int = 0) -> Dict[str, Any]:
     """สถานที่รับจอง 按钮(place_books 主档,分页全量可达)。"""
-    return _msg(TXT_ASK_PLACE, _pick_rows(place_books, "place", _name, page))
+    return _msg(
+        _option_text(TXT_ASK_PLACE, place_books, _name, page),
+        _pick_rows(place_books, "place", _name, page),
+    )
 
 
 def ask_car() -> Dict[str, Any]:
@@ -207,7 +216,10 @@ def ask_car() -> Dict[str, Any]:
 
 def car_results(rows: List[list], n: int, page: int = 0) -> Dict[str, Any]:
     """车型搜索结果按钮(分页):全部命中逐页可选,一次消息恒 ≤13 项。"""
-    return _msg(TXT_CAR_PICK.format(n=n), _pick_rows(rows, "car", _car_label, page))
+    text = TXT_CAR_PICK.format(n=n)
+    return _msg(
+        _option_text(text, rows, _car_label, page), _pick_rows(rows, "car", _car_label, page)
+    )
 
 
 def car_none() -> Dict[str, Any]:
@@ -219,7 +231,7 @@ def ask_paint(car_label: str, paints: List[list], page: int = 0) -> Dict[str, An
     text = TXT_ASK_PAINT.format(car=car_label)
     if len(paints or []) > QR_PAGE_SIZE:
         text = f"{text}\n{TXT_PAINT_MANY}"
-    return _msg(text, _pick_rows(paints, "paint", _name, page))
+    return _msg(_option_text(text, paints, _name, page), _pick_rows(paints, "paint", _name, page))
 
 
 def ask_date(today: date) -> Dict[str, Any]:
@@ -238,12 +250,18 @@ def ask_date(today: date) -> Dict[str, Any]:
 
 def ask_term(term_sales: List[list], page: int = 0) -> Dict[str, Any]:
     """第 6 问:เงื่อนไขการขาย 按钮(term_sales 主档,分页全量可达)。"""
-    return _msg(TXT_ASK_TERM, _pick_rows(term_sales, "term", _name, page))
+    return _msg(
+        _option_text(TXT_ASK_TERM, term_sales, _name, page),
+        _pick_rows(term_sales, "term", _name, page),
+    )
 
 
 def ask_regis(regis_behalfs: List[list], page: int = 0) -> Dict[str, Any]:
     """第 7 问:จดทะเบียนในนาม 按钮(regis_behalfs 主档,分页全量可达)。"""
-    return _msg(TXT_ASK_REGIS, _pick_rows(regis_behalfs, "regis", _name, page))
+    return _msg(
+        _option_text(TXT_ASK_REGIS, regis_behalfs, _name, page),
+        _pick_rows(regis_behalfs, "regis", _name, page),
+    )
 
 
 def ask_regis_name() -> Dict[str, Any]:
@@ -283,7 +301,19 @@ def ask_pay_src() -> Dict[str, Any]:
 def ask_pay_dst(company_banks: List[list], page: int = 0) -> Dict[str, Any]:
     if not company_banks:
         return _msg(TXT_NO_COMPANY_BANK)
-    return _msg(TXT_ASK_PAY_DST, _pick_rows(company_banks, "bank", company_bank_label, page))
+    return _msg(
+        _option_text(TXT_ASK_PAY_DST, company_banks, company_bank_label, page),
+        _pick_rows(company_banks, "bank", company_bank_label, page),
+    )
+
+
+def master_problem(code: str) -> Dict[str, Any]:
+    text = (_DMS_FRIENDLY.get(code) or {}).get("th") or TXT_MASTER_UNAVAILABLE
+    return _msg(text)
+
+
+def master_changed() -> Dict[str, Any]:
+    return _msg(TXT_MASTER_CHANGED)
 
 
 def ask_pay_ref(channel: str) -> Dict[str, Any]:

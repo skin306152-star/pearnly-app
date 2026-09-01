@@ -284,7 +284,7 @@ class DMSClientOpsMixin:
 
         return {"ok": not failed, "attached": attached, "failed": failed}
 
-    def fetch_masters(self) -> Dict[str, List[List[Any]]]:
+    def fetch_masters(self, *, strict: bool = False) -> Dict[str, List[List[Any]]]:
         """Pull the dropdown lists the connect wizard needs. Best-effort:
         a missing/unreadable list comes back as []. 普通主档与顾问名册一样翻页取全 ——
         只取第一页会让第 2 页起的选项在 LINE 逐问里静默消失。"""
@@ -297,14 +297,36 @@ class DMSClientOpsMixin:
             ("regis_behalfs", "txtregisbehalf"),
         ):
             try:
-                out[key] = self._bshsd_all(elem) or []
-            except Exception:
-                out[key] = []
+                rows = self._bshsd_all(elem)
+            except Exception as exc:
+                if strict:
+                    raise DMSClientError(
+                        f"DMS master {elem} unavailable during snapshot refresh",
+                        "ERR_DMS_MASTER_UNAVAILABLE",
+                    ) from exc
+                rows = None
+            if rows is None and strict:
+                raise DMSClientError(
+                    f"DMS master {elem} unavailable during snapshot refresh",
+                    "ERR_DMS_MASTER_UNAVAILABLE",
+                )
+            out[key] = rows or []
         try:
             # 顾问名册单独翻页取全:操作员账号按 code 列匹配,被分页截断就永远匹配不上。
-            out["advisors"] = self._advisor_rows() or []
-        except Exception:
-            out["advisors"] = []
+            advisors = self._advisor_rows()
+        except Exception as exc:
+            if strict:
+                raise DMSClientError(
+                    "DMS advisor master unavailable during snapshot refresh",
+                    "ERR_DMS_MASTER_UNAVAILABLE",
+                ) from exc
+            advisors = None
+        if advisors is None and strict:
+            raise DMSClientError(
+                "DMS advisor master unavailable during snapshot refresh",
+                "ERR_DMS_MASTER_UNAVAILABLE",
+            )
+        out["advisors"] = advisors or []
         try:
             out["prefixes"] = self.list_prefixes() or []
         except Exception:

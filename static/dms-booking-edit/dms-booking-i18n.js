@@ -15,6 +15,7 @@
             failed: 'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองใหม่',
             expired: 'รายการนี้หมดอายุหรือถูกแก้ไขแล้ว กรุณาใช้สรุปล่าสุดใน LINE',
             masterChanged: 'ตัวเลือกเปลี่ยนไปแล้ว กรุณาใช้สรุปล่าสุดใน LINE แล้วลองอีกครั้ง',
+            masterUnavailable: 'ยังโหลดตัวเลือกล่าสุดจาก DMS ไม่ได้ กรุณาลองใหม่อีกครั้ง',
             postcodeMissing: 'กรุณาเลือกรหัสไปรษณีย์จากรายการที่กำหนด',
             geoUnavailable: 'ข้อมูลที่อยู่ยังโหลดไม่ได้ กรุณาลองใหม่สักครู่',
             previewSendFailed: 'ส่งสรุปใหม่ไปที่ LINE ไม่สำเร็จ กรุณาลองอีกครั้ง',
@@ -93,6 +94,7 @@
             expired: 'This draft expired or was changed. Use the latest preview in LINE.',
             masterChanged:
                 'An option changed since this draft was created. Use the latest preview in LINE and try again.',
+            masterUnavailable: 'The latest DMS options are unavailable. Try again shortly.',
             postcodeMissing: 'Choose a postcode from the list.',
             geoUnavailable: 'Address data is unavailable right now. Try again shortly.',
             previewSendFailed: 'Could not send the revised preview to LINE. Try again.',
@@ -170,6 +172,7 @@
             failed: '保存失败，请检查字段后重试。',
             expired: '此草稿已过期或已被修改，请使用 LINE 中最新的预览卡。',
             masterChanged: '可选项目已更新，请使用 LINE 中的最新预览卡后重试。',
+            masterUnavailable: '暂时无法读取 DMS 最新选项，请稍后重试。',
             postcodeMissing: '请从列表中选择邮编。',
             geoUnavailable: '地址数据暂时不可用，请稍后重试。',
             previewSendFailed: '新版预览发送到 LINE 失败，请重试。',
@@ -247,6 +250,7 @@
             expired:
                 'この下書きは期限切れ、または変更済みです。LINE の最新プレビューを使用してください。',
             masterChanged: '選択肢が更新されました。LINE の最新プレビューで再試行してください。',
+            masterUnavailable: 'DMS の最新選択肢を取得できません。しばらくして再試行してください。',
             postcodeMissing: 'リストから郵便番号を選択してください。',
             geoUnavailable: '住所データを取得できませんでした。しばらくして再試行してください。',
             previewSendFailed:
@@ -316,6 +320,7 @@
     window.DMS_BOOKING_ERROR_KEYS = {
         'dms_booking.invalid_master': 'masterChanged',
         'dms_booking.invalid_bank': 'masterChanged',
+        'dms_booking.master_unavailable': 'masterUnavailable',
         'dms_booking.invalid_zipcode_id': 'postcodeMissing',
         'dms_booking.geo_unavailable': 'geoUnavailable',
         'dms_booking.preview_send_failed': 'previewSendFailed',

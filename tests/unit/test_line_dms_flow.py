@@ -10,7 +10,7 @@ import contextlib
 import unittest
 from unittest import mock
 
-from services.line_dms import cards, draft, flow, ocr_review, qa_cards, text_router
+from services.line_dms import cards, draft, flow, master_contract, ocr_review, qa_cards, text_router
 
 # 网页确认页 fields 键形状(static/dms/dms-intake-core.js)· LINE 侧必须同形。
 SPA_CREATE_FIELD_KEYS = {"prefix_id", "name", "people_id", "tax_id", "birthday_be", "phone"}
@@ -67,6 +67,16 @@ _GEO = {
     "text": {"house_no": "99", "moo": "4", "soi": "", "road": "สุขุมวิท"},
 }
 _PREFIXES = [["17", "นาย"]]
+_MASTER_SNAPSHOT = master_contract.build_snapshot(
+    {
+        "place_books": [["pl1", "", "สาขาบางนา"]],
+        "cars": [["c1", "DMX", "D-Max"]],
+        "term_sales": [["t1", "", "เงินสด"]],
+        "regis_behalfs": [["r1", "", "บุคคลธรรมดา"]],
+        "company_banks": [],
+    },
+    captured_at="2026-09-01T00:00:00+00:00",
+)
 
 
 class DraftPrefixTests(unittest.TestCase):
@@ -667,14 +677,20 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
                 "T1",
                 "L1",
                 "booking_qa",
-                {"qa": {"step": "slip", "files": {"id_card_mid": "mid-card", "slip_mid": None}}},
+                {
+                    "qa": {
+                        "step": "slip",
+                        "files": {"id_card_mid": "mid-card", "slip_mid": None},
+                        "master_snapshot": _MASTER_SNAPSHOT,
+                    }
+                },
             )
             flow.handle_image(_BINDING, _LUID, "mid-slip")
             await env.drain()
             env.recognize.assert_not_called()  # 不落 OCR
             self.assertEqual(env.session()["state"], "booking_qa")  # 会话没被 OCR 冲毁
             pushed = env.push_msgs.call_args.args[1][0]
-            self.assertEqual(pushed["text"], qa_cards.TXT_ASK_PLACE)  # 逐问推进到 place 步
+            self.assertTrue(pushed["text"].startswith(qa_cards.TXT_ASK_PLACE))
 
     async def test_g1b_image_on_non_slip_qa_step_pushes_hint_no_ocr(self):
         """booking_qa 非凭证步收图 → 只回 TXT_NO_IMAGE_NEEDED,不推进状态、不进 OCR。"""

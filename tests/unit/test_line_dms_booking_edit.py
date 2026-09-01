@@ -37,6 +37,7 @@ MASTERS = {
     "term_sales": [["T1", "T", "Finance"]],
     "regis_behalfs": [["R1", "R", "Person"]],
     "company_banks": [["B1", "SCB", "SCB", "Rayong", "1234567890123"]],
+    "prefixes": [["17", "Mr", "Mr"]],
 }
 
 
@@ -165,6 +166,8 @@ class BookingEditTests(TestCase):
         self.assertIn("10230", qa["summary"]["address"])
         self.assertTrue(qa["customer_dirty"])
         self.assertEqual(qa["files"]["slip_mid"], "MID2")
+        self.assertTrue(qa["master_snapshot"]["version"])
+        self.assertEqual(qa["paint_snapshots"]["C1"]["rows"], [["PA1", "RED", "Red"]])
         self.assertEqual(send.call_args.args[0], "L1")
         self.assertIn(next_nonce, str(send.call_args.args[1]))
 
@@ -181,12 +184,27 @@ class BookingEditTests(TestCase):
         ):
             out = booking_edit.load(self.user, "N1")
 
-        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True)
+        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True, require_complete=True)
         self.assertEqual(out["masters"]["prefixes"], [{"id": "17", "label": "Mr"}])
         self.assertEqual(
             out["masters"]["company_banks"],
             [{"id": "B1", "label": "SCB · 1234567890123 · Rayong"}],
         )
+
+    def test_load_blocks_when_live_master_bundle_is_incomplete(self):
+        with (
+            mock.patch.object(
+                booking_edit,
+                "_review",
+                return_value=(self.binding, self.payload, {"id": "E1"}),
+            ),
+            mock.patch.object(booking_edit, "get_masters", return_value={"cars": MASTERS["cars"]}),
+        ):
+            with self.assertRaisesRegex(
+                booking_edit.BookingEditError, "dms_booking.master_unavailable"
+            ) as ctx:
+                booking_edit.load(self.user, "N1")
+        self.assertEqual(ctx.exception.status, 503)
 
     def test_payment_only_edit_does_not_mark_customer_for_master_overwrite(self):
         submitted = form()
@@ -240,7 +258,7 @@ class BookingEditTests(TestCase):
             mock.patch.object(booking_edit, "get_paints", return_value=[["PA1", "RED", "Red"]]),
         ):
             out = booking_edit.paints(self.user, "N1", "C1")
-        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True)
+        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True, require_complete=True)
         self.assertEqual(out, [{"id": "PA1", "label": "Red"}])
 
     def test_save_reads_fresh_masters(self):
@@ -256,7 +274,7 @@ class BookingEditTests(TestCase):
             )
             es.enter_context(mock.patch.object(booking_edit, "_send"))
             booking_edit.save(self.user, "N1", form())
-        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True)
+        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True, require_complete=True)
 
     def test_invalid_master_does_not_replace_review(self):
         broken = form()

@@ -97,7 +97,7 @@ class Env:
         p(qa._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
         p(masters_cache, "get_masters", side_effect=self._get_masters)
 
-        def _paints(ep, cid, masters=None):
+        def _paints(ep, cid, masters=None, **kwargs):
             self.paints_calls.append(cid)
             self.paint_masters_calls.append(masters)
             return self.paints
@@ -177,7 +177,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(p["customer"], {"id": "C1", "name": "สมชาย ใจดี"})
             self.assertEqual(p["files"]["id_card_mid"], "mid-card")
             self.assertIsNone(p["files"]["slip_mid"])
-            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_PLACE)
+            self.assertTrue(_replied_text(env).startswith(qa_cards.TXT_ASK_PLACE))
             # 提成归属开局定死在 qa.advisor,建单执行器只认这一处
             self.assertEqual(p["advisor"], _ADVISOR)
             self.assertEqual(set(sess["payload"]), {"qa"})
@@ -221,7 +221,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             p = env.qa_payload()
             self.assertEqual(p["files"]["slip_mid"], "mid-slip")
             self.assertEqual(p["step"], "place")
-            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_PLACE)
+            self.assertTrue(_replied_text(env).startswith(qa_cards.TXT_ASK_PLACE))
 
     async def test_slip_cash_word_skips_without_slip(self):
         with Env() as env:
@@ -273,7 +273,8 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             _seed(env, _qa("car_search"))
             await qa.handle_text(_TID, _LUID, "dmax", "rt")
             msg = env.reply.call_args.args[1][0]
-            self.assertEqual(msg["text"], qa_cards.TXT_CAR_PICK.format(n=1))
+            self.assertTrue(msg["text"].startswith(qa_cards.TXT_CAR_PICK.format(n=1)))
+            self.assertIn("DMX D-Max", msg["text"])
             items = msg["quickReply"]["items"]
             self.assertEqual(items[0]["action"]["data"], "qa:car:c1")
             self.assertEqual(env.qa_payload()["step"], "car_search")  # 等按钮,不推进
@@ -285,7 +286,8 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             _seed(env, _qa("car_search"))
             await qa.handle_text(_TID, _LUID, "vios", "rt")
             msg = env.reply.call_args.args[1][0]
-            self.assertEqual(msg["text"], qa_cards.TXT_CAR_PICK.format(n=14))
+            self.assertTrue(msg["text"].startswith(qa_cards.TXT_CAR_PICK.format(n=14)))
+            self.assertIn("V10 Toyota Vios 10", msg["text"])
             items = msg["quickReply"]["items"]
             self.assertLessEqual(len(items), 13)
             self.assertEqual(items[-1]["action"]["data"], "qa:car:__page:1")
@@ -342,54 +344,88 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
 
     # ── 主档分页(quick reply 13 项硬限) ───────────────────────────────────
     async def test_masters_and_paints_first_read_force(self):
-        """主档/颜色首次读取(live 会话刚开、masters_synced 未落)→ force_refresh=True。"""
+        """主档首读严格抓全量；颜色基于同一会话快照再严格读取。"""
         with Env() as env:
             _seed(env, _qa("place"))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
             self.assertTrue(env.masters_calls)
-            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+            self.assertEqual(
+                env.masters_calls[-1][1],
+                {"force_refresh": True, "require_complete": True},
+            )
 
             _seed(env, _qa("paint", answers={"car": {"id": "c1", "label": "DMX D-Max"}}))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
-            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+            self.assertEqual(
+                env.masters_calls[0][1],
+                {"force_refresh": True, "require_complete": True},
+            )
+            self.assertEqual(
+                env.masters_calls[-1][1],
+                {"force_refresh": False, "require_complete": True},
+            )
             self.assertIsNotNone(env.paint_masters_calls[-1])  # 颜色带 masters,不吃 12h 缓存
 
-    async def test_first_master_read_forces_then_session_reuses_cache(self):
-        """本轮首个主档 force_refresh 登录一次,masters_synced 落会话,后续读复用缓存。"""
+    async def test_first_master_read_forces_then_session_reuses_snapshot(self):
+        """本轮首个主档严格登录一次并落版本快照，后续按钮不再读共享缓存。"""
         with Env() as env:
             _seed(env, _qa("place"))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
-            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
-            self.assertTrue(env.qa_payload().get("masters_synced"))
+            self.assertEqual(
+                env.masters_calls[-1][1],
+                {"force_refresh": True, "require_complete": True},
+            )
+            snapshot = env.qa_payload()["master_snapshot"]
+            self.assertTrue(snapshot["version"])
+            self.assertEqual(snapshot["counts"]["place_books"], len(_PLACES))
+            self.assertNotIn("masters_synced", env.qa_payload())
 
-            # 同一 booking_qa 会话再取主档 → 不再强制登录
+            # 同一 booking_qa 会话再取主档 → 直接读会话快照，不再调用缓存层。
+            before = len(env.masters_calls)
             await qa.send_step(_TID, _LUID, env.qa_payload(), "term", "rt")
-            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": False})
-            self.assertTrue(env.qa_payload().get("masters_synced"))
+            self.assertEqual(len(env.masters_calls), before)
+            self.assertEqual(env.qa_payload()["master_snapshot"]["version"], snapshot["version"])
 
-    async def test_empty_master_not_marked_and_next_read_retries_force(self):
-        """首次取数为空(端点可达但表空)→ 不落 masters_synced,下一次仍强制 live。"""
+    async def test_empty_master_not_snapshotted_and_next_read_retries_force(self):
+        """必需主档为空不落快照，下一次仍严格抓 live，绝不复用旧值。"""
         with Env(places=[]) as env:
             _seed(env, _qa("place"))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
-            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
-            self.assertNotIn("masters_synced", env.qa_payload())
+            self.assertEqual(
+                env.masters_calls[-1][1],
+                {"force_refresh": True, "require_complete": True},
+            )
+            self.assertNotIn("master_snapshot", env.qa_payload())
+            self.assertEqual(_replied_text(env), qa_cards.TXT_MASTER_EMPTY)
 
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
-            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+            self.assertEqual(
+                env.masters_calls[-1][1],
+                {"force_refresh": True, "require_complete": True},
+            )
+            self.assertEqual(len(env.masters_calls), 2)
 
     async def test_paints_force_once_then_reuse_cache(self):
-        """颜色路径:首次 live 拉取 force_refresh=True 并落标记,后续同会话复用缓存。"""
+        """颜色首次严格拉取并落车型快照，后续同会话不再碰缓存层。"""
         with Env() as env:
             _seed(env, _qa("paint", answers={"car": {"id": "c1", "label": "DMX D-Max"}}))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
-            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+            self.assertEqual(
+                env.masters_calls[0][1],
+                {"force_refresh": True, "require_complete": True},
+            )
+            self.assertEqual(
+                env.masters_calls[-1][1],
+                {"force_refresh": False, "require_complete": True},
+            )
             self.assertIsNotNone(env.paint_masters_calls[-1])
-            self.assertTrue(env.qa_payload().get("masters_synced"))
+            self.assertIn("c1", env.qa_payload()["paint_snapshots"])
+            masters_before = len(env.masters_calls)
+            paints_before = len(env.paints_calls)
 
             await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
-            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": False})
-            self.assertIsNotNone(env.paint_masters_calls[-1])
+            self.assertEqual(len(env.masters_calls), masters_before)
+            self.assertEqual(len(env.paints_calls), paints_before)
 
     async def test_place_pagination_reaches_last_row(self):
         places = [[f"pl{i}", "", f"สาขา {i}"] for i in range(14)]
@@ -528,7 +564,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             p = env.qa_payload()
             self.assertEqual(p["answers"]["term"], {"id": "t1", "name": "เงินสด"})
             self.assertEqual(p["step"], "regis")
-            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_REGIS)
+            self.assertTrue(_replied_text(env).startswith(qa_cards.TXT_ASK_REGIS))
             await qa.handle_postback(_TID, _LUID, "qa:regis:r1", {}, "rt")
             p = env.qa_payload()
             self.assertEqual(p["answers"]["regis"], {"id": "r1", "name": "บริษัท"})
@@ -585,7 +621,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_PAY_SRC)
             await qa.handle_text(_TID, _LUID, "-", "rt")
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
-            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_PAY_DST)
+            self.assertTrue(_replied_text(env).startswith(qa_cards.TXT_ASK_PAY_DST))
             self.assertEqual(_replied_items(env)[0]["action"]["data"], "qa:bank:1")
             await qa.handle_text(_TID, _LUID, "SCB", "rt")
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
@@ -935,7 +971,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             # 在 place 步误点 term 按钮(旧卡残留)→ 吃下但不推进,重问 place
             await qa.handle_postback(_TID, _LUID, "qa:term:t1", {}, "rt")
             self.assertEqual(env.qa_payload()["step"], "place")
-            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_PLACE)
+            self.assertTrue(_replied_text(env).startswith(qa_cards.TXT_ASK_PLACE))
 
     async def test_pay_amount_thai_digits(self):
         with Env() as env:

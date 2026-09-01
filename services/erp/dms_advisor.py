@@ -83,7 +83,9 @@ def match_in_masters(masters: Optional[Dict[str, Any]], username: str) -> Option
     return match_advisor(advisors, username)
 
 
-def resolve_operator_advisor(ep: Dict[str, Any]) -> Tuple[Optional[Dict[str, str]], str]:
+def resolve_operator_advisor(
+    ep: Dict[str, Any], *, masters: Optional[Dict[str, Any]] = None
+) -> Tuple[Optional[Dict[str, str]], str]:
     """端点 → (顾问, DMS 登录名)。返回的登录名只用于拦截话术,好让销售知道是哪个账号没对上。
 
     阻塞函数(解密 + 可能触发一次 DMS 登录抓主档),异步调用方经 _thr 调用。
@@ -91,10 +93,13 @@ def resolve_operator_advisor(ep: Dict[str, Any]) -> Tuple[Optional[Dict[str, str
     cfg = (ep or {}).get("config") or {}
     pinned = dict(cfg.get("booking_defaults") or {})
     if str(pinned.get("advisor_id") or "").strip():
-        return _pinned_advisor(ep, pinned), ""
+        advisor = _pinned_advisor(ep, pinned, masters=masters)
+        return advisor, ""
     username = _dms_username(cfg)
     if not username:
         return None, ""
+    if masters is not None:
+        return match_in_masters(masters, username), username
     cached = dms_masters_cache.read_fresh_masters(ep)
     hit = match_in_masters(cached, username)
     if hit is None:
@@ -106,7 +111,12 @@ def resolve_operator_advisor(ep: Dict[str, Any]) -> Tuple[Optional[Dict[str, str
     return hit, username
 
 
-def _pinned_advisor(ep: Dict[str, Any], pinned: Dict[str, Any]) -> Dict[str, str]:
+def _pinned_advisor(
+    ep: Dict[str, Any],
+    pinned: Dict[str, Any],
+    *,
+    masters: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, str]]:
     """老板在端点上钉死的归属(账号不在顾问名册时的出路)。
 
     name 缺就从已暖的主档缓存按 id 补一个给预览卡显示;补不到也照样放行 —— 建单层
@@ -114,11 +124,14 @@ def _pinned_advisor(ep: Dict[str, Any], pinned: Dict[str, Any]) -> Dict[str, str
     """
     advisor_id = str(pinned.get("advisor_id") or "").strip()
     name = str(pinned.get("advisor_name") or "").strip()
-    if not name:
-        cached = dms_masters_cache.read_fresh_masters(ep) or {}
-        row = row_by_id(cached.get("advisors"), advisor_id)
-        if row:
-            name = _cell(row, _COL_NAME)
+    cached = masters if masters is not None else dms_masters_cache.read_fresh_masters(ep) or {}
+    row = row_by_id(cached.get("advisors"), advisor_id)
+    if masters is not None:
+        if row is None:
+            return None
+        name = _cell(row, _COL_NAME)
+    elif not name and row:
+        name = _cell(row, _COL_NAME)
     return {"id": advisor_id, "name": name}
 
 

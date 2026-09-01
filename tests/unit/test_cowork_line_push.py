@@ -81,6 +81,7 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
             "endpoint_id": "endpoint-express",
             "workspace_client_id": 17,
             "adapter": "express",
+            "managed": True,
         }
         queued = [
             {
@@ -227,6 +228,7 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
             "endpoint_id": "endpoint-express",
             "workspace_client_id": 17,
             "adapter": "express",
+            "managed": True,
         }
         canonical = [
             {
@@ -301,6 +303,7 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
             "endpoint_id": "endpoint-express",
             "workspace_client_id": 17,
             "adapter": "express",
+            "managed": True,
         }
         cursor = _Cursor({"id": "manual-log"})
         with (
@@ -328,6 +331,36 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
         ):
             with self.assertRaises(push.CoworkLinePushError):
                 push._failure_log(IDENTITY, target, "history-1", "target_not_ready")
+
+    async def test_legacy_express_with_workspace_uses_legacy_reservation(self):
+        target = {
+            "endpoint_id": "endpoint-express",
+            "workspace_client_id": 17,
+            "adapter": "express",
+            "managed": False,
+        }
+        endpoint = {"id": "endpoint-express", "adapter": "express", "enabled": True}
+        intent = {
+            "history": dict(HISTORY),
+            "history_id": "history-1",
+            "log_id": "reserved-log",
+            "status": "retrying",
+            "accepted": False,
+            "dispatch": False,
+        }
+        with (
+            mock.patch.object(
+                push, "reserve_legacy_batch", return_value=(endpoint, [intent])
+            ) as legacy,
+            mock.patch.object(push, "reserve_managed_batch") as managed,
+        ):
+            result = await push.dispatch_confirmed(
+                IDENTITY, ["history-1"], target, {"posting_kind": "stock"}
+            )
+
+        legacy.assert_called_once_with(IDENTITY, ["history-1"], target, {"posting_kind": "stock"})
+        managed.assert_not_called()
+        self.assertEqual(result["committed"], 1)
 
 
 if __name__ == "__main__":

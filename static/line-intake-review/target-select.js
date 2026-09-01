@@ -36,6 +36,36 @@
             );
         }
 
+        function choicesFor(target) {
+            var choices = Array.isArray((target || {}).account_choices)
+                ? target.account_choices
+                : [];
+            if (choices.length) return choices;
+            var fallback = String(
+                (target || {}).selected_account_key ||
+                    (target || {}).account_set_label ||
+                    (target || {}).account_set ||
+                    ''
+            );
+            return fallback
+                ? [{ key: fallback, label: accountLabel(target), account_set: fallback }]
+                : [];
+        }
+
+        function accountRows() {
+            var rows = [];
+            accountTargets().forEach(function (target) {
+                choicesFor(target).forEach(function (choice) {
+                    rows.push({ target: target, choice: choice });
+                });
+            });
+            return rows;
+        }
+
+        function accountKey(row) {
+            return key(row.target) + '::' + String(row.choice.key || row.choice.account_set || '');
+        }
+
         function selected() {
             return targets().find(function (target) {
                 return (
@@ -48,6 +78,21 @@
                         )
                 );
             });
+        }
+
+        function selectedAccount() {
+            var target = selected();
+            if (!target) return null;
+            var wanted = String(selection().account_set || target.selected_account_key || '');
+            var row = accountRows().find(function (candidate) {
+                return (
+                    candidate.target === target &&
+                    String(candidate.choice.key || candidate.choice.account_set || '') === wanted
+                );
+            });
+            if (!row) return null;
+            if (!selection().account_set) applyAccount(row);
+            return row;
         }
 
         function adapter() {
@@ -77,6 +122,37 @@
                 target.workspace_name ||
                 target.label ||
                 text('accountSet')
+            );
+        }
+
+        function choiceLabel(choice) {
+            return (
+                choice.label || choice.account_company || choice.account_set || text('accountSet')
+            );
+        }
+
+        function rootRows() {
+            var seen = {};
+            return accountRows().reduce(function (rows, row) {
+                var rootKey = String(row.choice.root_key || '');
+                if (!rootKey || seen[rootKey]) return rows;
+                seen[rootKey] = true;
+                rows.push({
+                    key: rootKey,
+                    label: row.choice.root_label || rootKey,
+                });
+                return rows;
+            }, []);
+        }
+
+        function currentRoot() {
+            var selectedRow = selectedAccount();
+            return String(
+                selection().account_root ||
+                    (selectedRow && selectedRow.choice.root_key) ||
+                    '' ||
+                    (rootRows()[0] || {}).key ||
+                    ''
             );
         }
 
@@ -163,22 +239,52 @@
         }
 
         function html() {
-            var choices = accountTargets();
-            var optionsHtml = choices
-                .map(function (target) {
+            var roots = rootRows();
+            var root = currentRoot();
+            var rows = accountRows().filter(function (row) {
+                return (
+                    adapter() !== 'express' || !root || String(row.choice.root_key || '') === root
+                );
+            });
+            var selectedRow = selectedAccount();
+            var optionsHtml = rows
+                .map(function (row) {
                     return (
                         '<option value="' +
-                        escape(key(target)) +
+                        escape(accountKey(row)) +
                         '"' +
-                        (selected() === target ? ' selected' : '') +
-                        (blocked(target) ? ' disabled' : '') +
+                        (selectedRow && accountKey(selectedRow) === accountKey(row)
+                            ? ' selected'
+                            : '') +
+                        (blocked(row.target) || row.choice.writable === false ? ' disabled' : '') +
                         '>' +
-                        escape(accountLabel(target)) +
+                        escape(choiceLabel(row.choice)) +
                         '</option>'
                     );
                 })
                 .join('');
             var target = selected();
+            var rootHtml = '';
+            if (adapter() === 'express' && roots.length) {
+                rootHtml =
+                    '<label class="target-field"><span>' +
+                    escape(text('dataRoot')) +
+                    '</span><select data-target-root>' +
+                    roots
+                        .map(function (row) {
+                            return (
+                                '<option value="' +
+                                escape(row.key) +
+                                '"' +
+                                (row.key === root ? ' selected' : '') +
+                                '>' +
+                                escape(row.label) +
+                                '</option>'
+                            );
+                        })
+                        .join('') +
+                    '</select></label>';
+            }
             return (
                 '<section class="target-panel"><h2>' +
                 escape(text('target')) +
@@ -186,7 +292,9 @@
                 escape(text('erp')) +
                 '</span><strong class="target-locked">' +
                 escape(adapterLabel(adapter())) +
-                '</strong></div><label class="target-field"><span>' +
+                '</strong></div>' +
+                rootHtml +
+                '<label class="target-field"><span>' +
                 escape(text('accountSet')) +
                 '</span><select data-target-account-set>' +
                 (optionsHtml || '<option value="">' + escape(text('noAccountSet')) + '</option>') +
@@ -214,17 +322,25 @@
             );
         }
 
-        function choose(value) {
-            var target = targets().find(function (row) {
-                return key(row) === value;
-            });
-            if (!target || blocked(target)) return;
+        function applyAccount(row) {
+            var target = row.target;
+            var choice = row.choice;
             Object.assign(selection(), {
                 endpoint_id: target.endpoint_id || target.id,
                 workspace_client_id: target.workspace_client_id,
                 adapter: target.adapter,
                 target_label: target.label || target.target_label,
+                account_root: choice.root_key || null,
+                account_set: choice.key || choice.account_set,
             });
+        }
+
+        function choose(value) {
+            var row = accountRows().find(function (candidate) {
+                return accountKey(candidate) === value;
+            });
+            if (!row || blocked(row.target) || row.choice.writable === false) return;
+            applyAccount(row);
         }
 
         function valid() {
@@ -241,6 +357,7 @@
                       : /^(cash|credit)$/.test(selection().payment || '');
             return Boolean(
                 target &&
+                selectedAccount() &&
                 !blocked(target) &&
                 workspaceReady &&
                 /^(purchase|sales)$/.test(selection().direction || '') &&
@@ -249,6 +366,20 @@
         }
 
         function bind(root, render) {
+            var rootSelect = root.querySelector('[data-target-root]');
+            if (rootSelect) {
+                rootSelect.onchange = function () {
+                    selection().account_root = rootSelect.value || null;
+                    selection().account_set = null;
+                    var first = accountRows().find(function (row) {
+                        return String(row.choice.root_key || '') === String(rootSelect.value || '');
+                    });
+                    if (first) applyAccount(first);
+                    if (options.onChange)
+                        options.onChange('account_root', rootSelect.value || null);
+                    render();
+                };
+            }
             var accountSet = root.querySelector('[data-target-account-set]');
             if (accountSet) {
                 accountSet.onchange = function () {

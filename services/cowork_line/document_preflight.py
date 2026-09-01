@@ -80,6 +80,7 @@ def _express_projection(
     direction: str,
     posting_kind: str | None,
     payment: str | None,
+    account_config: dict[str, Any] | None,
 ) -> dict[str, Any]:
     kind = normalize_posting_kind(posting_kind)
     if kind is None:
@@ -91,6 +92,9 @@ def _express_projection(
             ["endpoint_not_found"],
             checks={"target_ready": False, "document_preflight": False},
         )
+    from services.erp.line_target_choice import endpoint_with_account_choice
+
+    endpoint = endpoint_with_account_choice(endpoint, account_config)
     config = dict(endpoint.get("config") or {})
     if endpoint.get("bound_account_set"):
         config["account_set"] = endpoint["bound_account_set"]
@@ -109,6 +113,7 @@ def preflight_document(
     direction: str,
     posting_kind: str | None = None,
     payment: str | None = None,
+    account_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     from services.cowork_line.erp_targets import CoworkLineErpTargetError, require_target
 
@@ -144,7 +149,15 @@ def preflight_document(
             checks={"target_ready": True, "workspace_subject": False},
         )
     if fresh.get("adapter") == "express":
-        return _express_projection(identity, fresh, history, direction, posting_kind, payment)
+        return _express_projection(
+            identity,
+            fresh,
+            history,
+            direction,
+            posting_kind,
+            payment,
+            account_config,
+        )
     if fresh.get("adapter") != "mrerp":
         return _result(["adapter_not_supported"], checks={"target_ready": True})
     if payment is None:

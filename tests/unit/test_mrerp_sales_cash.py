@@ -78,6 +78,33 @@ class TestSalesCashGenerator(unittest.TestCase):
         )
         self.assertEqual(cells.get("O"), "200")
         self.assertEqual(cells.get("R"), "3806")
+        self.assertEqual(cells.get("C"), "7 (รวม)")
+
+    def test_tax_exclusive_items_keep_separate_vat_mode(self):
+        history = {
+            **_HISTORY,
+            "subtotal": "100.00",
+            "vat": "7.00",
+            "total_amount": "107.00",
+            "items": [{"name": "ITEM A", "qty": 1, "unit_price": 100, "amount": 100}],
+        }
+        cells = _sheet1_datarow_cells(
+            gen.generate_xlsx([history], _MAPPINGS, sheet_kind="sales_cash")
+        )
+        self.assertEqual(cells.get("C"), "7 (แยก)")
+
+    def test_zero_vat_uses_zero_rate(self):
+        history = {
+            **_HISTORY,
+            "subtotal": "100.00",
+            "vat": "0.00",
+            "total_amount": "100.00",
+            "items": [{"name": "ITEM A", "qty": 1, "unit_price": 100, "amount": 100}],
+        }
+        cells = _sheet1_datarow_cells(
+            gen.generate_xlsx([history], _MAPPINGS, sheet_kind="sales_cash")
+        )
+        self.assertEqual(cells.get("C"), "0")
 
 
 class TestReceiptAccount(unittest.TestCase):

@@ -116,6 +116,8 @@ def _selection(payload: dict) -> dict[str, Any]:
         "workspace_client_id": payload.get("workspace_client_id"),
         "adapter": payload.get("adapter"),
         "target_label": payload.get("target_label"),
+        "account_root": payload.get("account_root"),
+        "account_set": payload.get("account_set"),
         "direction": payload.get("direction"),
         "posting_kind": payload.get("posting_kind")
         or (posting_mode if adapter == "express" else None),
@@ -145,6 +147,19 @@ def _normalize_selection(target: dict, selection: dict) -> dict:
     allowed = {str(value).lower() for value in target.get("mode_options") or []}
     if not mode or (allowed and mode not in allowed):
         raise CoworkLineIntakeError("mode_required", 422)
+    account_key = str(
+        selection.get("account_set") or target.get("selected_account_key") or ""
+    ).strip()
+    account = next(
+        (
+            row
+            for row in target.get("account_choices") or []
+            if isinstance(row, dict) and str(row.get("key") or "").strip() == account_key
+        ),
+        None,
+    )
+    if not account or account.get("writable") is False:
+        raise CoworkLineIntakeError("account_set_required", 422)
     workspace_client_id = target.get("workspace_client_id")
     return {
         "endpoint_id": str(target["endpoint_id"]),
@@ -153,6 +168,22 @@ def _normalize_selection(target: dict, selection: dict) -> dict:
         ),
         "adapter": adapter,
         "target_label": target.get("label") or "",
+        "account_root": str(account.get("root_key") or "").strip() or None,
+        "account_set": account_key,
+        "account_config": {
+            key: account.get(key)
+            for key in (
+                "comidyear",
+                "seldb",
+                "account_set",
+                "account_dir",
+                "account_company",
+                "account_set_row",
+                "root_key",
+                "mapping",
+            )
+            if account.get(key) not in (None, "")
+        },
         "direction": direction,
         "posting_kind": mode if adapter == "express" else None,
         "payment": mode if adapter != "express" else None,
@@ -204,6 +235,7 @@ def _preflight_target(
             selection["direction"],
             posting_kind=selection.get("posting_kind"),
             payment=selection.get("payment"),
+            account_config=selection.get("account_config"),
         )
         for code in result.get("missing") or []:
             if code not in missing:

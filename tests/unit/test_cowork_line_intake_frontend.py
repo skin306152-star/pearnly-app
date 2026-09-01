@@ -52,6 +52,10 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
         self.assertIn("target.workspace_name", self.target_select)
         self.assertIn("target.account_set_label", self.target_select)
         self.assertIn("data-target-account-set", self.target_select)
+        self.assertIn("data-target-root", self.target_select)
+        self.assertIn("account_choices", self.target_select)
+        self.assertIn("account_root: selection.account_root", self.app)
+        self.assertIn("account_set: selection.account_set", self.app)
         self.assertIn("lockedAdapter", self.target_select)
         self.assertNotIn("data-target-option", self.target_select)
 

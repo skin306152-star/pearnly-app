@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import ntpath
 from typing import Any
 
 from services.erp import target_readiness
@@ -27,25 +28,125 @@ def _setup_action(missing: list[str]) -> str | None:
     return next((actions[code] for code in missing if code in actions), None)
 
 
-def _legacy_account_label(
-    endpoint: dict[str, Any], adapter: str, probe: dict[str, Any] | None
-) -> str:
-    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
-    if adapter == "express":
-        return str(config.get("account_set_label") or config.get("account_set") or "").strip()[:200]
-    if adapter != "mrerp":
-        return ""
-    comidyear = str(config.get("comidyear") or "6").strip()
-    seldb = str(config.get("seldb") or "1").strip()
+def _choice_key(*parts: object) -> str:
+    return ":".join(str(part or "").strip() for part in parts)
+
+
+def _root_label(root: str) -> str:
+    clean = str(root or "").strip().rstrip("\\/")
+    return ntpath.basename(clean) or clean
+
+
+def _path_identity(path: object) -> str:
+    value = str(path or "").strip()
+    return ntpath.normcase(ntpath.normpath(value)) if value else ""
+
+
+def _int_value(value: object) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _mrerp_account_choices(probe: dict[str, Any] | None) -> list[dict[str, Any]]:
+    choices = []
     for company in (probe or {}).get("companies") or []:
         if not isinstance(company, dict):
             continue
-        if (
-            str(company.get("comidyear") or "").strip() == comidyear
-            and str(company.get("seldb") or "").strip() == seldb
-        ):
-            return str(company.get("label") or "").strip()[:80]
-    return f"{comidyear}/{seldb}"
+        comidyear = str(company.get("comidyear") or "").strip()
+        seldb = str(company.get("seldb") or "").strip()
+        if not comidyear or not seldb:
+            continue
+        label = str(company.get("label") or company.get("name") or "").strip()
+        choices.append(
+            {
+                "key": _choice_key(comidyear, seldb),
+                "label": label or f"{comidyear}/{seldb}",
+                "comidyear": comidyear,
+                "seldb": seldb,
+            }
+        )
+    return choices
+
+
+def _express_account_choices(endpoint: dict[str, Any]) -> list[dict[str, Any]]:
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    reported = config.get("reported_account_sets")
+    rows = reported if isinstance(reported, list) else []
+    choices: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        path = str(row.get("path") or "").strip()
+        identity = _path_identity(path)
+        if not identity or identity in seen:
+            continue
+        seen.add(identity)
+        root = str(row.get("root") or "").strip() or ntpath.dirname(path.rstrip("\\/"))
+        name = str(row.get("name") or row.get("company") or row.get("code") or "").strip()
+        choices.append(
+            {
+                "key": path,
+                "label": name or ntpath.basename(path.rstrip("\\/")) or path,
+                "root_key": root,
+                "root_label": str(row.get("root_label") or "").strip() or _root_label(root),
+                "account_set": path,
+                "account_dir": path,
+                "account_company": str(row.get("company") or "").strip(),
+                "account_set_row": _int_value(row.get("row")),
+                "writable": bool(row.get("writable")),
+                "mapping": row.get("mapping") if isinstance(row.get("mapping"), dict) else {},
+            }
+        )
+    current = str(config.get("account_set") or config.get("account_dir") or "").strip()
+    if current and _path_identity(current) not in seen:
+        root = str(config.get("express_root") or "").strip() or ntpath.dirname(
+            current.rstrip("\\/")
+        )
+        choices.append(
+            {
+                "key": current,
+                "label": str(config.get("account_set_label") or "").strip()
+                or ntpath.basename(current.rstrip("\\/"))
+                or current,
+                "root_key": root,
+                "root_label": _root_label(root),
+                "account_set": current,
+                "account_dir": str(config.get("account_dir") or current).strip(),
+                "account_company": str(config.get("account_company") or "").strip(),
+                "account_set_row": _int_value(config.get("account_set_row")),
+                "writable": True,
+                "mapping": {},
+            }
+        )
+    return choices
+
+
+def _legacy_account_choices(
+    endpoint: dict[str, Any], adapter: str, probe: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    if adapter == "mrerp":
+        return _mrerp_account_choices(probe)
+    if adapter == "express":
+        return _express_account_choices(endpoint)
+    return []
+
+
+def _legacy_account_label(
+    endpoint: dict[str, Any], adapter: str, choices: list[dict[str, Any]]
+) -> str:
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    selected = (
+        _choice_key(config.get("comidyear") or "6", config.get("seldb") or "1")
+        if adapter == "mrerp"
+        else str(config.get("account_set") or config.get("account_dir") or "").strip()
+    )
+    for choice in choices:
+        if str(choice.get("key") or "") == selected:
+            return str(choice.get("label") or "").strip()[:200]
+    return selected
 
 
 def _mrerp_account_available(endpoint: dict[str, Any], probe: dict[str, Any] | None) -> bool | None:
@@ -108,6 +209,18 @@ def managed_target(
         missing.append("companion_not_ready")
     profile_label = str(dto.get("account_set") or "").strip()
     endpoint_label = str(row.get("name") or "Express").strip()[:80]
+    account_choices = (
+        [
+            {
+                "key": profile_label,
+                "label": profile_label,
+                "account_set": profile_label,
+                "writable": True,
+            }
+        ]
+        if profile_label
+        else []
+    )
     return {
         "endpoint_id": endpoint_id,
         "workspace_client_id": workspace_id,
@@ -115,6 +228,8 @@ def managed_target(
         "adapter": "express",
         "label": f"{endpoint_label} · {profile_label}" if profile_label else endpoint_label,
         "account_set_label": profile_label or None,
+        "account_choices": account_choices,
+        "selected_account_key": profile_label or None,
         "connection_state": state,
         "configured": configured,
         "selectable": not missing,
@@ -158,7 +273,14 @@ def legacy_target(
     elif binding_count != 1:
         missing.append("workspace_binding_conflict")
     state = str(status["connection_state"])
-    account_label = _legacy_account_label(endpoint, adapter, probe)
+    account_choices = _legacy_account_choices(endpoint, adapter, probe)
+    account_label = _legacy_account_label(endpoint, adapter, account_choices)
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    selected_account_key = (
+        _choice_key(config.get("comidyear") or "6", config.get("seldb") or "1")
+        if adapter == "mrerp"
+        else str(config.get("account_set") or config.get("account_dir") or "").strip()
+    )
     endpoint_label = str(
         endpoint.get("name") or ("Express" if adapter == "express" else "MR.ERP")
     ).strip()[:80]
@@ -169,6 +291,8 @@ def legacy_target(
         "adapter": adapter,
         "label": f"{endpoint_label} · {account_label}" if account_label else endpoint_label,
         "account_set_label": account_label or None,
+        "account_choices": account_choices,
+        "selected_account_key": selected_account_key or None,
         "connection_state": state,
         "configured": configured,
         "selectable": not missing,

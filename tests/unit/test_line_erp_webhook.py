@@ -375,6 +375,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             endpoint_id="ep-1",
             workspace_client_id=7,
             posting_kind="stock",
+            account_config=None,
         )
         clear_session.assert_called_once_with("t1", "line-u1")
 

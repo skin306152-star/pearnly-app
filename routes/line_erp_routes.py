@@ -42,6 +42,8 @@ class DraftUpdateIn(BaseModel):
     direction: str = ""
     adapter: str = ""
     target_label: str = ""
+    account_root: str | None = None
+    account_set: str | None = None
     posting_kind: str | None = None
     payment: str | None = None
 
@@ -296,6 +298,8 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
         "direction": req.direction,
         "adapter": req.adapter,
         "target_label": req.target_label,
+        "account_root": req.account_root,
+        "account_set": req.account_set,
         "posting_kind": req.posting_kind,
         "payment": req.payment,
     }

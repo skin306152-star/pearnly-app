@@ -24,6 +24,7 @@ from services.erp.push_log_queries import (  # noqa: F401,E402
     get_push_stats_today,
 )
 from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
+from services.erp.push_dedup_store import has_recent_successful_push  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -360,68 +361,6 @@ def insert_push_log(
             return str(row["id"]) if row else None
     except Exception as e:
         logger.error(f"insert_push_log failed: {e}")
-        return None
-
-
-def has_recent_successful_push(
-    history_id: str,
-    endpoint_id: str,
-    user_id: str,
-    invoice_no: Optional[str] = None,
-    seller_name: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
-    """推送去重 L0(Zihao 2026-05-19 拍板)· 返回最近一次 success log,没有返 None。
-
-    ⚠️ 名字里的 `recent` 是**假的**:SQL 里没有任何时间窗,实际语义是 "ever" —— 成功过
-    一次(哪怕去年)就恒命中。加时间窗 = 打开重复过账的口子,所以留语义不留名字。
-    ⚠️ 作用域是 **user_id 不是 tenant_id**。L1(载荷层 prior_docnum,见 express_push/
-    prior_doc.py)才按 tenant_id 走:同租户换个会计重推时 L0 判不出、靠 L1 接 —— 两层
-    同一件事用两把尺子,**谁都别单独依赖**。两条语义由 test_push_dedup_contract.py 钉住。
-
-    ① 同 history × endpoint 已 success 过 → 命中(原逻辑)。
-    ② 跨记录:同一张票**重新上传**=新 history_id,原①判不出 → 按自然键
-       (票号 + 卖方名)× endpoint 再判一次,防同票 auto 双推双记账(对抗票 16)。
-       仅在 invoice_no 提供时启用(auto-push 传入);manual/旧 3 参调用行为不变。
-       要求票号**与**卖方名都相等才算撞(err 向"放行"·不误挡不同卖方复用同号/OCR 变体)。
-    """
-    if not endpoint_id:
-        return None
-    try:
-        with db.get_cursor_rls(user_id=str(user_id)) as cur:
-            if history_id:
-                cur.execute(
-                    """
-                    SELECT id, response_body, created_at, invoice_no
-                    FROM erp_push_logs
-                    WHERE history_id = %s AND endpoint_id = %s
-                      AND user_id = %s AND status = 'success'
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """,
-                    (history_id, endpoint_id, str(user_id)),
-                )
-                r = cur.fetchone()
-                if r:
-                    return dict(r)
-            if invoice_no:
-                cur.execute(
-                    """
-                    SELECT id, response_body, created_at, invoice_no
-                    FROM erp_push_logs
-                    WHERE endpoint_id = %s AND user_id = %s AND status = 'success'
-                      AND invoice_no = %s
-                      AND COALESCE(seller_name, '') = COALESCE(%s, '')
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                """,
-                    (endpoint_id, str(user_id), invoice_no, seller_name),
-                )
-                r = cur.fetchone()
-                if r:
-                    return dict(r)
-            return None
-    except Exception as e:
-        logger.error(f"has_recent_successful_push failed: {e}")
         return None
 
 

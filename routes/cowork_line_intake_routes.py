@@ -33,6 +33,8 @@ class DraftUpdateIn(BaseModel):
     direction: str = ""
     adapter: str = ""
     target_label: str = ""
+    account_root: str | None = None
+    account_set: str | None = None
     posting_kind: str | None = None
     payment: str | None = None
 

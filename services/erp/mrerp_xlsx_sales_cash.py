@@ -17,7 +17,7 @@ from collections import OrderedDict
 from typing import Any, Dict, List
 
 from services.erp import mrerp_xlsx_generator as _gen
-from services.erp.mrerp_xlsx_fmt import history_number
+from services.erp.mrerp_xlsx_fmt import history_number, mrerp_sales_tax_label
 from services.erp.mrerp_xlsx_sales_credit import (
     build_sales_credit_detail_rows,
     build_sales_credit_row,
@@ -163,7 +163,7 @@ def generate_xlsx_sales_cash(histories: List[Dict[str, Any]], mappings: Dict[str
         col_vals = {
             1: inv,
             2: date,
-            3: "7 (แยก)",
+            3: mrerp_sales_tax_label(history),
             4: "00000",
             5: "BOI1",
             6: "00002",

@@ -109,6 +109,77 @@ def history_number(history: Any, *keys: str) -> Optional[float]:
     return None
 
 
+def _field_value(history: Any, *keys: str) -> Any:
+    if not isinstance(history, dict):
+        return None
+    fields = history.get("fields")
+    fields = fields if isinstance(fields, dict) else {}
+    for key in keys:
+        for source in (history, fields):
+            if key in source and source.get(key) not in (None, ""):
+                return source.get(key)
+    return None
+
+
+def _bool_value(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().casefold()
+    if text in {"1", "true", "yes", "included", "inclusive", "รวม"}:
+        return True
+    if text in {"0", "false", "no", "excluded", "exclusive", "แยก"}:
+        return False
+    return None
+
+
+def _items_gross(history: Any) -> Optional[float]:
+    if not isinstance(history, dict):
+        return None
+    fields = history.get("fields")
+    fields = fields if isinstance(fields, dict) else {}
+    items = history.get("items") or fields.get("items")
+    if not isinstance(items, list) or not items:
+        return None
+    total = Decimal("0")
+    for item in items:
+        if not isinstance(item, dict):
+            return None
+        amount = fmt_number(item.get("amount") or item.get("total") or item.get("line_total"))
+        if amount is None:
+            qty = fmt_number(item.get("qty") or item.get("quantity"))
+            price = fmt_number(item.get("unit_price") or item.get("price"))
+            if qty is None or price is None:
+                return None
+            amount = qty * price
+        total += Decimal(str(amount))
+    return float(total)
+
+
+def mrerp_sales_tax_label(history: Any) -> str:
+    """Choose MR.ERP's VAT mode from explicit review data or reconciled item totals."""
+    vat = history_number(history, "vat", "vat_amount") or 0
+    if abs(vat) < 0.005:
+        return "0"
+
+    explicit = _bool_value(
+        _field_value(history, "price_includes_vat", "vat_included", "tax_inclusive")
+    )
+    if explicit is not None:
+        return "7 (รวม)" if explicit else "7 (แยก)"
+
+    gross = _items_gross(history)
+    total = history_number(history, "total_amount", "grand_total", "net_payable")
+    subtotal = history_number(history, "subtotal", "amount_before_tax")
+    discount = history_number(history, "discount", "discount_total") or 0
+    if gross is not None:
+        after_discount = gross - discount
+        if total is not None and abs(after_discount - total) <= 0.10:
+            return "7 (รวม)"
+        if subtotal is not None and abs(after_discount - subtotal) <= 0.10:
+            return "7 (แยก)"
+    return "7 (แยก)"
+
+
 def fmt_number_strict(value: Any) -> float:
     """金额严格模式 → float · 负数 / 超 MAX_AMOUNT / 非法都 raise ValueError
     用于 sales_credit 上传前 preflight · 销项发票净额必须 > 0

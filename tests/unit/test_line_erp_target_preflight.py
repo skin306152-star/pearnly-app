@@ -3,10 +3,68 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
+from services.erp.line_target_choice import endpoint_with_account_choice
 from services.line_erp import push, target_preflight, target_selection, webhook
 
 
 class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
+    def test_express_account_switch_does_not_reuse_previous_account_mapping(self):
+        endpoint = {
+            "adapter": "express",
+            "config": {
+                "account_set": r"S:\\2569\\EXP69\\OLD",
+                "revenue_acc": "OLD-REVENUE",
+                "reported_accounts": [{"code": "OLD-REVENUE"}],
+            },
+        }
+
+        selected = endpoint_with_account_choice(
+            endpoint,
+            {
+                "account_set": r"S:\\2569\\EXP69\\NEW",
+                "account_dir": r"S:\\2569\\EXP69\\NEW",
+                "mapping": {"ar_acc": "NEW-AR"},
+            },
+        )
+
+        self.assertNotIn("revenue_acc", selected["config"])
+        self.assertNotIn("reported_accounts", selected["config"])
+        self.assertEqual(selected["config"]["ar_acc"], "NEW-AR")
+
+    def test_selection_uses_one_server_projected_mrerp_year(self):
+        target = {
+            "endpoint_id": "mr",
+            "workspace_client_id": 7,
+            "adapter": "mrerp",
+            "label": "MR.ERP",
+            "account_choices": [
+                {
+                    "key": "15:1",
+                    "label": "TEST2020",
+                    "comidyear": "15",
+                    "seldb": "1",
+                }
+            ],
+        }
+        with mock.patch.object(
+            target_selection.target_preflight,
+            "require_ready",
+            return_value={"target": target},
+        ):
+            _, selected = target_selection.normalize(
+                {"user_id": "u1", "tenant_id": "t1"},
+                {
+                    "endpoint_id": "mr",
+                    "workspace_client_id": 7,
+                    "direction": "sales",
+                    "payment": "cash",
+                    "account_set": "15:1",
+                },
+            )
+
+        self.assertEqual(selected["account_set"], "15:1")
+        self.assertEqual(selected["account_config"], {"comidyear": "15", "seldb": "1"})
+
     def test_catalogue_keeps_every_target_and_marks_exact_selection(self):
         targets = [
             {
@@ -116,12 +174,14 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
                 endpoint_id="ep-1",
                 workspace_client_id=9,
                 posting_kind="service",
+                account_config={"account_set": "ACME"},
             )
 
         self.assertTrue(result["push_ok"])
         self.assertEqual(dispatch.await_args.kwargs["endpoint_id"], "ep-1")
         self.assertEqual(dispatch.await_args.kwargs["workspace_client_id"], 9)
         self.assertEqual(dispatch.await_args.kwargs["posting_kind"], "service")
+        self.assertEqual(dispatch.await_args.kwargs["account_config"], {"account_set": "ACME"})
 
 
 if __name__ == "__main__":

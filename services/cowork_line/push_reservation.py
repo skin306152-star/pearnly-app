@@ -14,6 +14,7 @@ from services.cowork_line.push_recovery import (
     LEGACY_RESERVATION_LEASE,
     settle_stale_legacy,
 )
+from services.cowork_line.push_dedup import prior_success as _prior_success
 from services.erp.express_push.enqueue import QUEUED_SENTINEL, enqueue_express
 from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
@@ -294,25 +295,11 @@ def reserve_managed_batch(
     return results
 
 
-def _prior_success(cur, endpoint_id: str, actor_id: str, history: dict[str, Any]):
-    cur.execute(
-        "SELECT id::text AS id,response_body FROM erp_push_logs "
-        "WHERE endpoint_id = %s AND user_id = %s AND status = 'success' "
-        "AND (history_id = %s OR (invoice_no = %s AND COALESCE(seller_name,'') = COALESCE(%s,''))) "
-        "ORDER BY created_at DESC,id DESC LIMIT 1",
-        (
-            endpoint_id,
-            actor_id,
-            history["id"],
-            history.get("invoice_no"),
-            history.get("seller_name"),
-        ),
-    )
-    return cur.fetchone()
-
-
 def reserve_legacy_batch(
-    identity: dict[str, Any], history_ids: list[str], target: dict[str, Any]
+    identity: dict[str, Any],
+    history_ids: list[str],
+    target: dict[str, Any],
+    selection: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Confirm Cowork rows and reserve legacy ERP outbox rows before external I/O."""
     tenant_id, actor_id = _identity(identity)
@@ -348,7 +335,13 @@ def reserve_legacy_batch(
 
         for history_id in ids:
             history = _staged_history(cur, history_id, tenant_id, actor_id, workspace_id)
-            prior = _prior_success(cur, endpoint_id, actor_id, history)
+            prior = _prior_success(
+                cur,
+                endpoint_id,
+                actor_id,
+                history,
+                str((selection or {}).get("account_set") or "").strip() or None,
+            )
             if prior:
                 status = "skipped_dup"
                 request_body = {
@@ -366,6 +359,7 @@ def reserve_legacy_batch(
                     "adapter": adapter,
                     "source": "cowork_line",
                     "reservation": "confirmed_pending_dispatch",
+                    "account_set": str((selection or {}).get("account_set") or "") or None,
                 }
                 response_body = None
                 error_msg = "COWORK_LEGACY_ERP_DISPATCH_RESERVED"
@@ -417,7 +411,12 @@ def reserve_legacy_batch(
                     "dispatch": status == "retrying",
                 }
             )
-    return dict(endpoint), intents
+    from services.erp.line_target_choice import endpoint_with_account_choice
+
+    return (
+        endpoint_with_account_choice(dict(endpoint), (selection or {}).get("account_config")),
+        intents,
+    )
 
 
 def finalize_legacy_intent(

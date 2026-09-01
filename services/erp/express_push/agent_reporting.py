@@ -12,62 +12,16 @@ import json
 import logging
 from typing import Any, Dict, List
 
+from services.erp.express_push.agent_account_sets import (  # noqa: F401
+    _sanitize_account_sets,
+    store_account_sets,
+)
+
 # 存货科目组的判据(筛候选 / 选哪个)已拆去 stock_acc_group —— 本模块只管上报数据的存取。
 # 此处 re-import 当 facade:agent_reporting.fit_stock_acc_groups 的既有调用点不用跟着改。
 from services.erp.express_push.stock_acc_group import fit_stock_acc_groups  # noqa: F401
 
 logger = logging.getLogger(__name__)
-
-_ACCOUNT_SET_KEYS = ("code", "name", "name_en", "tax_id", "path", "writable")
-_MAX_ACCOUNT_SETS = 50
-
-
-def _sanitize_account_sets(raw: Any) -> List[Dict[str, Any]]:
-    """净化 Agent 上报的账套列表:只留已知键、限长限量,布尔归一(防被塞脏数据)。"""
-    if not isinstance(raw, list):
-        return []
-    out: List[Dict[str, Any]] = []
-    for item in raw[:_MAX_ACCOUNT_SETS]:
-        if not isinstance(item, dict):
-            continue
-        clean: Dict[str, Any] = {}
-        for k in _ACCOUNT_SET_KEYS:
-            v = item.get(k)
-            if k == "writable":
-                clean[k] = bool(v)
-            elif v is not None:
-                clean[k] = str(v)[:200]
-        if clean.get("code") or clean.get("name"):
-            out.append(clean)
-    return out
-
-
-def store_account_sets(endpoint_id: str, account_sets: Any) -> int:
-    """存 Agent 探测的可用账套列表进 config.reported_account_sets(供 FE「选账套」读)。
-
-    净化后整体替换(非累加),并记 account_sets_seen_at。返回存入条数。
-    """
-    sets = _sanitize_account_sets(account_sets)
-    try:
-        from core import db
-
-        with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                UPDATE erp_endpoints
-                SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
-                        'reported_account_sets', %s::jsonb,
-                        'account_sets_seen_at', to_jsonb(NOW()::text))
-                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
-                """,
-                (json.dumps(sets, ensure_ascii=False), endpoint_id),
-            )
-            changed = cur.rowcount
-        return len(sets) if changed == 1 else 0
-    except Exception as e:
-        logger.error(f"store_account_sets failed: {e}")
-        return 0
-
 
 # ── 科目表(chart of accounts)· 供 FE「科目映射」下拉按名字选 ──────────────────
 # 小助手登录 Express 读科目 DBF(如 GLMAS)上报。科目表【可自定义·每账套不同】→ 必须按
@@ -293,7 +247,13 @@ def store_reported_catalog(
 # 所选账套【整组】· 方法无关(直录/RPA 共用 · 见 11-dispatch 可扩展性契约 §1/§2/§5)。
 # account_set 名(白名单)+ account_dir(DBF 写文件)+ account_company(公司名硬闸)
 # + account_set_row(RPA 登录后公司 grid 行)。客户选一次整组都推出,RPA 来零新增字段。
-_SELECTED_ACCOUNT_KEYS = ("account_set", "account_dir", "account_company", "account_set_row")
+_SELECTED_ACCOUNT_KEYS = (
+    "account_set",
+    "account_dir",
+    "account_company",
+    "account_set_row",
+    "express_root",
+)
 
 
 def _merge_config(endpoint_id: str, patch: Dict[str, Any]) -> bool:

@@ -30,6 +30,8 @@ def from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "workspace_client_id": payload.get("workspace_client_id"),
         "adapter": adapter or None,
         "target_label": payload.get("target_label"),
+        "account_root": payload.get("account_root"),
+        "account_set": payload.get("account_set"),
         "direction": payload.get("mode") or payload.get("direction"),
         "posting_kind": payload.get("posting_kind")
         or (posting_mode if adapter == "express" else None),
@@ -76,11 +78,38 @@ def normalize(
         posting_kind = None
     else:
         raise SelectionError("line_erp.adapter_not_supported", 422)
+    account_key = str(values.get("account_set") or target.get("selected_account_key") or "").strip()
+    account = next(
+        (
+            row
+            for row in target.get("account_choices") or []
+            if isinstance(row, dict) and str(row.get("key") or "").strip() == account_key
+        ),
+        None,
+    )
+    if not account or account.get("writable") is False:
+        raise SelectionError("line_erp.account_set_required", 422)
     normalized = {
         "endpoint_id": str(target["endpoint_id"]),
         "workspace_client_id": int(target["workspace_client_id"]),
         "adapter": adapter,
         "target_label": str(target.get("label") or "")[:200],
+        "account_root": str(account.get("root_key") or "").strip() or None,
+        "account_set": account_key,
+        "account_config": {
+            key: account.get(key)
+            for key in (
+                "comidyear",
+                "seldb",
+                "account_set",
+                "account_dir",
+                "account_company",
+                "account_set_row",
+                "root_key",
+                "mapping",
+            )
+            if account.get(key) not in (None, "")
+        },
         "direction": direction,
         "mode": direction,
         "posting_kind": posting_kind,

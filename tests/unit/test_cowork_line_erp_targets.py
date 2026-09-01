@@ -454,6 +454,81 @@ class ActivePushProjectionTests(unittest.TestCase):
         self.assertNotIn("LIMIT 1", cursor.execute.call_args.args[0])
 
 
+class AccountChoiceProjectionTests(unittest.TestCase):
+    def test_mrerp_projects_every_year_from_live_account_probe(self):
+        endpoint = {
+            "id": "mr-1",
+            "name": "MR.ERP",
+            "adapter": "mrerp",
+            "config": {"comidyear": "6", "seldb": "1"},
+        }
+        probe = {
+            "ok": True,
+            "companies": [
+                {"comidyear": "6", "seldb": "1", "label": "TEST2019"},
+                {"comidyear": "15", "seldb": "1", "label": "TEST2020"},
+            ],
+        }
+        with patch.object(
+            erp_target_projection.target_readiness,
+            "endpoint_status",
+            return_value={"configured": True, "missing": [], "connection_state": "online"},
+        ):
+            target = erp_target_projection.legacy_target(
+                endpoint,
+                {"id": 7, "name": "Main"},
+                binding_count=1,
+                probe=probe,
+            )
+
+        self.assertEqual(target["selected_account_key"], "6:1")
+        self.assertEqual(
+            [(row["key"], row["label"]) for row in target["account_choices"]],
+            [("6:1", "TEST2019"), ("15:1", "TEST2020")],
+        )
+
+    def test_express_projects_data_root_before_registered_account(self):
+        endpoint = {
+            "id": "ex-1",
+            "name": "Express",
+            "adapter": "express",
+            "config": {
+                "account_set": r"S:\\2569\\EXP69\\ACME",
+                "reported_account_sets": [
+                    {
+                        "name": "ACME",
+                        "path": r"S:\\2569\\EXP69\\ACME",
+                        "root": r"S:\\2569\\EXP69",
+                        "writable": True,
+                    },
+                    {
+                        "name": "OLD",
+                        "path": r"S:\\2558\\EXP58\\OLD",
+                        "root": r"S:\\2558\\EXP58",
+                        "writable": True,
+                    },
+                ],
+            },
+        }
+        with patch.object(
+            erp_target_projection.target_readiness,
+            "endpoint_status",
+            return_value={"configured": True, "missing": [], "connection_state": "online"},
+        ):
+            target = erp_target_projection.legacy_target(
+                endpoint,
+                {"id": 7, "name": "Main"},
+                binding_count=1,
+                probe={"ok": True},
+            )
+
+        self.assertEqual(
+            [row["root_label"] for row in target["account_choices"]],
+            ["EXP69", "EXP58"],
+        )
+        self.assertEqual(target["selected_account_key"], r"S:\\2569\\EXP69\\ACME")
+
+
 class IdentityGateTests(unittest.TestCase):
     def test_active_identity_query_and_both_permissions_are_required(self):
         row = {

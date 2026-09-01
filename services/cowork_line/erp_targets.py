@@ -399,10 +399,26 @@ def resolve_history_workspace(
     return require_target(identity, fresh_target["endpoint_id"], int(chosen))
 
 
-def preflight_document(identity, target, history_id, direction, posting_kind=None, payment=None):
+def preflight_document(
+    identity,
+    target,
+    history_id,
+    direction,
+    posting_kind=None,
+    payment=None,
+    account_config=None,
+):
     from services.cowork_line.document_preflight import preflight_document as run
 
-    return run(identity, target, history_id, direction, posting_kind, payment)
+    return run(
+        identity,
+        target,
+        history_id,
+        direction,
+        posting_kind,
+        payment,
+        account_config,
+    )
 
 
 __all__ = [

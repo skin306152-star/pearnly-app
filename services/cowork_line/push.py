@@ -149,7 +149,7 @@ async def dispatch_confirmed(
     """Atomically confirm recognition rows and create one push log for every row."""
     adapter = str(target.get("adapter") or "").lower()
     error_code: str | None = None
-    if adapter == "express" and target.get("workspace_client_id") is not None:
+    if adapter == "express" and target.get("managed"):
         try:
             results = reserve_managed_batch(
                 identity,
@@ -171,7 +171,7 @@ async def dispatch_confirmed(
                 committed = 0
     else:
         try:
-            endpoint, intents = reserve_legacy_batch(identity, history_ids, target)
+            endpoint, intents = reserve_legacy_batch(identity, history_ids, target, selection)
             committed = len(intents)
         except Exception as exc:
             code = _error_code(exc)

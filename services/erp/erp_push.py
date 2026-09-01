@@ -185,6 +185,7 @@ def push_mrerp_history(
         "tenant_id": tenant_id,
         "endpoint_id": endpoint_id,
         "adapter": "mrerp",
+        "account_set": f"{str(config.get('comidyear') or '6')}:{str(config.get('seldb') or '1')}",
     }
 
     def _resp(

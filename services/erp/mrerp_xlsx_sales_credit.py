@@ -13,7 +13,12 @@ import io
 from typing import Any, Dict, List
 
 from services.erp import mrerp_xlsx_generator as _gen
-from services.erp.mrerp_xlsx_fmt import fmt_date, fmt_number, history_number
+from services.erp.mrerp_xlsx_fmt import (
+    fmt_date,
+    fmt_number,
+    history_number,
+    mrerp_sales_tax_label,
+)
 from services.erp.mrerp_xlsx_lookups import (
     resolve_customer_code,
     _build_product_lookup,
@@ -248,7 +253,7 @@ def _generate_xlsx_sales_credit_korn_clone(
         STR_VALUES = [
             invoice_no,
             invoice_date,
-            "7 (แยก)",
+            mrerp_sales_tax_label(history),
             "00000",
             "BOI1",
             "00002",

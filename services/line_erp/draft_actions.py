@@ -253,6 +253,7 @@ async def confirm(
         endpoint_id=str(readiness["endpoint_id"]),
         workspace_client_id=selection["workspace_client_id"],
         posting_kind=selection.get("posting_kind"),
+        account_config=selection.get("account_config"),
     )
 
 

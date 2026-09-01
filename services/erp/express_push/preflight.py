@@ -421,6 +421,14 @@ def preflight_express(
             return _block(pf, "mapping", reason=mres.reason, request_body=body)
         payload = mres.payload
         pf.payload = payload
+        payload.update(
+            {
+                "account_root": str(config.get("express_root") or "").strip(),
+                "account_dir": str(config.get("account_dir") or account_set).strip(),
+                "account_company": str(config.get("account_company") or "").strip(),
+                "account_set_row": int(config.get("account_set_row") or 0),
+            }
+        )
         # 补期初:会计在「补期初卡」填的期初(name/qty/unit_cost/date)由端点写进 history.merged_fields
         # (一次性·不落库),mapper 从 flat 构造 payload 时不读 merged_fields,故在此显式透传给小助手 —
         # 否则期初永远到不了小助手,补期初卡空转。小助手据此先写期初再过账(仅销项·库存卖需要垫库存)。

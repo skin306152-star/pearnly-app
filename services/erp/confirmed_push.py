@@ -24,6 +24,7 @@ async def dispatch_confirmed_history(
     posting_kind: Optional[str] = None,
     request: Optional[Request] = None,
     workspace_client_id: Optional[int] = None,
+    account_config: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Reuse the web push path from LINE without exposing endpoint selection."""
     assigned_endpoint = team_access.assigned_endpoint_for_request(user, endpoint_id)
@@ -82,7 +83,23 @@ async def dispatch_confirmed_history(
     if not endpoint.get("enabled", True):
         raise HTTPException(400, detail="erp.endpoint_disabled")
 
-    existing = db.has_recent_successful_push(history_id, endpoint["id"], user["id"])
+    from services.erp.line_target_choice import endpoint_with_account_choice
+
+    endpoint = endpoint_with_account_choice(endpoint, account_config)
+    endpoint_config = endpoint.get("config") or {}
+    if str(endpoint.get("adapter") or "").lower() == "mrerp":
+        selected_account = (
+            f"{endpoint_config.get('comidyear') or '6'}:" f"{endpoint_config.get('seldb') or '1'}"
+        )
+    else:
+        selected_account = str(endpoint_config.get("account_set") or "").strip()
+
+    existing = db.has_recent_successful_push(
+        history_id,
+        endpoint["id"],
+        user["id"],
+        account_set=selected_account or None,
+    )
     if existing:
         log_args = {
             "endpoint_id": str(endpoint["id"]),

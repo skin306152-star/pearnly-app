@@ -330,13 +330,20 @@ class AccountSetsReportTests(unittest.TestCase):
                 "name": "X",
                 "tax_id": "1",
                 "path": "p",
+                "root": "r",
+                "root_label": "2569 / EXP69",
                 "writable": True,
+                "mapping": {"revenue_acc": "4100", "unknown": "drop"},
                 "evil": "drop",
             }
         ]
         out = agent_store._sanitize_account_sets(raw)
-        self.assertEqual(set(out[0]), {"code", "name", "tax_id", "path", "writable"})
+        self.assertEqual(
+            set(out[0]),
+            {"code", "name", "tax_id", "path", "root", "root_label", "writable", "mapping"},
+        )
         self.assertIs(out[0]["writable"], True)
+        self.assertEqual(out[0]["mapping"], {"revenue_acc": "4100"})
 
     def test_sanitize_drops_empty_and_nonlist(self):
         self.assertEqual(agent_store._sanitize_account_sets("nope"), [])

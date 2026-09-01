@@ -267,6 +267,8 @@
                 direction: selection.direction,
                 adapter: selection.adapter,
                 target_label: selection.target_label,
+                account_root: selection.account_root,
+                account_set: selection.account_set,
                 posting_kind: selection.posting_kind,
                 payment: selection.payment,
             }),

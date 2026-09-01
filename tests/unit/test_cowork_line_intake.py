@@ -18,12 +18,25 @@ IDENTITY = {
     "membership_id": "member-1",
     "line_user_id": "line-1",
 }
+MRERP_ACCOUNT = {
+    "selected_account_key": "6:1",
+    "account_choices": [
+        {
+            "key": "6:1",
+            "label": "TEST2019",
+            "comidyear": "6",
+            "seldb": "1",
+            "writable": True,
+        }
+    ],
+}
 PAYLOAD = {
     "history_ids": ["history-1"],
     "nonce": "nonce-1",
     "adapter": "mrerp",
     "endpoint_id": "endpoint-1",
     "workspace_client_id": None,
+    "account_set": "6:1",
     "direction": "purchase",
     "payment": "cash",
 }
@@ -37,6 +50,7 @@ class IntakeServiceTest(unittest.TestCase):
             "adapter": "mrerp",
             "label": "MR.ERP",
             "mode_options": ["cash", "credit"],
+            **MRERP_ACCOUNT,
         }
         ready = {**initial, "workspace_client_id": 17}
         targets = SimpleNamespace(
@@ -51,6 +65,7 @@ class IntakeServiceTest(unittest.TestCase):
             "workspace_client_id": None,
             "direction": "purchase",
             "payment": "cash",
+            "account_set": "6:1",
         }
         posting_result = SimpleNamespace(ok=True)
 
@@ -136,6 +151,7 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
             "adapter": "mrerp",
             "label": "MR.ERP",
             "mode_options": ["cash", "credit"],
+            **MRERP_ACCOUNT,
         }
         payload = {**PAYLOAD, "workspace_client_id": 17}
 
@@ -172,6 +188,7 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
             "adapter": "mrerp",
             "label": "MR.ERP",
             "mode_options": ["cash", "credit"],
+            **MRERP_ACCOUNT,
         }
         payload = {**PAYLOAD, "workspace_client_id": 17}
         targets = SimpleNamespace(
@@ -209,6 +226,7 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
             "adapter": "mrerp",
             "label": "MR.ERP",
             "mode_options": ["cash", "credit"],
+            **MRERP_ACCOUNT,
         }
         payload = {**PAYLOAD, "workspace_client_id": 17}
         targets = SimpleNamespace(require_target=mock.Mock(return_value=target))

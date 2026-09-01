@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 from routes import erp_endpoints_routes, history_routes
 from services.erp import team_access
-from services.line_erp import cards
+from services.line_erp import menu_cards
 
 
 def _request():
@@ -103,7 +103,7 @@ class TeamPermissionTests(unittest.TestCase):
             self.assertEqual(team_access.tenant_record_scope(request, user), user["tenant_id"])
 
     def test_line_menu_only_renders_assigned_mode(self):
-        rendered = str(cards.menu_card(("purchase",)))
+        rendered = str(menu_cards.menu_card(("purchase",)))
         self.assertIn("mode%3Apurchase", rendered)
         self.assertNotIn("mode%3Asales", rendered)
 

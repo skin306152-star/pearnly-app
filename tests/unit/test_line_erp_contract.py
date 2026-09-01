@@ -13,7 +13,7 @@ from PIL import Image
 
 from routes import line_erp_routes as routes
 from services.line_platform import client as line_client
-from services.line_erp import cards, flow, preview, store, webhook
+from services.line_erp import cards, flow, menu_cards, preview, store, webhook
 
 
 def _sig(body: bytes, secret: str) -> str:
@@ -86,7 +86,7 @@ class ErpFlowTests(unittest.TestCase):
         return [cell for row in grid["contents"] for cell in row["contents"]]
 
     def test_menu_has_six_cells_with_two_icon_actions(self):
-        card = cards.menu_card()
+        card = menu_cards.menu_card()
         cells = self._menu_cells(card)
         rendered = json.dumps(cells, ensure_ascii=False)
         self.assertEqual(len(cells), 6)
@@ -100,7 +100,7 @@ class ErpFlowTests(unittest.TestCase):
         self.assertNotIn("สถานะการเชื่อมต่อ ERP", rendered)
 
     def test_menu_hides_unassigned_sales_mode(self):
-        cells = self._menu_cells(cards.menu_card(("purchase",)))
+        cells = self._menu_cells(menu_cards.menu_card(("purchase",)))
         rendered = json.dumps(cells, ensure_ascii=False)
         self.assertIn("mode%3Apurchase", rendered)
         self.assertNotIn("mode%3Asales", rendered)

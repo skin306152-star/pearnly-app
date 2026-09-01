@@ -17,6 +17,7 @@ from services.line_erp import (
     draft_view,
     flow,
     intake,
+    menu_cards,
     preview,
     push as line_push,  # noqa: F401 - compatibility seam for route tests
     store,
@@ -39,7 +40,7 @@ BatchIncomplete = draft_actions.BatchIncomplete
 
 
 async def _menu_card(_binding: dict, modes: tuple[str, ...]) -> dict:
-    return cards.menu_card(modes)
+    return menu_cards.menu_card(modes)
 
 
 async def handle_event(ev: dict) -> None:

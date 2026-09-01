@@ -30,15 +30,28 @@ def _mrerp_credential_identity(endpoint: dict[str, Any]) -> tuple[str, str] | No
 def _deduplicate_legacy_specs(
     specs: list[LegacySpec],
 ) -> list[LegacySpec]:
-    selected: dict[tuple[Any, ...], tuple[int, tuple[bool, bool, str, str], LegacySpec]] = {}
+    credential_groups: dict[int, tuple[str, ...] | None] = {}
+    bound_groups: set[tuple[str, ...]] = set()
     for index, spec in enumerate(specs):
         endpoint, workspace, *_ = spec
         adapter = str(endpoint.get("adapter") or "").lower()
         credential = _mrerp_credential_identity(endpoint) if adapter == "mrerp" else None
+        group = (adapter, *credential) if credential else None
+        credential_groups[index] = group
+        if group and workspace is not None:
+            bound_groups.add(group)
+
+    selected: dict[tuple[Any, ...], tuple[int, tuple[bool, bool, str, str], LegacySpec]] = {}
+    for index, spec in enumerate(specs):
+        endpoint, workspace, *_ = spec
+        adapter = str(endpoint.get("adapter") or "").lower()
+        credential_group = credential_groups[index]
+        if credential_group in bound_groups and workspace is None:
+            continue
         workspace_id = int(workspace["id"]) if workspace else None
         key = (
-            (adapter, *credential, workspace_id)
-            if credential
+            (*credential_group, workspace_id)
+            if credential_group
             else (adapter, str(endpoint.get("id") or ""), workspace_id)
         )
         priority = (

@@ -194,6 +194,39 @@ class LegacyTargetTests(unittest.TestCase):
 
         self.assertEqual([spec[0]["id"] for spec in specs], ["first", "second"])
 
+    def test_bound_mrerp_connection_wins_over_unbound_duplicate(self):
+        cursor = Mock()
+        cursor.fetchall.side_effect = [
+            [
+                {
+                    "id": "bound",
+                    "adapter": "mrerp",
+                    "created_at": "2026-08-28T09:21:07Z",
+                    "config": {"username": "test01", "password": "same-password"},
+                },
+                {
+                    "id": "unbound",
+                    "adapter": "mrerp",
+                    "created_at": "2026-09-01T11:51:06Z",
+                    "config": {"username": "test01", "password": "same-password"},
+                },
+            ],
+        ]
+        workspace = {"id": 106, "name": "Store", "erp_endpoint_id": "bound"}
+
+        specs = erp_targets._legacy_target_specs(
+            cursor,
+            user_id="owner-1",
+            tenant_id="tenant-1",
+            all_workspaces=[workspace],
+            allowed_workspaces=[workspace],
+            can_auto_create=True,
+        )
+
+        self.assertEqual(len(specs), 1)
+        self.assertEqual(specs[0][0]["id"], "bound")
+        self.assertEqual(specs[0][1], workspace)
+
     def test_mrerp_requires_credentials_and_keeps_config_private(self):
         target = erp_targets._legacy_target(
             {

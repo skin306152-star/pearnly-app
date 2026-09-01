@@ -130,6 +130,23 @@ async function openErp(
             workspace_name: 'Sister Makeup',
             adapter: 'express',
             label: 'Express · MAIN',
+            account_set_label: 'MAIN',
+            selectable: true,
+            configured: true,
+            connection_state: 'online',
+            ready_checks: {
+                erp_connection: true,
+                companion_online: true,
+                profile_matches: true,
+            },
+        },
+        {
+            endpoint_id: 'express-2',
+            workspace_client_id: 71,
+            workspace_name: 'Sister Makeup Branch',
+            adapter: 'express',
+            label: 'Express · BRANCH',
+            account_set_label: 'BRANCH',
             selectable: true,
             configured: true,
             connection_state: 'online',
@@ -145,6 +162,19 @@ async function openErp(
             workspace_name: 'Accounting Client A',
             adapter: 'mrerp',
             label: 'MR.ERP · Client A',
+            account_set_label: 'Client A',
+            selectable: true,
+            configured: true,
+            connection_state: 'online',
+            ready_checks: { erp_connection: true },
+        },
+        {
+            endpoint_id: 'mrerp-2',
+            workspace_client_id: 72,
+            workspace_name: 'Accounting Client B',
+            adapter: 'mrerp',
+            label: 'MR.ERP · Client B',
+            account_set_label: 'Client B',
             selectable: true,
             configured: true,
             connection_state: 'online',
@@ -238,6 +268,7 @@ async function openCowork(page) {
             workspace_client_id: 69,
             adapter: 'express',
             label: 'Express · 69EXP',
+            account_set_label: '69EXP',
             selectable: true,
             configured: true,
             connection_state: 'online',
@@ -295,7 +326,8 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
 }) => {
     const page = await browser.newPage({ ...devices['iPhone 13'] });
     const run = await openErp(page);
-    await expect(page.locator('.target-card.active')).toContainText('Sister Makeup');
+    await expect(page.locator('.target-locked')).toHaveText('Express');
+    await expect(page.locator('[data-target-account-set]')).toHaveValue('express-1:69');
     await expect(page.locator('[data-target-selection="posting_kind"]')).toHaveValue('stock');
     await page.screenshot({
         path: path.join(OUT, 'erp-mobile-target-selection.png'),
@@ -352,26 +384,19 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
     await page.close();
 });
 
-test('ERP target can switch freely and MRERP sales uses payment instead of item stock type', async ({
-    page,
-}) => {
+test('editor locks the conversation ERP and only switches its account set', async ({ page }) => {
     await openErp(page, { adapter: 'mrerp', direction: 'sales' });
-    await expect(page.locator('.target-card.active')).toContainText('Accounting Client A');
+    await expect(page.locator('.target-locked')).toHaveText('MR.ERP');
+    await expect(page.locator('[data-target-account-set] option')).toHaveCount(2);
+    await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-1:70');
+    await expect(page.locator('[data-target-account-set]')).not.toContainText('Express');
     await expect(page.locator('[data-target-selection="payment"]')).toHaveValue('cash');
     await page.locator('.review-row').first().click();
     await expect(page.locator('[data-kind]')).toHaveCount(0);
     await page.locator('[data-review-back]').click();
-
-    await page.locator('.target-card', { hasText: 'Sister Makeup' }).click();
-    await expect(page.locator('[data-target-selection="posting_kind"]')).toBeVisible();
-    await expect(page.locator('[data-review-action="confirm"]')).toBeDisabled();
-    await page.locator('[data-target-selection="posting_kind"]').selectOption('service');
-    await page.locator('.review-row').first().click();
-    await expect(page.locator('[data-kind]').first()).toHaveValue('service');
-    await page.locator('[data-review-back]').click();
-
-    await page.locator('.target-card', { hasText: 'Accounting Client A' }).click();
-    await page.locator('[data-target-selection="payment"]').selectOption('cash');
+    await page.locator('[data-target-account-set]').selectOption('mrerp-2:72');
+    await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-2:72');
+    await expect(page.locator('[data-target-selection="payment"]')).toHaveValue('cash');
     await expect(page.locator('[data-kind]')).toHaveCount(0);
     await expect(page.locator('[data-review-action="confirm"]')).toBeEnabled();
 });

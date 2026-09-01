@@ -75,7 +75,11 @@ class IntakeServiceTest(unittest.TestCase):
             IDENTITY, "endpoint-1", workspace_client_id=None
         )
         targets.resolve_history_workspace.assert_called_once_with(
-            IDENTITY, initial, ["history-1"], "purchase"
+            IDENTITY,
+            initial,
+            ["history-1"],
+            "purchase",
+            provisional_history_assignment=True,
         )
         self.assertEqual(update_scope.call_args.args[2]["workspace_client_id"], 17)
         saved_payload = set_session.call_args.kwargs["payload"]

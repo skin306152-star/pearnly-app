@@ -159,6 +159,7 @@ def generate_xlsx_sales_cash(histories: List[Dict[str, Any]], mappings: Dict[str
         base = build_sales_credit_row(history, mappings)
         inv, date = base["invoice_no"], base["invoice_date"]
         cust, bill = base["customer_code"], base["bill_no"]
+        discount = history_number(history, "discount") or 0
         col_vals = {
             1: inv,
             2: date,
@@ -174,8 +175,8 @@ def generate_xlsx_sales_cash(histories: List[Dict[str, Any]], mappings: Dict[str
             12: date,
             13: "สุพรรณบุรี",
             14: "ขนส่งโดยบริษัท",
-            15: 0,
-            16: 0,  # 折扣 0 · 现金收讫 0(全额走收款科目槽,见下)
+            15: discount,
+            16: 0,  # 现金收讫 0(全额走收款科目槽,见下)
         }
         # 收款槽 1-3(รับอื่นๆ):MR.ERP 现金票要求 3 槽全非空 → 槽1 记全额到收款科目,
         # 槽2/3 用同科目占位、金额 0(满足非空校验,不产生额外分录)。见 _receipt_account。

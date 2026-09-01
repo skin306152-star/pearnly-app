@@ -32,7 +32,7 @@ def _legacy_account_label(
 ) -> str:
     config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
     if adapter == "express":
-        return str(config.get("account_set") or "").strip()[:80]
+        return str(config.get("account_set_label") or config.get("account_set") or "").strip()[:200]
     if adapter != "mrerp":
         return ""
     comidyear = str(config.get("comidyear") or "6").strip()
@@ -114,6 +114,7 @@ def managed_target(
         "workspace_name": str(workspace.get("name") or "")[:200] or None,
         "adapter": "express",
         "label": f"{endpoint_label} · {profile_label}" if profile_label else endpoint_label,
+        "account_set_label": profile_label or None,
         "connection_state": state,
         "configured": configured,
         "selectable": not missing,

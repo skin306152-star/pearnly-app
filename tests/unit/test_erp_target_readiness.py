@@ -64,6 +64,7 @@ class ErpTargetReadinessTests(unittest.TestCase):
         self.assertEqual(target["mode_options"], ["stock", "service"])
         self.assertFalse(target["managed"])
         self.assertEqual(target["label"], "Express Main · 69EXP")
+        self.assertEqual(target["account_set_label"], "69EXP")
         self.assertNotIn("agent_token_hash", repr(target))
 
     def test_mrerp_target_shows_the_mapped_account_set_name(self):

@@ -64,6 +64,21 @@ class TestSalesCashGenerator(unittest.TestCase):
         self.assertEqual(cells.get("T"), "0")
         self.assertEqual(cells.get("V"), "0")
 
+    def test_discount_is_sent_so_receipts_equal_net_total(self):
+        history = {
+            **_HISTORY,
+            "subtotal": "3557.01",
+            "vat": "248.99",
+            "discount": "200.00",
+            "total_amount": "3806.00",
+            "items": [{"name": "ITEM A", "qty": 1, "unit_price": 4006, "amount": 4006}],
+        }
+        cells = _sheet1_datarow_cells(
+            gen.generate_xlsx([history], _MAPPINGS, sheet_kind="sales_cash")
+        )
+        self.assertEqual(cells.get("O"), "200")
+        self.assertEqual(cells.get("R"), "3806")
+
 
 class TestReceiptAccount(unittest.TestCase):
     def test_transfer_defaults_to_bank(self):

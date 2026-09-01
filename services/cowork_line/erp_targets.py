@@ -321,9 +321,7 @@ def resolve_history_workspace(
     if len(histories) != len(ids):
         raise CoworkLineErpTargetError("history_not_found")
 
-    may_reassign = (
-        provisional_history_assignment and fresh_target.get("workspace_client_id") is None
-    )
+    may_reassign = provisional_history_assignment
     existing_ids = {
         int(history["workspace_client_id"])
         for history in histories.values()
@@ -339,6 +337,8 @@ def resolve_history_workspace(
     routed_ids: set[int] = set()
     for history_id in ids:
         history = histories[history_id]
+        if may_reassign and target_workspace is not None:
+            continue
         if history.get("workspace_client_id") is not None and not may_reassign:
             continue
         tax_id, name = _history_party(history, direction)

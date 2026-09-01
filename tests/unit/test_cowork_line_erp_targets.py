@@ -60,6 +60,7 @@ class ManagedTargetTests(unittest.TestCase):
         self.assertEqual(target["connection_state"], "online")
         self.assertEqual(target["mode_options"], ["stock", "service"])
         self.assertEqual(target["workspace_name"], "ACME")
+        self.assertEqual(target["account_set_label"], "ACME")
         self.assertIsNone(target["ready_checks"]["document_preflight"])
         self.assertTrue(target["ready_checks"]["profile_matches"])
         self.assertTrue({"config", "token", "path", "profile_key"}.isdisjoint(_keys(target)))
@@ -302,6 +303,33 @@ class WorkspaceAssignmentTests(unittest.TestCase):
         self.assertEqual(result, fresh)
         update.assert_not_called()
 
+    def test_editor_can_reassign_staged_history_to_selected_account_set(self):
+        fresh = {
+            "endpoint_id": "mrerp-2",
+            "workspace_client_id": 22,
+            "selectable": True,
+            "missing": [],
+        }
+        histories = {"h1": {"workspace_client_id": 11}}
+        with (
+            patch.object(erp_targets, "_selected_target", return_value=fresh),
+            patch.object(erp_targets.db, "get_ocr_history_details_bulk", return_value=histories),
+            patch.object(
+                erp_targets.db, "update_history_workspace_client_id", return_value=True
+            ) as update,
+            patch.object(erp_targets, "require_target", return_value=fresh),
+        ):
+            result = erp_targets.resolve_history_workspace(
+                {"user_id": "u1", "tenant_id": "t1"},
+                fresh,
+                ["h1"],
+                "sales",
+                provisional_history_assignment=True,
+            )
+
+        update.assert_called_once_with("h1", 22, "u1", "t1")
+        self.assertEqual(result, fresh)
+
     def test_unassigned_batch_uses_public_create_and_update_services(self):
         fresh = {
             "endpoint_id": "mrerp-1",
@@ -508,6 +536,7 @@ class DocumentPreflightTests(unittest.TestCase):
             "endpoint_id": "express-1",
             "workspace_client_id": 7,
             "adapter": "express",
+            "managed": True,
             "configured": True,
             "selectable": True,
             "missing": [],
@@ -525,7 +554,7 @@ class DocumentPreflightTests(unittest.TestCase):
                 document_preflight.db, "get_ocr_history_detail", return_value=self.history
             ),
             patch.object(document_preflight, "subject_matches", return_value=(True, None)),
-            patch.object(document_preflight, "_managed_endpoint", return_value=endpoint),
+            patch.object(document_preflight, "_express_endpoint", return_value=endpoint),
             patch.object(
                 document_preflight, "preflight_express", return_value=canonical
             ) as preflight,
@@ -539,6 +568,41 @@ class DocumentPreflightTests(unittest.TestCase):
         self.assertNotIn("request_body", result)
         self.assertNotIn("payload", result)
         self.assertNotIn("secret", repr(result))
+
+    def test_legacy_express_uses_owner_endpoint_for_document_preflight(self):
+        target = {
+            "endpoint_id": "express-legacy",
+            "workspace_client_id": 7,
+            "adapter": "express",
+            "managed": False,
+            "configured": True,
+            "selectable": True,
+            "missing": [],
+        }
+        endpoint = {
+            "id": "express-legacy",
+            "adapter": "express",
+            "config": {"account_set": r"\\server\account\TEST"},
+        }
+        canonical = Mock(disabled=False, reason=None)
+        canonical.checks_json.return_value = [{"key": "feature", "status": "ok"}]
+        with (
+            patch.object(erp_targets, "require_target", return_value=target),
+            patch.object(
+                document_preflight.db, "get_ocr_history_detail", return_value=self.history
+            ),
+            patch.object(document_preflight, "subject_matches", return_value=(True, None)),
+            patch.object(
+                document_preflight.db, "get_erp_endpoint", return_value=endpoint
+            ) as get_endpoint,
+            patch.object(document_preflight, "preflight_express", return_value=canonical),
+        ):
+            result = erp_targets.preflight_document(
+                self.identity, target, "h1", "sales", posting_kind="stock"
+            )
+
+        self.assertTrue(result["ok"])
+        get_endpoint.assert_called_once_with("u1", "express-legacy")
 
     def test_workspace_mismatch_blocks_before_adapter_preflight(self):
         target = {

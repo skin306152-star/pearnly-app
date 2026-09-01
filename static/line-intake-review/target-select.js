@@ -5,6 +5,7 @@
         var model = options.model;
         var text = options.text;
         var escape = options.escape;
+        var lockedAdapter = '';
 
         function current() {
             return model() || {};
@@ -21,6 +22,10 @@
 
         function endpointId(target) {
             return String(target.endpoint_id || target.id || '');
+        }
+
+        function adapterOf(target) {
+            return String((target || {}).adapter || '').toLowerCase();
         }
 
         function key(target) {
@@ -43,6 +48,36 @@
                         )
                 );
             });
+        }
+
+        function adapter() {
+            if (lockedAdapter) return lockedAdapter;
+            lockedAdapter = adapterOf(selected()) || adapterOf(selection());
+            return lockedAdapter;
+        }
+
+        function accountTargets() {
+            var value = adapter();
+            return value
+                ? targets().filter(function (target) {
+                      return adapterOf(target) === value;
+                  })
+                : [];
+        }
+
+        function adapterLabel(value) {
+            return value === 'mrerp' ? 'MR.ERP' : value === 'express' ? 'Express' : value || 'ERP';
+        }
+
+        function accountLabel(target) {
+            return (
+                target.account_set_label ||
+                target.account_set ||
+                target.workspace_label ||
+                target.workspace_name ||
+                target.label ||
+                text('accountSet')
+            );
         }
 
         function blocked(target) {
@@ -128,31 +163,18 @@
         }
 
         function html() {
-            var cards = targets()
+            var choices = accountTargets();
+            var optionsHtml = choices
                 .map(function (target) {
-                    var workspace =
-                        target.workspace_label ||
-                        target.workspace_name ||
-                        (target.workspace_client_id == null
-                            ? text('autoWorkspace')
-                            : text('workspace') + ' #' + target.workspace_client_id);
                     return (
-                        '<button type="button" class="target-card' +
-                        (selected() === target ? ' active' : '') +
-                        (blocked(target) ? ' blocked' : '') +
-                        '" data-target-option="' +
+                        '<option value="' +
                         escape(key(target)) +
                         '"' +
-                        (blocked(target) ? ' aria-disabled="true"' : '') +
-                        '><strong>' +
-                        escape(workspace) +
-                        '</strong><span>' +
-                        escape(
-                            target.label || target.target_label || target.adapter || text('erp')
-                        ) +
-                        '</span><div class="checks">' +
-                        status(target) +
-                        '</div></button>'
+                        (selected() === target ? ' selected' : '') +
+                        (blocked(target) ? ' disabled' : '') +
+                        '>' +
+                        escape(accountLabel(target)) +
+                        '</option>'
                     );
                 })
                 .join('');
@@ -160,9 +182,15 @@
             return (
                 '<section class="target-panel"><h2>' +
                 escape(text('target')) +
-                '</h2><div class="target-list">' +
-                (cards || '<p class="target-empty">' + escape(text('noTarget')) + '</p>') +
-                '</div><div class="target-grid"><label class="target-field"><span>' +
+                '</h2><div class="target-grid"><div class="target-field"><span>' +
+                escape(text('erp')) +
+                '</span><strong class="target-locked">' +
+                escape(adapterLabel(adapter())) +
+                '</strong></div><label class="target-field"><span>' +
+                escape(text('accountSet')) +
+                '</span><select data-target-account-set>' +
+                (optionsHtml || '<option value="">' + escape(text('noAccountSet')) + '</option>') +
+                '</select></label><label class="target-field"><span>' +
                 escape(text('direction')) +
                 '</span><select data-target-selection="direction"' +
                 (options.lockDirection ? ' disabled' : '') +
@@ -176,6 +204,8 @@
                 escape(text('sales')) +
                 '</option></select></label>' +
                 modeField(target) +
+                '</div><div class="checks">' +
+                (target ? status(target) : '') +
                 '</div>' +
                 (target && blocked(target)
                     ? '<p class="target-block-note">' + escape(text('blocked')) + '</p>'
@@ -194,8 +224,6 @@
                 workspace_client_id: target.workspace_client_id,
                 adapter: target.adapter,
                 target_label: target.label || target.target_label,
-                posting_kind: null,
-                payment: null,
             });
         }
 
@@ -221,13 +249,14 @@
         }
 
         function bind(root, render) {
-            root.querySelectorAll('[data-target-option]').forEach(function (button) {
-                button.onclick = function () {
-                    choose(button.dataset.targetOption);
+            var accountSet = root.querySelector('[data-target-account-set]');
+            if (accountSet) {
+                accountSet.onchange = function () {
+                    choose(accountSet.value);
                     if (options.onChange) options.onChange('target', selected());
                     render();
                 };
-            });
+            }
             root.querySelectorAll('[data-target-selection]').forEach(function (element) {
                 element.onchange = function () {
                     var field = element.dataset.targetSelection;
@@ -241,7 +270,7 @@
 
         return {
             adapter: function () {
-                return String((selected() || {}).adapter || '').toLowerCase();
+                return adapter();
             },
             bind: bind,
             html: html,

@@ -279,7 +279,11 @@ def save_draft(identity: dict, draft_id: str, records: list[dict], selection: di
             raise CoworkLineIntakeError("draft_save_failed")
     try:
         target = _targets_service().resolve_history_workspace(
-            identity, target, history_ids, normalized["direction"]
+            identity,
+            target,
+            history_ids,
+            normalized["direction"],
+            provisional_history_assignment=True,
         )
     except Exception as exc:
         if exc.__class__.__name__ != "CoworkLineErpTargetError":

@@ -49,11 +49,16 @@ def _with_manual_fields(history: dict[str, Any], direction: str, payment: str | 
     return prepared
 
 
-def _managed_endpoint(identity: dict[str, Any], target: dict[str, Any]) -> dict[str, Any] | None:
+def _express_endpoint(identity: dict[str, Any], target: dict[str, Any]) -> dict[str, Any] | None:
     tenant_id = str(identity.get("tenant_id") or "")
     user_id = str(identity.get("user_id") or "")
-    workspace_id = int(target["workspace_client_id"])
     endpoint_id = str(target["endpoint_id"])
+    if not target.get("managed"):
+        endpoint = db.get_erp_endpoint(user_id, endpoint_id)
+        if endpoint and str(endpoint.get("adapter") or "").lower() == "express":
+            return endpoint
+        return None
+    workspace_id = int(target["workspace_client_id"])
     with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
         cur.execute("SELECT set_config('app.current_workspace_id', %s, true)", (str(workspace_id),))
         if not enable_shared_express_select(cur, tenant_id, workspace_id):
@@ -80,14 +85,15 @@ def _express_projection(
     if kind is None:
         code = "posting_kind_required" if posting_kind in (None, "") else "posting_kind_invalid"
         return _result([code], checks={"target_ready": True, "document_preflight": False})
-    endpoint = _managed_endpoint(identity, target)
+    endpoint = _express_endpoint(identity, target)
     if endpoint is None:
         return _result(
             ["endpoint_not_found"],
             checks={"target_ready": False, "document_preflight": False},
         )
     config = dict(endpoint.get("config") or {})
-    config["account_set"] = endpoint.get("bound_account_set")
+    if endpoint.get("bound_account_set"):
+        config["account_set"] = endpoint["bound_account_set"]
     prepared_endpoint = {**endpoint, "config": config, "user_id": str(identity["user_id"])}
     prepared_history = _with_manual_fields(history, direction, payment)
     result = preflight_express(prepared_endpoint, prepared_history, posting_kind=kind)

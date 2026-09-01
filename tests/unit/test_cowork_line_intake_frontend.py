@@ -50,6 +50,10 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
         for mode in ("stock", "service", "cash", "credit"):
             self.assertIn("'" + mode + "'", self.target_select)
         self.assertIn("target.workspace_name", self.target_select)
+        self.assertIn("target.account_set_label", self.target_select)
+        self.assertIn("data-target-account-set", self.target_select)
+        self.assertIn("lockedAdapter", self.target_select)
+        self.assertNotIn("data-target-option", self.target_select)
 
     def test_line_primary_redirect_restores_scoped_draft(self):
         self.assertIn("direct.get('liff.state')", self.runtime)

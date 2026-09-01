@@ -65,6 +65,29 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         inspect.assert_not_called()
         self.assertEqual(card["type"], "flex")
 
+    async def test_rich_menu_postback_respects_assigned_modes(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        event = {"postback": {"data": "a=mode%3Asales"}}
+        with (
+            mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
+            mock.patch.object(webhook.target_flow, "begin_mode") as begin_mode,
+            mock.patch.object(webhook.line_client, "reply_text") as reply_text,
+        ):
+            await webhook._handle_postback(event, binding, "line-u1", "reply")
+        begin_mode.assert_not_called()
+        reply_text.assert_called_once()
+        self.assertIn("ไม่มีสิทธิ์", reply_text.call_args.args[1])
+
+    async def test_rich_menu_postback_starts_an_assigned_mode(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        event = {"postback": {"data": "a=mode%3Apurchase"}}
+        with (
+            mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
+            mock.patch.object(webhook.target_flow, "begin_mode") as begin_mode,
+        ):
+            await webhook._handle_postback(event, binding, "line-u1", "reply")
+        begin_mode.assert_awaited_once_with(binding, "line-u1", "reply", "purchase")
+
     async def test_media_event_queues_ocr_instead_of_waiting_for_reply(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}
         with (

@@ -129,6 +129,14 @@ async def _handle_postback(
     action = (params.get("a") or [""])[0]
     if action.startswith("mode:"):
         mode = action.split(":", 1)[1]
+        if mode not in _allowed_modes(binding):
+            if reply_token:
+                line_client.reply_text(
+                    reply_token,
+                    "บัญชีนี้ไม่มีสิทธิ์สำหรับรายการนี้",
+                    channel=CHANNEL,
+                )
+            return
         await target_flow.begin_mode(binding, line_user_id, reply_token, mode)
     elif action == "target-page":
         mode = str((params.get("mode") or [""])[0])

@@ -1,6 +1,6 @@
 # Pearnly 品牌源资产
 
-全站品牌素材的单一来源。通用品牌素材供页面、图标和社交预览接线；LINE Rich Menu 只保留当前 Cowork 与 DMS 两套 v1 成品。
+全站品牌素材的单一来源。通用品牌素材供页面、图标和社交预览接线；LINE Rich Menu 保留当前 Cowork、DMS 与 ERP 三套 v1 成品。
 
 | 文件                                          | 用途                                |
 | --------------------------------------------- | ----------------------------------- |
@@ -13,5 +13,6 @@
 | `social-preview-1200x630.png`                 | Open Graph / 社交分享卡             |
 | `line-richmenu-cowork-v1-2500x1686.png`      | Pearnly Cowork LINE Rich Menu       |
 | `line-richmenu-dms-v1-2500x1686.png`         | Pearnly DMS LINE Rich Menu          |
+| `line-richmenu-erp-v1-2500x1686.png`         | Pearnly ERP LINE Rich Menu          |
 
 接线时:页面 `<link rel="icon">` / `apple-touch-icon` / web manifest 指向 `/static/brand/<file>`,并按需 bump `?v=`。

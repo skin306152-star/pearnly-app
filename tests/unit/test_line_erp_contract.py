@@ -78,23 +78,22 @@ class ErpFlowTests(unittest.TestCase):
 
     @staticmethod
     def _menu_cells(card):
-        grid = next(
+        return [
             item
             for item in card["contents"]["body"]["contents"]
-            if item.get("layout") == "vertical" and item.get("spacing") == "sm"
-        )
-        return [cell for row in grid["contents"] for cell in row["contents"]]
+            if item.get("action") and item.get("cornerRadius") == "14px"
+        ]
 
-    def test_menu_has_six_cells_with_two_icon_actions(self):
+    def test_chat_menu_has_two_full_width_icon_rows(self):
         card = menu_cards.menu_card()
         cells = self._menu_cells(card)
         rendered = json.dumps(cells, ensure_ascii=False)
-        self.assertEqual(len(cells), 6)
+        self.assertEqual(len(cells), 2)
         self.assertIn("mode%3Apurchase", rendered)
         self.assertIn("mode%3Asales", rendered)
         self.assertNotIn("mode%3Adms", rendered)
-        self.assertEqual(sum("action" in cell for cell in cells), 2)
-        self.assertEqual(sum(cell["contents"] == [{"type": "filler"}] for cell in cells), 4)
+        self.assertTrue(all(cell["layout"] == "horizontal" for cell in cells))
+        self.assertTrue(all(cell["contents"][-1]["text"] == "›" for cell in cells))
         self.assertIn("/static/dms/line-icons/erp-purchase.png", rendered)
         self.assertIn("/static/dms/line-icons/erp-sales.png", rendered)
         self.assertNotIn("สถานะการเชื่อมต่อ ERP", rendered)

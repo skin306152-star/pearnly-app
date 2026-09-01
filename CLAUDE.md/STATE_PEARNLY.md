@@ -1,21 +1,18 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-31 F2 READY_FOR_DEVICE / 待真机用户验收
+## 当前状态卡 · 09-01 LINE 切套账 + 推送真因 READY_FOR_DEVICE
 
-- **▶ 当前 task**:F2“一个 Companion 进程管理多个隔离 Profile”候选已升级到 Companion `v1.1.66` / commit=`737b766c8b2dd68372995781a0d14cb69714bfb0`，状态仍为 `READY_FOR_DEVICE`，尚未 `USER_ACCEPTED`，绝不冒充真机闭环。
-- **🎯 F2 结果**:同一安装包/进程/开机项管理 Cowork 与 `/erp` 多个 Express 连接；每 Profile 独立 token、账套、暂停态、heartbeat/lease/ACK；一个公平串行写通道，A 的 401/暂停/离线不阻断 B。
-- **🔐 本地安全**:旧单 Profile 原子迁移为 schema v2；token 仅以 Windows CurrentUser DPAPI 密文落盘；相同物理 account_dir 拒绝；设置重载与退出协作等待当前 DBF 单据安全结束，绝不 `QThread.terminate()` 半路强杀。
-- **🖥 UI**:托盘“Express 连接”可添加、编辑、暂停/恢复、确认移除；显示在线/离线/处理中/需处理/已暂停；中泰语言可即时切换、立即持久化并同步管理窗/托盘；变更后只重启唯一 worker。
-- **☁️ 云端裁决**:F1 endpoint/token/heartbeat/lease/ACK 已天然支持同一 companion_id 的多 Profile；未新增 schema、路由或第二套队列。回归 commit=`0c55531e` 已推 origin/master，真 PG 双 endpoint/token 2/2 通过且交叉 ACK 零 mutation。
-- **🔎 现场根因与修复**:`1.1.65` 漏扫并非 Express 不存在：真实入口是桌面 `.lnk`，分别指向 `\\Accserver\d$\ACCOUNT\69EXP` / `70EXP`，旧 locator 不读取快捷方式；`1.1.66` 已加入真实 `.lnk` 发现/解析，并收口中泰即时持久切换。
-- **✅ Companion 验证**:commit=`737b766c8b2dd68372995781a0d14cb69714bfb0` 已推 master；Windows 33 tests 全绿，并已真实解析两条桌面 `.lnk`；本候选未扩大到业务写入或网页/LINE 日常切账套。
-- **🏷 发布结果**:`1.1.66` 已完成 Windows 构建并公开；安装包已放到 Windows 用户 `skin3` 的 Downloads，但尚未覆盖安装，故仍待用户真机验收。
-- **📦 制品真值**:installer ProductVersion=`1.1.66`；size=`62878930` bytes；SHA-256=`ddc1af67ca1781d9618f6dea9250bf82b7aad7fe5bfb1c190c8d4549bcd913a3`。
-- **🌐 更新入口**:`latest.json.version=1.1.66`，URL=`/static/companion/PearnlyCompanion-Setup.exe?v=v1.1.66-737b766`。
-- **🧾 F1 沿袭门**:F1 production candidate=`2dbb7dd0`/manual CD `33329235154`/flag rollout all 仍待老板+员工+Express report 真机证据；本轮只因用户明确指令进入 F2，F1 仍非 `USER_ACCEPTED`。
-- **⏭ 唯一下步**:Zihao 在同一台 Windows 从 `skin3\Downloads` 覆盖安装 `v1.1.66`，随后真机验证桌面 `.lnk` 扫描、中泰即时持久切换及 Cowork+A 与 `/erp`+B 双账套隔离；等 Zihao 明确 F2 OK。
-- **⏸ F2 后下一功能**:网页/LINE 日常切公司/账套不在小助手内操作；小助手首次绑定多个 Profile 后常驻。F2 真机明确 OK 后再做网页/LINE 按连接 ID 选目标、预览确认并记住员工上次选择；F3-F7 当前仍 `PLANNED_LOCKED`。
-- **📚 任务板/证据**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md` 与 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
+- **▶ 当前 task**:Cowork 与 `/erp` LINE 复核编辑器统一为“对话先选 ERP、编辑器锁定该 ERP、批次内切目标套账”；应用 commit=`8cc57cdf`，MR.ERP 现金折扣修复=`95149690`，均已在 production descendant `ca099544` 生效。
+- **🎯 MR.ERP 套账**:连接实时探测得到 `TEST2019=6:1`、`TEST2020=15:1`；下拉按年度账套显示，提交时服务端复核并仅投影到本次批次，不改老板默认配置。
+- **🎯 Express 套账**:Companion `v1.1.68` commit=`1239c144` 支持任务级“年度/数据根 → 套账”选择；心跳上报的 49 个有效候选已按 `59EXP/69EXP/70EXP` 分组，任务切换不改全局默认。
+- **🔐 安全边界**:任意路径不可信；MR.ERP 只接受实时账号账套，Express 只接受 Companion 本机发现并上报的根/套账；换套账会清掉旧套账的科目与商品目录，防串账。
+- **✅ MR.ERP 真写回归**:原单 `02000131` 经 TEST2019 正式重推成功，返回 `690524-700723` / `SI690524-700723`；`arse` 现金销售列表按单号回读命中 `24/05/2569`、`3,806.00`，不是仅 HTTP 200。
+- **🔎 MR.ERP 真因**:现金销售导入器不接受“表头折扣 + 已净额收款”；新逻辑仅在金额勾稽成立时把折扣按分币分摊到明细金额、保留原单价、导入表头折扣归零。TEST2019 另留两张诊断单 `690524-303539`、`690524-598370`。
+- **🔎 Express 真因**:`erp.endpoint_changed` 是云端旧判定，已由 `8cc57cdf` 修复；后续 `HS6901-101` 已到本地 Agent，但 `ACCCOD ST01` 对应科目不像存货科目，被写侧安全闸转人工，须由会计选非库存或配置真实存货组，禁止代码猜测绕过。
+- **🖥 Companion 现场**:`v1.1.68` 已发布且曾上报 50 条候选，但目标连接随后优雅离线；`Express TEST` 仍报 `v1.1.67` 且心跳超时。当前不得称 Express 真机闭环。
+- **✅ 验证/发布**:应用 MR.ERP 422 tests + 全 pre-push 绿，manual CD `33495883253` 成功；Companion 471 passed/35 skipped，release `33493512960` 成功，installer SHA-256=`abc6abf00e075138c0b92f796a1e151b51babc903008634380b076e16151abc4`。
+- **⏭ 唯一下步**:Windows 保持 `v1.1.68` 小助手在线；Zihao 在 LINE 真机验证 MR.ERP 两年度与 Express“数据根→套账”切换，再由会计对 `HS6901-101` 选择正确库存口径后重推并回查 Express 单据。
+- **📚 任务板/证据**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`、`docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`、`docs/integrations/mrerp-known-facts.md`。
 
 ---
 

@@ -286,8 +286,7 @@ def same_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
 
 
 def booking_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
-    """菜单2/直拍=订车工作流(2026-07-19 泰方:与档案维护是 DMS 两个功能,证件只为认人):
-    认出已有客户(有无差异都不弹更新)→ 预览 + [ทำใบจองต่อ][แก้ไข],确认即去选车。"""
+    """菜单2认出资料一致的客户时，确认后进入订车逐问。"""
     footer = [
         _btn(BTN_CONTINUE_BOOKING, _data(ACT_KEEP, nonce=nonce), "primary"),
         _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"),

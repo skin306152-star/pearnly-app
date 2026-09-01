@@ -96,11 +96,15 @@ def _ocr_ok():
     return {"needs_review": False, "missing_fields": [], "id_card": dict(_RAW_ID)}
 
 
-def _lookup(scenario, *, field_diffs=None, customer_id=None, candidates=None):
+def _lookup(scenario, *, field_diffs=None, customer_id=None, candidates=None, current_fields=None):
     return {
         "ok": True,
         "scenario": scenario,
-        "match": {"found": scenario == "exact", "customer_id": customer_id, "current_fields": {}},
+        "match": {
+            "found": scenario == "exact",
+            "customer_id": customer_id,
+            "current_fields": current_fields or {},
+        },
         "field_diffs": field_diffs or [],
         "candidates": candidates or [],
         "geo": _GEO,
@@ -254,21 +258,50 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             card = env.pushed_card()
             self.assertEqual(card["altText"], cards.same_customer_card({}, "x")["altText"])
 
-    async def test_c2b_booking_mode_exact_shows_booking_card_even_with_diffs(self):
-        """订车工作流(2026-07-19 泰方拍板):缺省/菜单2 认出已有客户,有差异也不弹更新,
-        出 [ทำใบจองต่อ][แก้ไข] 确认卡;点继续 → 开逐问,零写入。"""
-        diffs = [{"field": "house_no", "old": "88", "new": "99"}]
+    async def test_c2b_booking_diff_updates_customer_before_qa(self):
+        """菜单2发现差异时复用更新卡；写档成功后才进入订车逐问。"""
+        diffs = [{"field": "phone", "old": "0811111111", "new": _PHONE}]
         with _Env(
-            ocr=_ocr_ok(), lookup=_lookup("exact", field_diffs=diffs, customer_id="C7"), admin=True
+            ocr=_ocr_ok(),
+            lookup=_lookup("exact", field_diffs=diffs, customer_id="C7"),
+            admin=True,
+            push_result={"success": True, "customer_id": "C7", "response_body": {}},
         ) as env:
             nonce = await self._seed_reviewing(env)
             card = env.pushed_card()
             labels = _all_button_labels(card)
-            self.assertIn(cards.BTN_CONTINUE_BOOKING, labels)
-            self.assertNotIn(cards.BTN_UPDATE, labels)
+            self.assertIn(cards.BTN_UPDATE, labels)
+            self.assertNotIn(cards.BTN_CONTINUE_BOOKING, labels)
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_UPDATE, nonce))
+            await env.drain()
+        self.assertEqual(env.push_idcard.call_args.kwargs["fields"]["phone"], _PHONE)
+        self.assertEqual(env.qa_start.call_args.kwargs["draft"]["phone"], _PHONE)
+
+    async def test_c2c_booking_diff_keep_uses_master_snapshot(self):
+        """菜单2差异卡选择保留时，逐问展示与最终建单都沿用旧主档。"""
+        old = {
+            "people_id": _RAW_ID["people_id"],
+            "name": "สมชาย ใจดี",
+            "birthday_be": _RAW_ID["birthday_be"],
+            "phone": "0811111111",
+            "house_no": "88",
+            "province_name": "กรุงเทพมหานคร",
+            "district_name": "คลองเตย",
+            "subdistrict_name": "คลองเตย",
+            "zipcode_name": "10110",
+        }
+        diffs = [{"field": "phone", "old": old["phone"], "new": _PHONE}]
+        with _Env(
+            ocr=_ocr_ok(),
+            lookup=_lookup("exact", field_diffs=diffs, customer_id="C7", current_fields=old),
+            admin=True,
+        ) as env:
+            nonce = await self._seed_reviewing(env)
             await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP, nonce))
             await env.drain()
-            env.push_idcard.assert_not_called()
+        env.push_idcard.assert_not_called()
+        self.assertEqual(env.qa_start.call_args.kwargs["draft"]["phone"], old["phone"])
+        self.assertEqual(env.qa_start.call_args.kwargs["summary"]["phone"], old["phone"])
 
     async def test_c3_exact_addr_diff_update_only_changed(self):
         """C3:exact+地址 diff → 卡恰 1 条 diff;确认→overwrite 且 fields 有地址键、无生日。"""

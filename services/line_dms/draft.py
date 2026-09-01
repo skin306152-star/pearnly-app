@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from services.erp.erp_dms_push import _dms_resolve_admin_creds
 from services.line_dms import cards
@@ -21,6 +21,30 @@ _GEO_LISTS = {
     "subdistrict_id": "subdistricts",
     "zipcode_id": "zipcodes",
 }
+
+_MASTER_DRAFT_KEYS = (
+    "people_id",
+    "prefix_id",
+    "prefix_name",
+    "name",
+    "birthday_be",
+    "phone",
+    "house_no",
+    "building",
+    "floor",
+    "room",
+    "village",
+    "moo",
+    "soi",
+    "road",
+    "province_id",
+    "province_name",
+    "district_id",
+    "district_name",
+    "subdistrict_id",
+    "subdistrict_name",
+    "zipcode_id",
+)
 
 
 def build_draft(id_card: dict, geo: dict, prefixes: List[list], phone: str) -> Dict[str, str]:
@@ -93,6 +117,31 @@ def build_summary(draft: Dict[str, str], geo: dict) -> Dict[str, str]:
         "zipcode": zc,
         "phone": draft.get("phone", ""),
     }
+
+
+def master_snapshot(fields: dict) -> Tuple[Dict[str, str], Dict[str, str]]:
+    """保留 DMS 旧资料时，生成订车逐问使用的主档快照。"""
+    current = {key: str(fields.get(key) or "") for key in _MASTER_DRAFT_KEYS}
+    current["zipcode"] = str(fields.get("zipcode_name") or fields.get("zipcode") or "")
+    bits = [
+        current.get("house_no"),
+        f"หมู่ {current['moo']}" if current.get("moo") else "",
+        f"ซ.{current['soi']}" if current.get("soi") else "",
+        f"ถ.{current['road']}" if current.get("road") else "",
+        f"ต.{current['subdistrict_name']}" if current.get("subdistrict_name") else "",
+        f"อ.{current['district_name']}" if current.get("district_name") else "",
+        f"จ.{current['province_name']}" if current.get("province_name") else "",
+        current.get("zipcode"),
+    ]
+    summary = {
+        "people_id": current.get("people_id", ""),
+        "name": current.get("name", ""),
+        "birthday_be": current.get("birthday_be", ""),
+        "address": " ".join(part for part in bits if part),
+        "zipcode": current.get("zipcode", ""),
+        "phone": current.get("phone", ""),
+    }
+    return current, summary
 
 
 def display_diffs(field_diffs: List[dict], geo: dict) -> List[Dict[str, str]]:

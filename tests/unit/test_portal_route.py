@@ -62,6 +62,26 @@ class PortalRouteTest(unittest.TestCase):
         self.assertNotIn("location", response.headers)
         self.assertIn("Pearnly DMS", response.text)
 
+    def test_home_serves_restored_direct_booking_draft_after_liff_login(self):
+        response = self.client.get(
+            "/home",
+            params={"draft": "restored-line-nonce"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly DMS", response.text)
+
+    def test_login_serves_restored_direct_booking_draft_after_liff_login(self):
+        response = self.client.get(
+            "/login",
+            params={"draft": "restored-line-nonce"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly DMS", response.text)
+
     def test_login_routes_explicit_cowork_liff_state_before_legacy_dms_draft(self):
         response = self.client.get(
             "/login",

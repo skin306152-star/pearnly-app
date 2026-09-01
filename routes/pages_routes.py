@@ -128,7 +128,7 @@ async def login_page(
     intake_shell = _line_intake_shell(liff_state, flow, draft)
     if intake_shell:
         return intake_shell
-    if _is_dms_booking_state(liff_state):
+    if _is_dms_booking_state(liff_state, draft):
         return _dms_booking_shell()
     # 旧入口退居别名；next 只接受同源绝对路径。
     target = _safe_internal_next(next) or "/cowork"
@@ -151,8 +151,10 @@ def _safe_internal_next(next_url: str) -> str | None:
     return next_url
 
 
-def _is_dms_booking_state(liff_state: str) -> bool:
+def _is_dms_booking_state(liff_state: str, draft: str = "") -> bool:
     """Select the DMS shell without changing LIFF's primary-redirect URL."""
+    if str(draft or "").strip():
+        return True
     parsed = urlsplit(str(liff_state or "").strip())
     params = parse_qs(parsed.query or parsed.path.lstrip("?"))
     if (params.get("credentials") or [""])[0].strip() == "dms":
@@ -195,7 +197,7 @@ async def home(
     intake_shell = _line_intake_shell(liff_state, flow, draft)
     if intake_shell:
         return intake_shell
-    if _is_dms_booking_state(liff_state):
+    if _is_dms_booking_state(liff_state, draft):
         return _dms_booking_shell()
     # v118.27.5.4 · 强制 no-cache · 防 CDN/浏览器误缓存导致用户拿不到新版
     return FileResponse("static/dist/home.html", headers=_NO_CACHE)

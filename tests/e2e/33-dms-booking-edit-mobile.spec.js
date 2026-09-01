@@ -488,6 +488,65 @@ test('mobile payment and attachment controls stay aligned', async ({ page }) => 
     await page.screenshot({ path: path.join(OUT, 'mobile-controls.png'), fullPage: true });
 });
 
+test('restored LIFF draft callback opens the booking editor instead of Cowork login', async ({
+    page,
+}) => {
+    let authRequested = false;
+    let draftRequested = false;
+    const payload = Buffer.from(
+        JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+    ).toString('base64url');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => localStorage.setItem('pearnly_lang', 'zh'));
+    await page.route('https://static.line-scdn.net/**', (route) =>
+        route.fulfill({
+            contentType: 'application/javascript',
+            body: liffMockScript('ios', true, true),
+        })
+    );
+    await page.route('**/api/line/dms-booking/**', async (route) => {
+        const url = new URL(route.request().url());
+        if (url.pathname.endsWith('/config')) {
+            return route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: { liff_id: 'DMS-LIFF' } }),
+            });
+        }
+        if (url.pathname.endsWith('/auth')) {
+            authRequested = true;
+            return route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: { token: `e2e.${payload}.sig` } }),
+            });
+        }
+        if (url.pathname.endsWith('/draft')) {
+            draftRequested = true;
+            expect(url.searchParams.get('nonce')).toBe('restored-line-nonce');
+            return route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: DRAFT }),
+            });
+        }
+        return route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: [] }),
+        });
+    });
+
+    await page.goto(`${BASE}/home?draft=restored-line-nonce`);
+    await page.waitForSelector('#editor:not([hidden])');
+
+    expect(authRequested).toBe(true);
+    expect(draftRequested).toBe(true);
+    await expect(page).toHaveURL(/\/home\?draft=restored-line-nonce$/);
+    const title = await page.evaluate(() => window.DMS_BOOKING_TEXT.zh.title);
+    await expect(page.locator('h1')).toHaveText(title);
+    await page.screenshot({
+        path: path.join(OUT, 'restored-liff-draft-editor-390.png'),
+        fullPage: true,
+    });
+});
+
 test('booking editor exposes every live DMS title option', async ({ page }) => {
     await page.addInitScript(() => {
         const payload = btoa(

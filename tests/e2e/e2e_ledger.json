@@ -1101,11 +1101,13 @@
     "33-dms-booking-edit-mobile.spec.js": {
       "artifacts": "tests/e2e/_artifacts/dms-booking-edit/*.png",
       "covers": [
+        "routes/pages_routes.py",
         "static/dms-booking-edit/dms-booking-edit.html",
         "static/dms-booking-edit/dms-booking-edit.css",
         "static/dms-booking-edit/dms-booking-i18n.js"
       ],
       "only_e2e": [
+        "LINE 登录后将 liff.state 还原为直接 draft 参数时,真实 /home 路由仍完成 DMS 身份交换、草稿读取并显示编辑器,不落 Cowork 登录页",
         "390px 手机视口下付款删除按钮、金额输入框与附件勾选框的真实浏览器布局和对齐",
         "后端返回主档变更或现金与转账凭证冲突时,手机和桌面浏览器均显示对应中文补救指引"
       ]

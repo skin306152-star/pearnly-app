@@ -179,6 +179,32 @@ class CoworkLineIdentityTests(unittest.TestCase):
             },
         )
 
+    def test_unfollow_revokes_identity_and_invalidates_open_codes(self):
+        cursor = FakeCursor(
+            [
+                {
+                    "membership_id": "membership-1",
+                    "tenant_id": "tenant-1",
+                    "user_id": "user-1",
+                }
+            ]
+        )
+        with patch.object(identity_store.db, "get_cursor", cursor_context(cursor)):
+            revoked = identity_store.revoke_identity_by_line_user("U-line")
+
+        self.assertEqual(
+            revoked,
+            {
+                "membership_id": "membership-1",
+                "tenant_id": "tenant-1",
+                "user_id": "user-1",
+            },
+        )
+        statements = [sql for sql, _ in cursor.calls]
+        self.assertIn("FOR UPDATE", statements[0])
+        self.assertTrue(any("friendship_ready = FALSE" in sql for sql in statements))
+        self.assertTrue(any("cowork_line_connect_tokens" in sql for sql in statements))
+
     def test_active_identity_reconciles_expired_mrerp_reservations(self):
         cursor = FakeCursor(
             [

@@ -182,6 +182,15 @@ async def handle_event(event: dict) -> None:
     reply_token = str(event.get("replyToken") or "") or None
     if source.get("type") != "user" or not line_user_id:
         return
+    if event.get("type") == "unfollow":
+        revoked = await asyncio.to_thread(identity_store.revoke_identity_by_line_user, line_user_id)
+        if revoked:
+            await asyncio.to_thread(
+                session_store.clear_session,
+                tenant_id=revoked["tenant_id"],
+                line_user_id=line_user_id,
+            )
+        return
     identity = await asyncio.to_thread(identity_store.resolve_active_identity, line_user_id)
     if event.get("type") == "follow":
         lang = _lang(event)

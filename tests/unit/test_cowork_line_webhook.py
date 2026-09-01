@@ -16,6 +16,45 @@ def text_event(code="123456", *, source_type="user"):
 
 
 class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unfollow_revokes_identity_before_resolving_old_binding(self):
+        revoked = {
+            "membership_id": "membership-1",
+            "tenant_id": "tenant-1",
+            "user_id": "user-1",
+        }
+        event = {"type": "unfollow", "source": {"type": "user", "userId": "U-line"}}
+        with (
+            patch.object(
+                webhook.identity_store,
+                "revoke_identity_by_line_user",
+                return_value=revoked,
+            ) as revoke,
+            patch.object(webhook.identity_store, "resolve_active_identity") as resolve,
+            patch.object(webhook.cowork_flow.session_store, "clear_session") as clear,
+        ):
+            await webhook._handle_event(event)
+
+        revoke.assert_called_once_with("U-line")
+        resolve.assert_not_called()
+        clear.assert_called_once_with(tenant_id="tenant-1", line_user_id="U-line")
+
+    async def test_unblocked_follow_prompts_for_new_binding_code(self):
+        event = {
+            "type": "follow",
+            "replyToken": "reply-1",
+            "source": {"type": "user", "userId": "U-line"},
+            "follow": {"isUnblocked": True},
+            "language": "zh",
+        }
+        with (
+            patch.object(webhook.identity_store, "resolve_active_identity", return_value=None),
+            patch.object(webhook.line_client, "reply_text", return_value=True) as reply,
+        ):
+            await webhook._handle_event(event)
+
+        self.assertIn("6 位绑定码", reply.call_args.args[1])
+        self.assertEqual(reply.call_args.kwargs["channel"], "cowork")
+
     async def test_menu_hides_all_unavailable_erp_targets(self):
         identity = {
             "tenant_id": "tenant-1",

@@ -293,6 +293,49 @@ def unbind_identity(*, user_id: str, tenant_id: str) -> bool:
     return disconnected
 
 
+def revoke_identity_by_line_user(line_user_id: str) -> dict[str, str] | None:
+    """Revoke the active membership when LINE reports that the bot was blocked."""
+    line_user_id = str(line_user_id or "").strip()
+    if not line_user_id:
+        return None
+    with db.get_cursor(commit=True) as cur:
+        cur.execute(
+            """
+            SELECT membership_id, tenant_id, user_id
+            FROM cowork_line_identities
+            WHERE line_user_id = %s AND revoked_at IS NULL
+            FOR UPDATE
+            """,
+            (line_user_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        cur.execute(
+            """
+            UPDATE cowork_line_identities
+            SET revoked_at = NOW(),
+                friendship_ready = FALSE,
+                friendship_checked_at = NOW()
+            WHERE membership_id = %s AND revoked_at IS NULL
+            """,
+            (row["membership_id"],),
+        )
+        cur.execute(
+            """
+            UPDATE cowork_line_connect_tokens
+            SET used_at = NOW()
+            WHERE membership_id = %s AND used_at IS NULL
+            """,
+            (row["membership_id"],),
+        )
+    return {
+        "membership_id": str(row["membership_id"]),
+        "tenant_id": str(row["tenant_id"]),
+        "user_id": str(row["user_id"]),
+    }
+
+
 def resolve_active_identity(line_user_id: str) -> dict[str, str] | None:
     if not line_user_id:
         return None

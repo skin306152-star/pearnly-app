@@ -22,6 +22,9 @@ DMS_PORTAL_KEY = "dms_portal"
 # ERP 入口邀请闸:名单成员即开,不叠加总闸;邀请/收回是超管后台唯一写入口。
 # 判定域=账套主体归属(tenant_id 用 tenant · 个人套账退回 user_id),与 Daily 一致。
 ERP_PORTAL_KEY = "erp_portal"
+# ERP 套账/主档/字段/按钮统一投影闸(P3a):默认关。关 = 新只读 API 404、现有网页与 LINE
+# 逐字节不变;开 = 被授权租户可读取服务端 current projection。采集/切流分批独立验收。
+ERP_TARGET_PROJECTION_KEY = "erp_target_projection"
 # DMS LINE 通道邀请闸(独立 LINE OA · 经销商销售员绑定/会话):默认关 fail-closed。
 # 关 = /api/line/dms/webhook 收到事件一律 200 静默零回复、DMS 侧 /api/dms/line/* 绑定端点
 # 判定域内不放行(现状零变化,老会计站 OA 逐字节不受影响);开 = 被邀请租户可从 DMS LINE OA
@@ -153,6 +156,15 @@ def dms_portal_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> 
 def erp_portal_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
     """ERP 邀请制直判:名单是授权事实,不叠加 platform_settings.enabled 总闸。"""
     return _allowlisted(ERP_PORTAL_KEY, tenant_id or user_id, "erp_portal_enabled_for")
+
+
+def erp_target_projection_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
+    """统一目标投影只读面；按 tenant 开闸，读取异常 fail-closed。"""
+    return _enabled(
+        ERP_TARGET_PROJECTION_KEY,
+        tenant_id or user_id,
+        "erp_target_projection_enabled_for",
+    )
 
 
 def daily_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:

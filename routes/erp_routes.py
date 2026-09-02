@@ -60,6 +60,7 @@ from routes.erp_posting_preview_routes import router as _posting_preview_router 
 from routes.erp_shared_express_enrollment_routes import router as _shared_enrollment_router
 from routes.erp_shared_express_lifecycle_routes import router as _shared_lifecycle_router
 from routes.erp_shared_express_profile_routes import router as _shared_profile_router
+from routes.erp_target_projection_routes import router as _target_projection_router
 
 router = APIRouter()
 router.include_router(_listing_router)
@@ -72,3 +73,4 @@ router.include_router(_posting_preview_router)
 router.include_router(_shared_enrollment_router)
 router.include_router(_shared_lifecycle_router)
 router.include_router(_shared_profile_router)
+router.include_router(_target_projection_router)

@@ -52,6 +52,8 @@ def _project_targets(
         targets,
         legacy_specs,
         refresh_probes=refresh,
+        tenant_id=tenant_id,
+        user_id=user_id,
     )
     endpoints = {str(endpoint.get("id") or ""): endpoint for endpoint, *_ in legacy_specs}
     return user, targets, endpoints

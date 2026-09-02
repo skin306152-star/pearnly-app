@@ -12,6 +12,10 @@ from psycopg2.extras import RealDictCursor
 
 from core.rls import RLS_APP_ROLE, ensure_rls_app_role
 from services.erp.target_projection_contract import normalize_projection
+from services.erp.mrerp_target_projection import (
+    MRErpProjectionError,
+    claim_endpoint_tenant_with_cursor,
+)
 from services.erp.target_projection_schema import TABLES, apply_target_projection_schema
 from services.erp.target_projection_store import (
     load_state_with_cursor,
@@ -24,6 +28,8 @@ TENANT_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 TENANT_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 ENDPOINT_A = "33333333-3333-4333-8333-333333333333"
 ENDPOINT_B = "44444444-4444-4444-8444-444444444444"
+LEGACY_ENDPOINT = "55555555-5555-4555-8555-555555555555"
+OWNER_A = "11111111-1111-4111-8111-111111111111"
 
 
 def _observation(label: str = "Alpha", *, action_enabled: bool = True) -> dict:
@@ -64,9 +70,11 @@ class TargetProjectionPgSmokeTests(unittest.TestCase):
         cls.cur.execute(f'SET search_path TO "{cls.schema}", public')
         cls.cur.execute(
             "CREATE TABLE tenants (id uuid PRIMARY KEY);"
+            "CREATE TABLE users (id uuid PRIMARY KEY, tenant_id uuid NOT NULL REFERENCES tenants(id));"
             "CREATE TABLE erp_endpoints ("
-            "id uuid PRIMARY KEY, tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,"
-            "adapter text NOT NULL, enabled boolean NOT NULL DEFAULT TRUE);"
+            "id uuid PRIMARY KEY, tenant_id uuid REFERENCES tenants(id) ON DELETE CASCADE,"
+            "user_id uuid REFERENCES users(id), adapter text NOT NULL, "
+            "enabled boolean NOT NULL DEFAULT TRUE);"
         )
         ensure_rls_app_role(cls.cur)
         apply_target_projection_schema(cls.cur)
@@ -96,13 +104,18 @@ class TargetProjectionPgSmokeTests(unittest.TestCase):
         self.cur.execute(f'SET search_path TO "{self.schema}", public')
         self.cur.execute(
             "TRUNCATE erp_target_projection_items, erp_target_projection_heads, "
-            "erp_target_projection_snapshots, erp_endpoints, tenants CASCADE"
+            "erp_target_projection_snapshots, erp_endpoints, users, tenants CASCADE"
         )
         self.cur.execute("INSERT INTO tenants(id) VALUES (%s),(%s)", (TENANT_A, TENANT_B))
+        self.cur.execute("INSERT INTO users(id,tenant_id) VALUES (%s,%s)", (OWNER_A, TENANT_A))
         self.cur.execute(
             "INSERT INTO erp_endpoints(id,tenant_id,adapter) VALUES "
             "(%s,%s,'express'),(%s,%s,'express')",
             (ENDPOINT_A, TENANT_A, ENDPOINT_B, TENANT_B),
+        )
+        self.cur.execute(
+            "INSERT INTO erp_endpoints(id,user_id,adapter) VALUES (%s,%s,'mrerp')",
+            (LEGACY_ENDPOINT, OWNER_A),
         )
         self.conn.commit()
 
@@ -208,6 +221,20 @@ class TargetProjectionPgSmokeTests(unittest.TestCase):
         self.assertEqual(state["freshness"]["error_code"], "erp.companion_offline")
         self.assertEqual(state["freshness"]["observed_at"].hour, 2)
         self.assertEqual(state["freshness"]["attempted_at"].hour, 4)
+
+    def test_legacy_endpoint_can_only_be_claimed_by_owner_tenant(self):
+        with self.assertRaises(MRErpProjectionError):
+            claim_endpoint_tenant_with_cursor(
+                self.cur, tenant_id=TENANT_B, endpoint_id=LEGACY_ENDPOINT
+            )
+        self.conn.rollback()
+        self.cur.execute(f'SET search_path TO "{self.schema}", public')
+        claim_endpoint_tenant_with_cursor(self.cur, tenant_id=TENANT_A, endpoint_id=LEGACY_ENDPOINT)
+        self.cur.execute(
+            "SELECT tenant_id::text AS tenant_id FROM erp_endpoints WHERE id=%s",
+            (LEGACY_ENDPOINT,),
+        )
+        self.assertEqual(self.cur.fetchone()["tenant_id"], TENANT_A)
 
     def test_rls_hides_other_tenant_projection(self):
         self._publish(_observation(), TENANT_A, ENDPOINT_A)

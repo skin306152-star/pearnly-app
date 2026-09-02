@@ -45,7 +45,9 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
             )
 
         collect.assert_called_once_with(cursor, user, authz)
-        project.assert_called_once_with([], specs, refresh_probes=True)
+        project.assert_called_once_with(
+            [], specs, refresh_probes=True, tenant_id="t1", user_id="u1"
+        )
         self.assertIs(projected_user, user)
         self.assertEqual(targets, [target])
         self.assertEqual(endpoints, {"mr": endpoint})

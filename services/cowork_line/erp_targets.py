@@ -87,12 +87,14 @@ def _project_targets(
         targets,
         legacy_specs,
         refresh_probes=refresh_probes,
+        tenant_id=tenant_id,
+        user_id=user_id,
     )
 
 
-def list_targets(identity: dict[str, Any]) -> list[dict[str, Any]]:
+def list_targets(identity: dict[str, Any], *, refresh: bool = False) -> list[dict[str, Any]]:
     """List only ERP targets currently visible to this active LINE member."""
-    return _project_targets(identity)
+    return _project_targets(identity, refresh_probes=refresh)
 
 
 def require_target(

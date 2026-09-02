@@ -32,9 +32,9 @@ def _target_error(exc: Exception) -> CoworkLineIntakeError:
     return CoworkLineIntakeError(code, status)
 
 
-def _list_targets(identity: dict) -> list[dict]:
+def _list_targets(identity: dict, *, refresh: bool = False) -> list[dict]:
     try:
-        return _targets_service().list_targets(identity)
+        return _targets_service().list_targets(identity, refresh=refresh)
     except Exception as exc:
         if exc.__class__.__name__ != "CoworkLineErpTargetError":
             raise
@@ -132,7 +132,7 @@ def get_draft(identity: dict, draft_id: str) -> dict:
     return {
         "draft_id": str(draft_id),
         "records": _records(identity, str(draft_id), history_ids),
-        "targets": _list_targets(identity),
+        "targets": _list_targets(identity, refresh=True),
         "selection": _selection(payload),
     }
 

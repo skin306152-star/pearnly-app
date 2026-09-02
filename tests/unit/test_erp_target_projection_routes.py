@@ -77,6 +77,46 @@ class TargetProjectionRouteTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
 
+    def test_refresh_runs_external_collector_off_the_async_loop(self):
+        endpoint = {"id": "33333333-3333-4333-8333-333333333333", "adapter": "mrerp"}
+
+        def refresh_off_loop(**kwargs):
+            with self.assertRaises(RuntimeError):
+                asyncio.get_running_loop()
+            self.assertEqual(kwargs["account_set_key"], "15:2")
+            return {"ok": True, "data": {"snapshot": {"revision": 2}}}
+
+        with (
+            mock.patch.object(routes, "require_perm", return_value=self.user),
+            mock.patch.object(routes, "erp_target_projection_enabled_for", return_value=True),
+            mock.patch.object(routes, "_resolve_endpoint", return_value=endpoint),
+            mock.patch.object(routes, "refresh_mrerp_projection", side_effect=refresh_off_loop),
+        ):
+            response = self.client.post(
+                "/api/erp/endpoints/33333333-3333-4333-8333-333333333333/target-projection/refresh",
+                params={"account_set_key": "15:2"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+
+    def test_refresh_rejects_non_mrerp_projection(self):
+        endpoint = {"id": "33333333-3333-4333-8333-333333333333", "adapter": "express"}
+        with (
+            mock.patch.object(routes, "require_perm", return_value=self.user),
+            mock.patch.object(routes, "erp_target_projection_enabled_for", return_value=True),
+            mock.patch.object(routes, "_resolve_endpoint", return_value=endpoint),
+            mock.patch.object(
+                routes,
+                "refresh_mrerp_projection",
+                side_effect=routes.MRErpProjectionError("erp.target_projection_adapter_mismatch"),
+            ),
+        ):
+            response = self.client.post(
+                "/api/erp/endpoints/33333333-3333-4333-8333-333333333333/target-projection/refresh"
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "erp.target_projection_adapter_mismatch")
+
 
 if __name__ == "__main__":
     unittest.main()

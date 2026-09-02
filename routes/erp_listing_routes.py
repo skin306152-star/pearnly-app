@@ -19,12 +19,17 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core import db
+from core.feature_flags import erp_target_projection_enabled_for
 from services.erp import erp_push as _erp
 from core.auth import get_current_user_from_request
 from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import DMS, require_erp_portal
 from services.erp import target_readiness
 from services.erp._master_data_cache import TTLCache as _EndpointTestCache
+from services.erp.mrerp_projection_listing import (
+    projection_endpoint as _projection_endpoint,
+    projection_listing as _projection_listing,
+)
 
 logger = logging.getLogger("mr-pilot")
 
@@ -303,7 +308,7 @@ async def erp_endpoint_customers(
     user = get_current_user_from_request(request)
     require_erp_portal(user)
     _check_push_access(user)
-    ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    ep = _projection_endpoint(user, endpoint_id)
     if not ep:
         raise HTTPException(404, detail="erp.endpoint_not_found")
 
@@ -324,6 +329,11 @@ async def erp_endpoint_customers(
             },
             "elapsed_ms": 0,
         }
+
+    if erp_target_projection_enabled_for(user.get("tenant_id"), user.get("id")):
+        import asyncio as _asyncio
+
+        return await _asyncio.to_thread(_projection_listing, user, ep, "customers")
 
     cache_key = (str(user["id"]), str(endpoint_id), "customers")
     if not refresh:
@@ -364,7 +374,7 @@ async def erp_endpoint_products(
     user = get_current_user_from_request(request)
     require_erp_portal(user)
     _check_push_access(user)
-    ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    ep = _projection_endpoint(user, endpoint_id)
     if not ep:
         raise HTTPException(404, detail="erp.endpoint_not_found")
 
@@ -382,6 +392,11 @@ async def erp_endpoint_products(
             },
             "elapsed_ms": 0,
         }
+
+    if erp_target_projection_enabled_for(user.get("tenant_id"), user.get("id")):
+        import asyncio as _asyncio
+
+        return await _asyncio.to_thread(_projection_listing, user, ep, "products")
 
     cache_key = (str(user["id"]), str(endpoint_id), "products")
     if not refresh:

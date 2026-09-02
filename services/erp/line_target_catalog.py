@@ -5,9 +5,12 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
+from core.feature_flags import erp_target_projection_enabled_for
 from services.erp import line_target_projection, target_readiness
+from services.erp.mrerp_target_projection import refresh_mrerp_projection
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 from services.erp.shared_express_schema import enable_shared_express_select
+from services.erp.target_projection_store import load_state
 
 LegacySpec = tuple[dict[str, Any], dict[str, Any] | None, int, bool]
 
@@ -200,13 +203,17 @@ def project_legacy_targets(
     specs: list[tuple[dict[str, Any], dict[str, Any] | None, int, bool]],
     *,
     refresh_probes: bool = False,
+    tenant_id: str | None = None,
+    user_id: str | None = None,
 ) -> list[dict[str, Any]]:
     probes: dict[str, dict[str, Any]] = {}
     for endpoint, workspace, binding_count, can_auto_create in specs:
         endpoint_id = str(endpoint.get("id") or "")
         if endpoint_id not in probes:
-            probes[endpoint_id] = target_readiness.probe_endpoint(
+            probes[endpoint_id] = _projection_probe(
                 endpoint,
+                tenant_id=tenant_id,
+                user_id=user_id,
                 refresh=refresh_probes,
             )
         targets.append(
@@ -219,6 +226,66 @@ def project_legacy_targets(
             )
         )
     return targets
+
+
+def _projection_probe(
+    endpoint: dict[str, Any],
+    *,
+    tenant_id: str | None,
+    user_id: str | None,
+    refresh: bool,
+) -> dict[str, Any]:
+    adapter = str(endpoint.get("adapter") or "").strip().lower()
+    enabled = bool(tenant_id and user_id and erp_target_projection_enabled_for(tenant_id, user_id))
+    if adapter != "mrerp" or not enabled:
+        return target_readiness.probe_endpoint(endpoint, refresh=refresh)
+
+    refresh_result = None
+    if refresh:
+        refresh_result = refresh_mrerp_projection(
+            tenant_id=str(tenant_id),
+            user_id=str(user_id),
+            endpoint=endpoint,
+        )
+    state = load_state(
+        tenant_id=str(tenant_id),
+        user_id=str(user_id),
+        endpoint_id=str(endpoint.get("id") or ""),
+    )
+    snapshot = (state or {}).get("snapshot") or {}
+    freshness = (state or {}).get("freshness") or {}
+    if not snapshot and refresh_result is None:
+        return target_readiness.probe_endpoint(endpoint, refresh=False)
+    account_sets = snapshot.get("account_sets") or []
+    companies = [
+        {
+            "label": row.get("label"),
+            "comidyear": (row.get("attributes") or {}).get("comidyear"),
+            "seldb": (row.get("attributes") or {}).get("seldb"),
+        }
+        for row in account_sets
+        if isinstance(row, dict)
+    ]
+    fresh = freshness.get("status") == "fresh" and bool(snapshot)
+    if refresh_result is not None:
+        fresh = fresh and bool(refresh_result.get("ok"))
+    attempted_at = freshness.get("attempted_at")
+    return {
+        "ok": fresh,
+        "error_code": (
+            (refresh_result or {}).get("error_code")
+            or freshness.get("error_code")
+            or (None if fresh else "ERR_TECHNICAL")
+        ),
+        "companies": companies,
+        "elapsed_ms": 0,
+        "last_tested_at": (
+            attempted_at.isoformat() if hasattr(attempted_at, "isoformat") else attempted_at
+        ),
+        "cached": not refresh,
+        "projection_revision": snapshot.get("revision"),
+        "account_sets_revision": snapshot.get("account_sets_revision"),
+    }
 
 
 __all__ = [

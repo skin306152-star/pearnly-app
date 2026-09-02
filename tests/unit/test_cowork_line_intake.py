@@ -43,6 +43,17 @@ PAYLOAD = {
 
 
 class IntakeServiceTest(unittest.TestCase):
+    def test_opening_a_new_draft_forces_latest_erp_projection(self):
+        targets = SimpleNamespace(list_targets=mock.Mock(return_value=[]))
+        with (
+            mock.patch.object(intake, "require_draft", return_value=({}, dict(PAYLOAD))),
+            mock.patch.object(intake, "_assert_owned_staged"),
+            mock.patch.object(intake, "_records", return_value=[]),
+            mock.patch.object(intake, "_targets_service", return_value=targets),
+        ):
+            intake.get_draft(IDENTITY, "history-1")
+        targets.list_targets.assert_called_once_with(IDENTITY, refresh=True)
+
     def test_save_revalidates_target_and_auto_creates_workspace(self):
         initial = {
             "endpoint_id": "endpoint-1",

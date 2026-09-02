@@ -104,7 +104,7 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
         )
         message = reply.call_args.args[1][0]
         self.assertEqual(
-            [action["label"] for action in _actions(message)], ["Sister Makeup · MAIN"]
+            [action["label"] for action in _actions(message)], ["MAIN · Sister Makeup"]
         )
         self.assertIn("account", parse_qs(_actions(message)[0]["data"]))
         rendered = json.dumps(message, ensure_ascii=False)
@@ -203,7 +203,7 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
         request_refresh.assert_not_called()
         self.assertEqual(
             [action["label"] for action in _actions(reply.call_args.args[1][0])],
-            ["Sister Makeup · MAIN"],
+            ["MAIN · Sister Makeup"],
         )
 
     async def test_erp_choice_rechecks_employee_permission_before_preflight(self):
@@ -457,6 +457,24 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
         for action in (*first_actions, *second_actions):
             self.assertLessEqual(len(action["label"]), 20)
             self.assertLessEqual(len(action["data"]), 300)
+
+    def test_long_workspace_keeps_mrerp_years_distinguishable(self):
+        target = {
+            **self.target,
+            "adapter": "mrerp",
+            "workspace_name": "บริษัท มานะชัยบริการ จำกัด (สำนักงานใหญ่)",
+            "account_choices": [
+                {"key": "6:1", "label": "TEST2019", "writable": True},
+                {"key": "15:1", "label": "TEST2020", "writable": True},
+            ],
+        }
+
+        message = selection_messages.account_picker_message([target], "mrerp", "sales")
+
+        self.assertEqual(
+            [action["label"] for action in _actions(message)],
+            ["TEST2019 · บริษัท มา", "TEST2020 · บริษัท มา"],
+        )
 
     def test_mrerp_posting_mode_matches_purchase_and_sales_rules(self):
         target = {**self.target, "adapter": "mrerp"}

@@ -87,6 +87,15 @@ class IntakeServiceTest(unittest.TestCase):
             mock.patch.object(intake, "update_ocr_history_pages", return_value=True) as update,
             mock.patch.object(intake, "_update_scope") as update_scope,
             mock.patch.object(intake, "_records", return_value=records),
+            mock.patch.object(
+                intake.selected_account_refresh,
+                "ensure_for_editor",
+                return_value={
+                    "request_id": "refresh-6-1",
+                    "status": "succeeded",
+                    "account_set_key": "6:1",
+                },
+            ) as refresh,
             mock.patch.object(intake.session_store, "set_session") as set_session,
             mock.patch(
                 "services.ocr_history.posting_manual.update_history_posting_manual",
@@ -111,6 +120,13 @@ class IntakeServiceTest(unittest.TestCase):
         saved_payload = set_session.call_args.kwargs["payload"]
         self.assertEqual(saved_payload["workspace_client_id"], 17)
         self.assertEqual(saved_payload["posting_mode"], "cash")
+        self.assertEqual(saved_payload["master_refresh_request_id"], "refresh-6-1")
+        refresh.assert_called_once_with(
+            IDENTITY,
+            mock.ANY,
+            "6:1",
+            previous_request_id=None,
+        )
         self.assertEqual(result["selection"]["payment"], "cash")
 
     def test_line_posting_mode_is_projected_into_editor_selection(self):

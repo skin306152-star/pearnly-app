@@ -18,6 +18,7 @@ from services.cowork_line import (
     menu_cards,
     session_store,
 )
+from services.erp.line_target_choice import find_account_choice, target_label_for_account
 from services.line_platform import client as line_client
 from services.ocr.recognize.core import run_recognition_core  # noqa: F401
 
@@ -308,13 +309,31 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
         if not target:
             _reply_text(reply_token, _text(lang, "target_changed"))
             return
+        account_ref = str(params.get("account") or "").strip()
+        account = find_account_choice(
+            target,
+            account_ref=account_ref,
+            account_key=None if account_ref else target.get("selected_account_key"),
+        )
+        if target.get("account_choices") and not account:
+            _reply_text(reply_token, _text(lang, "target_changed"))
+            return
         selected = {
             "lang": lang,
             "endpoint_id": target["endpoint_id"],
             "workspace_client_id": target.get("workspace_client_id"),
             "adapter": target["adapter"],
-            "target_label": target.get("label"),
+            "target_label": (
+                target_label_for_account(target, account) if account else target.get("label")
+            ),
         }
+        if account:
+            selected.update(
+                {
+                    "account_root": str(account.get("root_key") or "").strip() or None,
+                    "account_set": str(account.get("key") or account.get("account_set") or ""),
+                }
+            )
         _set(identity, "select_direction", selected)
         _reply_card(reply_token, flow_cards.direction_card(lang))
         return

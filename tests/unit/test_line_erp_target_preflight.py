@@ -148,6 +148,7 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(selected["account_set"], "6:1")
         self.assertEqual(selected["account_config"], {"comidyear": "6", "seldb": "1"})
+        self.assertEqual(selected["target_label"], "MR.ERP · TEST2019")
 
     def test_selection_accepts_cowork_auto_workspace_target(self):
         target = {

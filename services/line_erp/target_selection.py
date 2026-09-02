@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from core import db
+from services.erp.line_target_choice import find_account_choice, target_label_for_account
 from services.line_erp import target_preflight
 
 
@@ -80,15 +81,8 @@ def normalize(
     else:
         raise SelectionError("line_erp.adapter_not_supported", 422)
     account_key = str(values.get("account_set") or target.get("selected_account_key") or "").strip()
-    account = next(
-        (
-            row
-            for row in target.get("account_choices") or []
-            if isinstance(row, dict) and str(row.get("key") or "").strip() == account_key
-        ),
-        None,
-    )
-    if not account or account.get("writable") is False:
+    account = find_account_choice(target, account_key=account_key)
+    if not account:
         raise SelectionError("line_erp.account_set_required", 422)
     normalized = {
         "endpoint_id": str(target["endpoint_id"]),
@@ -98,7 +92,7 @@ def normalize(
             else None
         ),
         "adapter": adapter,
-        "target_label": str(target.get("label") or "")[:200],
+        "target_label": target_label_for_account(target, account),
         "account_root": str(account.get("root_key") or "").strip() or None,
         "account_set": account_key,
         "account_config": {

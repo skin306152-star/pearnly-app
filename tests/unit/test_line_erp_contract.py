@@ -109,6 +109,101 @@ class ErpChannelTests(unittest.TestCase):
         )
 
 
+class ErpDraftSelectionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_editor_year_replaces_initial_refresh_evidence(self):
+        target = {
+            "endpoint_id": "ep-1",
+            "workspace_client_id": 7,
+            "adapter": "mrerp",
+            "supports_master_refresh": True,
+        }
+        selection = {
+            "endpoint_id": "ep-1",
+            "workspace_client_id": 7,
+            "adapter": "mrerp",
+            "target_label": "MR.ERP · TEST2019",
+            "account_root": None,
+            "account_set": "6:1",
+            "account_config": {"comidyear": "6", "seldb": "1"},
+            "direction": "sales",
+            "mode": "sales",
+            "posting_kind": None,
+            "payment": "cash",
+            "posting_mode": "cash",
+        }
+        session = {
+            "payload": {
+                "mode": "sales",
+                "history_ids": ["h1"],
+                "master_refresh_request_id": "refresh-15-1",
+            }
+        }
+        request = routes.DraftUpdateIn(
+            records=[{"id": "h1", "pages": [{"fields": {}}]}],
+            endpoint_id="ep-1",
+            workspace_client_id=7,
+            direction="sales",
+            adapter="mrerp",
+            account_set="6:1",
+            payment="cash",
+        )
+        with (
+            mock.patch.object(
+                routes,
+                "_draft_token",
+                return_value=(
+                    {"user_id": "u1", "line_user_id": "line-1"},
+                    {"tenant_id": "t1", "user_id": "u1"},
+                    session,
+                ),
+            ),
+            mock.patch.object(
+                routes.target_selection,
+                "normalize",
+                return_value=({"target": target}, selection),
+            ),
+            mock.patch.object(routes.target_selection, "apply_to_records"),
+            mock.patch(
+                "services.ocr_history.mutations.update_ocr_history_pages",
+                return_value=True,
+            ),
+            mock.patch.object(
+                routes.workspace_resolution,
+                "resolve_history_workspace",
+                return_value=target,
+            ),
+            mock.patch.object(routes.target_selection, "update_scope"),
+            mock.patch.object(
+                routes.selected_account_refresh,
+                "ensure_for_editor",
+                return_value={
+                    "request_id": "refresh-6-1",
+                    "status": "succeeded",
+                    "account_set_key": "6:1",
+                },
+            ) as ensure_refresh,
+            mock.patch.object(routes.store, "set_session") as set_session,
+            mock.patch.object(
+                routes.target_preflight,
+                "inspect_targets",
+                return_value={"targets": [target]},
+            ),
+            mock.patch.object(routes.webhook, "draft_records", return_value=[]),
+        ):
+            result = await routes.erp_draft_update(None, "h1", request)
+
+        ensure_refresh.assert_called_once_with(
+            {"tenant_id": "t1", "user_id": "u1"},
+            target,
+            "6:1",
+            previous_request_id="refresh-15-1",
+        )
+        saved_payload = set_session.call_args.args[3]
+        self.assertEqual(saved_payload["target_label"], "MR.ERP · TEST2019")
+        self.assertEqual(saved_payload["master_refresh_request_id"], "refresh-6-1")
+        self.assertEqual(result["data"]["master_refresh"]["account_set_key"], "6:1")
+
+
 class ErpFlowTests(unittest.TestCase):
     def test_mode_must_be_selected_before_media(self):
         self.assertFalse(flow.accept_media_mode(None, "purchase"))
@@ -321,8 +416,8 @@ class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
         }
         with (
             mock.patch.object(
-                webhook.draft_actions.target_refresh,
-                "refresh_status",
+                webhook.draft_actions.selected_account_refresh,
+                "status_for_selection",
                 return_value={"status": "leased"},
             ) as refresh_status,
             mock.patch.object(webhook.target_selection, "normalize") as normalize,
@@ -339,9 +434,10 @@ class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result["detail"], "line_erp.master_refresh_pending")
         refresh_status.assert_called_once_with(
+            {"tenant_id": "t1", "user_id": "u1"},
+            {"endpoint_id": "ep-1", "adapter": "mrerp"},
+            None,
             selection["master_refresh_request_id"],
-            tenant_id="t1",
-            endpoint_id="ep-1",
         )
         normalize.assert_not_called()
 

@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from services.cowork_line import flow_cards, webhook, webhook_documents
+from services.erp.line_target_choice import account_reference
 
 IDENTITY = {
     "membership_id": "membership-1",
@@ -451,6 +452,33 @@ class CoworkLineFlexRegressionTests(unittest.TestCase):
             ["库存商品", "服务 / 非库存"],
         )
 
+    def test_one_mrerp_connection_expands_to_distinct_year_choices(self):
+        account_question = flow_cards.account_picker_card(
+            [
+                {
+                    "adapter": "mrerp",
+                    "endpoint_id": "endpoint-1",
+                    "workspace_client_id": 1,
+                    "workspace_name": "บริษัท มานะชัยบริการ จำกัด",
+                    "label": "MR.ERP · TEST2020",
+                    "selectable": True,
+                    "account_choices": [
+                        {"key": "6:1", "label": "TEST2019"},
+                        {"key": "15:1", "label": "TEST2020"},
+                    ],
+                }
+            ],
+            "mrerp",
+            "zh",
+        )
+
+        items = quick_reply_items(account_question)
+        self.assertEqual(
+            [item["action"]["label"] for item in items],
+            ["TEST2019 · บริษัท มา", "TEST2020 · บริษัท มา"],
+        )
+        self.assertTrue(all("account=" in item["action"]["data"] for item in items))
+
     def test_preview_reuses_erp_header_and_footer_hierarchy(self):
         card = flow_cards.preview_card(
             draft_id="draft-1",
@@ -504,6 +532,40 @@ class CoworkLineFlexRegressionTests(unittest.TestCase):
 
 
 class CoworkLineAccountPaginationRegressionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_selected_year_is_saved_before_direction_and_ocr(self):
+        target = {
+            "adapter": "mrerp",
+            "endpoint_id": "endpoint-1",
+            "workspace_client_id": 7,
+            "connection_label": "MR.ERP",
+            "label": "MR.ERP · TEST2020",
+            "account_choices": [
+                {"key": "6:1", "label": "TEST2019"},
+                {"key": "15:1", "label": "TEST2020"},
+            ],
+        }
+        session = {"state": "select_account", "payload": {"lang": "zh", "adapter": "mrerp"}}
+        with (
+            patch.object(webhook, "_session", return_value=session),
+            patch.object(webhook, "_require_target", new=AsyncMock(return_value=target)),
+            patch.object(webhook, "_set") as set_session,
+            patch.object(webhook, "_reply_card"),
+        ):
+            await webhook._handle_postback(
+                postback_event(
+                    "a=cowork_erp_target&endpoint=endpoint-1&workspace=7&account="
+                    + account_reference("6:1")
+                ),
+                IDENTITY,
+                "reply-1",
+                "zh",
+            )
+
+        saved = set_session.call_args.args[2]
+        self.assertEqual(set_session.call_args.args[1], "select_direction")
+        self.assertEqual(saved["account_set"], "6:1")
+        self.assertEqual(saved["target_label"], "MR.ERP · TEST2019")
+
     async def test_thirteenth_account_is_reachable_through_postback_pagination(self):
         targets = [
             {

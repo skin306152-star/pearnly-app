@@ -412,7 +412,7 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
 });
 
 test('editor locks the conversation ERP and only switches its account set', async ({ page }) => {
-    await openErp(page, { adapter: 'mrerp', direction: 'sales' });
+    const run = await openErp(page, { adapter: 'mrerp', direction: 'sales' });
     await expect(page.locator('.target-locked')).toHaveText('MR.ERP');
     await expect(page.locator('[data-target-account-set] option')).toHaveCount(2);
     await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-1:70::Client A');
@@ -426,6 +426,15 @@ test('editor locks the conversation ERP and only switches its account set', asyn
     await expect(page.locator('[data-target-selection="payment"]')).toHaveValue('cash');
     await expect(page.locator('[data-kind]')).toHaveCount(0);
     await expect(page.locator('[data-review-action="confirm"]')).toBeEnabled();
+    await page.locator('[data-review-action="save"]').click();
+    await expect.poll(() => run.requests.filter((entry) => entry.method === 'PUT').length).toBe(1);
+    const saved = JSON.parse(run.requests.find((entry) => entry.method === 'PUT').body);
+    expect(saved).toMatchObject({
+        endpoint_id: 'mrerp-2',
+        workspace_client_id: 72,
+        account_set: 'Client B',
+        target_label: 'MR.ERP · Client B',
+    });
 });
 
 test('both LINE editors localize system fields while preserving stored enum values', async ({

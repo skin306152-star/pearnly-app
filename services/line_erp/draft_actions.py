@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from core import db
-from services.erp import line_document_subject, target_refresh, team_access
+from services.erp import line_document_subject, selected_account_refresh, team_access
 from services.intake_bridge import convert as convert_svc
 from services.line_erp import push as line_push, store, target_preflight, target_selection
 from services.line_platform import client as line_client
@@ -138,19 +138,24 @@ async def confirm(
     refresh_request_id = str(selection_values.get("master_refresh_request_id") or "")
     if refresh_request_id:
         refresh_state = await asyncio.to_thread(
-            target_refresh.refresh_status,
+            selected_account_refresh.status_for_selection,
+            {"tenant_id": binding["tenant_id"], "user_id": binding["user_id"]},
+            {
+                "endpoint_id": selection_values.get("endpoint_id"),
+                "adapter": selection_values.get("adapter"),
+            },
+            selection_values.get("account_set"),
             refresh_request_id,
-            tenant_id=str(binding["tenant_id"]),
-            endpoint_id=str(selection_values.get("endpoint_id") or ""),
         )
         refresh_status = str((refresh_state or {}).get("status") or "")
         if refresh_status != "succeeded":
+            refresh_failed = refresh_status in {"failed", "mismatch"}
             if reply_token:
                 line_client.reply_text(
                     reply_token,
                     (
                         "อัปเดตข้อมูล ERP ไม่สำเร็จ กรุณาเลือกบัญชี ERP ใหม่"
-                        if refresh_status == "failed"
+                        if refresh_failed
                         else "กำลังอัปเดตข้อมูล ERP ล่าสุด กรุณารอสักครู่แล้วลองยืนยันอีกครั้ง"
                     ),
                     channel=CHANNEL,
@@ -160,7 +165,7 @@ async def confirm(
                 "status": 409,
                 "detail": (
                     "line_erp.master_refresh_failed"
-                    if refresh_status == "failed"
+                    if refresh_failed
                     else "line_erp.master_refresh_pending"
                 ),
             }

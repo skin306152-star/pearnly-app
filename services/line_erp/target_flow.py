@@ -8,6 +8,7 @@ from typing import Any
 
 from core.feature_flags import erp_target_projection_enabled_for
 from services.erp import target_refresh, team_access
+from services.erp.line_target_choice import find_account_choice, target_label_for_account
 from services.line_erp import flow, selection_messages, store, target_preflight, target_selection
 from services.line_platform import client as line_client
 
@@ -307,25 +308,12 @@ async def choose_target(
         _notify(line_user_id, reply_token, "รายการหมดอายุ กรุณาเลือก ERP ใหม่")
         return
     account_ref = str((params.get("account") or [""])[0]).strip()
-    account_choices = [
-        account
-        for account in target.get("account_choices") or []
-        if isinstance(account, dict) and account.get("writable") is not False
-    ]
     if account_ref:
-        account = next(
-            (
-                choice
-                for choice in account_choices
-                if selection_messages.account_reference(choice.get("key")) == account_ref
-            ),
-            None,
-        )
+        account = find_account_choice(target, account_ref=account_ref)
     else:
-        selected_key = str(target.get("selected_account_key") or "")
-        account = next(
-            (choice for choice in account_choices if str(choice.get("key") or "") == selected_key),
-            None,
+        account = find_account_choice(
+            target,
+            account_key=target.get("selected_account_key"),
         )
     if account is None:
         _notify(line_user_id, reply_token, "ชุดบัญชีมีการเปลี่ยนแปลง กรุณาเลือกใหม่")
@@ -336,14 +324,7 @@ async def choose_target(
         **target,
         "selected_account_key": account_key,
         "account_set_label": account_label,
-        "label": " · ".join(
-            value
-            for value in (
-                str(target.get("connection_label") or "").strip(),
-                account_label,
-            )
-            if value
-        ),
+        "label": target_label_for_account(target, account),
     }
     projection_enabled = await asyncio.to_thread(
         erp_target_projection_enabled_for,

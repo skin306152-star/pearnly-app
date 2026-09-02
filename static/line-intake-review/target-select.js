@@ -134,6 +134,17 @@
             );
         }
 
+        function selectedTargetLabel(target, choice) {
+            var connection =
+                target.connection_label ||
+                (adapterOf(target) === 'mrerp'
+                    ? 'MR.ERP'
+                    : adapterOf(target) === 'express'
+                      ? 'Express'
+                      : target.label || target.target_label || 'ERP');
+            return [connection, choiceLabel(choice)].filter(Boolean).join(' · ');
+        }
+
         function rootRows() {
             var seen = {};
             return accountRows().reduce(function (rows, row) {
@@ -332,7 +343,7 @@
                 endpoint_id: target.endpoint_id || target.id,
                 workspace_client_id: target.workspace_client_id,
                 adapter: target.adapter,
-                target_label: target.label || target.target_label,
+                target_label: selectedTargetLabel(target, choice),
                 account_root: choice.root_key || null,
                 account_set: choice.key || choice.account_set,
             });

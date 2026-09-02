@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import ntpath
 from typing import Any
 
@@ -18,6 +19,53 @@ _MAPPING_KEYS = (
 def _path_identity(value: object) -> str:
     path = str(value or "").strip()
     return ntpath.normcase(ntpath.normpath(path)) if path else ""
+
+
+def account_reference(account_key: object) -> str:
+    """Return a short opaque reference safe for LINE postback payloads."""
+    raw = str(account_key or "").strip()
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def find_account_choice(
+    target: dict[str, Any],
+    *,
+    account_key: object = None,
+    account_ref: object = None,
+) -> dict[str, Any] | None:
+    wanted_key = str(account_key or "").strip()
+    wanted_ref = str(account_ref or "").strip()
+    for row in target.get("account_choices") or []:
+        if not isinstance(row, dict) or row.get("writable") is False:
+            continue
+        key = str(row.get("key") or row.get("account_set") or "").strip()
+        if not key:
+            continue
+        if wanted_key and key == wanted_key:
+            return row
+        if wanted_ref and account_reference(key) == wanted_ref:
+            return row
+    return None
+
+
+def target_label_for_account(target: dict[str, Any], account: dict[str, Any]) -> str:
+    connection = str(
+        target.get("connection_label")
+        or ("MR.ERP" if str(target.get("adapter") or "").lower() == "mrerp" else "Express")
+    ).strip()
+    account_label = str(
+        account.get("label") or account.get("account_company") or account.get("key") or ""
+    ).strip()
+    return " · ".join(value for value in (connection, account_label) if value)[:200]
+
+
+def account_option_label(target: dict[str, Any], account: dict[str, Any]) -> str:
+    """Put the distinguishing account name first so LINE's 20-char limit keeps it."""
+    account_label = str(
+        account.get("label") or account.get("account_company") or account.get("key") or ""
+    ).strip()
+    owner = str(target.get("workspace_name") or "").strip()
+    return " · ".join(value for value in (account_label, owner) if value)
 
 
 def endpoint_with_account_choice(
@@ -68,4 +116,10 @@ def endpoint_with_account_choice(
     return projected
 
 
-__all__ = ["endpoint_with_account_choice"]
+__all__ = [
+    "account_option_label",
+    "account_reference",
+    "endpoint_with_account_choice",
+    "find_account_choice",
+    "target_label_for_account",
+]

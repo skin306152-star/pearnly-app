@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -16,7 +17,7 @@ from core import db
 from core.auth import JWT_ALGORITHM, _jwt_secret, get_current_user_from_request
 from core.feature_flags import erp_line_enabled_for
 from core.workspace_context import WS_HEADER
-from services.erp import target_refresh
+from services.erp import selected_account_refresh, target_refresh
 from services.auth.entrance import require_erp_portal
 from services.erp import team_access
 from services.line_erp import (
@@ -33,6 +34,7 @@ from services.line_platform.liff import verify_id_token
 router = APIRouter(tags=["line-erp"])
 CHANNEL = "erp"
 _ROOT = Path(__file__).resolve().parent.parent
+logger = logging.getLogger(__name__)
 
 
 class LiffAuthIn(BaseModel):
@@ -371,7 +373,35 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
         target_selection.update_scope(binding, expected_ids, selection)
     except target_selection.SelectionError as exc:
         raise HTTPException(exc.status_code, detail=exc.code) from None
+    try:
+        master_refresh = await asyncio.to_thread(
+            selected_account_refresh.ensure_for_editor,
+            {"tenant_id": binding["tenant_id"], "user_id": binding["user_id"]},
+            target,
+            selection["account_set"],
+            previous_request_id=payload.get("master_refresh_request_id"),
+        )
+    except Exception:
+        logger.exception(
+            "LINE ERP selected-account refresh failed: %s",
+            str(selection.get("endpoint_id") or "")[:8],
+        )
+        raise HTTPException(409, detail="line_erp.master_refresh_failed") from None
     next_payload = {**payload, **selection, "history_ids": expected_ids}
+    for key in (
+        "master_refresh_request_id",
+        "master_refresh_status",
+        "master_refresh_account_set",
+    ):
+        next_payload.pop(key, None)
+    if master_refresh:
+        next_payload.update(
+            {
+                "master_refresh_request_id": master_refresh["request_id"],
+                "master_refresh_status": master_refresh["status"],
+                "master_refresh_account_set": master_refresh["account_set_key"],
+            }
+        )
     store.set_session(
         str(binding["tenant_id"]),
         str(claims["line_user_id"]),
@@ -392,6 +422,7 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
             ),
             "targets": target_result["targets"],
             "selection": target_selection.from_payload(next_payload),
+            "master_refresh": master_refresh,
         },
     }
 

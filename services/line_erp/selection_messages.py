@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 
-import hashlib
 import math
 
+from services.erp.line_target_choice import account_option_label, account_reference
 from services.line_erp import target_preflight
 from services.line_platform.quick_replies import question, quick_reply_item
 
 QR_LIMIT = 13
 QR_PAGE_SIZE = 11
 _ADAPTERS = (("mrerp", "MR.ERP"), ("express", "Express"))
-
-
-def account_reference(account_key: object) -> str:
-    return hashlib.sha256(str(account_key or "").strip().encode("utf-8")).hexdigest()[:16]
 
 
 def _status(targets: list[dict]) -> str:
@@ -56,14 +52,7 @@ def account_picker_message(targets: list[dict], adapter: str, mode: str, *, page
     start = page * QR_PAGE_SIZE
     items = [
         quick_reply_item(
-            " · ".join(
-                value
-                for value in (
-                    str(target.get("workspace_name") or "").strip(),
-                    str(account.get("label") or account.get("key") or "").strip(),
-                )
-                if value
-            ),
+            account_option_label(target, account),
             "target",
             mode=mode,
             endpoint=target.get("endpoint_id"),

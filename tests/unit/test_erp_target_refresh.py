@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from services.erp import target_refresh
+from services.erp import selected_account_refresh, target_refresh
 
 
 class _Cursor:
@@ -147,6 +147,126 @@ class TargetRefreshTests(unittest.TestCase):
 
         self.assertFalse(completed)
         self.assertEqual(cursor.executed, [])
+
+
+class SelectedAccountRefreshTests(unittest.TestCase):
+    identity = {"tenant_id": "tenant-1", "user_id": "user-1"}
+    target = {
+        "endpoint_id": "endpoint-1",
+        "adapter": "mrerp",
+        "supports_master_refresh": True,
+    }
+
+    def test_matching_succeeded_refresh_is_reused(self):
+        with (
+            mock.patch.object(
+                selected_account_refresh,
+                "erp_target_projection_enabled_for",
+                return_value=True,
+            ),
+            mock.patch.object(
+                selected_account_refresh.target_refresh,
+                "refresh_status",
+                return_value={"status": "succeeded", "account_set_key": "6:1"},
+            ),
+            mock.patch.object(
+                selected_account_refresh.target_refresh, "request_refresh"
+            ) as request,
+            mock.patch.object(
+                selected_account_refresh.target_refresh, "process_mrerp_request"
+            ) as process,
+        ):
+            result = selected_account_refresh.ensure_for_editor(
+                self.identity,
+                self.target,
+                "6:1",
+                previous_request_id="refresh-1",
+            )
+
+        self.assertEqual(result["request_id"], "refresh-1")
+        self.assertEqual(result["status"], "succeeded")
+        request.assert_not_called()
+        process.assert_not_called()
+
+    def test_changed_mrerp_year_gets_new_refresh_and_waits_for_it(self):
+        states = [
+            {"status": "succeeded", "account_set_key": "15:1"},
+            {"status": "requested", "account_set_key": "6:1"},
+            {"status": "succeeded", "account_set_key": "6:1"},
+        ]
+        with (
+            mock.patch.object(
+                selected_account_refresh,
+                "erp_target_projection_enabled_for",
+                return_value=True,
+            ),
+            mock.patch.object(
+                selected_account_refresh.target_refresh,
+                "refresh_status",
+                side_effect=states,
+            ),
+            mock.patch.object(
+                selected_account_refresh.target_refresh,
+                "request_refresh",
+                return_value={"request_id": "refresh-2", "status": "requested"},
+            ) as request,
+            mock.patch.object(
+                selected_account_refresh.target_refresh,
+                "process_mrerp_request",
+                return_value=True,
+            ) as process,
+        ):
+            result = selected_account_refresh.ensure_for_editor(
+                self.identity,
+                self.target,
+                "6:1",
+                previous_request_id="refresh-1",
+            )
+
+        request.assert_called_once_with(
+            tenant_id="tenant-1",
+            user_id="user-1",
+            endpoint_id="endpoint-1",
+            account_set_key="6:1",
+            adapter="mrerp",
+            reason="line_editor_selection",
+        )
+        process.assert_called_once_with("refresh-2")
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(result["account_set_key"], "6:1")
+
+    def test_express_editor_requests_exact_account_without_cloud_blocking(self):
+        target = {**self.target, "adapter": "express"}
+        account_key = r"c:\express\new"
+        with (
+            mock.patch.object(
+                selected_account_refresh,
+                "erp_target_projection_enabled_for",
+                return_value=True,
+            ),
+            mock.patch.object(
+                selected_account_refresh.target_refresh,
+                "refresh_status",
+                return_value={"status": "requested", "account_set_key": account_key},
+            ),
+            mock.patch.object(
+                selected_account_refresh.target_refresh,
+                "request_refresh",
+                return_value={"request_id": "refresh-3", "status": "requested"},
+            ),
+            mock.patch.object(
+                selected_account_refresh.target_refresh, "process_mrerp_request"
+            ) as process,
+        ):
+            result = selected_account_refresh.ensure_for_editor(
+                self.identity,
+                target,
+                r"C:\\Express\\NEW",
+            )
+
+        process.assert_not_called()
+        self.assertEqual(result["status"], "requested")
+        self.assertEqual(result["account_set_key"], account_key)
 
 
 if __name__ == "__main__":

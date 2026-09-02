@@ -6,6 +6,8 @@ from typing import Any
 
 from core import db
 from services.cowork_line import session_store
+from services.erp import selected_account_refresh
+from services.erp.line_target_choice import find_account_choice, target_label_for_account
 from services.ocr_history.mutations import update_ocr_history_pages
 from services.ocr_history.queries import get_history_pdf_info, get_ocr_history_detail
 from services.ocr_history.staged import discard_staged_ocr_history_with_pdf_paths
@@ -122,6 +124,7 @@ def _selection(payload: dict) -> dict[str, Any]:
         "posting_kind": payload.get("posting_kind")
         or (posting_mode if adapter == "express" else None),
         "payment": payload.get("payment") or (posting_mode if adapter == "mrerp" else None),
+        "master_refresh_request_id": payload.get("master_refresh_request_id"),
     }
 
 
@@ -150,15 +153,8 @@ def _normalize_selection(target: dict, selection: dict) -> dict:
     account_key = str(
         selection.get("account_set") or target.get("selected_account_key") or ""
     ).strip()
-    account = next(
-        (
-            row
-            for row in target.get("account_choices") or []
-            if isinstance(row, dict) and str(row.get("key") or "").strip() == account_key
-        ),
-        None,
-    )
-    if not account or account.get("writable") is False:
+    account = find_account_choice(target, account_key=account_key)
+    if not account:
         raise CoworkLineIntakeError("account_set_required", 422)
     workspace_client_id = target.get("workspace_client_id")
     return {
@@ -167,7 +163,7 @@ def _normalize_selection(target: dict, selection: dict) -> dict:
             int(workspace_client_id) if workspace_client_id is not None else None
         ),
         "adapter": adapter,
-        "target_label": target.get("label") or "",
+        "target_label": target_label_for_account(target, account),
         "account_root": str(account.get("root_key") or "").strip() or None,
         "account_set": account_key,
         "account_config": {
@@ -338,12 +334,35 @@ def save_draft(identity: dict, draft_id: str, records: list[dict], selection: di
             if not result.ok:
                 raise CoworkLineIntakeError("draft_save_failed")
     target = _preflight_target(identity, target, history_ids, normalized)
+    try:
+        master_refresh = selected_account_refresh.ensure_for_editor(
+            identity,
+            target,
+            normalized["account_set"],
+            previous_request_id=payload.get("master_refresh_request_id"),
+        )
+    except Exception as exc:
+        raise CoworkLineIntakeError("master_refresh_failed") from exc
     next_payload = {
         **payload,
         **normalized,
         "history_ids": history_ids,
         "posting_mode": normalized.get("posting_kind") or normalized.get("payment"),
     }
+    for key in (
+        "master_refresh_request_id",
+        "master_refresh_status",
+        "master_refresh_account_set",
+    ):
+        next_payload.pop(key, None)
+    if master_refresh:
+        next_payload.update(
+            {
+                "master_refresh_request_id": master_refresh["request_id"],
+                "master_refresh_status": master_refresh["status"],
+                "master_refresh_account_set": master_refresh["account_set_key"],
+            }
+        )
     session_store.set_session(
         tenant_id=str(identity["tenant_id"]),
         line_user_id=str(identity["line_user_id"]),
@@ -355,6 +374,7 @@ def save_draft(identity: dict, draft_id: str, records: list[dict], selection: di
         "records": _records(identity, str(draft_id), history_ids),
         "targets": _replace_target(_list_targets(identity), target),
         "selection": _selection(next_payload),
+        "master_refresh": master_refresh,
     }
 
 
@@ -379,6 +399,19 @@ async def confirm_and_push(identity: dict, draft: str | dict) -> dict:
         _selection(payload),
         refresh_probe=True,
     )
+    try:
+        master_refresh = selected_account_refresh.ensure_for_editor(
+            identity,
+            target,
+            normalized["account_set"],
+            previous_request_id=payload.get("master_refresh_request_id"),
+        )
+    except Exception as exc:
+        raise CoworkLineIntakeError("master_refresh_failed") from exc
+    refresh_status = str((master_refresh or {}).get("status") or "")
+    if master_refresh and refresh_status != "succeeded":
+        code = "master_refresh_failed" if refresh_status == "failed" else "master_refresh_pending"
+        raise CoworkLineIntakeError(code)
     from services.line_platform.draft_validation import batch_issues
 
     records = _records(identity, draft_id, history_ids)

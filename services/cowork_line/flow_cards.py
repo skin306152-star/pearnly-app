@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 from services.cowork_line.card_fields import HEADER_KEYS, HEADER_LABELS
+from services.erp.line_target_choice import account_option_label, account_reference
 from services.line_platform.quick_replies import (
     postback_action as _postback,
     question as _question,
@@ -281,17 +282,38 @@ def erp_picker_card(targets: list[dict], lang: str) -> dict:
 
 def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: int = 0) -> dict:
     ready_targets = [target for target in targets if target.get("selectable")]
-    page_count = max(1, math.ceil(len(ready_targets) / QR_PAGE_SIZE))
+    account_options = []
+    for target in ready_targets:
+        choices = [
+            choice
+            for choice in target.get("account_choices") or []
+            if isinstance(choice, dict)
+            and str(choice.get("key") or choice.get("account_set") or "").strip()
+            and choice.get("writable") is not False
+        ]
+        account_options.extend((target, choice) for choice in choices)
+        if not choices:
+            account_options.append((target, None))
+    page_count = max(1, math.ceil(len(account_options) / QR_PAGE_SIZE))
     page = max(0, min(int(page), page_count - 1))
     start = page * QR_PAGE_SIZE
     items = [
         _quick_reply_item(
-            str(item.get("label") or item.get("name") or adapter),
+            (
+                account_option_label(target, account)
+                if account
+                else str(target.get("label") or target.get("name") or adapter)
+            ),
             "cowork_erp_target",
-            endpoint=item.get("endpoint_id") or item.get("id"),
-            workspace=item.get("workspace_client_id"),
+            endpoint=target.get("endpoint_id") or target.get("id"),
+            workspace=target.get("workspace_client_id"),
+            account=(
+                account_reference(account.get("key") or account.get("account_set"))
+                if account
+                else None
+            ),
         )
-        for item in ready_targets[start : start + QR_PAGE_SIZE]
+        for target, account in account_options[start : start + QR_PAGE_SIZE]
     ]
     if page > 0:
         items.insert(

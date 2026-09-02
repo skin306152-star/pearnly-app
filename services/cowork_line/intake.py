@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from core import db
 from services.cowork_line import session_store
+from services.cowork_line.review_fields import (
+    pages_with_direction as _pages_with_direction,
+    selection_from_payload as _selection,
+)
 from services.erp import selected_account_refresh
 from services.erp.line_target_choice import find_account_choice, target_label_for_account
 from services.ocr_history.mutations import update_ocr_history_pages
@@ -110,24 +112,6 @@ def _records(identity: dict, draft_id: str, history_ids: list[str]) -> list[dict
     return records
 
 
-def _selection(payload: dict) -> dict[str, Any]:
-    adapter = str(payload.get("adapter") or "").lower()
-    posting_mode = payload.get("posting_mode")
-    return {
-        "endpoint_id": payload.get("endpoint_id"),
-        "workspace_client_id": payload.get("workspace_client_id"),
-        "adapter": payload.get("adapter"),
-        "target_label": payload.get("target_label"),
-        "account_root": payload.get("account_root"),
-        "account_set": payload.get("account_set"),
-        "direction": payload.get("direction"),
-        "posting_kind": payload.get("posting_kind")
-        or (posting_mode if adapter == "express" else None),
-        "payment": payload.get("payment") or (posting_mode if adapter == "mrerp" else None),
-        "master_refresh_request_id": payload.get("master_refresh_request_id"),
-    }
-
-
 def get_draft(identity: dict, draft_id: str) -> dict:
     _, payload = require_draft(identity, draft_id)
     history_ids = _ids(payload)
@@ -206,17 +190,6 @@ def _validated_selection(
             raise
         raise _target_error(exc) from exc
     return target, _normalize_selection(target, selection)
-
-
-def _pages_with_direction(pages: list, direction: str) -> list:
-    updated = []
-    for page in pages:
-        current = dict(page) if isinstance(page, dict) else {}
-        fields = dict(current.get("fields") or {})
-        fields["direction"] = direction
-        current["fields"] = fields
-        updated.append(current)
-    return updated
 
 
 def _preflight_target(

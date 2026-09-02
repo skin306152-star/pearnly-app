@@ -107,7 +107,7 @@ class TargetProjectionRouteTests(unittest.TestCase):
         endpoint = {
             "id": "33333333-3333-4333-8333-333333333333",
             "adapter": "express",
-            "agent_version": "1.1.74",
+            "agent_version": "1.1.75",
         }
         with (
             mock.patch.object(routes, "require_perm", return_value=self.user),
@@ -131,7 +131,7 @@ class TargetProjectionRouteTests(unittest.TestCase):
         endpoint = {
             "id": "33333333-3333-4333-8333-333333333333",
             "adapter": "express",
-            "agent_version": "1.1.73",
+            "agent_version": "1.1.74",
         }
         with (
             mock.patch.object(routes, "require_perm", return_value=self.user),

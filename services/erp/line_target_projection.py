@@ -11,7 +11,7 @@ from services.erp.express_target_projection import normalize_express_account_key
 from services.erp.push_log_meta import _derive_v3_meta
 from services.erp.shared_express_store import safe_endpoint_dto
 
-_MASTER_REFRESH_MIN_VERSION = (1, 1, 74)
+_MASTER_REFRESH_MIN_VERSION = (1, 1, 75)
 
 
 def supports_master_refresh(version: Any) -> bool:

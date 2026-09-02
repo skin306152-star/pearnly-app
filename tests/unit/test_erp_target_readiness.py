@@ -9,10 +9,10 @@ from services.erp import line_target_projection as erp_target_projection
 
 
 class ErpTargetReadinessTests(unittest.TestCase):
-    def test_master_refresh_requires_companion_protocol_1_1_73(self):
+    def test_master_refresh_requires_companion_protocol_1_1_74(self):
         self.assertFalse(erp_target_projection.supports_master_refresh(None))
-        self.assertFalse(erp_target_projection.supports_master_refresh("1.1.72"))
-        self.assertTrue(erp_target_projection.supports_master_refresh("1.1.73"))
+        self.assertFalse(erp_target_projection.supports_master_refresh("1.1.73"))
+        self.assertTrue(erp_target_projection.supports_master_refresh("1.1.74"))
         self.assertTrue(erp_target_projection.supports_master_refresh("1.2.0"))
 
     def test_mrerp_probe_is_cached_and_keeps_rich_response_shape(self):

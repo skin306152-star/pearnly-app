@@ -1,7 +1,7 @@
 # ERP LINE 目标、套账与主档一致性合同
 
-> 状态：`DISCOVERY_COMPLETE / IMPLEMENTATION_STAGED`  
-> 基线：2026-09-01 production `cf76c57539a439304abb0f8117d25ae5aa6ca1c2`，Companion `v1.1.69`。  
+> 状态：`P3A_IMPLEMENTED / FEATURE_FLAG_OFF / ADAPTER_AND_LINE_INTEGRATION_PENDING`
+> P3a 实现：`fc9e48b9`；部署与生产回读完成前只视为候选版本。
 > 本文只定义连接、套账、主档与 LINE 选择的一致性边界；第三方 ERP 推送状态继续唯一来自
 > `erp_push_logs`，不在这里建立第二套推送状态。
 
@@ -76,11 +76,16 @@ token mask。mask 只显示 token 前 3 位和后 4 位，中间统一为 `***`�
 
 - `revision`：服务端单调递增版本；
 - `source_hash`：稳定排序后的完整快照哈希；
-- `observed_at`、`source_status`、adapter 与采集设备；
-- products、customers、accounts 的稳定 source id、显示标签和 active 状态；
+- `observed_at`、`last_refresh_attempted_at`、`source_status`、adapter 与采集设备；
+- account sets，以及 products、customers、suppliers、units、branches、accounts 的稳定 source id、
+  显示标签和 active 状态；
+- 表单字段、字段类型、必填状态、选项来源，以及当前可用按钮/动作；
+- account sets、master、form schema、capability 四个独立 component revision；
 - 完整快照语义：本次缺失的旧行视为删除，不做无限 merge。
 
 `erp_push_logs` 不承载这些字段。主档 snapshot 是选择/校验投影，不是推送队列。
+刷新失败只推进 `last_refresh_attempted_at`，不得覆盖最后一次成功来源的 `observed_at` 或 current
+snapshot；同一内容重复上报只更新 freshness，不生成假 revision。
 
 ### 3.3 单据目标快照
 
@@ -172,9 +177,12 @@ P1 获得真机 `USER_ACCEPTED` 后才进入 P2。
 
 ### P3 统一 master snapshot 协议
 
-- 落 snapshot/revision 表与原子发布；接 MR.ERP live fetch、legacy/managed Express ingestion 和
-  Companion refresh request。
-- 增删改、离线、超时、跨套账和并发发布测试全绿。
+- **P3a 已实现**：immutable snapshot、current head、normalized items、原子发布、稳定 hash、component
+  revision、freshness、租户 RLS 与只读 API；功能闸默认关闭，现有网页和 LINE 不切流。
+- **P3b 待实现**：接 MR.ERP live fetch，并把套账、六类主档、表单字段与动作能力发布到统一投影。
+- **P3c 待实现**：接 legacy/managed Express ingestion 与 Companion refresh request，共用同一 catalog。
+- P3a 已覆盖新增套账、主档改名、字段必填变化、按钮可用性变化、离线保留、RLS 与并发发布；
+  这些测试证明底座语义，不代表第三方采集或 LINE 下拉已经完成。
 
 ### P4 LINE 选择、编辑器和确认 CAS
 

@@ -1,16 +1,25 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 09-01 `/erp` 两层 LINE 菜单 READY_FOR_DEVICE
+## 当前状态卡 · 09-02 ERP 最新主档 P3a READY_FOR_RELEASE
 
-- **▶ 当前 task**:纠正 `/erp` 菜单格式；应用逻辑=`359c1e02`，manual CD `33523760620` 成功，生产已运行该 SHA。
-- **💬 对话菜单**:不再用六宫格 Flex；按 DMS 格式显示两张纵向、全宽、整行可点卡片，含专用采购入库/销售出库图标、编号、标题、说明和箭头。
-- **📱 底部 Rich Menu**:独立 2×3 六宫格；仅采购、销售两格有 LINE 点击区，四个占位格无 action。默认菜单=`richmenu-b910b934511b275beafef72f47432603`。
-- **🛡 权限/状态**:对话菜单不再被 ERP 预检红字卡劫持，点选采购/销售后才检测目标；Rich Menu postback 同样校验员工分配的业务方向，不可绕过权限。
-- **✅ 验证**:完整 pre-push 两次全绿（unittest 1108 模块/6 片）；LINE Flex 与 Rich Menu 官方 validator 均 HTTP 200；生产 HEAD/service/health/ready 回读通过。
-- **✅ LINE 回读**:当前 ERP 菜单数=1，尺寸=2500×1686，点击区=2，图片 SHA-256=`0f749fa6c8ab83fa244dcd8a94279f78489389672ecfa4fe2a16e4f5d2eedfcd`，与仓库成品一致。
-- **⏭ 真机验收**:在 Pearnly ERP LINE 展开底部菜单，确认两个有效菜单+四个占位；发送 `menu/เมนู` 确认对话里是两张纵向行卡。用户真机 OK 前不称验收完成。
+- **▶ 当前 task**:第三方 ERP 套账、主档、字段与按钮统一投影 P3a；运行时实现=`fc9e48b9`，测试闸修正=`511d9069`。
+- **✅ 本批交付**:immutable snapshot + current head + normalized items；endpoint/account-set 双 scope；稳定 hash、单调 revision、四类 component revision 与刷新 freshness 单源。
+- **📚 投影范围**:account sets；products/customers/suppliers/units/branches/accounts；表单字段/必填/选项来源；动作与按钮能力。
+- **🛡 一致性**:同内容不上假版本；失败保留最后成功 snapshot；attempted/observed 时间分离；租户 RLS；并发发布串行化；`erp_push_logs` 仍是推送状态唯一源。
+- **🚧 明确未做**:MR.ERP live fetch、Express Companion refresh/ingestion、网页与 LINE 消费、确认前 revision CAS 均未接；当前 LINE 下拉不会因 P3a 自动出现第三方新增内容。
+- **🚦 开关**:`erp_target_projection` 默认关闭；关闭时新增只读 API 返回 404，现有 `/cowork`、`/erp` 网页与 LINE 行为不切流。
+- **✅ 本地证据**:完整 pre-push 全绿（unittest 1114 模块/6 片）；P3a 11 个 contract/schema/route tests + 5 个真实 PostgreSQL smoke；RLS、权限覆盖、Alembic head 与 app import 通过。
+- **⏭ 批次门**:先完成 pinned-SHA 生产部署与 schema/ready 回读；用户确认 P3a 后才进入 P3b MR.ERP live projection，不提前接 LINE。
 
 ---
+
+## 历史 · 09-01 `/erp` 两层 LINE 菜单 READY_FOR_DEVICE
+
+- **▶ 当时 task**:纠正 `/erp` 菜单格式；应用逻辑=`359c1e02`，manual CD `33523760620` 成功，生产已运行该 SHA。
+- **💬 对话菜单**:按 DMS 格式显示两张纵向、全宽、整行可点卡片；底部为独立 2×3 六宫格，只有采购、销售两格可点。
+- **🛡 权限/状态**:点选采购/销售后才检测目标；Rich Menu postback 同样校验员工分配的业务方向，不可绕过权限。
+- **✅ 验证**:完整 pre-push 全绿；LINE Flex/Rich Menu validator HTTP 200；生产 HEAD/service/health/ready 与菜单图片 hash 回读通过。
+- **⏭ 真机验收**:用户真机 OK 前仍不称验收完成。
 
 ## 历史 · 09-01 LINE/ERP 推送状态闭环 READY_FOR_DEVICE
 

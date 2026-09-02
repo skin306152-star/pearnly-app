@@ -160,6 +160,8 @@ async def dispatch_confirmed(
                 history_ids,
                 target,
                 posting_kind=selection.get("posting_kind"),
+                account_set_key=selection.get("account_set"),
+                account_config=selection.get("account_config"),
             )
             committed = len(results)
         except Exception as exc:

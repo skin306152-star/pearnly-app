@@ -18,6 +18,7 @@ from services.erp.shared_express_agent_auth import (
     stored_token_matches,
 )
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
+from services.erp.selected_account import allowed_express_account_keys
 
 _LEASE_SECONDS = 120
 _MAX_ATTEMPTS = 3
@@ -100,11 +101,12 @@ def _authenticate_managed(cur, token: str) -> tuple[Dict[str, Any], str]:
     lock_endpoint_binding(cur, endpoint_id)
     cur.execute(
         """
-        SELECT endpoint.id, endpoint.tenant_id, endpoint.workspace_client_id,
+        SELECT endpoint.id, endpoint.tenant_id, endpoint.workspace_client_id, endpoint.adapter,
                endpoint.enabled, endpoint.shared_scope, endpoint.binding_generation,
                endpoint.bound_account_set, endpoint.bound_profile_key,
                endpoint.live_account_set, endpoint.live_profile_key,
                endpoint.agent_last_seen_at,
+               endpoint.config,
                endpoint.config ->> 'agent_token_hash' AS token_hash,
                clock_timestamp() AS db_now
         FROM erp_endpoints endpoint
@@ -188,7 +190,13 @@ def lease_managed(token: str, agent_id: object, max_n: int) -> Dict[str, Any]:
                 return {"ok": True, "lease_seconds": _LEASE_SECONDS, "jobs": []}
             endpoint_id = str(endpoint["id"])
             generation = int(endpoint["binding_generation"])
-            account_set = endpoint["account_set"]
+            account_sets = allowed_express_account_keys(
+                endpoint,
+                tenant_id=str(endpoint["tenant_id"]),
+                cur=cur,
+            )
+            if endpoint["account_set"] not in account_sets:
+                account_sets.append(endpoint["account_set"])
             cur.execute(
                 f"""
                 WITH due AS (
@@ -202,7 +210,7 @@ def lease_managed(token: str, agent_id: object, max_n: int) -> Dict[str, Any]:
                       AND lower(btrim(COALESCE(
                             request_body->>'account_set',
                             request_body->'meta'->>'account_set', ''
-                          ))) = %s
+                          ))) = ANY(%s)
                       AND (
                             lease_owner IS NULL
                             OR (NOT ({_CONFIRMED})
@@ -222,7 +230,7 @@ def lease_managed(token: str, agent_id: object, max_n: int) -> Dict[str, Any]:
                 RETURNING log.id, log.history_id, log.invoice_no, log.request_body,
                           log.attempt, log.lease_expires_at
                 """,
-                (endpoint_id, str(generation), account_set, limit, owner, _LEASE_SECONDS),
+                (endpoint_id, str(generation), account_sets, limit, owner, _LEASE_SECONDS),
             )
             rows = [dict(row) for row in (cur.fetchall() or [])]
             jobs: List[Dict[str, Any]] = []
@@ -230,7 +238,7 @@ def lease_managed(token: str, agent_id: object, max_n: int) -> Dict[str, Any]:
                 payload = row.get("request_body") or {}
                 if (
                     _payload_generation(payload) != generation
-                    or _payload_account_set(payload) != account_set
+                    or _payload_account_set(payload) not in account_sets
                 ):
                     raise RuntimeError("managed lease payload contract changed after selection")
                 jobs.append(
@@ -246,7 +254,7 @@ def lease_managed(token: str, agent_id: object, max_n: int) -> Dict[str, Any]:
             result = {"ok": True, "lease_seconds": _LEASE_SECONDS, "jobs": jobs}
             from services.erp.target_refresh import lease_express_refresh_with_cursor
 
-            refresh = lease_express_refresh_with_cursor(cur, endpoint_id, account_set)
+            refresh = lease_express_refresh_with_cursor(cur, endpoint_id)
             if refresh:
                 result["master_refresh"] = refresh
             return result

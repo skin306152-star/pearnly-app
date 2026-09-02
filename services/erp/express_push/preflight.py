@@ -329,7 +329,7 @@ def preflight_express(
 
     # 账套白名单(逐端点 · 须 == 本端点配置账套)。
     account_set = str(config.get("account_set") or "").strip()
-    if not account_set_allowed(account_set, endpoint):
+    if not account_set_allowed(account_set, endpoint, config.get("express_root")):
         return _block(
             pf,
             "account_set",
@@ -438,7 +438,9 @@ def preflight_express(
         pf.checks.append(Check("mapping", OK))
 
         # 防御性复核白名单(mapper 已带 account_set · 与 Agent lease 同口径)· 命中归 account_set 项。
-        if not account_set_allowed(payload.get("account_set"), endpoint):
+        if not account_set_allowed(
+            payload.get("account_set"), endpoint, payload.get("account_root")
+        ):
             for c in pf.checks:
                 if c.key == "account_set":
                     c.status = BLOCKED

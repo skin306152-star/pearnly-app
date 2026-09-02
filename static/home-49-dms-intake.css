@@ -322,6 +322,9 @@
 .dmsx .dx-erp-c span{display:block;font-size:9px;color:var(--ink2);margin-top:3px}
 .dmsx .dx-erp-chk{width:18px;height:18px;border-radius:50%;border:1px solid var(--dx-line-strong);display:grid;place-items:center;color:transparent;font-size:10px;font-weight:900}
 .dmsx .dx-erp.active .dx-erp-chk{background:var(--dx-brand);border-color:var(--dx-brand);color:#fff}
+.dmsx .dx-erp-account{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;margin-top:-1px;padding:10px 12px;border:1px solid var(--dx-brand);border-top:0;border-radius:0 0 12px 12px;background:var(--bg)}
+.dmsx .dx-erp-account label{font-size:10px;font-weight:700;color:var(--ink2)}
+.dmsx .dx-erp-account select{min-width:0;min-height:44px;border:1px solid var(--dx-line-strong);border-radius:9px;background:var(--card);color:var(--ink);padding:0 10px;font-size:11px}
 .dmsx .dx-erp-empty{border:1px dashed var(--dx-line-strong);background:var(--bg);border-radius:13px;padding:16px;text-align:center;margin-top:11px}
 .dmsx .dx-erp-empty-ic{width:42px;height:42px;border-radius:12px;background:var(--card);border:1px solid var(--dx-line);color:var(--ink2);display:grid;place-items:center;margin:0 auto 10px;font-size:18px}
 .dmsx .dx-erp-empty h4{font-size:12px;margin:0}

@@ -6,22 +6,25 @@
 // ============================================================
 import { esc, authHeaders } from './dms-intake-core.js';
 import { isAgentOffline } from './erp-agent-liveness.js';
+import {
+    accountChoiceLabel,
+    accountKey,
+    enrichEndpointAccountChoices,
+    preserveAccountSelection,
+    type ErpEndpoint,
+} from './dms-intake-erp-accounts.js';
+
+export {
+    selectedAccountKey,
+    selectedAccountLabel,
+    selectErpAccount,
+    type ErpAccountChoice,
+    type ErpEndpoint,
+} from './dms-intake-erp-accounts.js';
 
 function t(k: string): string {
     const w = window as unknown as { t?: (k: string) => string };
     return typeof w.t === 'function' ? w.t(k) : k;
-}
-
-export interface ErpEndpoint {
-    id?: string | number;
-    name?: string;
-    adapter?: string;
-    enabled?: boolean;
-    is_default?: boolean;
-    config?: Record<string, unknown>;
-    connection_state?: string;
-    ready?: boolean;
-    block_reason?: string | null;
 }
 
 function expressState(endpoint: ErpEndpoint): string {
@@ -58,13 +61,17 @@ async function probeEndpoint(endpoint: ErpEndpoint, refresh: boolean): Promise<E
             `/api/erp/endpoints/${encodeURIComponent(String(endpoint.id))}/test-connection${suffix}`,
             { method: 'POST', headers: authHeaders() }
         );
-        const result = (await response.json().catch(() => ({}))) as { ok?: boolean };
+        const result = (await response.json().catch(() => ({}))) as {
+            ok?: boolean;
+            companies?: Array<Record<string, unknown>>;
+        };
         const ready = response.ok && result.ok === true;
         return {
             ...endpoint,
             ready,
             connection_state: ready ? 'online' : 'offline',
             block_reason: ready ? null : 'erp_connection_failed',
+            probe_companies: result.companies || [],
         };
     } catch {
         return {
@@ -77,14 +84,21 @@ async function probeEndpoint(endpoint: ErpEndpoint, refresh: boolean): Promise<E
 }
 
 // 拉取并检测全部 ERP 端点。不可用端点保留给界面说明原因，但不能被选择或推送。
-export async function fetchErpEndpoints(refresh = false): Promise<ErpEndpoint[]> {
+export async function fetchErpEndpoints(
+    refresh = false,
+    previous: ErpEndpoint[] = []
+): Promise<ErpEndpoint[]> {
     try {
         const r = await fetch('/api/erp/endpoints', { headers: authHeaders() });
         const d = (await r.json().catch(() => ({}))) as { items?: ErpEndpoint[] };
         const endpoints = (d.items || []).filter(
             (e) => (e.adapter || '').toLowerCase() !== 'mrerp_dms'
         );
-        return await Promise.all(endpoints.map((endpoint) => probeEndpoint(endpoint, refresh)));
+        const probed = await Promise.all(
+            endpoints.map((endpoint) => probeEndpoint(endpoint, refresh))
+        );
+        const enriched = await Promise.all(probed.map(enrichEndpointAccountChoices));
+        return enriched.map((endpoint) => preserveAccountSelection(endpoint, previous));
     } catch {
         return [];
     }
@@ -130,11 +144,29 @@ export function erpTargetCardsHtml(
             const lg = (e.adapter || '').slice(0, 2).toUpperCase();
             const meta = (e.is_default ? t('dxi-erp-default') + ' · ' : '') + endpointStateLabel(e);
             const attr = e.ready === true ? ` ${targetAttribute}="${esc(String(e.id))}"` : '';
+            const accountSelect =
+                on && e.account_choices?.length
+                    ? `<div class="dx-erp-account"><label>${esc(t('exp-step-3'))}</label>` +
+                      `<select data-erp-account-select="${esc(String(e.id))}">` +
+                      e.account_choices
+                          .map(
+                              (choice) =>
+                                  `<option value="${esc(choice.key)}"${
+                                      accountKey(e, choice.key) ===
+                                      accountKey(e, e.selected_account_key)
+                                          ? ' selected'
+                                          : ''
+                                  }>${esc(accountChoiceLabel(choice))}</option>`
+                          )
+                          .join('') +
+                      '</select></div>'
+                    : '';
             return (
                 `<div class="dx-erp${on}${blocked}"${attr}>` +
                 `<div class="dx-erp-lg">${esc(lg)}</div>` +
                 `<div class="dx-erp-c"><b>${esc(e.name || e.adapter || 'ERP')}</b>` +
-                `<span>${esc(meta)}</span></div><div class="dx-erp-chk" aria-hidden="true"></div></div>`
+                `<span>${esc(meta)}</span></div><div class="dx-erp-chk" aria-hidden="true"></div></div>` +
+                accountSelect
             );
         })
         .join('');
@@ -200,7 +232,8 @@ export function pushToastKind(state: PushOutcome): 'success' | 'info' | 'warn' |
 export async function pushHistory(
     historyId: string,
     target: string,
-    postingKind?: string
+    postingKind?: string,
+    accountSetKey?: string
 ): Promise<PushOutcome> {
     try {
         if (!(await ensureErpTargetReady(target))) return 'needs_action';
@@ -210,6 +243,7 @@ export async function pushHistory(
         };
         if (target) body.endpoint_id = target;
         if (postingKind) body.posting_kind = postingKind;
+        if (accountSetKey) body.account_set_key = accountSetKey;
         const r = await fetch('/api/erp/push', {
             method: 'POST',
             headers: authHeaders(true),

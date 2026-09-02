@@ -32,6 +32,7 @@ async def dispatch_confirmed_history(
     request: Optional[Request] = None,
     workspace_client_id: Optional[int] = None,
     account_config: Optional[dict[str, Any]] = None,
+    account_set_key: Optional[str] = None,
 ) -> dict[str, Any]:
     """Reuse the web push path from LINE without exposing endpoint selection."""
     assigned_endpoint = team_access.assigned_endpoint_for_request(user, endpoint_id)
@@ -56,6 +57,8 @@ async def dispatch_confirmed_history(
             history_id=history_id,
             endpoint_id=effective_endpoint_id,
             posting_kind=posting_kind,
+            account_set_key=account_set_key,
+            account_config=account_config,
         )
     else:
         managed = await asyncio.to_thread(
@@ -65,6 +68,8 @@ async def dispatch_confirmed_history(
             endpoint_id=effective_endpoint_id,
             requested_workspace_id=workspace_client_id,
             posting_kind=posting_kind,
+            account_set_key=account_set_key,
+            account_config=account_config,
         )
     if managed is not None:
         return managed
@@ -91,8 +96,17 @@ async def dispatch_confirmed_history(
         raise HTTPException(400, detail="erp.endpoint_disabled")
 
     from services.erp.line_target_choice import endpoint_with_account_choice
+    from services.erp.selected_account import resolve_account_choice
 
-    endpoint = endpoint_with_account_choice(endpoint, account_config)
+    if account_set_key or account_config:
+        selected_choice = resolve_account_choice(
+            endpoint,
+            tenant_id=str(_tid(user)),
+            user_id=str(user["id"]),
+            account_set_key=account_set_key,
+            trusted_account_config=account_config,
+        )
+        endpoint = endpoint_with_account_choice(endpoint, selected_choice)
     endpoint_config = endpoint.get("config") or {}
     if str(endpoint.get("adapter") or "").lower() == "mrerp":
         selected_account = (

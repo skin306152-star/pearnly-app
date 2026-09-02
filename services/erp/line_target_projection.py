@@ -179,6 +179,14 @@ def _legacy_account_choices(
     return []
 
 
+def account_choices_for_endpoint(
+    endpoint: dict[str, Any], probe: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
+    """Return the canonical selectable accounts for one ERP connection."""
+    adapter = str(endpoint.get("adapter") or "").strip().lower()
+    return _legacy_account_choices(endpoint, adapter, probe)
+
+
 def _legacy_account_label(
     endpoint: dict[str, Any], adapter: str, choices: list[dict[str, Any]]
 ) -> str:
@@ -422,6 +430,7 @@ def active_push_state(cur, endpoint_id: str) -> tuple[bool, bool]:
 
 
 __all__ = [
+    "account_choices_for_endpoint",
     "active_push_state",
     "legacy_target",
     "managed_target",

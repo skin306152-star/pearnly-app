@@ -85,8 +85,8 @@ def test_erp_target_detection_runs_before_ocr_and_before_push():
     assert "await ensureErpTargetReady(target)" in push
     assert "await preflightInvoiceErp(IV)" in invoice
     assert "state.endpoints = await fetchErpEndpoints(true)" in invoice_erp
-    assert "await fetchErpEndpoints(true)" in submit
-    assert "await fetchErpEndpoints(true)" in batch
+    assert "await fetchErpEndpoints(true" in submit
+    assert "await fetchErpEndpoints(true" in batch
     assert ".filter((e) => e.enabled !== false)" not in submit
 
 

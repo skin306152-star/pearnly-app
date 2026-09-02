@@ -17,6 +17,8 @@ import logging
 import secrets
 from typing import Any, Dict, List, Optional
 
+from services.erp.express_push.agent_lease_store import lease_pending_rows
+
 logger = logging.getLogger(__name__)
 
 _LEASE_SECONDS = 120
@@ -201,7 +203,12 @@ def close_unacked_confirmed(cur, endpoint_id: str) -> int:
     return len(swept)
 
 
-def lease_pending(endpoint_id: str, owner: str, max_n: int) -> List[Dict[str, Any]]:
+def lease_pending(
+    endpoint_id: str,
+    owner: str,
+    max_n: int,
+    account_sets: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
     """领取该 endpoint 未被有效租约占用的 pending 日志(原子置租约)· 返回载荷列表。
 
     SKIP LOCKED + 租约到期可重领:Agent 崩溃后队列不卡死。owner 标识领取者。
@@ -230,30 +237,15 @@ def lease_pending(endpoint_id: str, owner: str, max_n: int) -> List[Dict[str, An
             lock_endpoint_binding(cur, endpoint_id)
             if not lock_legacy_endpoint(cur, endpoint_id):
                 return []
-            cur.execute(
-                f"""
-                WITH due AS (
-                    SELECT id FROM erp_push_logs
-                    WHERE endpoint_id = %s AND status = 'pending'
-                      AND (lease_owner IS NULL
-                           OR (NOT ({_CONFIRMED})
-                               AND (lease_expires_at IS NULL
-                                    OR lease_expires_at < NOW())))
-                    ORDER BY created_at ASC
-                    LIMIT %s
-                    FOR UPDATE SKIP LOCKED
-                )
-                UPDATE erp_push_logs l
-                SET lease_owner = %s,
-                    lease_expires_at = NOW() + (%s * INTERVAL '1 second')
-                FROM due
-                WHERE l.id = due.id
-                RETURNING l.id, l.history_id, l.invoice_no, l.request_body,
-                          l.lease_expires_at
-                """,
-                (endpoint_id, n, owner, _LEASE_SECONDS),
+            rows = lease_pending_rows(
+                cur,
+                endpoint_id=endpoint_id,
+                owner=owner,
+                max_n=n,
+                account_sets=account_sets,
+                confirmed_predicate=_CONFIRMED,
+                lease_seconds=_LEASE_SECONDS,
             )
-            rows = cur.fetchall() or []
             return [dict(r) for r in rows]
     except Exception as e:
         logger.error(f"lease_pending failed: {e}")

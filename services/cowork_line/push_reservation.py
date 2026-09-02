@@ -15,6 +15,7 @@ from services.cowork_line.push_recovery import (
     settle_stale_legacy,
 )
 from services.cowork_line.push_dedup import prior_success as _prior_success
+from services.cowork_line.push_history import staged_history as _staged_history
 from services.erp.express_push.enqueue import QUEUED_SENTINEL, enqueue_express
 from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
@@ -28,7 +29,8 @@ from services.erp.shared_express_push import (
     _queued_response,
 )
 from services.erp.shared_express_schema import enable_shared_express_select
-from services.ocr_history.queries import _DETAIL_COLUMNS, _detail_row
+from services.erp.line_target_choice import endpoint_with_account_choice
+from services.erp.selected_account import resolve_endpoint_account
 
 _ACCEPTED_STATUSES = {"success", "pending", "retrying", "skipped_dup"}
 
@@ -140,25 +142,14 @@ def confirmed_batch_result(
     return results
 
 
-def _staged_history(cur, history_id: str, tenant_id: str, actor_id: str, workspace_id: int):
-    cur.execute(
-        f"SELECT {_DETAIL_COLUMNS} FROM ocr_history "
-        "WHERE id = %s AND tenant_id = %s AND user_id = %s "
-        "AND workspace_client_id = %s AND staged = TRUE FOR UPDATE",
-        (history_id, tenant_id, actor_id, workspace_id),
-    )
-    row = cur.fetchone()
-    if not row:
-        raise HTTPException(409, detail="cowork_line_intake.draft_changed")
-    return _detail_row(row)
-
-
 def reserve_managed_batch(
     identity: dict[str, Any],
     history_ids: list[str],
     target: dict[str, Any],
     *,
     posting_kind: str | None,
+    account_set_key: str | None = None,
+    account_config: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Confirm all staged rows and enqueue all Express intents in one transaction."""
     tenant_id, actor_id = _identity(identity)
@@ -200,9 +191,16 @@ def reserve_managed_batch(
             tenant_id=tenant_id,
             workspace_client_id=workspace_id,
         )
+        endpoint, selected_account = resolve_endpoint_account(
+            endpoint,
+            tenant_id=tenant_id,
+            user_id=actor_id,
+            account_set_key=account_set_key,
+            trusted_account_config=account_config,
+            cur=cur,
+        )
         endpoint_for_payload = dict(endpoint)
         config = dict(endpoint.get("config") or {})
-        config["account_set"] = endpoint["bound_account_set"]
         endpoint_for_payload.update({"config": config, "user_id": actor_id})
 
         for history_id in ids:
@@ -221,6 +219,7 @@ def reserve_managed_batch(
                 workspace_client_id=workspace_id,
                 endpoint_id=managed_id,
                 history_id=history_id,
+                account_set=selected_account,
             )
             if success:
                 item = {
@@ -412,8 +411,6 @@ def reserve_legacy_batch(
                     "dispatch": status == "retrying",
                 }
             )
-    from services.erp.line_target_choice import endpoint_with_account_choice
-
     return (
         endpoint_with_account_choice(dict(endpoint), (selection or {}).get("account_config")),
         intents,

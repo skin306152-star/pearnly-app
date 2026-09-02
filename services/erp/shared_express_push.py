@@ -16,6 +16,8 @@ from services.erp.legacy_generation import lock_endpoint_binding
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 from services.erp.shared_express_live import _profile_is_fresh
 from services.erp.shared_express_schema import enable_shared_express_select
+from services.erp.line_target_choice import endpoint_with_account_choice
+from services.erp.selected_account import resolve_account_choice
 from services.ocr_history.queries import _DETAIL_COLUMNS, _detail_row
 
 _WEB_ENTRIES = frozenset({"main", "cowork", "erp"})
@@ -204,13 +206,23 @@ def _confirmed_direction(
 
 
 def _existing_log(
-    cur, *, tenant_id: str, workspace_client_id: int, endpoint_id: str, history_id: str
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    endpoint_id: str,
+    history_id: str,
+    account_set: str,
 ) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     scope = "tenant_id = %s AND workspace_client_id = %s AND endpoint_id = %s AND history_id = %s"
-    params = (tenant_id, workspace_client_id, endpoint_id, history_id)
+    account_scope = (
+        "lower(btrim(COALESCE(request_body->>'account_set', "
+        "request_body->'meta'->>'account_set', ''))) = %s"
+    )
+    params = (tenant_id, workspace_client_id, endpoint_id, history_id, account_set.casefold())
     cur.execute(
         "SELECT id::text AS id,status,http_status,response_body,created_at "
-        f"FROM erp_push_logs WHERE {scope} "
+        f"FROM erp_push_logs WHERE {scope} AND {account_scope} "
         "AND (status IN ('pending','retrying') OR lease_owner IS NOT NULL) "
         "ORDER BY created_at DESC,id DESC LIMIT 1",
         params,
@@ -218,7 +230,7 @@ def _existing_log(
     active = _row_dict(cur.fetchone()) or None
     cur.execute(
         "SELECT id::text AS id,status,http_status,response_body,created_at "
-        f"FROM erp_push_logs WHERE {scope} AND status = 'success' "
+        f"FROM erp_push_logs WHERE {scope} AND {account_scope} AND status = 'success' "
         "ORDER BY created_at DESC,id DESC LIMIT 1",
         params,
     )
@@ -246,6 +258,8 @@ def reserve_managed_manual_push(
     endpoint_id: Optional[str],
     requested_workspace_id: Optional[int],
     posting_kind: Optional[str],
+    account_set_key: Optional[str] = None,
+    account_config: Optional[dict[str, Any]] = None,
 ) -> Optional[dict]:
     tenant_id = str(user.get("tenant_id") or "").strip()
     actor_id = str(user.get("id") or "").strip()
@@ -295,6 +309,22 @@ def reserve_managed_manual_push(
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
         )
+        selected_choice = resolve_account_choice(
+            endpoint,
+            tenant_id=tenant_id,
+            user_id=actor_id,
+            account_set_key=account_set_key,
+            trusted_account_config=account_config,
+            cur=cur,
+        )
+        endpoint = endpoint_with_account_choice(endpoint, selected_choice)
+        selected_account = str(
+            (endpoint.get("config") or {}).get("account_set")
+            or (endpoint.get("config") or {}).get("account_dir")
+            or ""
+        ).strip()
+        if not selected_account:
+            raise HTTPException(409, detail="erp.account_set_unavailable")
         history = _locked_history(
             cur,
             history_id=history_id,
@@ -320,6 +350,7 @@ def reserve_managed_manual_push(
             workspace_client_id=workspace_client_id,
             endpoint_id=managed_endpoint_id,
             history_id=history_id,
+            account_set=selected_account,
         )
         if success:
             return {
@@ -339,7 +370,6 @@ def reserve_managed_manual_push(
 
         endpoint_for_payload = dict(endpoint)
         config = dict(endpoint.get("config") or {})
-        config["account_set"] = endpoint["bound_account_set"]
         endpoint_for_payload.update({"config": config, "user_id": actor_id})
         result = enqueue_express(endpoint_for_payload, history, posting_kind=posting_kind)
         payload = result.get("request_body")
@@ -401,6 +431,8 @@ async def maybe_reserve_manual_push(
     history_id: str,
     endpoint_id: Optional[str],
     posting_kind: Optional[str],
+    account_set_key: Optional[str] = None,
+    account_config: Optional[dict[str, Any]] = None,
 ) -> Optional[dict]:
     raw_workspace = request.headers.get("X-Workspace-Client-Id")
 
@@ -415,6 +447,8 @@ async def maybe_reserve_manual_push(
             endpoint_id=endpoint_id,
             requested_workspace_id=requested_workspace_id,
             posting_kind=posting_kind,
+            account_set_key=account_set_key,
+            account_config=account_config,
         )
 
     return await asyncio.to_thread(run)

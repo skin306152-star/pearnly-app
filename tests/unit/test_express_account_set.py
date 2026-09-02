@@ -34,6 +34,35 @@ class PerEndpointWhitelist(unittest.TestCase):
     def test_whitespace_normalized(self):
         self.assertTrue(account_set_allowed("58ASIASP", _ep(" 58ASIASP ")))
 
+    def test_reported_writable_account_requires_its_reported_root(self):
+        ep = _ep(r"S:\\69EXP\\MAIN")
+        ep["config"]["reported_account_sets"] = [
+            {
+                "path": r"S:\\68EXP\\BRANCH",
+                "root": r"S:\\68EXP",
+                "writable": True,
+            }
+        ]
+        self.assertTrue(
+            account_set_allowed(
+                r"s:/68exp/branch/",
+                ep,
+                r"s:/68exp/",
+            )
+        )
+        self.assertFalse(account_set_allowed(r"S:\\68EXP\\BRANCH", ep, r"D:\\OTHER"))
+
+    def test_unwritable_reported_account_is_rejected(self):
+        ep = _ep(r"S:\\69EXP\\MAIN")
+        ep["config"]["reported_account_sets"] = [
+            {
+                "path": r"S:\\68EXP\\LOCKED",
+                "root": r"S:\\68EXP",
+                "writable": False,
+            }
+        ]
+        self.assertFalse(account_set_allowed(r"S:\\68EXP\\LOCKED", ep, r"S:\\68EXP"))
+
 
 class EnqueueGate(unittest.TestCase):
     def test_endpoint_without_account_set_goes_manual(self):

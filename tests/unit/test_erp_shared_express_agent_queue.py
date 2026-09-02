@@ -132,9 +132,10 @@ class AgentRouteEventLoopTests(unittest.TestCase):
                 _assert_worker_thread(self, event_thread)
                 return endpoint
 
-            def lease(endpoint_id, owner, max_n):
+            def lease(endpoint_id, owner, max_n, account_sets):
                 _assert_worker_thread(self, event_thread)
                 self.assertEqual((endpoint_id, owner, max_n), (ENDPOINT, "default", 1))
+                self.assertEqual(account_sets, ["datat"])
                 return [row]
 
             with (

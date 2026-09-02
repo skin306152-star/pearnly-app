@@ -27,7 +27,7 @@ import {
     onBatchDrop,
 } from './dms-intake-batch.js';
 import { onBatchReviewClick, rerenderBatchReview } from './dms-intake-batch-review.js';
-import { onBatchSubmitClick } from './dms-intake-batch-submit.js';
+import { onBatchSubmitChange, onBatchSubmitClick } from './dms-intake-batch-submit.js';
 import { isErpEntry } from './erp-intake.js';
 
 // ── 导航 / 重置 ──────────────────────────────────────────────
@@ -82,7 +82,10 @@ function bind() {
 
     el.addEventListener('change', (ev) => {
         const tg = ev.target as HTMLElement;
-        if (S.task === 'summary_batch') return onBatchChange(tg);
+        if (S.task === 'summary_batch') {
+            if (onBatchSubmitChange(tg)) return;
+            return onBatchChange(tg);
+        }
         onInvoiceChange(tg);
     });
 

@@ -11,6 +11,8 @@ import {
     erpTargetCardsHtml,
     isErpTargetReady,
     pushHistory,
+    selectedAccountKey,
+    selectErpAccount,
     type ErpEndpoint,
 } from './dms-intake-erp-push.js';
 import { focusDxErpCards } from './dms-intake-erp-cards.js';
@@ -203,7 +205,7 @@ export async function enterBatchSubmit() {
         _pushed = null;
         _pushing = false;
         // 有可建行才拉端点(空批省一次请求)。目标保留上次选择(仍启用则不变)。
-        _endpoints = createdIds().length ? await fetchErpEndpoints() : [];
+        _endpoints = createdIds().length ? await fetchErpEndpoints(false, _endpoints) : [];
         _target = pickDefaultTarget(_endpoints, _target);
         B.view = 'submit';
         render();
@@ -219,7 +221,7 @@ export async function enterBatchSubmit() {
 async function doPush(): Promise<void> {
     const ids = createdIds();
     if (_pushing || !ids.length || !_target) return;
-    _endpoints = await fetchErpEndpoints(true);
+    _endpoints = await fetchErpEndpoints(true, _endpoints);
     if (!isErpTargetReady(_endpoints, _target)) {
         _target = pickDefaultTarget(_endpoints, _target);
         render();
@@ -232,7 +234,12 @@ async function doPush(): Promise<void> {
     let pending = 0;
     let fail = 0;
     for (const id of ids) {
-        const outcome = await pushHistory(id, _target);
+        const outcome = await pushHistory(
+            id,
+            _target,
+            undefined,
+            selectedAccountKey(_endpoints, _target)
+        );
         if (outcome === 'success') ok++;
         else if (outcome === 'waiting') pending++;
         else fail++;
@@ -268,4 +275,11 @@ export function onBatchSubmitClick(tg: HTMLElement): boolean {
     }
     // dxb-restart 由 dms-intake 的 resetFlow 收口(在本处理器之前拦截)。
     return false;
+}
+
+export function onBatchSubmitChange(tg: HTMLElement): boolean {
+    const endpointId = tg.getAttribute('data-erp-account-select');
+    if (!endpointId) return false;
+    if (selectErpAccount(_endpoints, endpointId, (tg as HTMLSelectElement).value)) render();
+    return true;
 }

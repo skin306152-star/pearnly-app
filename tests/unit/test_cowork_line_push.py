@@ -134,15 +134,28 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
                 "accepted": True,
             }
         ]
+        selection = {
+            "posting_kind": "stock",
+            "account_set": r"S:\\70EXP\\TEST2020",
+            "account_config": {
+                "account_set": r"S:\\70EXP\\TEST2020",
+                "root_key": r"S:\\70EXP",
+            },
+        }
         with mock.patch.object(push, "reserve_managed_batch", return_value=queued) as reserve:
-            result = await push.dispatch_confirmed(
-                IDENTITY, ["history-1"], target, {"posting_kind": "stock"}
-            )
+            result = await push.dispatch_confirmed(IDENTITY, ["history-1"], target, selection)
 
         self.assertTrue(result["push_ok"])
         self.assertEqual(result["committed"], 1)
         self.assertEqual(result["results"][0]["log_id"], "log-express")
-        reserve.assert_called_once_with(IDENTITY, ["history-1"], target, posting_kind="stock")
+        reserve.assert_called_once_with(
+            IDENTITY,
+            ["history-1"],
+            target,
+            posting_kind="stock",
+            account_set_key=selection["account_set"],
+            account_config=selection["account_config"],
+        )
 
     async def test_legacy_reserves_intent_before_external_push_and_finalizes_same_log(self):
         target = {

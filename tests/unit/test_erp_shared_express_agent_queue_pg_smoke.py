@@ -12,6 +12,7 @@ from unittest import mock
 from psycopg2.extras import RealDictCursor
 
 from services.erp import shared_express_agent_queue as queue
+from services.erp import target_projection_store
 from tests.unit._pg_smoke import connect_or_skip, require_disposable_db
 
 TENANT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -24,6 +25,10 @@ HISTORY = "55555555-5555-4555-8555-555555555555"
 LOG = "66666666-6666-4666-8666-666666666666"
 OTHER_HISTORY = "77777777-7777-4777-8777-777777777777"
 OTHER_LOG = "88888888-8888-4888-8888-888888888888"
+SECOND_HISTORY = "99999999-9999-4999-8999-999999999999"
+SECOND_LOG = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+SNAPSHOT = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+OTHER_SNAPSHOT = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
 TOKEN = f"exp_{ENDPOINT}_CompanionSecret_123"
 OTHER_TOKEN = f"exp_{OTHER_ENDPOINT}_CompanionSecret_456"
 
@@ -67,6 +72,20 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
               started_at timestamptz, lease_owner text, lease_expires_at timestamptz,
               updated_at timestamptz not null default now()
             );
+            CREATE TABLE erp_target_projection_snapshots (
+              id uuid primary key, source_hash text not null, observed_at timestamptz not null,
+              adapter text not null, collector jsonb not null, account_sets jsonb not null,
+              form_schema jsonb not null, capabilities jsonb not null, entity_counts jsonb not null
+            );
+            CREATE TABLE erp_target_projection_heads (
+              tenant_id uuid not null, endpoint_id uuid not null, scope_kind text not null,
+              scope_key text not null, current_snapshot_id uuid, current_revision bigint not null,
+              account_sets_revision bigint not null, master_revision bigint not null,
+              form_schema_revision bigint not null, capability_revision bigint not null,
+              last_refresh_status text not null, last_refresh_error_code text,
+              last_refresh_source jsonb not null, last_refresh_attempted_at timestamptz,
+              last_observed_at timestamptz, updated_at timestamptz not null default now()
+            );
             """)
         cls.conn.commit()
 
@@ -85,7 +104,8 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
     def setUp(self):
         self.cur.execute(f'SET search_path TO "{self.schema}", public')
         self.cur.execute(
-            "TRUNCATE erp_target_refresh_requests, erp_push_logs, ocr_history, "
+            "TRUNCATE erp_target_projection_heads, erp_target_projection_snapshots, "
+            "erp_target_refresh_requests, erp_push_logs, ocr_history, "
             "erp_endpoints, workspace_clients, tenants"
         )
         self.cur.execute("INSERT INTO tenants VALUES (%s, 'active')", (TENANT,))
@@ -119,6 +139,32 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
                       'datat','v1:key','datat','v1:key',clock_timestamp(),NULL)
             """,
             endpoint_rows,
+        )
+        account_sets = json.dumps(
+            [
+                {
+                    "source_id": "datat",
+                    "label": "DATAT",
+                    "active": True,
+                    "attributes": {"path": "DATAT", "writable": True},
+                }
+            ]
+        )
+        snapshot_rows = ((SNAPSHOT, account_sets), (OTHER_SNAPSHOT, account_sets))
+        self.cur.executemany(
+            "INSERT INTO erp_target_projection_snapshots "
+            "(id,source_hash,observed_at,adapter,collector,account_sets,form_schema,capabilities,entity_counts) "
+            "VALUES (%s,'hash',clock_timestamp(),'express','{}',%s::jsonb,'{}','{}','{}')",
+            snapshot_rows,
+        )
+        self.cur.executemany(
+            "INSERT INTO erp_target_projection_heads "
+            "(tenant_id,endpoint_id,scope_kind,scope_key,current_snapshot_id,current_revision,"
+            "account_sets_revision,master_revision,form_schema_revision,capability_revision,"
+            "last_refresh_status,last_refresh_source,last_refresh_attempted_at,last_observed_at) "
+            "VALUES (%s,%s,'endpoint','@endpoint',%s,1,1,1,1,1,'fresh','{}',"
+            "clock_timestamp(),clock_timestamp())",
+            ((TENANT, ENDPOINT, SNAPSHOT), (TENANT, OTHER_ENDPOINT, OTHER_SNAPSHOT)),
         )
         self.cur.execute("INSERT INTO ocr_history VALUES (%s, 'pending', NULL)", (HISTORY,))
         self.cur.execute(
@@ -325,6 +371,75 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
             [row["last_push_status"] for row in self.cur.fetchall()],
             ["success", "success"],
         )
+
+    def test_lease_accepts_another_writable_projected_account(self):
+        account_set = r"S:\70EXP\TEST2020"
+        self.cur.execute(
+            "UPDATE erp_target_projection_snapshots SET account_sets=%s::jsonb WHERE id=%s",
+            (
+                json.dumps(
+                    [
+                        {
+                            "source_id": "datat",
+                            "label": "DATAT",
+                            "active": True,
+                            "attributes": {"path": "DATAT", "writable": True},
+                        },
+                        {
+                            "source_id": account_set.lower(),
+                            "label": "TEST2020",
+                            "active": True,
+                            "attributes": {"path": account_set, "writable": True},
+                        },
+                    ]
+                ),
+                SNAPSHOT,
+            ),
+        )
+        self.cur.execute("INSERT INTO ocr_history VALUES (%s, 'pending', NULL)", (SECOND_HISTORY,))
+        self.cur.execute(
+            "INSERT INTO erp_push_logs "
+            "(id,user_id,endpoint_id,history_id,invoice_no,status,request_body,attempt) "
+            "VALUES (%s,%s,%s,%s,'RR-2020','pending',%s::jsonb,1)",
+            (
+                SECOND_LOG,
+                OWNER,
+                ENDPOINT,
+                SECOND_HISTORY,
+                json.dumps({"account_set": account_set, "meta": {"managed_generation": 2}}),
+            ),
+        )
+        self.conn.commit()
+
+        with self._db_cursor() as cur:
+            state = target_projection_store.load_state_with_cursor(
+                cur, tenant_id=TENANT, endpoint_id=ENDPOINT
+            )
+        self.assertEqual(
+            [row["source_id"] for row in state["snapshot"]["account_sets"]],
+            ["datat", account_set.lower()],
+        )
+
+        original_allowed = queue.allowed_express_account_keys
+        observed_allowed = []
+
+        def capture_allowed(*args, **kwargs):
+            keys = original_allowed(*args, **kwargs)
+            observed_allowed.extend(keys)
+            return keys
+
+        with (
+            mock.patch.object(queue.db, "get_cursor", side_effect=self._db_cursor),
+            mock.patch.object(
+                queue, "erp_shared_express_endpoint_enabled_for", return_value=True
+            ) as enabled,
+            mock.patch.object(queue, "allowed_express_account_keys", side_effect=capture_allowed),
+        ):
+            result = queue.lease_managed(TOKEN, "comp-a", 5)
+
+        enabled.assert_called_once_with(TENANT)
+        self.assertIn(account_set.lower(), observed_allowed)
+        self.assertEqual({job["invoice_no"] for job in result["jobs"]}, {"RR-1", "RR-2020"})
 
 
 if __name__ == "__main__":

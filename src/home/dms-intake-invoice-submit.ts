@@ -14,6 +14,8 @@ import {
     isErpTargetReady,
     pickDefaultTarget,
     pushHistory,
+    selectedAccountKey,
+    selectedAccountLabel,
 } from './dms-intake-erp-push.js';
 import { renderReview } from './dms-intake-review.js';
 import { postingPreviewContainer, refreshPostingPreview } from './dms-intake-posting-preview.js';
@@ -53,12 +55,14 @@ function returnToReviewForConfirmation(): void {
     showToast(t('dxi-erp-confirm-required'), 'error');
 }
 async function loadEndpoints() {
-    IV.endpoints = (await fetchErpEndpoints()) as Endpoint[];
+    IV.endpoints = (await fetchErpEndpoints(false, IV.endpoints)) as Endpoint[];
     IV.target = pickDefaultTarget(IV.endpoints, IV.target);
 }
 function targetName(): string {
     const e = IV.endpoints.find((x) => String(x.id) === IV.target);
-    return e ? e.name || e.adapter || 'ERP' : t('dxi-target-export-only');
+    if (!e) return t('dxi-target-export-only');
+    const account = selectedAccountLabel(IV.endpoints, IV.target);
+    return [e.name || e.adapter || 'ERP', account].filter(Boolean).join(' · ');
 }
 function totalInvoices(): number {
     return IV.results.reduce((n, r) => n + (r.invoice_count || 1), 0);
@@ -164,7 +168,7 @@ export async function doFinish() {
     if (!(await ensureErpFormalConfirmation())) return;
     // 空选合法(= 仅完成入库);只在选了推送但无可用端点时拦。
     if (IV.output.erp) {
-        IV.endpoints = (await fetchErpEndpoints(true)) as Endpoint[];
+        IV.endpoints = (await fetchErpEndpoints(true, IV.endpoints)) as Endpoint[];
         if (!isErpTargetReady(IV.endpoints, IV.target)) {
             showToast(t('dxi-need-erp'), 'warn');
             renderSubmit();
@@ -318,7 +322,12 @@ async function doExport(): Promise<boolean> {
     }
 }
 async function pushOne(historyId: string): Promise<import('./dms-intake-erp-push.js').PushOutcome> {
-    return pushHistory(historyId, IV.target, IV.postingKind);
+    return pushHistory(
+        historyId,
+        IV.target,
+        IV.postingKind,
+        selectedAccountKey(IV.endpoints, IV.target)
+    );
 }
 function downloadBlob(blob: Blob, name: string) {
     const url = URL.createObjectURL(blob);

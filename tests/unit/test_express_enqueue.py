@@ -101,6 +101,24 @@ class EnqueueTests(unittest.TestCase):
         self.assertEqual(r["request_body"]["account_set"], "DATAT")
         self.assertEqual(r["request_body"]["total_amount"], "401621.50")
 
+    def test_reported_second_year_is_queued_with_its_physical_root(self):
+        account = r"S:\68EXP\TEST2020"
+        root = r"S:\68EXP"
+        endpoint = _endpoint(
+            config={
+                "account_set": account,
+                "account_dir": account,
+                "express_root": root,
+                "reported_account_sets": [{"path": account, "root": root, "writable": True}],
+            }
+        )
+
+        result = enqueue_express(endpoint, _history())
+
+        self.assertEqual(result["error_msg"], "EXPRESS_QUEUED")
+        self.assertEqual(result["request_body"]["account_set"], account)
+        self.assertEqual(result["request_body"]["account_root"], root)
+
     def test_low_confidence_manual(self):
         r = enqueue_express(_endpoint(), _history(confidence="low"))
         self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))

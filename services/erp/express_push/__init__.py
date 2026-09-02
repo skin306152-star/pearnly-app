@@ -14,6 +14,7 @@ Agent 出站拉取(lease)、录入 Express、回报(ack)。
 特性开关 ERP_PUSH_ENABLED(默认 off);账套白名单 = 逐端点匹配建连接时配置的 account_set。
 """
 
+import ntpath
 import os
 from typing import Any, Dict, Optional
 
@@ -23,17 +24,44 @@ def express_push_enabled() -> bool:
     return (os.environ.get("ERP_PUSH_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def account_set_allowed(account_set: str, endpoint: Dict[str, Any]) -> bool:
-    """账套白名单(逐端点)· 只放行 == 本端点配置(建连接时客户选定)的 account_set。
+def _path(value: object) -> str:
+    raw = str(value or "").strip().replace("/", "\\").rstrip("\\")
+    return ntpath.normcase(ntpath.normpath(raw)) if raw else ""
 
-    `endpoint.config.account_set` 即该连接被授权写入的唯一账套 —— 跨账套写入是账务事故,
-    故只认配置那一个。不等 / 任一缺失 → 拒(fail-safe)。
-    """
-    s = (account_set or "").strip()
-    if not s:
+
+def authorized_account_sets(endpoint: Dict[str, Any]) -> list[str]:
+    """Return the endpoint default plus writable account sets reported by its agent."""
+    config = (endpoint or {}).get("config") or {}
+    allowed = {_path(config.get("account_set") or config.get("account_dir"))}
+    reported = config.get("reported_account_sets")
+    for row in reported if isinstance(reported, list) else []:
+        if not isinstance(row, dict) or row.get("writable") is not True:
+            continue
+        allowed.add(_path(row.get("path")))
+    allowed.discard("")
+    return sorted(allowed)
+
+
+def account_set_allowed(
+    account_set: str, endpoint: Dict[str, Any], account_root: object = None
+) -> bool:
+    """Allow only a writable account path reported by this exact Express connection."""
+    selected = _path(account_set)
+    if not selected or selected not in authorized_account_sets(endpoint):
         return False
-    configured = str(((endpoint or {}).get("config") or {}).get("account_set") or "").strip()
-    return bool(configured) and s == configured
+    config = (endpoint or {}).get("config") or {}
+    default = _path(config.get("account_set") or config.get("account_dir"))
+    if selected == default:
+        return True
+    requested_root = _path(account_root)
+    for row in config.get("reported_account_sets") or []:
+        if not isinstance(row, dict) or row.get("writable") is not True:
+            continue
+        if _path(row.get("path")) != selected:
+            continue
+        reported_root = _path(row.get("root")) or _path(ntpath.dirname(str(row.get("path") or "")))
+        return bool(requested_root and requested_root == reported_root)
+    return False
 
 
 def stock_lane_enabled(config: Dict[str, Any]) -> bool:

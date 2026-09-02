@@ -13,6 +13,7 @@ import {
     probeInvoiceErp,
 } from './dms-intake-invoice-erp.js';
 import { erpIntakeDirection, isErpEntry } from './erp-intake.js';
+import { selectErpAccount, type ErpEndpoint } from './dms-intake-erp-accounts.js';
 
 export type Dict = Record<string, unknown>;
 export interface IvFile {
@@ -41,16 +42,7 @@ export interface IvResult {
     needs_review: boolean; // 后端 missed_invoice_warnings 非空 = 可能漏票需人工核对
     from_cache: boolean;
 }
-export interface Endpoint {
-    id?: string | number;
-    adapter?: string;
-    name?: string;
-    enabled?: boolean;
-    is_default?: boolean;
-    connection_state?: string;
-    ready?: boolean;
-    block_reason?: string | null;
-}
+export type Endpoint = ErpEndpoint;
 
 export const IV = {
     files: [] as IvFile[],
@@ -464,6 +456,13 @@ export function onInvoiceChange(tg: HTMLElement): boolean {
     }
     if (id === 'dx-inv-tpl') {
         IV.tpl = (tg as HTMLSelectElement).value;
+        return true;
+    }
+    const endpointId = tg.getAttribute('data-erp-account-select');
+    if (endpointId) {
+        if (selectErpAccount(IV.endpoints, endpointId, (tg as HTMLSelectElement).value)) {
+            renderSubmit();
+        }
         return true;
     }
     // 复核字段编辑:data-iv-field="fileIdx:invIdx:key"

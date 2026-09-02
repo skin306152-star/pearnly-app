@@ -26,6 +26,9 @@ class ErpPushRequest(BaseModel):
     history_id: str
     endpoint_id: Optional[str] = Field(None, description="不传则用默认端点")
     posting_kind: Optional[str] = Field(None, description="stock | service · Express 库存过账开关")
+    account_set_key: Optional[str] = Field(
+        None, max_length=500, description="最终选择的年度/账套键"
+    )
 
 
 @router.post("/api/erp/push")
@@ -40,6 +43,7 @@ async def erp_push(req: ErpPushRequest, request: Request):
         history_id=req.history_id,
         endpoint_id=req.endpoint_id,
         posting_kind=req.posting_kind,
+        account_set_key=req.account_set_key,
     )
 
 

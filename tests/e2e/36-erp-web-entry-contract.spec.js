@@ -134,6 +134,7 @@ async function boot(page, entry, state = {}) {
                 state.failSave || (state.failSaveAfterConfirm && state.historyPuts > 2) ? 500 : 200;
         } else if (pathname === '/api/ocr/commit' && req.method() === 'POST') {
             state.commits += 1;
+            body = { ok: true, committed: 1 };
         } else if (pathname === '/api/ocr/convert-documents') {
             state.converts += 1;
             body = {
@@ -240,6 +241,9 @@ async function boot(page, entry, state = {}) {
             body = saved;
         } else if (pathname === '/api/erp/endpoints') {
             body = { items: state.erpEndpoints || [] };
+        } else if (/^\/api\/erp\/endpoints\/[^/]+\/target-projection$/.test(pathname)) {
+            const endpointId = pathname.split('/')[4];
+            body = state.targetProjections?.[endpointId] || { ok: true, data: { snapshot: null } };
         } else if (pathname === '/api/erp/push') {
             state.erpPushes += 1;
             state.erpPushBodies.push(req.postDataJSON());
@@ -611,6 +615,85 @@ test('ERP finish save failure stays in review without commit or result success',
     expect(state.converts).toBe(1);
     await expect(page.locator('#dx-s-inv-review')).toHaveCount(1);
     await expect(page.locator('#dx-s-success.active')).toHaveCount(0);
+});
+
+test('ERP step four sends the final Express year and account selected by the user', async ({
+    page,
+}) => {
+    const endpoint = {
+        id: 'express-1',
+        name: 'Express',
+        adapter: 'express',
+        enabled: true,
+        is_default: true,
+        connection_state: 'online',
+        config: { account_set: 'S:\\69EXP\\TEST2019' },
+    };
+    const state = {
+        modules: { inventory: { enabled: true } },
+        erpEndpoints: [endpoint],
+        targetProjections: {
+            'express-1': {
+                ok: true,
+                data: {
+                    snapshot: {
+                        account_sets: [
+                            {
+                                source_id: 'S:\\69EXP\\TEST2019',
+                                label: 'TEST2019',
+                                attributes: {
+                                    path: 'S:\\69EXP\\TEST2019',
+                                    root: 'S:\\69EXP',
+                                    root_label: '69EXP',
+                                    writable: true,
+                                },
+                            },
+                            {
+                                source_id: 'S:\\70EXP\\TEST2020',
+                                label: 'TEST2020',
+                                attributes: {
+                                    path: 'S:\\70EXP\\TEST2020',
+                                    root: 'S:\\70EXP',
+                                    root_label: '70EXP',
+                                    writable: true,
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+        erpPushResponses: [{ ok: true, status: 'pending' }],
+    };
+    await boot(page, 'erp', state);
+    await page.evaluate(() => {
+        sessionStorage.setItem('pearnly_erp_intake_direction', 'purchase');
+        window.loadDmsIntake();
+        document.querySelectorAll('.page').forEach((node) => node.classList.remove('active'));
+        document.getElementById('page-dms-intake')?.classList.add('active');
+    });
+    await page.setInputFiles('#dx-inv-file', {
+        name: 'dynamic-target.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('invoice'),
+    });
+    await page.click('#dx-inv-start');
+    await page.waitForSelector('#dx-s-inv-review.active');
+    await page.locator('select.dx-item-type').selectOption('stock');
+    await page.click('.dx-confirm-one');
+    await expect.poll(() => state.converts).toBe(1);
+    await page.click('#dx-inv-rev-next');
+    await page.waitForSelector('#dx-s-inv-submit.active');
+    await page.click('[data-iv-out="erp"]');
+    const selector = page.locator('[data-erp-account-select="express-1"]');
+    await expect(selector).toBeVisible();
+    await expect(selector.locator('option')).toHaveCount(2);
+    await selector.selectOption('s:\\70exp\\test2020');
+    await expect(page.locator('.dx-scan')).toContainText('70EXP · TEST2020');
+    await page.click('#dx-inv-finish');
+
+    await expect.poll(() => state.erpPushBodies.length).toBe(1);
+    expect(state.erpPushBodies[0].account_set_key).toBe('s:\\70exp\\test2020');
 });
 
 test('ERP review save failure does not create a formal document', async ({ page }) => {

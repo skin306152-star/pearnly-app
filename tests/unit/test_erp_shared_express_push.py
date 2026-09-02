@@ -31,7 +31,11 @@ class SharedExpressPushRouteTests(unittest.IsolatedAsyncioTestCase):
             "http_status": 202,
         }
         request = _request()
-        req = routes.ErpPushRequest(history_id="history-1", endpoint_id="endpoint-1")
+        req = routes.ErpPushRequest(
+            history_id="history-1",
+            endpoint_id="endpoint-1",
+            account_set_key=r"S:\\68EXP\\BRANCH",
+        )
         with (
             patch.object(routes, "get_current_user_from_request", return_value=user),
             patch.object(routes, "require_erp_portal"),
@@ -46,6 +50,7 @@ class SharedExpressPushRouteTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, queued)
         reserve.assert_awaited_once()
+        self.assertEqual(reserve.call_args.kwargs["account_set_key"], r"S:\\68EXP\\BRANCH")
         outbound.assert_not_called()
 
     async def test_gen0_fallback_keeps_existing_route_result(self):

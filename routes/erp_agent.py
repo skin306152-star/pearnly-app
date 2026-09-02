@@ -23,7 +23,11 @@ from pydantic import BaseModel, Field
 from core.auth import get_current_user_from_request
 from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import require_erp_portal
-from services.erp.express_push import account_set_allowed, express_push_enabled
+from services.erp.express_push import (
+    account_set_allowed,
+    authorized_account_sets,
+    express_push_enabled,
+)
 from services.erp.express_push import agent_store
 from services.erp.express_push.connection_identity import (
     connection_identity as _connection_identity,
@@ -244,12 +248,13 @@ class LeaseRequest(BaseModel):
 def _legacy_agent_lease(ep: Dict[str, Any], owner: str, max_n: int) -> Dict[str, Any]:
     cfg = ep.get("config") or {}
     target_set = str(cfg.get("account_set") or "")
-    leased = agent_store.lease_pending(str(ep["id"]), owner, max_n)
+    allowed_sets = authorized_account_sets(ep)
+    leased = agent_store.lease_pending(str(ep["id"]), owner, max_n, allowed_sets)
     jobs: List[Dict[str, Any]] = []
     for row in leased:
         payload = row.get("request_body") or {}
         pset = str(payload.get("account_set") or "")
-        if not account_set_allowed(pset, ep):
+        if not account_set_allowed(pset, ep, payload.get("account_root")):
             logger.warning(
                 "[express-lease] 账套不符已跳过 · log=%s payload_set=%r target=%r",
                 str(row.get("id"))[:8],
@@ -268,7 +273,7 @@ def _legacy_agent_lease(ep: Dict[str, Any], owner: str, max_n: int) -> Dict[str,
     result = {"ok": True, "lease_seconds": 120, "jobs": jobs}
     return _offer_master_refresh(
         result,
-        {"account_set": cfg.get("account_set") or cfg.get("account_dir")},
+        {},
         endpoint_id=str(ep["id"]),
     )
 

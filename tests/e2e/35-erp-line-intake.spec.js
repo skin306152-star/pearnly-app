@@ -1,4 +1,4 @@
-/* global window */
+/* global window, document, getComputedStyle */
 
 const path = require('path');
 const fs = require('fs');
@@ -271,10 +271,10 @@ async function openErp(
     return { requests, authBodies, previewHeaders };
 }
 
-async function openCowork(page) {
+async function openCowork(page, { draftRecords = coworkRecords() } = {}) {
     const requests = [];
     const previewHeaders = [];
-    const records = coworkRecords();
+    const records = draftRecords;
     const selection = {
         endpoint_id: 'endpoint-1',
         workspace_client_id: 69,
@@ -360,16 +360,50 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
     await expect(page.locator('.review-row')).toHaveCount(1);
     await page.locator('[data-review-search]').fill('');
     await page.locator('.review-row').first().click();
-    await expect(page.locator('.review-original')).toHaveCount(2);
-    await page.locator('[data-field="0:field:total_amount"]').click();
-    await expect(page.locator('[data-review-page="1"]')).toHaveClass(/is-source/);
-    await expect
-        .poll(() => page.locator('[data-review-originals]').evaluate((node) => node.scrollTop))
-        .toBeGreaterThan(0);
-    await expect(page.locator('[data-field="0:field:seller_name"]')).toHaveValue('Supplier');
-    await page.locator('[data-field="0:field:seller_name"]').click();
-    await expect(page.locator('[data-review-page="0"]')).toHaveClass(/is-source/);
+    await expect(page.locator('[data-review-document-open]')).toBeVisible();
+    await expect(page.locator('[data-review-originals]')).toHaveCount(0);
+    await expect(page.locator('[data-review-document-viewer]')).toBeHidden();
     await page.locator('[data-field="0:field:seller_name"]').fill('Edited Supplier');
+    await page.locator('[data-field="0:field:total_amount"]').click();
+    await expect(page.locator('[data-review-document-viewer]')).toHaveAttribute(
+        'data-selected-page',
+        '1'
+    );
+    const documentOpener = page.locator('[data-review-document-open]');
+    await documentOpener.scrollIntoViewIfNeeded();
+    const editorScroll = await page.evaluate(() => window.scrollY);
+    await documentOpener.click();
+    await expect(page.locator('[data-review-document-viewer]')).toBeVisible();
+    await expect(page.locator('.review-document-page')).toHaveCount(2);
+    await expect(page.locator('.review-document-page img')).toHaveCount(2);
+    await expect(page.locator('[data-review-page="1"]')).toHaveClass(/is-source/);
+    await expect(page.locator('[data-review-document-status]')).toContainText('2 / 2');
+    await page.screenshot({ path: path.join(OUT, 'erp-mobile-pdf-viewer.png') });
+    const darkColors = await page.evaluate(() => {
+        document.documentElement.classList.add('dark');
+        const probe = document.createElement('div');
+        probe.style.background = 'var(--bg)';
+        document.body.appendChild(probe);
+        const colors = {
+            viewer: getComputedStyle(document.querySelector('[data-review-document-viewer]'))
+                .backgroundColor,
+            token: getComputedStyle(probe).backgroundColor,
+        };
+        probe.remove();
+        return colors;
+    });
+    expect(darkColors.viewer).toBe(darkColors.token);
+    await page.screenshot({ path: path.join(OUT, 'erp-mobile-pdf-viewer-dark.png') });
+    await page.evaluate(() => document.documentElement.classList.remove('dark'));
+    await page.locator('[data-review-document-close]').click();
+    await expect(page.locator('[data-review-document-viewer]')).toBeHidden();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(editorScroll);
+    await expect(page.locator('[data-field="0:field:seller_name"]')).toHaveValue('Edited Supplier');
+    await page.locator('[data-field="0:field:seller_name"]').click();
+    await expect(page.locator('[data-review-document-viewer]')).toHaveAttribute(
+        'data-selected-page',
+        '0'
+    );
     const longName = 'SMR Cushion 02 รุ่นพิเศษสำหรับสาขาทดลองชื่อสินค้ายาวมาก';
     await expect(page.locator('[data-field="0:item:0:name"]')).toHaveJSProperty(
         'tagName',
@@ -504,6 +538,18 @@ test('ERP desktop filters anomalies and uses the shared discard dialog', async (
     await expect(page.locator('h1')).toContainText('Review purchase documents');
     await page.locator('[data-filter="review"]').click();
     await expect(page.locator('.review-row')).toHaveCount(2);
+    await page.locator('.review-row').first().click();
+    const openLabel = await page.evaluate(() =>
+        window.lineIntakeReviewI18n.text('en', 'openOriginal')
+    );
+    await expect(page.locator('[data-review-document-open]')).toContainText(openLabel);
+    await page.locator('[data-review-document-open]').click();
+    const viewerBox = await page.locator('[data-review-document-viewer]').boundingBox();
+    expect(viewerBox).toMatchObject({ x: 0, y: 0, width: 1280, height: 800 });
+    await page.screenshot({ path: path.join(OUT, 'erp-desktop-pdf-viewer.png') });
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-review-document-viewer]')).toBeHidden();
+    await page.locator('[data-review-back]').click();
     await page.locator('[data-review-action="discard"]').click();
     await expect(page.locator('#discard-dialog')).toBeVisible();
     await page.locator('[data-dialog-cancel-button]').click();
@@ -572,7 +618,15 @@ test('Cowork uses the same list, detail, anomaly gate, and batch action layout',
     await expect(page.locator('.review-row')).toHaveCount(1);
     await expect(page.locator('[data-review-action="confirm"]')).toBeDisabled();
     await page.locator('.review-row').click();
-    await expect(page.locator('.review-original')).toHaveCount(1);
+    const openLabel = await page.evaluate(() =>
+        window.lineIntakeReviewI18n.text('zh', 'openOriginal')
+    );
+    await expect(page.locator('[data-review-document-open]')).toContainText(openLabel);
+    await expect(page.locator('[data-review-originals]')).toHaveCount(0);
+    await page.locator('[data-review-document-open]').click();
+    await expect(page.locator('[data-review-document-viewer]')).toBeVisible();
+    await page.screenshot({ path: path.join(OUT, 'cowork-mobile-pdf-viewer.png') });
+    await page.locator('[data-review-document-close]').click();
     await page.locator('[data-field="0:items:0:name"]').fill('镜片');
     await expect(page.locator('[data-review-action="confirm"]')).toBeEnabled();
     await expect(page.locator('[data-review-status]')).toContainText('已就绪');
@@ -588,5 +642,19 @@ test('Cowork uses the same list, detail, anomaly gate, and batch action layout',
         'POST /api/cowork-line/intake/draft/c1/confirm',
     ]);
     expect(run.previewHeaders).toContain('Bearer cowork-bearer');
+    await page.close();
+});
+
+test('image originals remain inline instead of using the PDF viewer', async ({ browser }) => {
+    const page = await browser.newPage({ ...devices['iPhone 13'] });
+    const imageRecords = coworkRecords();
+    imageRecords[0].filename = 'line-receipt.jpg';
+    await openCowork(page, { draftRecords: imageRecords });
+    await page.locator('.review-row').click();
+    await expect(page.locator('[data-review-document-open]')).toHaveCount(0);
+    await expect(page.locator('[data-review-originals]')).toBeVisible();
+    await expect(page.locator('.review-original')).toHaveCount(1);
+    await expect(page.locator('.review-original img')).toBeVisible();
+    await page.screenshot({ path: path.join(OUT, 'cowork-mobile-image-original.png') });
     await page.close();
 });

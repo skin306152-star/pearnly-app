@@ -102,10 +102,18 @@ class SharedEditorSourceTests(unittest.TestCase):
         source_page = (ROOT / "static/line-intake-review/source-page.js").read_text(
             encoding="utf-8"
         )
+        document_viewer = (
+            ROOT / "static/line-intake-review/document-viewer.js"
+        ).read_text(encoding="utf-8")
+        shared_i18n = (ROOT / "static/line-intake-review/i18n.js").read_text(
+            encoding="utf-8"
+        )
         for html in (cowork, erp):
-            self.assertIn("/static/line-intake-review/batch-review.js?v=2", html)
-            self.assertIn("/static/line-intake-review/i18n.js?v=2", html)
-            self.assertIn("/static/line-intake-review/source-page.js?v=1", html)
+            self.assertIn("/static/line-intake-review/batch-review.js?v=3", html)
+            self.assertIn("/static/line-intake-review/i18n.js?v=3", html)
+            self.assertIn("/static/line-intake-review/document-viewer.js?v=1", html)
+            self.assertIn("/static/line-intake-review/document-viewer.css?v=1", html)
+            self.assertIn("/static/line-intake-review/source-page.js?v=2", html)
             self.assertIn("/static/line-intake-review/liff-runtime.js?v=1", html)
             self.assertIn("data-dialog-title", html)
         self.assertIn("IntersectionObserver", shared)
@@ -115,6 +123,11 @@ class SharedEditorSourceTests(unittest.TestCase):
         self.assertIn("fieldPage", source_page)
         self.assertIn("data-review-page", source_page)
         self.assertIn("data-source-page", source_page)
+        self.assertIn("isPdf(record)", document_viewer)
+        self.assertIn("data-review-document-viewer", document_viewer)
+        self.assertIn("data-review-document-open", document_viewer)
+        for key in ("pdfDocument", "openOriginal", "closeOriginal"):
+            self.assertEqual(shared_i18n.count(f"{key}:"), 4)
         self.assertFalse((ROOT / "static/erp-line-intake/preview.js").exists())
         self.assertFalse((ROOT / "static/erp-line-intake/discard-dialog.js").exists())
 

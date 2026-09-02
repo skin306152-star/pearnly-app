@@ -83,6 +83,8 @@
         var review = window.lineIntakeBatchReview;
         var urls = review.previewUrls(record);
         if (!urls.length) return '<p class="review-empty">—</p>';
+        var viewer = window.lineIntakeDocumentViewer;
+        if (viewer && viewer.isPdf(record)) return viewer.html(record, text);
         var pages = Array.isArray(record.pages) ? record.pages : [];
         return (
             '<div class="review-originals" data-review-originals>' +
@@ -113,6 +115,12 @@
 
     function showPage(root, rawPage) {
         var page = Number(rawPage || 0);
+        if (
+            window.lineIntakeDocumentViewer &&
+            window.lineIntakeDocumentViewer.selectPage(root, page)
+        ) {
+            return;
+        }
         var container = root.querySelector('[data-review-originals]');
         var target = root.querySelector('[data-review-page="' + page + '"]');
         if (!container || !target) return;
@@ -123,6 +131,7 @@
     }
 
     function bind(root) {
+        if (window.lineIntakeDocumentViewer) window.lineIntakeDocumentViewer.bind(root);
         root.querySelectorAll('[data-source-page]').forEach(function (control) {
             var follow = function () {
                 showPage(root, control.dataset.sourcePage);

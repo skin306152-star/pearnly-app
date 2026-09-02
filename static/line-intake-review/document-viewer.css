@@ -1,0 +1,196 @@
+body.review-document-viewer-open {
+  overflow: hidden;
+}
+.review-document-file__open {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 12px;
+  width: 100%;
+  min-height: 76px;
+  padding: 12px;
+  align-items: center;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-3);
+  background: var(--line2);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.review-document-file__open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.review-document-file__icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--accent-weak);
+  color: var(--accent-deep);
+}
+.review-document-file__icon svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.review-document-file__body {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+.review-document-file__body strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-document-file__body span {
+  color: var(--ink2);
+  font-size: 12px;
+}
+.review-document-file__type {
+  padding: 4px 8px;
+  border-radius: var(--radius-round);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+.review-document-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  width: 100vw;
+  height: 100dvh;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--bg);
+  color: var(--ink);
+}
+.review-document-viewer[hidden] {
+  display: none;
+}
+.review-document-viewer__header {
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  min-height: calc(60px + env(safe-area-inset-top));
+  padding: max(8px, env(safe-area-inset-top)) 10px 8px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+.review-document-viewer__close {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+.review-document-viewer__close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.review-document-viewer__close svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.review-document-viewer__title {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  text-align: center;
+}
+.review-document-viewer__title strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-document-viewer__title span {
+  color: var(--ink2);
+  font-size: 12px;
+}
+.review-document-viewer__pages {
+  padding: 14px max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y proximity;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+.review-document-page {
+  position: relative;
+  display: grid;
+  width: min(100%, 54rem);
+  min-height: 240px;
+  margin: 0 auto 14px;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink2);
+  box-shadow: var(--shadow);
+  scroll-snap-align: start;
+}
+.review-document-page:last-child {
+  margin-bottom: 0;
+}
+.review-document-page.is-source {
+  border-color: var(--accent);
+}
+.review-document-page figcaption {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  padding: 3px 8px;
+  border-radius: var(--radius-round);
+  background: var(--card);
+  color: var(--ink2);
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+.review-document-page__image {
+  display: grid;
+  width: 100%;
+  min-height: 240px;
+  place-items: center;
+}
+.review-document-page__image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+@media (max-width: 600px) {
+  .review-document-viewer__pages {
+    padding-top: 10px;
+  }
+  .review-document-page {
+    min-height: 180px;
+    margin-bottom: 10px;
+  }
+  .review-document-page__image {
+    min-height: 180px;
+  }
+}

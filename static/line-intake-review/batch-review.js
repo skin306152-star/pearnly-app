@@ -275,6 +275,7 @@
         }
 
         function render() {
+            if (window.lineIntakeDocumentViewer) window.lineIntakeDocumentViewer.cleanup(root);
             root.innerHTML =
                 '<h1>' +
                 esc(options.title()) +
@@ -403,14 +404,17 @@
                           });
                 ready
                     .then(function (url) {
-                        element.innerHTML =
-                            '<a href="' +
-                            esc(url) +
-                            '" target="_blank" rel="noopener"><img src="' +
-                            esc(url) +
-                            '" alt="' +
-                            esc(t('original')) +
-                            '"></a>';
+                        var image = '<img src="' + esc(url) + '" alt="' + esc(t('original')) + '">';
+                        element.innerHTML = element.closest('[data-review-document-viewer]')
+                            ? image
+                            : '<a href="' +
+                              esc(url) +
+                              '" target="_blank" rel="noopener">' +
+                              image +
+                              '</a>';
+                        element.dispatchEvent(
+                            new CustomEvent('review-preview-loaded', { bubbles: true })
+                        );
                     })
                     .catch(function () {
                         element.textContent = t('previewFailed');

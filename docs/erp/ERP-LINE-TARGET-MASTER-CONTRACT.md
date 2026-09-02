@@ -1,8 +1,8 @@
 # ERP LINE 目标、套账与主档一致性合同
 
-> 状态：`P3C_READY_FOR_DEPLOY / FEATURE_FLAG_ALL / P4_CAS_PENDING`
+> 状态：`P3C_PROD_VERIFIED / FEATURE_FLAG_ALL / P4_CAS_PENDING`
 > P3a 底座：`fc9e48b9`；LINE polling 止血：`34606115`；durable refresh + Express
-> canonical ingestion 候选：`9247c615`；Companion 协议最低版本：`1.1.72`。
+> canonical ingestion：`9247c615`；应用即时派发闸：`fc57650b`；Companion 协议最低版本：`1.1.76`。
 > 本文只定义连接、套账、主档与 LINE 选择的一致性边界；第三方 ERP 推送状态继续唯一来自
 > `erp_push_logs`，不在这里建立第二套推送状态。
 
@@ -131,7 +131,7 @@ MR.ERP endpoint refresh 只更新套账目录，account-set refresh 才采集该
 id、scope、目标套账和结果。managed 与 legacy heartbeat 共用同一 canonical ingestion，普通心跳
 缺少 catalog 时不得清空上次主档。
 
-该严格协议只对 Companion `>=1.1.72` 启用。旧版本继续原有 snapshot/30 分钟 catalog 行为，保持
+该严格协议只对 Companion `>=1.1.76` 启用。旧版本继续原有 snapshot/30 分钟 catalog 行为，保持
 可用但不宣称“下一张立即最新”；网页手动 strict refresh 对旧版本返回 update-required。
 
 ### 4.4 确认前 CAS
@@ -191,12 +191,18 @@ P1 获得真机 `USER_ACCEPTED` 后才进入 P2。
   实测 68ms/61ms。
 - **P3b2 待实现**：MR.ERP 供应商、单位、分支、科目及第三方动态字段/按钮尚无已验证 live collector；
   当前 form schema 对这四类明确标 `collector_not_connected`，不得宣称六类已全量同步。
-- **P3c 应用候选已实现**：`9247c615` 增加 durable coalesced request、MR.ERP 后台 worker、Express
-  lease/poll 命令、legacy/managed canonical ingestion、LINE 两级 refresh gate 与旧 Companion 兼容闸。
-  Companion 候选 `v1.1.72` 增加非阻塞 endpoint/account-set 扫描与 request-scoped ACK；待 pinned-SHA
-  生产发布及 Windows release 后更新为 PROD_VERIFIED。
-- **当前生产证据**：hotfix SHA `34606115a7ee7b2dcb5cfdea2172b91808d7560d`，Manual CD
-  `33596453457`，service/health/ready 全绿；首次轻量套账刷新 808ms，随后 draft poll 68ms/61ms。
+- **P3c 已生产验证**：`9247c615..fc57650b` 增加 durable coalesced request、MR.ERP 后台 worker、
+  Express lease/poll 命令、legacy/managed canonical ingestion、LINE 两级 refresh gate 与旧 Companion
+  兼容闸。Companion `v1.1.76` 从每次约 3 秒 poll 接收刷新命令，并把 endpoint refresh 限定为 SCCOMP、
+  account-set refresh 限定为商品/客户/科目，避免 60 秒 heartbeat 等待和无关 posting 扫描。
+- **MR.ERP 生产证据**：endpoint/account 后台刷新分别 1.135s/19.382s；刷新期间 LINE polling
+  109/91ms、83/78ms，最终快照 300 商品、111 客户。普通菜单、draft 和状态 poll 未访问第三方 ERP。
+- **Express 真机证据**：Companion commit `4243ee6f`，release run `33613228324`；生产安装包
+  62,900,788 bytes，SHA-256=`a0bb4a23e3858e61befbb73cf5b2092148dfa647c44c54b57e89450e9fae645c`。
+  Windows 登录用户 session 1 的两个 endpoint 均回报 1.1.76。LINE 绑定 endpoint 的 endpoint/account
+  refresh 分别 9.967s/9.986s，期间 LINE snapshot polling 69–87ms；快照含 3 套账、276 商品、552 客户、
+  225 科目。内容哈希未变化时 immutable revision 保持不变，但 freshness 的 attempted/observed 时间和
+  source 已更新为本次 Companion 1.1.76，不能把“不增 revision”误判为“未刷新”。
 
 ### P4 LINE 选择、编辑器和确认 CAS
 

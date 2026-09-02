@@ -1,17 +1,18 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 09-02 ERP 最新主档 P3c READY_FOR_DEPLOY
+## 当前状态卡 · 09-02 ERP 最新主档 P3c PROD_VERIFIED
 
-- **▶ 当前 task**:第三方 ERP 最新主档统一投影；当前应用候选=`9247c615`，Express Companion 候选=`v1.1.72`。
-- **✅ 功能保持打开**:`erp_target_projection` 继续全量 rollout；不因本轮改造关闭，也不等待真机才继续发布前验证。
-- **✅ 性能事故已止血**:生产 hotfix=`34606115`，Manual CD=`33596453457`；LINE 普通 draft/target polling 改为只读服务器 snapshot，不再每拍 live 拉第三方 ERP。生产实测首次轻量套账刷新 808ms，随后 draft poll 68ms/61ms。
-- **✅ 新刷新协议**:开始新单选择 ERP 时只入 durable refresh request；MR.ERP 由云端后台采集，Express 由 Companion 正常约 3 秒 poll 领取命令并后台扫描。交互请求只轮询数据库状态。
-- **✅ Express 单一投影**:legacy/managed heartbeat 共用 canonical ingestion；endpoint refresh 更新套账列表，精确 account-set refresh 更新商品、客户、科目；缺 catalog 的普通 heartbeat 不清空最后成功主档。
-- **✅ LINE fail closed**:套账列表刷新完成后才显示最新 quick replies；选定套账后再次刷新该套账主档；确认只接受 refresh=`succeeded`，pending/failed 不冒充最新。
-- **✅ 兼容闸**:严格刷新只对 MR.ERP 和 Companion `>=1.1.72` 生效；旧 Express Companion 继续旧流程，不会被新协议阻断，但也不承诺“下一单立即最新”。
-- **✅ 本地证据**:应用相关 129 tests + 10 subtests、完整 pre-push 1119 modules/6 shards 全绿；Companion 新路径 21 tests 全绿，全套与原仓相同仅 5 个 macOS/Windows-only 基线失败。
+- **▶ 当前 task**:第三方 ERP 最新主档统一投影；应用逻辑=`9247c615..fc57650b`，Express Companion=`v1.1.76` / `4243ee6f`。
+- **✅ 功能保持打开**:`erp_target_projection` 继续全量 rollout；普通 LINE/Web polling 永远只读服务器 snapshot，不同步访问第三方 ERP。
+- **✅ 新刷新协议**:开始新单选择 ERP 时只写 durable/coalesced request；MR.ERP 云端 worker 后台采集，Express Companion 从每次约 3 秒 poll 领取命令，交互请求只轮询数据库状态。
+- **✅ Express 单一投影**:legacy/managed heartbeat 共用 canonical ingestion；endpoint refresh 只读 SCCOMP 套账目录，account-set refresh 只读商品、客户、科目；普通 heartbeat 缺 catalog 时保留最后成功主档。
+- **✅ LINE fail closed**:套账列表刷新成功后才显示最新 quick replies；选定套账后刷新精确主档；确认只接受 refresh=`succeeded`，pending/failed 不冒充最新。
+- **✅ 生产 MR.ERP**:endpoint/account 后台分别 1.135s/19.382s；刷新期间 LINE polling 109/91ms、83/78ms，快照 300 商品、111 客户。
+- **✅ Windows Express**:生产安装包 62,900,788 bytes，SHA-256=`a0bb4a23e3858e61befbb73cf5b2092148dfa647c44c54b57e89450e9fae645c`；真实电脑两 endpoint 均回报 1.1.76、session 1 在线。
+- **✅ Express 性能**:endpoint/account refresh 分别 9.967s/9.986s；期间 LINE polling 69–87ms；结果 3 套账、276 商品、552 客户、225 科目，freshness 来源为 1.1.76。
+- **✅ 本地证据**:应用相关 129 tests + 10 subtests、完整 pre-push 1119 modules/6 shards 全绿；Companion focused 52 passed，全套 487 passed/35 skipped，另 5 项与原仓相同的 macOS/Windows-only 基线失败。
 - **🚧 明确未做**:MR.ERP suppliers/units/branches/accounts、通用动态字段/按钮 collector 仍缺；LINE 编辑器尚无泛型主档下拉 schema；draft `master_revision` 全程 CAS 尚待 P4。
-- **⏭ 下一步**:发布应用精确 SHA → 生产 MR.ERP refresh/poll 延迟复验 → 发布 Companion `v1.1.72` installer → 保持生产 `/erp` 打开。
+- **⏭ 下一步**:提交状态证据 → 发布应用最终精确 SHA → 回读 production HEAD/service/ready → 保持生产 `/erp` 打开等待真机验收。
 
 ---
 

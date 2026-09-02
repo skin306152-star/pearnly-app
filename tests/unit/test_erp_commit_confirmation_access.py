@@ -216,6 +216,70 @@ class ErpCommitConfirmationAccessTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 409)
         self.assertEqual(caught.exception.detail["history_ids"], [PURCHASE_HISTORY])
 
+    def test_status_is_read_only_and_uses_canonical_formal_records(self):
+        cur = mock.Mock()
+        user = {"id": ACTOR, "tenant_id": TENANT, "entry": "erp"}
+        preflight = access.ConfirmationPreflight(
+            ("purchase", "sales"),
+            (),
+            ((PURCHASE_HISTORY, "purchase"), (SALES_HISTORY, "sales")),
+        )
+        with (
+            mock.patch.object(access, "require_erp_portal") as entrance,
+            mock.patch.object(access, "_shared_preflight", return_value=preflight) as guard,
+            mock.patch.object(
+                access,
+                "_formal_history_ids_by_direction",
+                return_value={"purchase": {PURCHASE_HISTORY}, "sales": set()},
+            ) as formal,
+        ):
+            result = access.confirmation_status(
+                cur,
+                mock.sentinel.request,
+                user,
+                TENANT,
+                WORKSPACE,
+                [PURCHASE_HISTORY, SALES_HISTORY],
+            )
+        self.assertEqual(
+            result,
+            {"resolved": [PURCHASE_HISTORY], "unresolved": [SALES_HISTORY]},
+        )
+        entrance.assert_called_once_with(user)
+        self.assertFalse(guard.call_args.kwargs["lock_histories"])
+        formal.assert_called_once()
+
+    def test_preflight_reports_actor_owned_workspace_mismatch_without_leaking_workspace(self):
+        cur = mock.Mock()
+        cur.fetchone.return_value = {"id": WORKSPACE, "tax_id": "0105537000881"}
+        cur.fetchall.return_value = [
+            {
+                "id": PURCHASE_HISTORY,
+                "user_id": ACTOR,
+                "tenant_id": TENANT,
+                "workspace_client_id": WORKSPACE + 1,
+                "pages": [{"fields": {}}],
+                "source": "upload",
+            }
+        ]
+        with self.assertRaises(HTTPException) as caught:
+            access.preflight_confirmation(
+                cur,
+                tenant_id=TENANT,
+                actor_id=ACTOR,
+                workspace_client_id=WORKSPACE,
+                history_ids=[PURCHASE_HISTORY],
+                lock_histories=False,
+            )
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(
+            caught.exception.detail,
+            {"code": "erp.workspace_mismatch", "history_ids": [PURCHASE_HISTORY]},
+        )
+        history_sql = cur.execute.call_args_list[1].args[0]
+        self.assertNotIn("FOR UPDATE", history_sql)
+        self.assertNotIn(str(WORKSPACE + 1), str(caught.exception.detail))
+
 
 if __name__ == "__main__":
     unittest.main()

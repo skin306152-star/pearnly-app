@@ -236,6 +236,25 @@ class TargetRefreshTests(unittest.TestCase):
                 revision=4,
             )
 
+    def test_express_empty_scan_completion_is_terminal_failed(self):
+        cursor = _Cursor([])
+
+        completed = target_refresh.complete_express_refresh_with_cursor(
+            cursor,
+            request_id="11111111-1111-4111-8111-111111111111",
+            endpoint_id="endpoint-1",
+            account_set_key=target_refresh.ENDPOINT_SCOPE_KEY,
+            scope_kind="endpoint",
+            error_code="ERR_ACCOUNT_SET_EMPTY",
+        )
+
+        self.assertTrue(completed)
+        sql, params = cursor.executed[-1]
+        self.assertIn("ELSE %s END", sql)
+        self.assertEqual(params[0], "failed")
+        self.assertEqual(params[1], "ERR_ACCOUNT_SET_EMPTY")
+        self.assertIsNone(params[2])
+
     def test_mrerp_claim_preserves_a_click_recorded_during_an_expired_attempt(self):
         cursor = _Cursor([None])
         request_id = "11111111-1111-4111-8111-111111111111"

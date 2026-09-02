@@ -319,8 +319,8 @@ class ErpConfirmationAccessTests(unittest.TestCase):
                 workspace_client_id=WORKSPACE,
                 history_ids=[PURCHASE_HISTORY, SALES_HISTORY],
             )
-        self.assertEqual(caught.exception.status_code, 404)
-        self.assertEqual(caught.exception.detail, "history.not_found")
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(caught.exception.detail["code"], "erp.workspace_mismatch")
         self.assertTrue(all(sql.lstrip().startswith("SELECT") for sql, _ in cur.executed))
 
     def test_workspace_outside_tenant_or_inactive_is_not_found_before_history_lookup(self):

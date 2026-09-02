@@ -30,6 +30,11 @@ def is_supported_ocr_file(filename: str) -> bool:
     return file_ext(filename) in SUPPORTED_OCR_EXTENSIONS
 
 
+def web_upload_source(entry: Optional[str]) -> str:
+    """Return the persisted OCR source for an authenticated web entry."""
+    return "erp_web" if entry == "erp" else "manual"
+
+
 def content_hash(content: bytes) -> str:
     return hashlib.sha256(content or b"").hexdigest()
 

@@ -15,6 +15,7 @@ from PIL import Image
 from routes import line_erp_routes as routes
 from services.cowork_line import flow_cards as cowork_flow_cards
 from services.cowork_line import review_cards as cowork_review_cards
+from services.erp import line_target_projection
 from services.line_platform import client as line_client
 from services.line_platform.summary_review_card import postback_action
 from services.line_erp import cards, flow, menu_cards, store, webhook
@@ -222,12 +223,28 @@ class ErpChannelTests(unittest.TestCase):
             "workspace_client_id": 7,
             "adapter": "mrerp",
         }
-        full = {
-            **compact,
-            "account_catalog_loaded": True,
-            "account_choices": [{"key": "2026", "label": "2026"}],
-            "projection_revision": 7,
-        }
+        full = line_target_projection.legacy_target(
+            {
+                "id": "ep-1",
+                "name": "MR.ERP",
+                "adapter": "mrerp",
+                "enabled": True,
+                "config": {
+                    "username": "operator",
+                    "password": "secret",
+                    "comidyear": "15",
+                    "seldb": "1",
+                },
+            },
+            {"id": 7, "name": "Client", "erp_endpoint_id": "ep-1"},
+            binding_count=1,
+            probe={
+                "ok": True,
+                "companies": [{"label": "2026", "comidyear": "15", "seldb": "1"}],
+                "projection_revision": 7,
+                "account_sets_revision": 4,
+            },
+        )
         response = routes.Response()
         with (
             mock.patch.object(

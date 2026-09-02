@@ -33,9 +33,16 @@ def test_erp_empty_ocr_line_does_not_guess_quantity_or_amount():
     assert "qty: '1', price: amount" not in recognize
 
 
-def test_erp_review_has_per_line_type_and_discard_action():
+def test_erp_review_has_batch_default_per_line_override_and_discard_action():
     review = read("src/home/dms-intake-review.ts")
+    posting = read("src/home/dms-intake-review-posting.ts")
     assert "posting_kind" in review
+    assert "data-iv-posting-default" in review
+    assert "applyPostingDefault" in posting
+    assert "confirmed.has(index)" in posting
+    assert "missingPostingKind" in posting
+    assert "item.name" not in posting
+    assert "item.qty" not in posting
     assert 'data-dx-action="discard"' in review
     assert "/api/erp/intake/discard" in review
 

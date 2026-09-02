@@ -102,6 +102,67 @@ class ExpressTargetProjectionTests(unittest.TestCase):
         self.assertEqual(publish.call_count, 1)
         self.assertEqual(publish.call_args.kwargs["projection"].scope_kind, "endpoint")
 
+    def test_omitted_account_sets_keeps_old_companion_selected_account_compatibility(self):
+        body = {key: value for key, value in self.body.items() if key != "account_sets"}
+        result, publish = self._ingest(body)
+
+        self.assertTrue(result["published"])
+        self.assertEqual(publish.call_count, 2)
+        endpoint_projection = publish.call_args_list[0].kwargs["projection"]
+        self.assertEqual(
+            [row["source_id"] for row in endpoint_projection.account_sets],
+            [r"c:\express\test"],
+        )
+
+    def test_empty_reported_scan_fails_refresh_and_preserves_snapshot(self):
+        body = {
+            **self.body,
+            "account_sets": [],
+            "master_refresh_request_id": "33333333-3333-4333-8333-333333333333",
+            "master_refresh_scope": "endpoint",
+        }
+        cursor = _Cursor(self.endpoint)
+        with (
+            mock.patch.object(
+                projection.db,
+                "get_cursor",
+                return_value=_CursorContext(cursor),
+            ),
+            mock.patch.object(projection, "publish_with_cursor") as publish,
+            mock.patch.object(
+                projection,
+                "record_refresh_state_with_cursor",
+            ) as record_failure,
+            mock.patch(
+                "services.erp.target_refresh.complete_express_refresh_with_cursor",
+                return_value=True,
+            ) as complete,
+        ):
+            result = projection.ingest_express_heartbeat(self.endpoint["id"], body)
+
+        self.assertFalse(result["published"])
+        self.assertEqual(result["reason"], "account_sets_empty")
+        self.assertEqual(result["error_code"], "ERR_ACCOUNT_SET_EMPTY")
+        publish.assert_not_called()
+        record_failure.assert_called_once_with(
+            cursor,
+            tenant_id=self.endpoint["tenant_id"],
+            endpoint_id=self.endpoint["id"],
+            account_set_key=None,
+            status="error",
+            observed_at=mock.ANY,
+            collector={"kind": "companion", "adapter_version": "1.1.70"},
+            error_code="ERR_ACCOUNT_SET_EMPTY",
+        )
+        complete.assert_called_once_with(
+            cursor,
+            request_id=body["master_refresh_request_id"],
+            endpoint_id=self.endpoint["id"],
+            account_set_key=r"c:\express\test",
+            scope_kind="endpoint",
+            error_code="ERR_ACCOUNT_SET_EMPTY",
+        )
+
     def test_duplicate_or_uncoded_rows_are_removed_at_ingestion_boundary(self):
         body = dict(self.body)
         body["catalog"] = {

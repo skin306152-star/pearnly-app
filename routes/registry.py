@@ -42,6 +42,7 @@ from routes.daily_routes import router as daily_router
 from routes.email_ingest_routes import router as email_ingest_router
 from routes.erp_agent import router as erp_agent_router
 from routes.erp_bridge_routes import router as erp_bridge_router
+from routes.erp_confirmation_status_routes import router as erp_confirmation_status_router
 from routes.erp_intake_routes import router as erp_intake_router
 from routes.erp_mappings_routes import router as erp_mappings_router
 from routes.erp_routes import router as erp_router
@@ -191,6 +192,7 @@ ROUTERS = (
     erp_intake_router,  # ERP 商户 staged OCR 草稿丢弃
     erp_agent_router,  # Express Push · 本地 Agent 出站拉取 + token
     erp_bridge_router,  # ERP 桥 · 内网出站 + 管理端
+    erp_confirmation_status_router,  # 复核→推送之间只读核验正式单
     companion_installer_router,  # 小助手安装包下载
     dms_router,  # MR.ERP DMS · 身份证→订车单
     dms_roster_router,  # DMS 操作员花名册(owner-only)

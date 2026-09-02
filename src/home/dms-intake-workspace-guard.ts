@@ -3,8 +3,8 @@
 //   真机场景(2026-08-08):美妆店销项票在冰块公司套账下上传,数据落错账本污染报表。
 //   落库时 seller_routing 已按税号自动归对已存在套账;本模块只兜「无匹配/错配」——
 //   复核屏检测票主税号 ≠ 当前套账税号 → 提示「切到已有套账并归入」或「建套账并归入」。
-//   非阻断:点「保持当前套账」本批内记住,一切照旧。错配未处理的文件不进「确认全部」
-//   (blockedIdxs 供 dms-intake-review.ts 过滤)。检测/比对为纯前端,不碰后端路由。
+//   点「保持当前套账」会把草稿真实重绑到当前套账，不能只隐藏提示后继续。
+//   错配未处理的文件不进「确认全部」(blockedIdxs 供 dms-intake-review.ts 过滤)。
 // ============================================================
 /* global t, showToast, withLoading */
 import { esc, authHeaders } from './dms-intake-core.js';
@@ -234,8 +234,6 @@ function finishRebind(
     targetId: number
 ): void {
     const skipped = Array.isArray(d.skipped) ? d.skipped : [];
-    _settled.add(g.tax);
-    switchWorkspace(targetId);
     if (skipped.length) {
         showToast(
             t('wsg-partial')
@@ -243,9 +241,12 @@ function finishRebind(
                 .replace('{m}', String(skipped.length)),
             'warn'
         );
-    } else {
-        showToast(t('wsg-done').replace('{n}', String(d.rebound || 0)), 'success');
+        _rerender?.();
+        return;
     }
+    _settled.add(g.tax);
+    switchWorkspace(targetId);
+    showToast(t('wsg-done').replace('{n}', String(d.rebound || 0)), 'success');
     _rerender?.();
 }
 
@@ -288,17 +289,26 @@ async function doSwitchAndRebind(btn: HTMLElement): Promise<void> {
     }
 }
 
-// [保持当前套账]:本批内记住(按税号),横幅消失,一切照旧。
-function handleKeep(): void {
+// [保持当前套账]:真实重绑草稿归属；成功后横幅才消失。
+async function handleKeep(btn: HTMLElement): Promise<void> {
     const g = _groups[0];
     if (!g) return;
-    _settled.add(g.tax);
-    _rerender?.();
+    const current = activeWsId();
+    if (current == null || !g.historyIds.length) return;
+    try {
+        await withLoading(btn, async () => {
+            const d = await rebindTo(g.historyIds, current);
+            finishRebind(g, d, current);
+        });
+    } catch {
+        showToast(t('wsg-create-fail'), 'error');
+    }
 }
 
 export function onGuardClick(tg: HTMLElement): boolean {
-    if (tg.closest('[data-wsg-keep]')) {
-        handleKeep();
+    const keep = tg.closest('[data-wsg-keep]') as HTMLElement | null;
+    if (keep) {
+        void handleKeep(keep);
         return true;
     }
     const sw = tg.closest('[data-wsg-switch]') as HTMLElement | null;

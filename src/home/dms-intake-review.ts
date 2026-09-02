@@ -5,7 +5,7 @@
 //   (拖拽 / 滚轮缩放 / 放大缩小 / 旋转 / 重置 / 双击)。
 //   多发票 PDF → 同面板堆叠 N 组字段 + 右侧复用共享 image-viewer.ts(识别记录/异常同款):
 //   按物理页翻(‹ 1/N ›)看到每一页,治「一份多页 PDF 只渲第一页」。不再各写一套查看器。
-//   字段编辑经「保存修改」真持久化到各张 ocr_history;确认态(IV.confirmed)仍纯前端视觉。
+//   字段编辑经「保存修改」真持久化到各张 ocr_history；正式确认后按后端状态锁定只读。
 //   从 invoice-submit.ts 拆出以控行数。
 // ============================================================
 /* global t, showToast, withLoading */
@@ -23,7 +23,19 @@ import {
     ensureGuardData,
 } from './dms-intake-workspace-guard.js';
 import { isErpEntry } from './erp-intake.js';
-import { confirmIndices, convertChipHtml, pagesForInvoice } from './dms-intake-review-convert.js';
+import {
+    confirmationErrorMessage,
+    confirmIndices,
+    convertChipHtml,
+    pagesForInvoice,
+} from './dms-intake-review-convert.js';
+import {
+    applyPostingDefault,
+    editablePostingItems,
+    missingPostingKind,
+    selectedPostingDefault,
+} from './dms-intake-review-posting.js';
+import type { PostingKind } from './dms-intake-review-posting.js';
 
 // 套账不符横幅需要重渲复核屏(归入/保持后横幅状态变化)→ 把 renderReview 交给 guard 模块。
 initGuard(renderReview);
@@ -40,6 +52,7 @@ function passable(r: IvResult): boolean {
 // 同一刻只一个面板挂载,重渲先清旧实例。
 let viewerCleanup: (() => void) | null = null;
 let viewerApi: ViewerApi | null = null;
+let confirmationInFlight = false;
 
 export function renderReview() {
     IV.view = 'review';
@@ -53,6 +66,7 @@ export function renderReview() {
     const items = IV.results.map((r, i) => accItemHtml(r, i)).join('');
     el.innerHTML = banner + wsguard + barHtml() + `<div class="dx-acc">${items}</div>` + footHtml();
     showStepInv(3, 'dx-s-inv-review');
+    bindPostingDefault();
     bindOpenViewer();
     void ensureGuardData(); // 首次进入复核:拉账套列表 → 有错配时补渲出横幅
 }
@@ -62,10 +76,47 @@ function barHtml(): string {
         '<div class="dx-rv-bar"><div class="dx-rv-bar-t">' +
         `<b>${esc(t('dxi-rev-files-h'))}</b><span>${esc(t('dxi-rev-files-tip'))}</span></div>` +
         '<div class="dx-rv-bar-a">' +
+        postingDefaultHtml() +
         `<button class="btn small" id="dx-inv-collapse-all">${esc(t('dxi-rev-collapse-all'))}</button>` +
         `<button class="btn small primary" id="dx-inv-confirm-all">${esc(t('dxi-rev-confirm-all'))}</button>` +
         '</div></div>'
     );
+}
+
+function postingDefaultHtml(): string {
+    if (!isErpEntry()) return '';
+    const items = editablePostingItems(IV.results, IV.confirmed);
+    const selected = selectedPostingDefault(items);
+    const disabled = items.length ? '' : ' disabled';
+    return (
+        `<label class="dx-item-default"><span>${esc(t('dxi-item-type'))}</span>` +
+        `<select data-iv-posting-default${disabled}>` +
+        `<option value=""${selected ? '' : ' selected'}>${esc(t('dxi-item-type-batch'))}</option>` +
+        `<option value="stock"${selected === 'stock' ? ' selected' : ''}>${esc(t('dxi-item-type-all-stock'))}</option>` +
+        `<option value="service"${selected === 'service' ? ' selected' : ''}>${esc(t('dxi-item-type-all-service'))}</option>` +
+        '</select></label>'
+    );
+}
+
+function syncPostingDefault(): void {
+    const select = document.querySelector('[data-iv-posting-default]') as HTMLSelectElement | null;
+    if (select)
+        select.value = selectedPostingDefault(editablePostingItems(IV.results, IV.confirmed));
+}
+
+function bindPostingDefault(): void {
+    const select = document.querySelector('[data-iv-posting-default]') as HTMLSelectElement | null;
+    select?.addEventListener('change', () => {
+        if (!['stock', 'service'].includes(select.value)) return;
+        applyPostingDefault(
+            editablePostingItems(IV.results, IV.confirmed),
+            select.value as PostingKind
+        );
+        renderReview();
+    });
+    document.querySelectorAll('.dx-item-type').forEach((itemSelect) => {
+        itemSelect.addEventListener('change', () => window.setTimeout(syncPostingDefault, 0));
+    });
 }
 
 function statusHtml(r: IvResult, i: number): string {
@@ -80,6 +131,7 @@ function statusHtml(r: IvResult, i: number): string {
 
 function accItemHtml(r: IvResult, i: number): string {
     const open = i === IV.openIdx;
+    const confirmed = IV.confirmed.has(i);
     const w = fileWarns(r);
     const sub =
         (r.invoice_count > 1
@@ -89,7 +141,7 @@ function accItemHtml(r: IvResult, i: number): string {
     const row =
         `<div class="dx-acc-row" data-iv-toggle="${i}">` +
         `<div class="dx-file-ic">${esc(ext(r.filename))}</div>` +
-        `<div class="dx-file-c"><b>${esc(r.filename)}</b><span>${sub} · ${esc(t('dxi-rev-editable'))}</span></div>` +
+        `<div class="dx-file-c"><b>${esc(r.filename)}</b><span>${sub} · ${esc(t(confirmed ? 'dxi-rev-confirmed' : 'dxi-rev-editable'))}</span></div>` +
         statusHtml(r, i) +
         `<button class="dx-acc-btn" data-iv-toggle="${i}">${esc(t(open ? 'dxi-rev-collapse' : 'dxi-rev-view'))}</button></div>`;
     const panel = open ? accPanelHtml(r, i) : '';
@@ -97,18 +149,20 @@ function accItemHtml(r: IvResult, i: number): string {
 }
 
 function accPanelHtml(r: IvResult, i: number): string {
+    const locked = IV.confirmed.has(i);
     const groups = r.invoices.map((inv, ii) => invoiceGroupHtml(i, ii, inv)).join('');
     return (
         '<div class="dx-acc-panel"><div class="dx-acc-top"><div>' +
         `<b>${esc(r.filename)} · ${esc(t('dxi-rev-h'))}</b>` +
         `<span class="dx-acc-tip">${esc(t('dxi-rev-panel-tip'))}</span></div></div>` +
-        `<div class="dx-rgrid"><div class="dx-fields">${groups}${fieldsFootHtml()}</div>` +
+        `<div class="dx-rgrid"><div class="dx-fields">${groups}${fieldsFootHtml(locked)}</div>` +
         imageCardHtml(r) +
         '</div></div>'
     );
 }
 
 function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
+    const locked = IV.confirmed.has(fi);
     const warns = warnFields(inv.fields);
     if (inv.fmtWarn) warns.add('invoice_number'); // 格式偏离多数派 → 标黄该张发票号
     const fmtChip = inv.fmtWarn
@@ -131,7 +185,7 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
         const v = String(raw ?? '');
         return (
             `<div class="dx-rv${warn}"><label>${esc(t(lk))}</label>` +
-            `<input class="dx-rv-in" data-iv-field="${fi}:${ii}:${esc(k)}" value="${esc(v)}"></div>`
+            `<input class="dx-rv-in" data-iv-field="${fi}:${ii}:${esc(k)}" value="${esc(v)}"${locked ? ' disabled' : ''}></div>`
         );
     };
     const core = revCore(inv.fields).map(cell).join('');
@@ -145,7 +199,7 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
         `<div class="dx-inv-grp" data-inv-grp="${ii}" data-inv-page="${invPage(inv)}">` +
         head +
         `<div class="dx-review-grid">${core}</div>` +
-        itemsTableHtml(fi, ii, inv) +
+        itemsTableHtml(fi, ii, inv, locked) +
         `<div class="dx-extra"><div class="dx-review-grid">${more}</div></div></div>`
     );
 }
@@ -166,7 +220,7 @@ const ITEM_COLS: Array<[string, string]> = [
     ['subtotal', 'dxi-rev-item-amt'],
 ];
 
-function itemsTableHtml(fi: number, ii: number, inv: IvInvoice): string {
+function itemsTableHtml(fi: number, ii: number, inv: IvInvoice, locked: boolean): string {
     const items = (inv.fields.items as Array<Dict>) || [];
     if (!Array.isArray(items) || !items.length) return '';
     const rows = items
@@ -175,12 +229,12 @@ function itemsTableHtml(fi: number, ii: number, inv: IvInvoice): string {
                 const v = String(it[k] ?? (k === 'subtotal' ? (it.amount ?? '') : ''));
                 return (
                     `<td${ci ? ' class="r"' : ''}><input class="dx-item-in"` +
-                    ` data-iv-item="${fi}:${ii}:${ti}:${k}" value="${esc(v)}"></td>`
+                    ` data-iv-item="${fi}:${ii}:${ti}:${k}" value="${esc(v)}"${locked ? ' disabled' : ''}></td>`
                 );
             }).join('');
             const postingKind = String(it.posting_kind || '');
             const typeCell = isErpEntry()
-                ? `<td><select class="dx-item-type" data-iv-item="${fi}:${ii}:${ti}:posting_kind"><option value="">${esc(t('dxi-item-type-pick'))}</option><option value="stock"${postingKind === 'stock' ? ' selected' : ''}>${esc(t('dxi-posting-stock-t'))}</option><option value="service"${postingKind === 'service' ? ' selected' : ''}>${esc(t('dxi-posting-service-t'))}</option></select></td>`
+                ? `<td><select class="dx-item-type" data-iv-item="${fi}:${ii}:${ti}:posting_kind"${locked ? ' disabled' : ''}><option value="">${esc(t('dxi-item-type-pick'))}</option><option value="stock"${postingKind === 'stock' ? ' selected' : ''}>${esc(t('dxi-posting-stock-t'))}</option><option value="service"${postingKind === 'service' ? ' selected' : ''}>${esc(t('dxi-posting-service-t'))}</option></select></td>`
                 : '';
             return `<tr>${tds}${typeCell}</tr>`;
         })
@@ -191,7 +245,9 @@ function itemsTableHtml(fi: number, ii: number, inv: IvInvoice): string {
     return `<table class="dx-item-tbl"><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function fieldsFootHtml(): string {
+function fieldsFootHtml(locked: boolean): string {
+    if (locked)
+        return `<div class="dx-fields-foot"><div class="dx-note">${esc(t('dxi-rev-confirmed'))}</div></div>`;
     return (
         `<div class="dx-fields-foot"><div class="dx-note">${esc(t('dxi-rev-hint'))}</div>` +
         '<div class="dx-fields-foot-a">' +
@@ -232,6 +288,10 @@ function footHtml(): string {
 async function saveOpenFileEdits(btn: HTMLElement | null): Promise<void> {
     const r = IV.results[IV.openIdx];
     if (!r) return;
+    if (IV.confirmed.has(IV.openIdx)) {
+        showToast(t('dxi-err-formal-locked'), 'error');
+        return;
+    }
     const targets = r.invoices.filter((iv) => iv.history_id);
     if (!targets.length) {
         showToast(t('dxi-rev-save-fail'), 'error');
@@ -279,6 +339,7 @@ export function onReviewClick(tg: HTMLElement): boolean {
     if (tg.closest('.dx-confirm-one')) {
         if (IV.openIdx >= 0) {
             const idx = IV.openIdx;
+            if (IV.confirmed.has(idx)) return true;
             if (isErpEntry() && missingPostingKind(IV.results[idx])) {
                 showToast(t('dxi-item-type-required'), 'error');
                 return true;
@@ -314,15 +375,21 @@ export function onReviewClick(tg: HTMLElement): boolean {
 }
 
 async function confirmAndRender(idxs: number[], current: number): Promise<void> {
-    const ok = await confirmIndices(idxs);
-    if (!ok && isErpEntry()) {
+    if (confirmationInFlight) return;
+    confirmationInFlight = true;
+    try {
+        const ok = await confirmIndices(idxs);
+        if (!ok && isErpEntry()) {
+            renderReview();
+            showToast(confirmationErrorMessage(), 'error');
+            return;
+        }
+        if (current >= 0) IV.openIdx = nextUnconfirmed(current);
         renderReview();
-        showToast(t('dxi-rev-save-fail'), 'error');
-        return;
+        showToast(t(current >= 0 ? 'dxi-rev-confirmed-toast' : 'dxi-rev-confirmed-all'), 'success');
+    } finally {
+        confirmationInFlight = false;
     }
-    if (current >= 0) IV.openIdx = nextUnconfirmed(current);
-    renderReview();
-    showToast(t(current >= 0 ? 'dxi-rev-confirmed-toast' : 'dxi-rev-confirmed-all'), 'success');
 }
 
 async function discardOpenFile(): Promise<void> {
@@ -352,22 +419,6 @@ async function discardOpenFile(): Promise<void> {
     } catch {
         showToast(t('dxi-discard-fail'), 'error');
     }
-}
-
-function missingPostingKind(r: IvResult): boolean {
-    return r.invoices.some((invoice) => {
-        const items = invoice.fields.items;
-        return (
-            !Array.isArray(items) ||
-            !items.length ||
-            items.some(
-                (item) =>
-                    !String(item.name || '').trim() ||
-                    !String(item.qty || '').trim() ||
-                    !['stock', 'service'].includes(String(item.posting_kind || ''))
-            )
-        );
-    });
 }
 
 function nextUnconfirmed(from: number): number {

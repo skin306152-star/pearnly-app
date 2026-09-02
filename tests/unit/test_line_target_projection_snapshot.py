@@ -59,6 +59,7 @@ class LineTargetProjectionSnapshotTests(unittest.TestCase):
 
         self.assertTrue(probe["ok"])
         self.assertEqual(probe["companies"][0]["comidyear"], "15")
+        self.assertEqual(probe["projection_revision"], 4)
         self.assertEqual(probe["account_sets_revision"], 3)
         self.assertFalse(probe["cached"])
         refresh.assert_called_once()
@@ -142,6 +143,31 @@ class LineTargetProjectionSnapshotTests(unittest.TestCase):
         live_probe.assert_not_called()
         refresh.assert_not_called()
 
+    def test_legacy_target_carries_projection_receipt_revisions(self):
+        target = line_target_projection.legacy_target(
+            {
+                **self.endpoint,
+                "name": "MR.ERP",
+                "config": {
+                    **self.endpoint["config"],
+                    "username": "operator",
+                    "password": "secret",
+                },
+            },
+            {"id": 7, "name": "Client", "erp_endpoint_id": "endpoint-1"},
+            binding_count=1,
+            probe={
+                "ok": True,
+                "companies": [{"label": "New account", "comidyear": "15", "seldb": "2"}],
+                "projection_revision": 4,
+                "account_sets_revision": 3,
+            },
+        )
+
+        self.assertEqual(target["projection_revision"], 4)
+        self.assertEqual(target["account_sets_revision"], 3)
+        self.assertEqual(target["account_choices"][0]["key"], "15:2")
+
     def test_compact_managed_target_never_loads_projection_rows(self):
         cursor = mock.Mock()
         cursor.fetchall.return_value = [
@@ -186,6 +212,61 @@ class LineTargetProjectionSnapshotTests(unittest.TestCase):
         load_state.assert_not_called()
         self.assertIsNone(project.call_args.kwargs["account_sets"])
         self.assertFalse(project.call_args.kwargs["account_catalog_loaded"])
+        self.assertIsNone(project.call_args.kwargs["projection_revision"])
+        self.assertIsNone(project.call_args.kwargs["account_sets_revision"])
+
+    def test_full_managed_target_receives_projection_revisions(self):
+        cursor = mock.Mock()
+        cursor.fetchall.return_value = [
+            {
+                "id": "express-1",
+                "adapter": "express",
+                "workspace_client_id": 7,
+            }
+        ]
+        workspace = {"id": 7, "name": "Client", "erp_endpoint_id": "express-1"}
+        state = {
+            "snapshot": {
+                "revision": 9,
+                "account_sets_revision": 5,
+                "account_sets": [{"source_id": "account-1", "label": "Account 1"}],
+            }
+        }
+        with (
+            mock.patch.object(
+                line_target_catalog,
+                "erp_shared_express_endpoint_enabled_for",
+                return_value=True,
+            ),
+            mock.patch.object(
+                line_target_catalog,
+                "enable_shared_express_select",
+                return_value=True,
+            ),
+            mock.patch.object(
+                line_target_catalog.line_target_projection,
+                "active_push_state",
+                return_value=(False, False),
+            ),
+            mock.patch.object(
+                line_target_catalog.line_target_projection,
+                "managed_target",
+                return_value={"endpoint_id": "express-1"},
+            ) as project,
+            mock.patch.object(
+                line_target_catalog,
+                "load_state_with_cursor",
+                return_value=state,
+            ),
+        ):
+            result = line_target_catalog.managed_targets(cursor, "tenant-1", [workspace])
+
+        self.assertEqual(result, [{"endpoint_id": "express-1"}])
+        self.assertEqual(
+            project.call_args.kwargs["account_sets"], state["snapshot"]["account_sets"]
+        )
+        self.assertEqual(project.call_args.kwargs["projection_revision"], 9)
+        self.assertEqual(project.call_args.kwargs["account_sets_revision"], 5)
 
     def test_compact_managed_target_keeps_bound_year_and_account_without_snapshot(self):
         account_dir = r"S:\2569\69EXP\TEST"
@@ -250,9 +331,13 @@ class LineTargetProjectionSnapshotTests(unittest.TestCase):
                     "attributes": {"path": r"S:\2569\69EXP\TEST", "writable": True},
                 }
             ],
+            projection_revision=9,
+            account_sets_revision=5,
         )
 
         self.assertEqual(target["account_choices"][0]["root_key"], r"S:\2569\69EXP")
+        self.assertEqual(target["projection_revision"], 9)
+        self.assertEqual(target["account_sets_revision"], 5)
 
 
 if __name__ == "__main__":

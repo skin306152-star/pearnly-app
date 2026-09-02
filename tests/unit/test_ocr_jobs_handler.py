@@ -101,6 +101,15 @@ class HandleWebOcrTests(unittest.TestCase):
         kinds = [c.kwargs.get("posting_kind") for c in core.call_args_list]
         self.assertEqual(kinds, ["stock", None])
 
+    def test_source_follows_queued_authenticated_entry(self):
+        with self._patch_core(
+            return_value={"response": {}, "raw_pages": [], "history_ids": []}
+        ) as core:
+            h.handle_web_ocr(_params(entry="erp", direction="purchase"), [], lambda p: None)
+            h.handle_web_ocr(_params(entry="cowork"), [], lambda p: None)
+        sources = [call.kwargs["source"] for call in core.call_args_list]
+        self.assertEqual(sources, ["erp_web", "manual"])
+
     def test_erp_async_without_direction_fails(self):
         with self._patch_core(
             side_effect=HTTPException(400, detail="erp.direction_required")

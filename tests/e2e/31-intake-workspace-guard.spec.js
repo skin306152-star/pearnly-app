@@ -307,9 +307,15 @@ test.describe('复核屏「套账不符」非阻断横幅', () => {
         expect(convertCalls[0].history_ids).toContain('h2');
         await expect(banner).toBeVisible(); // 错配未处理 → 横幅还在
 
-        // [保持当前套账] → 横幅消失,错配文件放行进确认全部
+        // [保持当前套账] → 先把草稿真实重绑到当前套账，成功后横幅才消失。
+        const keepRebind = page.waitForResponse((r) =>
+            r.url().includes('/api/workspace/rebind-history')
+        );
         await page.click('[data-wsg-keep]');
+        await keepRebind;
         await expect(banner).toHaveCount(0);
+        expect(rebindCalls.at(-1).history_ids).toEqual(['h1']);
+        expect(rebindCalls.at(-1).workspace_client_id).toBe(1);
         await page.click('#dx-inv-confirm-all');
         await expect.poll(() => convertCalls.length).toBe(2);
         expect(convertCalls[1].history_ids).toContain('h1');

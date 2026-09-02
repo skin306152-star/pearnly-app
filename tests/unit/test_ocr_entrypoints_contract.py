@@ -9,6 +9,12 @@ from services.ocr import entrypoints
 
 
 class OcrEntrypointContractTests(unittest.TestCase):
+    def test_web_upload_source_uses_authenticated_erp_entry_only(self):
+        self.assertEqual(entrypoints.web_upload_source("erp"), "erp_web")
+        for entry in ("cowork", "main", "pos", None, ""):
+            with self.subTest(entry=entry):
+                self.assertEqual(entrypoints.web_upload_source(entry), "manual")
+
     def test_all_entrypoints_share_supported_file_set(self):
         required = {
             ".pdf",

@@ -22,6 +22,7 @@ const PORT = 8979;
 const BASE = `http://127.0.0.1:${PORT}`;
 const OUT = path.join(__dirname, '_artifacts', 'intake-convert');
 fs.mkdirSync(OUT, { recursive: true });
+const HOME_HTML = fs.readFileSync(path.join(localServer.ROOT, 'home.html'), 'utf8');
 
 const RECOG = {
     ok: true,
@@ -151,9 +152,18 @@ test.beforeAll(async () => {
 test.afterAll(() => localServer.stop(server));
 
 let convertCalls = [];
+let statusCalls = [];
+let historyPutCalls = [];
+let commitCalls = [];
+let confirmationRequests = [];
 
-async function stub(page, convertResult, recogn) {
+async function stub(page, convertResult, recogn, entry = 'firm') {
     convertCalls = [];
+    statusCalls = [];
+    historyPutCalls = [];
+    commitCalls = [];
+    confirmationRequests = [];
+    const convertedIds = new Set();
     await page.route('**/api/**', async (route) => {
         const req = route.request();
         const u = req.url();
@@ -164,19 +174,98 @@ async function stub(page, convertResult, recogn) {
                 body: JSON.stringify(recogn || RECOG),
             });
         }
-        if (u.includes('/api/ocr/convert-documents')) {
-            convertCalls.push(JSON.parse(req.postData() || '{}'));
+        if (u.includes('/api/ocr/convert-documents/status')) {
+            confirmationRequests.push('status');
+            const payload = JSON.parse(req.postData() || '{}');
+            statusCalls.push(payload);
+            const ids = payload.history_ids || [];
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    resolved: ids.filter((id) => convertedIds.has(id)),
+                    unresolved: ids.filter((id) => !convertedIds.has(id)),
+                }),
+            });
+        }
+        if (u.endsWith('/api/ocr/convert-documents')) {
+            confirmationRequests.push('convert');
+            const payload = JSON.parse(req.postData() || '{}');
+            convertCalls.push(payload);
+            for (const row of convertResult.converted || []) convertedIds.add(row.history_id);
+            for (const row of convertResult.skipped || []) {
+                if (row.reason === 'already_converted') convertedIds.add(row.history_id);
+            }
             return route.fulfill({
                 status: 200,
                 contentType: 'application/json',
                 body: JSON.stringify(convertResult),
             });
         }
+        if (/\/api\/history\/[^/]+$/.test(new URL(u).pathname) && req.method() === 'PUT') {
+            confirmationRequests.push('put');
+            historyPutCalls.push(JSON.parse(req.postData() || '{}'));
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true }),
+            });
+        }
+        if (u.includes('/api/ocr/commit')) {
+            commitCalls.push(JSON.parse(req.postData() || '{}'));
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, committed: 1 }),
+            });
+        }
         if (u.includes('/api/erp/endpoints')) {
             return route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ items: [] }),
+                body: JSON.stringify({
+                    items:
+                        entry === 'erp'
+                            ? [
+                                  {
+                                      id: 'mrerp-1',
+                                      name: 'MR.ERP',
+                                      adapter: 'mrerp',
+                                      enabled: true,
+                                      is_default: true,
+                                      connection_state: 'configured',
+                                      config: {
+                                          comidyear: '15',
+                                          seldb: '1',
+                                          _username_enc_set: true,
+                                          _password_enc_set: true,
+                                      },
+                                  },
+                              ]
+                            : [],
+                }),
+            });
+        }
+        if (u.endsWith('/api/me')) {
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    id: 'u1',
+                    tenant_id: 't1',
+                    role: 'owner',
+                    is_super_admin: false,
+                    ocr_async_web: false,
+                }),
+            });
+        }
+        if (u.endsWith('/api/me/modules')) {
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    data: { modules: {}, business_type: 'firm', entry },
+                }),
             });
         }
         return route.fulfill({
@@ -187,15 +276,27 @@ async function stub(page, convertResult, recogn) {
     });
 }
 
-async function boot(page, convertResult, recogn) {
-    await page.addInitScript(() => {
+async function boot(page, convertResult, recogn, entry = 'firm') {
+    await page.addInitScript((selectedEntry) => {
         localStorage.setItem('mrpilot_token', 'e2e-intake-convert-token');
+        if (selectedEntry === 'erp') {
+            localStorage.setItem('mrpilot_token_erp', 'e2e-intake-convert-token');
+            localStorage.setItem('pearnly_active_workspace_client_id_erp', '1');
+            sessionStorage.setItem('pearnly_erp_intake_direction', 'purchase');
+        }
         localStorage.setItem('mrpilot_lang', 'zh');
         // Keep static home.html tests on the internal full shell.
-        localStorage.setItem('pearnly_entry', 'firm');
+        localStorage.setItem('pearnly_entry', selectedEntry);
+    }, entry);
+    if (entry === 'erp') {
+        await page.route(/\/erp(?:\?.*)?$/, (route) =>
+            route.fulfill({ status: 200, contentType: 'text/html', body: HOME_HTML })
+        );
+    }
+    await stub(page, convertResult, recogn, entry);
+    await page.goto(entry === 'erp' ? `${BASE}/erp` : `${BASE}/home.html`, {
+        waitUntil: 'domcontentloaded',
     });
-    await stub(page, convertResult, recogn);
-    await page.goto(`${BASE}/home.html`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof window.routeTo === 'function', { timeout: 20000 });
     await page.evaluate(() => {
         window.isOwner = () => true;
@@ -277,6 +378,38 @@ test.describe('OCR 确认 → 正式单据转换桥(前端接线 + UI 拍板)', 
             path: path.join(OUT, '03-skipped-reason-chip.png'),
             fullPage: true,
         });
+    });
+
+    test('ERP 确认只写入并转换一次，下一步与完成只读核验', async ({ page }) => {
+        const erpRecogn = JSON.parse(JSON.stringify(RECOG));
+        erpRecogn.invoices[0].fields.direction = 'purchase';
+        erpRecogn.invoices[0].fields.date_raw = '24 ธันวาคม 2568';
+        erpRecogn.invoices[0].fields.items[0].posting_kind = 'stock';
+        await boot(page, CONVERT_OK, erpRecogn, 'erp');
+        await page.setInputFiles('#dx-inv-file', {
+            name: 'invoice.pdf',
+            mimeType: 'application/pdf',
+            buffer: Buffer.from('x'),
+        });
+        await page.click('#dx-inv-start');
+        await page.waitForSelector('#dx-s-inv-review.active', { timeout: 8000 });
+
+        await page.click('#dx-inv-confirm-all');
+        await expect.poll(() => convertCalls.length).toBe(1);
+        expect(historyPutCalls.length).toBe(1);
+        expect(statusCalls.length).toBeGreaterThanOrEqual(2);
+        expect(confirmationRequests.slice(0, 4)).toEqual(['status', 'put', 'convert', 'status']);
+
+        await page.click('#dx-inv-rev-next');
+        await page.waitForSelector('#dx-s-inv-submit.active', { timeout: 8000 });
+        expect(historyPutCalls.length).toBe(1);
+        expect(convertCalls.length).toBe(1);
+
+        await page.click('#dx-inv-finish');
+        await page.waitForSelector('#dx-s-success.active', { timeout: 8000 });
+        expect(historyPutCalls.length).toBe(1);
+        expect(convertCalls.length).toBe(1);
+        expect(commitCalls.length).toBe(0);
     });
 
     test('识别记录页:「仅票据」范围条已整块删除', async ({ page }) => {

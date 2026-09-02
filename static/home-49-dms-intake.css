@@ -234,6 +234,9 @@
 .dmsx .dx-rv-bar-t b{font-size:12px}
 .dmsx .dx-rv-bar-t span{display:block;font-size:10px;color:var(--ink2);margin-top:3px}
 .dmsx .dx-rv-bar-a{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dmsx .dx-item-default{display:flex;align-items:center;gap:7px;min-height:38px;color:var(--ink2);font-size:10px;font-weight:750}
+.dmsx .dx-item-default select{height:38px;min-width:116px;border:1px solid var(--dx-line);border-radius:9px;background:var(--card);color:var(--ink);padding:0 9px;font:inherit;font-size:11px;font-weight:750;outline:0}
+.dmsx .dx-item-default select:focus{border-color:var(--dx-brand)}
 .dmsx .dx-acc{display:grid;gap:8px}
 .dmsx .dx-acc-item{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:clip}
 .dmsx .dx-acc-item.open{border-color:var(--dx-brand);box-shadow:var(--dx-shadow)}
@@ -392,6 +395,9 @@
   .dmsx .dx-drop{min-height:200px;padding:18px 14px}
   /* 发票复核/导出网格收单列 */
   .dmsx .dx-review-grid,.dmsx .dx-scan{grid-template-columns:1fr}
+  .dmsx .dx-rv-bar-a{width:100%}
+  .dmsx .dx-item-default{width:100%;justify-content:space-between}
+  .dmsx .dx-item-default select{flex:1;max-width:210px}
   .dmsx .dx-frow{grid-template-columns:34px 1fr auto}
   .dmsx .dx-frow .dx-fstatus{grid-column:1/-1;text-align:left}
   .dmsx .dx-erp{grid-template-columns:34px 1fr auto}

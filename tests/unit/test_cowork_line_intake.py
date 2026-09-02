@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import unittest
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest import mock
 
@@ -11,6 +12,7 @@ from fastapi import HTTPException
 
 from routes import cowork_line_intake_routes as routes
 from services.cowork_line import intake, intake_targets
+from services.erp import line_target_projection
 
 IDENTITY = {
     "tenant_id": "tenant-1",
@@ -441,12 +443,36 @@ class IntakeRouteTest(unittest.TestCase):
             "workspace_client_id": 69,
             "adapter": "express",
         }
-        full = {
-            **compact,
-            "account_catalog_loaded": True,
-            "account_choices": [{"key": "69EXP", "label": "69EXP"}],
-            "projection_revision": 7,
-        }
+        observed_at = datetime(2026, 9, 3, 12, 0, tzinfo=timezone.utc)
+        full = line_target_projection.managed_target(
+            {
+                "id": "endpoint-1",
+                "name": "Express",
+                "adapter": "express",
+                "enabled": True,
+                "shared_scope": True,
+                "workspace_client_id": 69,
+                "binding_generation": 1,
+                "bound_account_set": "69EXP",
+                "bound_profile_key": "profile-1",
+                "live_account_set": "69EXP",
+                "live_profile_key": "profile-1",
+                "agent_last_seen_at": observed_at,
+                "agent_version": "1.1.77",
+                "revoked_at": None,
+                "server_now": observed_at,
+            },
+            {"id": 69, "name": "Client", "erp_endpoint_id": "endpoint-1"},
+            account_sets=[
+                {
+                    "source_id": "69EXP",
+                    "label": "69EXP",
+                    "attributes": {"path": r"S:\2569\69EXP", "writable": True},
+                }
+            ],
+            projection_revision=7,
+            account_sets_revision=4,
+        )
         response = routes.Response()
         with (
             mock.patch.object(routes, "_draft_identity", return_value=IDENTITY),

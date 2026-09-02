@@ -60,6 +60,11 @@ def _int_value(value: object) -> int:
         return 0
 
 
+def _revision(value: object) -> int | None:
+    parsed = _int_value(value)
+    return parsed if parsed > 0 else None
+
+
 def _mrerp_account_choices(probe: dict[str, Any] | None) -> list[dict[str, Any]]:
     choices = []
     for company in (probe or {}).get("companies") or []:
@@ -271,6 +276,8 @@ def managed_target(
     waiting_lock: bool = False,
     account_sets: list[dict[str, Any]] | None = None,
     account_catalog_loaded: bool = True,
+    projection_revision: int | None = None,
+    account_sets_revision: int | None = None,
 ) -> dict[str, Any]:
     endpoint_id = str(row.get("id") or "")
     workspace_id = int(workspace["id"])
@@ -332,6 +339,8 @@ def managed_target(
         "account_set_label": account_label or None,
         "account_choices": account_choices,
         "account_catalog_loaded": account_catalog_loaded,
+        "projection_revision": _revision(projection_revision),
+        "account_sets_revision": _revision(account_sets_revision),
         "selected_account_key": selected_account_key or None,
         "connection_state": state,
         "configured": configured,
@@ -417,6 +426,8 @@ def legacy_target(
         "account_set_label": account_label or None,
         "account_choices": account_choices,
         "account_catalog_loaded": include_account_catalog,
+        "projection_revision": _revision((probe or {}).get("projection_revision")),
+        "account_sets_revision": _revision((probe or {}).get("account_sets_revision")),
         "selected_account_key": selected_account_key or None,
         "connection_state": state,
         "configured": configured,

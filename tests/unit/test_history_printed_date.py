@@ -34,6 +34,11 @@ class DeriveFromPrintedTests(unittest.TestCase):
         _derive_dates_from_printed(pages)
         self.assertEqual(pages[0]["fields"]["date"], "2026-03-15")
 
+    def test_thai_full_month_from_production_can_be_persisted(self):
+        pages = _pages("24 ธันวาคม 2568")
+        self.assertIsNone(_derive_dates_from_printed(pages))
+        self.assertEqual(pages[0]["fields"]["date"], "2025-12-24")
+
     def test_gregorian_printed_date_kept(self):
         pages = _pages("31/5/2026")
         _derive_dates_from_printed(pages)
@@ -67,6 +72,11 @@ class GregorianFromPrintedTests(unittest.TestCase):
     def test_iso_input(self):
         self.assertEqual(thai_date.gregorian_from_printed("2026-05-31"), "2026-05-31")
         self.assertEqual(thai_date.gregorian_from_printed("2569-05-31"), "2026-05-31")
+
+    def test_thai_full_and_abbreviated_month_names(self):
+        self.assertEqual(thai_date.gregorian_from_printed("24 ธันวาคม 2568"), "2025-12-24")
+        self.assertEqual(thai_date.gregorian_from_printed("24 ธ.ค. 2568"), "2025-12-24")
+        self.assertEqual(thai_date.gregorian_from_printed("24 ธค 2568"), "2025-12-24")
 
     def test_unparsable(self):
         for v in ("", None, "n/a", "31/5", "99/99/2569"):

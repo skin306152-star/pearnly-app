@@ -11,6 +11,20 @@ let server;
 const OUT = path.join(__dirname, '_artifacts', 'erp-web-entry');
 fs.mkdirSync(OUT, { recursive: true });
 const HOME_HTML = fs.readFileSync(path.join(localServer.ROOT, 'home.html'), 'utf8');
+const READY_MRERP = {
+    id: 'mrerp-1',
+    name: 'MR.ERP',
+    adapter: 'mrerp',
+    enabled: true,
+    is_default: true,
+    connection_state: 'configured',
+    config: {
+        comidyear: '15',
+        seldb: '1',
+        _username_enc_set: true,
+        _password_enc_set: true,
+    },
+};
 
 const RECOGNIZED = {
     ok: true,
@@ -90,11 +104,16 @@ test.afterAll(() => localServer.stop(server));
 
 async function boot(page, entry, state = {}) {
     if (!state.salesDocuments) state.salesDocuments = JSON.parse(JSON.stringify(SALES_RECORDS));
+    if (entry === 'erp' && state.erpEndpoints === undefined) {
+        state.erpEndpoints = [JSON.parse(JSON.stringify(READY_MRERP))];
+    }
     Object.assign(state, {
         recognizes: [],
         historyPuts: 0,
+        historyPutBodies: [],
         commits: 0,
         converts: 0,
+        formalHistoryIds: new Set(),
         lineCodeCalls: 0,
         erpPushes: 0,
         erpPushBodies: [],
@@ -137,23 +156,38 @@ async function boot(page, entry, state = {}) {
             body = state.recognized || RECOGNIZED;
         } else if (/^\/api\/history\/[^/]+$/.test(pathname) && req.method() === 'PUT') {
             state.historyPuts += 1;
+            state.historyPutBodies.push(req.postDataJSON());
             status =
                 state.failSave || (state.failSaveAfterConfirm && state.historyPuts > 2) ? 500 : 200;
         } else if (pathname === '/api/ocr/commit' && req.method() === 'POST') {
             state.commits += 1;
             body = { ok: true, committed: (req.postDataJSON().ids || []).length };
+        } else if (pathname === '/api/ocr/convert-documents/status') {
+            const historyIds = req.postDataJSON().history_ids || [];
+            body = {
+                resolved: historyIds.filter((historyId) => state.formalHistoryIds.has(historyId)),
+                unresolved: historyIds.filter(
+                    (historyId) => !state.formalHistoryIds.has(historyId)
+                ),
+            };
         } else if (pathname === '/api/ocr/convert-documents') {
             state.converts += 1;
             const historyIds = req.postDataJSON().history_ids || ['h1'];
-            body = {
-                converted: historyIds.map((historyId, index) => ({
-                    history_id: historyId,
-                    doc_type: 'purchase',
-                    doc_id: `doc-${index + 1}`,
-                    doc_no: `ERP-${String(index + 1).padStart(3, '0')}`,
-                })),
-                skipped: [],
-            };
+            if (state.convertErrorDetail) {
+                status = 409;
+                body = { detail: state.convertErrorDetail };
+            } else {
+                historyIds.forEach((historyId) => state.formalHistoryIds.add(historyId));
+                body = {
+                    converted: historyIds.map((historyId, index) => ({
+                        history_id: historyId,
+                        doc_type: 'purchase',
+                        doc_id: `doc-${index + 1}`,
+                        doc_no: `ERP-${String(index + 1).padStart(3, '0')}`,
+                    })),
+                    skipped: [],
+                };
+            }
         } else if (pathname === '/api/purchase/docs') {
             body = { docs: [], summary: null };
         } else if (pathname === '/api/purchase/docs/purchase-1') {
@@ -227,6 +261,7 @@ async function boot(page, entry, state = {}) {
                 id: 'u1',
                 tenant_id: 't1',
                 username: 'erp-owner',
+                role: 'owner',
                 is_super_admin: false,
                 ocr_async_web: false,
             };
@@ -424,7 +459,7 @@ test('ERP MR.ERP setup uses the isolated ERP session and refreshes its card imme
 
     await expect.poll(() => state.mrerpTestAuth).toBe('Bearer erp-e2e-token');
     await expect.poll(() => state.mrerpSaveAuth).toBe('Bearer erp-e2e-token');
-    await expect(page.locator('[data-erp="mrerp"] [data-erp-status]')).toContainText('已连接');
+    await expect(page.locator('[data-erp="mrerp"] [data-erp-status]')).toContainText('已配置');
 });
 
 test('ERP gets sales-system labels and records while POS keeps its invoicing menu', async ({
@@ -434,7 +469,14 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
     const erpState = {
         businessType: 'pos_only',
         erpEndpoints: [
-            { id: 'express-1', name: 'Express ERP', adapter: 'express', is_default: true },
+            {
+                id: 'express-1',
+                name: 'Express ERP',
+                adapter: 'express',
+                enabled: true,
+                is_default: true,
+                connection_state: 'online',
+            },
         ],
         erpPushResponses: [{ ok: true, status: 'pending' }, { ok: true }],
     };
@@ -630,10 +672,72 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
     await posPage.close();
 });
 
-test('ERP finish save failure stays in review without commit or result success', async ({
-    page,
-}) => {
-    const state = { failSaveAfterConfirm: true };
+test('ERP review applies one batch item type and keeps mixed-line overrides', async ({ page }) => {
+    const recognized = JSON.parse(JSON.stringify(RECOGNIZED));
+    recognized.invoices[0].fields.items = [
+        { name: 'Stock item', qty: '1', price: '80', subtotal: '80' },
+        { name: 'Installation', qty: '1', price: '20', subtotal: '20' },
+    ];
+    const state = { recognized };
+    await boot(page, 'erp', state);
+    await page.evaluate(() => window.routeTo('purchase'));
+    await page.waitForSelector('#pur-record-btn');
+    await page.click('#pur-record-btn');
+    await page.setInputFiles('#dx-inv-file', {
+        name: 'mixed-invoice.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('invoice'),
+    });
+    await page.click('#dx-inv-start');
+    await page.waitForSelector('#dx-s-inv-review.active');
+
+    const batch = page.locator('[data-iv-posting-default]');
+    const itemTypes = page.locator('select.dx-item-type');
+    await expect(batch).toBeVisible();
+    await expect(batch).toHaveValue('');
+    await batch.selectOption('stock');
+    await expect(itemTypes).toHaveCount(2);
+    await expect(itemTypes.nth(0)).toHaveValue('stock');
+    await expect(itemTypes.nth(1)).toHaveValue('stock');
+
+    await itemTypes.nth(1).selectOption('service');
+    await expect(batch).toHaveValue('');
+    await page.click('.dx-confirm-one');
+    await expect.poll(() => state.historyPutBodies.length).toBe(1);
+    expect(
+        state.historyPutBodies[0].pages[0].fields.items.map((item) => item.posting_kind)
+    ).toEqual(['stock', 'service']);
+});
+
+test('ERP reports the exact missing item field after a type was selected', async ({ page }) => {
+    const state = {
+        convertErrorDetail: {
+            code: 'erp.declaration_required',
+            histories: { h1: 'item_name_required' },
+        },
+    };
+    await boot(page, 'erp', state);
+    await page.evaluate(() => window.routeTo('purchase'));
+    await page.click('#pur-record-btn');
+    await page.setInputFiles('#dx-inv-file', {
+        name: 'erp-invoice.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('invoice'),
+    });
+    await page.click('#dx-inv-start');
+    await page.waitForSelector('#dx-s-inv-review.active');
+    await page.locator('select.dx-item-type').selectOption('stock');
+    await page.click('.dx-confirm-one');
+    await expect(page.locator('#mp-toast-wrap .mp-toast.error').last()).toContainText(
+        '请填写商品 / 服务名称'
+    );
+    await expect(page.locator('#mp-toast-wrap .mp-toast.error').last()).not.toContainText(
+        '请选择明细类型'
+    );
+});
+
+test('ERP next and finish do not replay the confirmed history write', async ({ page }) => {
+    const state = {};
     await boot(page, 'erp', state);
     await page.evaluate(() => window.routeTo('purchase'));
     await page.waitForSelector('#pur-record-btn');
@@ -646,18 +750,28 @@ test('ERP finish save failure stays in review without commit or result success',
     await page.click('#dx-inv-start');
     await page.waitForSelector('#dx-s-inv-review.active');
     await page.locator('select.dx-item-type').selectOption('stock');
-    await page.click('.dx-confirm-one');
+    await page.evaluate(() => {
+        const button = document.querySelector('.dx-confirm-one');
+        button.click();
+        button.click();
+    });
     await expect.poll(() => state.historyPuts).toBe(1);
     await expect.poll(() => state.converts).toBe(1);
+    await page.locator('.dx-acc-row[data-iv-toggle="0"]').click();
+    await expect(page.locator('.dx-acc-item.open input:not([disabled])')).toHaveCount(0);
+    await expect(page.locator('.dx-acc-item.open select:not([disabled])')).toHaveCount(0);
+    await expect(
+        page.locator('.dx-acc-item.open .dx-save-one, .dx-acc-item.open .dx-confirm-one')
+    ).toHaveCount(0);
     await page.click('#dx-inv-rev-next');
     await page.waitForSelector('#dx-s-inv-submit.active');
-    await expect.poll(() => state.historyPuts).toBe(2);
+    expect(state.historyPuts).toBe(1);
     await page.click('#dx-inv-finish');
-    await expect.poll(() => state.historyPuts).toBe(3);
+    await page.waitForSelector('#dx-s-success.active');
+    expect(state.historyPuts).toBe(1);
     expect(state.commits).toBe(0);
     expect(state.converts).toBe(1);
-    await expect(page.locator('#dx-s-inv-review')).toHaveCount(1);
-    await expect(page.locator('#dx-s-success.active')).toHaveCount(0);
+    await expect(page.locator('#dx-s-success.active')).toBeVisible();
 });
 
 test('ERP step four sends the final Express year and account selected by the user', async ({
@@ -1018,7 +1132,8 @@ test('ERP sales cannot finish before confirmation creates the formal document', 
     await page.click('#dx-inv-rev-next');
     await expect(page.locator('#dx-s-inv-submit.active')).toBeVisible();
     await page.click('#dx-inv-finish');
-    await expect.poll(() => state.commits).toBe(1);
+    await expect(page.locator('#dx-s-success.active')).toBeVisible();
+    expect(state.commits).toBe(0);
     expect(state.recognizes[0]).toContain('sales');
 });
 

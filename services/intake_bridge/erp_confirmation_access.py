@@ -76,18 +76,55 @@ def commit_shared_confirmation(request, user, tenant_id, history_ids) -> int | N
         return int(cur.rowcount or 0)
 
 
-def _shared_preflight(cur, request, user, tenant_id, workspace_client_id, history_ids):
+def _shared_preflight(
+    cur,
+    request,
+    user,
+    tenant_id,
+    workspace_client_id,
+    history_ids,
+    *,
+    lock_histories: bool = True,
+):
     check_workspace_scope(request, user, workspace_client_id)
-    preflight = preflight_confirmation(
-        cur,
-        tenant_id=tenant_id,
-        actor_id=str(user["id"]),
-        workspace_client_id=workspace_client_id,
-        history_ids=history_ids,
-    )
+    preflight_args = {
+        "tenant_id": tenant_id,
+        "actor_id": str(user["id"]),
+        "workspace_client_id": workspace_client_id,
+        "history_ids": history_ids,
+    }
+    if not lock_histories:
+        preflight_args["lock_histories"] = False
+    preflight = preflight_confirmation(cur, **preflight_args)
     for permission in preflight.required_permissions:
         require_perm(request, permission)
     return preflight
+
+
+def confirmation_status(cur, request, user, tenant_id, workspace_client_id, history_ids) -> dict:
+    """Read the canonical formal-document state without replaying confirmation writes."""
+    require_erp_portal(user)
+    ids = _history_ids(history_ids)
+    preflight = _shared_preflight(
+        cur,
+        request,
+        user,
+        tenant_id,
+        workspace_client_id,
+        ids,
+        lock_histories=False,
+    )
+    converted = _formal_history_ids_by_direction(
+        cur,
+        tenant_id=tenant_id,
+        actor_id=str(user["id"]),
+        workspace_client_id=int(workspace_client_id),
+        history_ids=ids,
+    )
+    directions = dict(preflight.history_directions)
+    resolved = [history_id for history_id in ids if history_id in converted[directions[history_id]]]
+    unresolved = [history_id for history_id in ids if history_id not in resolved]
+    return {"resolved": resolved, "unresolved": unresolved}
 
 
 def finish_resolved_histories(
@@ -166,23 +203,13 @@ def _require_formal_conversion(
     history_ids: list[str],
 ) -> None:
     """Require the canonical formal document created by this actor in this workspace."""
-    cur.execute(
-        "SELECT ocr_history_id::text AS history_id FROM purchase_docs "
-        "WHERE tenant_id = %s::uuid AND workspace_client_id = %s "
-        "AND created_by = %s::uuid AND status = 'posted' "
-        "AND ocr_history_id = ANY(%s::uuid[]) FOR SHARE",
-        (tenant_id, workspace_client_id, actor_id, history_ids),
+    converted = _formal_history_ids_by_direction(
+        cur,
+        tenant_id=tenant_id,
+        actor_id=actor_id,
+        workspace_client_id=workspace_client_id,
+        history_ids=history_ids,
     )
-    purchase_ids = {str(row["history_id"]) for row in cur.fetchall() or []}
-    cur.execute(
-        "SELECT ocr_history_id::text AS history_id FROM sales_documents "
-        "WHERE tenant_id = %s::uuid AND seller_workspace_client_id = %s "
-        "AND created_by = %s::uuid AND status = 'issued' "
-        "AND ocr_history_id = ANY(%s::uuid[]) FOR SHARE",
-        (tenant_id, workspace_client_id, actor_id, history_ids),
-    )
-    sales_ids = {str(row["history_id"]) for row in cur.fetchall() or []}
-    converted = {"purchase": purchase_ids, "sales": sales_ids}
     requested = set(history_ids)
     missing = [
         history_id
@@ -201,6 +228,28 @@ def _require_formal_conversion(
         )
 
 
+def _formal_history_ids_by_direction(
+    cur, *, tenant_id: str, actor_id: str, workspace_client_id: int, history_ids: list[str]
+) -> dict[str, set[str]]:
+    cur.execute(
+        "SELECT ocr_history_id::text AS history_id FROM purchase_docs "
+        "WHERE tenant_id = %s::uuid AND workspace_client_id = %s "
+        "AND created_by = %s::uuid AND status = 'posted' "
+        "AND ocr_history_id = ANY(%s::uuid[]) FOR SHARE",
+        (tenant_id, workspace_client_id, actor_id, history_ids),
+    )
+    purchase_ids = {str(row["history_id"]) for row in cur.fetchall() or []}
+    cur.execute(
+        "SELECT ocr_history_id::text AS history_id FROM sales_documents "
+        "WHERE tenant_id = %s::uuid AND seller_workspace_client_id = %s "
+        "AND created_by = %s::uuid AND status = 'issued' "
+        "AND ocr_history_id = ANY(%s::uuid[]) FOR SHARE",
+        (tenant_id, workspace_client_id, actor_id, history_ids),
+    )
+    sales_ids = {str(row["history_id"]) for row in cur.fetchall() or []}
+    return {"purchase": purchase_ids, "sales": sales_ids}
+
+
 def preflight_confirmation(
     cur,
     *,
@@ -208,6 +257,7 @@ def preflight_confirmation(
     actor_id: str,
     workspace_client_id: int,
     history_ids: list,
+    lock_histories: bool = True,
 ) -> ConfirmationPreflight:
     """Lock and validate the entire batch before formal-document writes begin."""
     ids = _history_ids(history_ids)
@@ -220,11 +270,12 @@ def preflight_confirmation(
     if workspace is None:
         raise HTTPException(404, detail="authz.not_found")
 
+    history_lock = " FOR UPDATE" if lock_histories else ""
     cur.execute(
         "SELECT id::text AS id, user_id::text AS user_id, tenant_id::text AS tenant_id, "
         "workspace_client_id, pages, source FROM ocr_history "
         "WHERE id = ANY(%s::uuid[]) AND tenant_id = %s::uuid AND user_id = %s::uuid "
-        "ORDER BY id FOR UPDATE",
+        f"ORDER BY id{history_lock}",
         (ids, tenant_id, actor_id),
     )
     rows = {str(row["id"]): row for row in cur.fetchall() or []}
@@ -241,7 +292,10 @@ def preflight_confirmation(
         except (TypeError, ValueError):
             raise HTTPException(404, detail="history.not_found") from None
         if actual_workspace != requested_workspace:
-            raise HTTPException(404, detail="history.not_found")
+            raise HTTPException(
+                409,
+                detail={"code": "erp.workspace_mismatch", "history_ids": ids},
+            )
 
     directions = []
     directions_by_id = {}

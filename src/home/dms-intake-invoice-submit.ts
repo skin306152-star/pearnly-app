@@ -21,10 +21,11 @@ import {
 } from './dms-intake-erp-push.js';
 import { renderReview } from './dms-intake-review.js';
 import {
-    confirmIndices,
+    confirmationErrorMessage,
     confirmedIndices,
     convertedHistoryIds,
     pagesForInvoice,
+    verifyFormalConfirmation,
 } from './dms-intake-review-convert.js';
 import { isErpEntry } from './erp-intake.js';
 
@@ -42,18 +43,18 @@ async function ensureErpFormalConfirmation(): Promise<boolean> {
         returnToReviewForConfirmation();
         return false;
     }
-    const converted = await confirmIndices(confirmed);
+    const converted = await verifyFormalConfirmation(confirmed);
     const ids = Array.from(new Set(allHistoryIds().filter(Boolean)));
     if (!converted || convertedHistoryIds(ids).length !== ids.length) {
-        returnToReviewForConfirmation();
+        returnToReviewForConfirmation(confirmationErrorMessage());
         return false;
     }
     return true;
 }
 
-function returnToReviewForConfirmation(): void {
+function returnToReviewForConfirmation(message = t('dxi-erp-confirm-required')): void {
     renderReview();
-    showToast(t('dxi-erp-confirm-required'), 'error');
+    showToast(message, 'error');
 }
 async function loadEndpoints() {
     IV.endpoints = (await fetchErpEndpoints(false, IV.endpoints)) as Endpoint[];
@@ -181,15 +182,15 @@ export async function doFinish() {
     }
     IV.busy = true;
     renderSubmit();
-    // 终态:① 先把复核面改过的字段(已实时写入 IV.results)全部写进各自记录 →
-    // ② 再 commit 草稿→正式落识别记录。顺序不能反,否则落库的是识别时原值(治"改了不同步")。
-    const saved = await persistAllEdits();
+    // 普通工作台在终态写入编辑值并提交草稿。ERP 入口已在步骤 3 一次性完成
+    // PUT→正式单转换；步骤 4 只能回读状态和推送，不能重放已锁定记录的写操作。
+    const saved = isErpEntry() ? true : await persistAllEdits();
     if (isErpEntry() && !saved) {
         IV.busy = false;
         renderReview();
         return;
     }
-    const committed = await commitStaged();
+    const committed = isErpEntry() ? true : await commitStaged();
     if (isErpEntry() && !committed) {
         showToast(t('dxi-rev-save-fail'), 'error');
         IV.busy = false;

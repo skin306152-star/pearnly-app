@@ -60,6 +60,7 @@ def two_digit_year_to_gregorian(yy: int, anchor_year: Optional[int] = None) -> i
 
 
 _PRINTED_DATE = re.compile(r"^\s*(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\s*$")
+_PRINTED_NAMED_DATE = re.compile(r"^\s*(\d{1,2})\s+([^\d\s,]+)\s*,?\s*(\d{2,4})\s*$", re.IGNORECASE)
 
 
 def gregorian_from_printed(printed: object, anchor_year: Optional[int] = None) -> Optional[str]:
@@ -77,9 +78,17 @@ def gregorian_from_printed(printed: object, anchor_year: Optional[int] = None) -
         year, month, day = int(iso.group(1)), int(iso.group(2)), int(iso.group(3))
     else:
         m = _PRINTED_DATE.match(s)
-        if not m:
+        named = _PRINTED_NAMED_DATE.match(s) if not m else None
+        if m:
+            day, month, raw_year = int(m.group(1)), int(m.group(2)), m.group(3)
+        elif named:
+            day = int(named.group(1))
+            month = _printed_month_number(named.group(2))
+            raw_year = named.group(3)
+            if month is None:
+                return None
+        else:
             return None
-        day, month, raw_year = int(m.group(1)), int(m.group(2)), m.group(3)
         year = (
             two_digit_year_to_gregorian(int(raw_year), anchor_year)
             if len(raw_year) == 2
@@ -220,3 +229,14 @@ def printed_month_map(*, th_abbr=None, en_full=False, en_abbr=False):
     if en_abbr:
         mapping.update({name: i + 1 for i, name in enumerate(MONTHS_EN_ABBR3)})
     return mapping
+
+
+def _printed_month_number(value: object) -> Optional[int]:
+    """Resolve a Thai or English printed month token, including common Thai abbreviations."""
+    token = str(value or "").strip().casefold()
+    if not token:
+        return None
+    aliases = printed_month_map(th_abbr="dotted", en_full=True, en_abbr=True)
+    aliases.update(printed_month_map(th_abbr="plain"))
+    aliases.update(printed_month_map(th_abbr="dotted_trailing"))
+    return aliases.get(token) or aliases.get(token.rstrip("."))

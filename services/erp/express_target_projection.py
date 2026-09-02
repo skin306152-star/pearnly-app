@@ -9,7 +9,10 @@ from typing import Any, Iterable, Mapping
 
 from core import db
 from services.erp.target_projection_contract import normalize_projection
-from services.erp.target_projection_store import publish_with_cursor
+from services.erp.target_projection_store import (
+    publish_with_cursor,
+    record_refresh_state_with_cursor,
+)
 
 _COLLECTOR_KIND = "companion"
 
@@ -242,11 +245,16 @@ def ingest_express_heartbeat(endpoint_id: str, body: Mapping[str, Any]) -> dict[
     endpoint_id = str(endpoint_id or "").strip()
     if not endpoint_id or not isinstance(body, Mapping):
         return {"published": False, "reason": "invalid"}
-    account_sets = _account_sets(body.get("account_sets"))
+    reported_account_sets = body.get("account_sets")
+    account_sets_reported = reported_account_sets is not None
+    account_sets = _account_sets(reported_account_sets)
     selected_key = _selected_account_set(body)
-    account_sets = _ensure_selected_choice(account_sets, body, selected_key)
+    if not account_sets_reported:
+        account_sets = _ensure_selected_choice(account_sets, body, selected_key)
     has_catalog = isinstance(body.get("catalog"), Mapping)
     request_scope = str(body.get("master_refresh_scope") or "").strip()
+    request_id = body.get("master_refresh_request_id")
+    refresh_error = str(body.get("master_refresh_error") or "").strip()
     refreshed_account_key = normalize_express_account_key(body.get("master_refresh_account_set"))
     projection_key = (
         refreshed_account_key
@@ -254,7 +262,8 @@ def ingest_express_heartbeat(endpoint_id: str, body: Mapping[str, Any]) -> dict[
         else selected_key
     )
     projection_key_is_registered = any(row["source_id"] == projection_key for row in account_sets)
-    if not account_sets and not (has_catalog and selected_key):
+    empty_account_scan = account_sets_reported and not account_sets
+    if not account_sets and not (has_catalog and selected_key) and not empty_account_scan:
         return {"published": False, "reason": "empty"}
 
     observed_at = datetime.now(timezone.utc)
@@ -284,8 +293,36 @@ def ingest_express_heartbeat(endpoint_id: str, body: Mapping[str, Any]) -> dict[
                 (tenant_id, endpoint_id),
             )
 
-        request_id = body.get("master_refresh_request_id")
-        refresh_error = str(body.get("master_refresh_error") or "").strip()
+        if empty_account_scan:
+            error_code = refresh_error or "ERR_ACCOUNT_SET_EMPTY"
+            failure_scope = projection_key if request_scope == "account_set" else None
+            record_refresh_state_with_cursor(
+                cur,
+                tenant_id=tenant_id,
+                endpoint_id=endpoint_id,
+                account_set_key=failure_scope,
+                status="error",
+                observed_at=observed_at,
+                collector=_collector(body),
+                error_code=error_code,
+            )
+            if request_id and request_scope in {"endpoint", "account_set"}:
+                from services.erp.target_refresh import complete_express_refresh_with_cursor
+
+                complete_express_refresh_with_cursor(
+                    cur,
+                    request_id=request_id,
+                    endpoint_id=endpoint_id,
+                    account_set_key=projection_key,
+                    scope_kind=request_scope,
+                    error_code=error_code,
+                )
+            return {
+                "published": False,
+                "reason": "account_sets_empty",
+                "error_code": error_code,
+            }
+
         if request_id and refresh_error and request_scope in {"endpoint", "account_set"}:
             from services.erp.target_refresh import complete_express_refresh_with_cursor
 

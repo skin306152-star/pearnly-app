@@ -135,6 +135,7 @@ def managed_targets(
                 if load_account_catalog
                 else None
             )
+            projection_snapshot = (projection_state or {}).get("snapshot") or {}
             targets.append(
                 line_target_projection.managed_target(
                     row,
@@ -142,10 +143,10 @@ def managed_targets(
                     duplicate=duplicate,
                     cloud_in_flight=cloud_in_flight,
                     waiting_lock=waiting_lock,
-                    account_sets=((projection_state or {}).get("snapshot") or {}).get(
-                        "account_sets"
-                    ),
+                    account_sets=projection_snapshot.get("account_sets"),
                     account_catalog_loaded=load_account_catalog,
+                    projection_revision=projection_snapshot.get("revision"),
+                    account_sets_revision=projection_snapshot.get("account_sets_revision"),
                 )
             )
     return targets

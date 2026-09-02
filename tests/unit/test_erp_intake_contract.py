@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from core import db  # noqa: F401
 from routes import erp_intake_routes as routes
+from routes import erp_confirmation_status_routes as status_routes
 from routes import history_routes
 from services.erp.express_push.posting_kind import item_posting_kinds
 from services.ocr_history import staged
@@ -119,6 +120,32 @@ class ErpIntakeContractTests(unittest.TestCase):
 
 
 class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
+    async def test_confirmation_status_is_read_only_and_actor_scoped(self):
+        cur = _Cur()
+        user = {"id": "u1", "tenant_id": "t1", "entry": "erp", "role": "owner"}
+        expected = {"resolved": ["h1"], "unresolved": []}
+        with (
+            mock.patch.object(status_routes, "get_current_user_from_request", return_value=user),
+            mock.patch.object(status_routes, "_check_history_access"),
+            mock.patch.object(status_routes, "_tid", return_value="t1"),
+            mock.patch.object(status_routes.team_access, "assert_owned_histories") as owned,
+            mock.patch.object(status_routes.db, "get_cursor_rls", return_value=_Ctx(cur)) as cursor,
+            mock.patch.object(
+                status_routes.erp_confirmation_access,
+                "confirmation_status",
+                return_value=expected,
+            ) as inspect,
+        ):
+            result = await status_routes.confirmation_status(
+                status_routes.ConfirmationStatusRequest(history_ids=["h1"], workspace_client_id=1),
+                mock.MagicMock(),
+            )
+        self.assertEqual(result, expected)
+        owned.assert_called_once_with(mock.ANY, user, ["h1"])
+        cursor.assert_called_once_with(tenant_id="t1", user_id="u1")
+        inspect.assert_called_once_with(cur, mock.ANY, user, "t1", 1, ["h1"])
+        self.assertEqual(cur.sql, [])
+
     async def test_erp_commit_rejects_history_without_formal_document(self):
         cur = _Cur()
         user = {"id": "u1", "tenant_id": "t1", "entry": "erp", "role": "owner"}

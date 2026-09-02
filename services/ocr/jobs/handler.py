@@ -57,6 +57,7 @@ def handle_web_ocr(
 ) -> Union[Dict[str, Any], Tuple[str, dict]]:
     from fastapi import HTTPException
 
+    from services.ocr.entrypoints import web_upload_source
     from services.ocr.recognize.core import run_recognition_core
 
     user_id = params.get("user_id")
@@ -97,6 +98,7 @@ def handle_web_ocr(
             posting_kind=posting_kind,
             direction=direction,
             staged=True,
+            source=web_upload_source(user.get("entry")),
         )
     except HTTPException as he:
         # 校验/非票/余额不足:终态失败,前端按明确原因展示(绝不冒充完成)。

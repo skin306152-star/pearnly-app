@@ -963,17 +963,6 @@
       ],
       "only_e2e": ["发票任务露 MR.ERP 与 Express 两卡、身份证下架、切汇总表仍两卡"]
     },
-    "23-posting-preview-render.spec.js": {
-      "covers": [
-        "src/home/**",
-        "static/home-*.css",
-        "home.html",
-        "login.html",
-        "static/i18n-data.js",
-        "tests/e2e/_helpers/**"
-      ],
-      "only_e2e": ["步 4 推送前预览四态真浏览器渲染 + 截图为证"]
-    },
     "23-summary-import.spec.js": {
       "covers": [
         "src/home/**",
@@ -1179,7 +1168,7 @@
         "ERP 销售系统显示销售发票、销售记录、开票资料，POS 继续显示原发票系统且不出现销售记录。",
         "ERP 销售记录在桌面和手机真实视口呈现采购式汇总，并进入独立销售单据详情查看原票、买方、商品/服务、金额、收款和推送状态；不得调用开票详情或出现 PDF、打印、付款二维码、红冲、补开等开票操作。",
         "ERP 集成页只保留成熟 LINE 绑定卡，显示 ERP 专用 QR、Basic ID、6 位码、自动轮询、已绑定和移动端触控状态。",
-        "ERP 录入第 4 步展示当前连接已验证的年度与账套；用户改选后刷新仍保留选择，最终推送请求携带该物理账套键。"
+        "ERP 录入第 4 步初始只从 compact endpoints 展示绑定默认值，不下载完整目录；每次开始打开年度或账套时在同一卡片原位显示动态提示，先请求第三方 ERP 刷新并读取对应的最新 projection，同一次选择的第二击与 change 不重复刷新。Express 年度与账套级联，切年度清空旧账套并禁用推送，MR.ERP 保持单账套框；刷新失败保留原选择并明确提示。最终每张推送都携带精确物理账套键，批量 N 张不会逐票重读 endpoints、触发主档刷新或读取 projection。"
       ]
     },
     "37-dms-line-cross-platform.spec.js": {

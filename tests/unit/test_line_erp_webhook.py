@@ -420,6 +420,13 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         }
         cursor = _Cursor(count=2)
         selection = _express_selection()
+        selection.update(
+            {
+                "account_set": r"S:\\70EXP\\TEST2020",
+                "catalog_refresh_request_id": "11111111-1111-4111-8111-111111111111",
+                "catalog_refresh_revision": 8,
+            }
+        )
         records = [
             {
                 "pages": [
@@ -496,7 +503,10 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             endpoint_id="ep-1",
             workspace_client_id=7,
             posting_kind="stock",
+            account_set_key=r"S:\\70EXP\\TEST2020",
             account_config=None,
+            catalog_refresh_request_id="11111111-1111-4111-8111-111111111111",
+            catalog_refresh_revision=8,
         )
         clear_session.assert_called_once_with("t1", "line-u1")
 

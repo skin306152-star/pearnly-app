@@ -17,7 +17,7 @@ from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled
 from services.erp.shared_express_live import _profile_is_fresh
 from services.erp.shared_express_schema import enable_shared_express_select
 from services.erp.line_target_choice import endpoint_with_account_choice
-from services.erp.selected_account import resolve_account_choice
+from services.erp.selected_account import require_catalog_evidence, resolve_account_choice
 from services.ocr_history.queries import _DETAIL_COLUMNS, _detail_row
 
 _WEB_ENTRIES = frozenset({"main", "cowork", "erp"})
@@ -124,7 +124,7 @@ def _endpoint_after_lock(
         "workspace_client_id, binding_generation, bound_account_set, bound_profile_key, "
         "live_account_set, live_profile_key, agent_last_seen_at, revoked_at, "
         "clock_timestamp() AS db_now FROM erp_endpoints "
-        "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s LIMIT 1",
+        "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s LIMIT 1 FOR SHARE",
         (endpoint_id, tenant_id, workspace_client_id),
     )
     endpoint = _row_dict(cur.fetchone())
@@ -260,6 +260,9 @@ def reserve_managed_manual_push(
     posting_kind: Optional[str],
     account_set_key: Optional[str] = None,
     account_config: Optional[dict[str, Any]] = None,
+    target_refresh_request_id: Optional[str] = None,
+    target_projection_revision: Optional[int] = None,
+    catalog_evidence_required: bool = False,
 ) -> Optional[dict]:
     tenant_id = str(user.get("tenant_id") or "").strip()
     actor_id = str(user.get("id") or "").strip()
@@ -309,6 +312,17 @@ def reserve_managed_manual_push(
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
         )
+        if catalog_evidence_required:
+            require_catalog_evidence(
+                endpoint,
+                tenant_id=tenant_id,
+                user_id=actor_id,
+                account_set_key=account_set_key,
+                trusted_account_config=account_config,
+                request_id=target_refresh_request_id,
+                revision=target_projection_revision,
+                cur=cur,
+            )
         selected_choice = resolve_account_choice(
             endpoint,
             tenant_id=tenant_id,
@@ -433,6 +447,8 @@ async def maybe_reserve_manual_push(
     posting_kind: Optional[str],
     account_set_key: Optional[str] = None,
     account_config: Optional[dict[str, Any]] = None,
+    target_refresh_request_id: Optional[str] = None,
+    target_projection_revision: Optional[int] = None,
 ) -> Optional[dict]:
     raw_workspace = request.headers.get("X-Workspace-Client-Id")
 
@@ -449,6 +465,9 @@ async def maybe_reserve_manual_push(
             posting_kind=posting_kind,
             account_set_key=account_set_key,
             account_config=account_config,
+            target_refresh_request_id=target_refresh_request_id,
+            target_projection_revision=target_projection_revision,
+            catalog_evidence_required=True,
         )
 
     return await asyncio.to_thread(run)

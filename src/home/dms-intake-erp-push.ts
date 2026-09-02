@@ -7,19 +7,26 @@
 import { esc, authHeaders } from './dms-intake-core.js';
 import { isAgentOffline } from './erp-agent-liveness.js';
 import {
-    accountChoiceLabel,
+    accountChoicesForSelectedRoot,
     accountKey,
-    enrichEndpointAccountChoices,
+    erpRootChoices,
     preserveAccountSelection,
+    seedEndpointAccountChoice,
     type ErpEndpoint,
 } from './dms-intake-erp-accounts.js';
 
 export {
+    consumeErpCatalogArm,
     selectedAccountKey,
     selectedAccountLabel,
+    selectedCatalogEvidence,
+    isErpAccountSelectionComplete,
+    loadErpAccountChoices,
     selectErpAccount,
+    selectErpRoot,
     type ErpAccountChoice,
     type ErpEndpoint,
+    type ErpRootChoice,
 } from './dms-intake-erp-accounts.js';
 
 function t(k: string): string {
@@ -33,7 +40,17 @@ function expressState(endpoint: ErpEndpoint): string {
     return isAgentOffline(endpoint) ? 'offline' : 'online';
 }
 
-async function probeEndpoint(endpoint: ErpEndpoint, refresh: boolean): Promise<ErpEndpoint> {
+function mrErpConfigured(endpoint: ErpEndpoint): boolean {
+    const config = endpoint.config || {};
+    const credentials = Boolean(
+        (config.username_enc && config.password_enc) ||
+        (config._username_enc_set && config._password_enc_set) ||
+        (config.username && config.password)
+    );
+    return credentials && Boolean(config.comidyear && config.seldb);
+}
+
+async function probeEndpoint(endpoint: ErpEndpoint): Promise<ErpEndpoint> {
     const adapter = String(endpoint.adapter || '').toLowerCase();
     if (endpoint.enabled === false) {
         return {
@@ -55,50 +72,39 @@ async function probeEndpoint(endpoint: ErpEndpoint, refresh: boolean): Promise<E
     if (adapter !== 'mrerp') {
         return { ...endpoint, ready: true, connection_state: 'online', block_reason: null };
     }
-    try {
-        const suffix = refresh ? '?refresh=1' : '';
-        const response = await fetch(
-            `/api/erp/endpoints/${encodeURIComponent(String(endpoint.id))}/test-connection${suffix}`,
-            { method: 'POST', headers: authHeaders() }
-        );
-        const result = (await response.json().catch(() => ({}))) as {
-            ok?: boolean;
-            companies?: Array<Record<string, unknown>>;
-        };
-        const ready = response.ok && result.ok === true;
-        return {
-            ...endpoint,
-            ready,
-            connection_state: ready ? 'online' : 'offline',
-            block_reason: ready ? null : 'erp_connection_failed',
-            probe_companies: result.companies || [],
-        };
-    } catch {
-        return {
-            ...endpoint,
-            ready: false,
-            connection_state: 'offline',
-            block_reason: 'connection_check_failed',
-        };
-    }
+    const state = String(endpoint.connection_state || '').toLowerCase();
+    const blocked = new Set(['disabled', 'offline', 'unconfigured', 'revoked']);
+    const configured = mrErpConfigured(endpoint);
+    const ready = blocked.has(state)
+        ? false
+        : endpoint.ready === true ||
+          state === 'online' ||
+          state === 'configured' ||
+          String(endpoint.last_status || '').toLowerCase() === 'success' ||
+          configured;
+    return {
+        ...endpoint,
+        ready,
+        connection_state: state || (configured ? 'configured' : 'unconfigured'),
+        block_reason: ready ? null : configured ? 'erp_connection_failed' : 'credentials_missing',
+    };
 }
 
 // 拉取并检测全部 ERP 端点。不可用端点保留给界面说明原因，但不能被选择或推送。
 export async function fetchErpEndpoints(
-    refresh = false,
+    _refresh = false,
     previous: ErpEndpoint[] = []
 ): Promise<ErpEndpoint[]> {
     try {
-        const r = await fetch('/api/erp/endpoints', { headers: authHeaders() });
+        const r = await fetch('/api/erp/endpoints?compact=true', { headers: authHeaders() });
         const d = (await r.json().catch(() => ({}))) as { items?: ErpEndpoint[] };
         const endpoints = (d.items || []).filter(
             (e) => (e.adapter || '').toLowerCase() !== 'mrerp_dms'
         );
-        const probed = await Promise.all(
-            endpoints.map((endpoint) => probeEndpoint(endpoint, refresh))
-        );
-        const enriched = await Promise.all(probed.map(enrichEndpointAccountChoices));
-        return enriched.map((endpoint) => preserveAccountSelection(endpoint, previous));
+        const probed = await Promise.all(endpoints.map((endpoint) => probeEndpoint(endpoint)));
+        return probed
+            .map(seedEndpointAccountChoice)
+            .map((endpoint) => preserveAccountSelection(endpoint, previous));
     } catch {
         return [];
     }
@@ -115,6 +121,7 @@ export function pickDefaultTarget(endpoints: ErpEndpoint[], current: string): st
 export function endpointStateLabel(endpoint: ErpEndpoint): string {
     const state = String(endpoint.connection_state || 'offline');
     if (state === 'online') return t('dx-erp-connected');
+    if (state === 'configured') return t('dx-erp-configured');
     if (state === 'disabled' || state === 'revoked') return t('dx-erp-disabled');
     if (state === 'offline') return t('dx-erp-offline');
     if (state === 'unbound') return t('dx-erp-profile-unconfirmed');
@@ -126,9 +133,64 @@ export function isErpTargetReady(endpoints: ErpEndpoint[], target: string): bool
     return endpoints.some((endpoint) => String(endpoint.id) === target && endpoint.ready === true);
 }
 
-export async function ensureErpTargetReady(target: string, refresh = false): Promise<boolean> {
-    if (!target) return false;
-    return isErpTargetReady(await fetchErpEndpoints(refresh), target);
+function selectOption(value: string, label: string, selected: string): string {
+    return `<option value="${esc(value)}"${value === selected ? ' selected' : ''}>${esc(label)}</option>`;
+}
+
+function selectionFieldsHtml(endpoint: ErpEndpoint, active: boolean): string {
+    if (!active) return '';
+    const adapter = String(endpoint.adapter || '').toLowerCase();
+    const endpointId = esc(String(endpoint.id));
+    const selectedAccount = accountKey(endpoint, endpoint.selected_account_key);
+    const loading = endpoint.account_catalog_loading === true;
+    const loadingKey = endpoint.account_catalog_slow
+        ? 'dx-erp-catalog-still-scanning'
+        : 'dx-erp-catalog-loading';
+    const loadingState = loading
+        ? `<div class="dx-erp-fields-loading" role="status" aria-live="polite"><i aria-hidden="true"></i>${esc(t(loadingKey))}</div>`
+        : '';
+    const errorState =
+        !loading && endpoint.account_catalog_error
+            ? `<div class="dx-erp-fields-error" role="alert" aria-live="polite">${esc(t(endpoint.account_catalog_error === 'timeout' ? 'dx-erp-catalog-timeout' : 'dx-erp-catalog-load-failed'))}</div>`
+            : '';
+    const interaction = (control: 'root' | 'account'): string => {
+        if (loading) return '';
+        return endpoint.account_catalog_armed === control
+            ? ` data-erp-catalog-armed="${control}"`
+            : ` data-erp-catalog-refresh="${control}"`;
+    };
+    if (adapter === 'express') {
+        const roots = erpRootChoices(endpoint);
+        const selectedRoot = accountKey(endpoint, endpoint.selected_root_key);
+        const rootOptions = roots
+            .map((root) => selectOption(root.key, root.label, selectedRoot))
+            .join('');
+        const accountOptions = accountChoicesForSelectedRoot(endpoint)
+            .map((choice) => selectOption(choice.key, choice.label, selectedAccount))
+            .join('');
+        return (
+            `<div class="dx-erp-fields${loading ? ' is-loading' : ''}">` +
+            `<label><span>${esc(t('dx-erp-year-label'))}</span>` +
+            `<select data-erp-root-select="${endpointId}"${interaction('root')}${loading ? ' disabled' : ''}>` +
+            `<option value=""${selectedRoot ? '' : ' selected'} disabled>${esc(t('dx-erp-year-placeholder'))}</option>` +
+            `${rootOptions}</select></label>` +
+            `<label><span>${esc(t('dx-erp-account-label'))}</span>` +
+            `<select data-erp-account-select="${endpointId}"${interaction('account')}${selectedRoot && !loading ? '' : ' disabled'}>` +
+            `<option value=""${selectedAccount ? '' : ' selected'} disabled>${esc(t('dx-erp-account-placeholder'))}</option>` +
+            `${accountOptions}</select></label>${errorState}${loadingState}</div>`
+        );
+    }
+    if (adapter !== 'mrerp') return '';
+    const accountOptions = (endpoint.account_choices || [])
+        .map((choice) => selectOption(choice.key, choice.label, selectedAccount))
+        .join('');
+    return (
+        `<div class="dx-erp-fields single${loading ? ' is-loading' : ''}">` +
+        `<label><span>${esc(t('dx-erp-account-label'))}</span>` +
+        `<select data-erp-account-select="${endpointId}"${interaction('account')}${loading ? ' disabled' : ''}>` +
+        `<option value=""${selectedAccount ? '' : ' selected'} disabled>${esc(t('dx-erp-account-placeholder'))}</option>` +
+        `${accountOptions}</select></label>${errorState}${loadingState}</div>`
+    );
 }
 
 // 全部端点都展示；只有当前已就绪端点提供点击入口。
@@ -144,29 +206,13 @@ export function erpTargetCardsHtml(
             const lg = (e.adapter || '').slice(0, 2).toUpperCase();
             const meta = (e.is_default ? t('dxi-erp-default') + ' · ' : '') + endpointStateLabel(e);
             const attr = e.ready === true ? ` ${targetAttribute}="${esc(String(e.id))}"` : '';
-            const accountSelect =
-                on && e.account_choices?.length
-                    ? `<div class="dx-erp-account"><label>${esc(t('exp-step-3'))}</label>` +
-                      `<select data-erp-account-select="${esc(String(e.id))}">` +
-                      e.account_choices
-                          .map(
-                              (choice) =>
-                                  `<option value="${esc(choice.key)}"${
-                                      accountKey(e, choice.key) ===
-                                      accountKey(e, e.selected_account_key)
-                                          ? ' selected'
-                                          : ''
-                                  }>${esc(accountChoiceLabel(choice))}</option>`
-                          )
-                          .join('') +
-                      '</select></div>'
-                    : '';
             return (
-                `<div class="dx-erp${on}${blocked}"${attr}>` +
+                `<div class="dx-erp${on}${blocked}"><div class="dx-erp-head"${attr}>` +
                 `<div class="dx-erp-lg">${esc(lg)}</div>` +
                 `<div class="dx-erp-c"><b>${esc(e.name || e.adapter || 'ERP')}</b>` +
                 `<span>${esc(meta)}</span></div><div class="dx-erp-chk" aria-hidden="true"></div></div>` +
-                accountSelect
+                selectionFieldsHtml(e, Boolean(on)) +
+                '</div>'
             );
         })
         .join('');
@@ -233,10 +279,10 @@ export async function pushHistory(
     historyId: string,
     target: string,
     postingKind?: string,
-    accountSetKey?: string
+    accountSetKey?: string,
+    catalogEvidence?: { requestId: string; revision: number }
 ): Promise<PushOutcome> {
     try {
-        if (!(await ensureErpTargetReady(target))) return 'needs_action';
         const body: Record<string, unknown> = {
             history_id: historyId,
             operation_id: operationId(),
@@ -244,6 +290,10 @@ export async function pushHistory(
         if (target) body.endpoint_id = target;
         if (postingKind) body.posting_kind = postingKind;
         if (accountSetKey) body.account_set_key = accountSetKey;
+        if (catalogEvidence) {
+            body.target_refresh_request_id = catalogEvidence.requestId;
+            body.target_projection_revision = catalogEvidence.revision;
+        }
         const r = await fetch('/api/erp/push', {
             method: 'POST',
             headers: authHeaders(true),

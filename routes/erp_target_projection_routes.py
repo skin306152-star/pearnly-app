@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from core.feature_flags import erp_target_projection_enabled_for
 from services.auth.entrance import require_erp_portal
 from services.authz.deps import require_perm
-from services.erp import line_target_projection, target_refresh, team_access
+from services.erp import line_target_projection, shared_express_access, target_refresh, team_access
 from services.erp.target_projection_contract import ProjectionContractError
 from services.erp.target_projection_store import load_state
 
@@ -21,27 +21,39 @@ def _parse_entities(raw: str) -> tuple[str, ...]:
     return tuple(value.strip().lower() for value in raw.split(",") if value.strip())
 
 
-def _resolve_endpoint(user: dict, endpoint_id: str) -> dict | None:
+def _resolve_endpoint(user: dict, endpoint_id: str, request: Request | None = None) -> dict | None:
     assigned = team_access.assigned_endpoint_for_request(user, endpoint_id)
     if assigned is not None:
         return assigned
+    if request is not None and shared_express_access.is_shared_endpoint_read(user):
+        visible = shared_express_access.visible_endpoint_for_request(
+            request,
+            user,
+            endpoint_id,
+        )
+        if visible is not None and visible.get("enabled") is True:
+            return visible
     from core import db
 
     endpoint = db.get_erp_endpoint(str(user.get("id") or ""), endpoint_id)
     return endpoint if endpoint and endpoint.get("enabled") else None
 
 
-def _endpoint_visible(user: dict, endpoint_id: str) -> bool:
-    return _resolve_endpoint(user, endpoint_id) is not None
+def _endpoint_visible(user: dict, endpoint_id: str, request: Request | None = None) -> bool:
+    return _resolve_endpoint(user, endpoint_id, request) is not None
 
 
 def _read_projection(
-    user: dict, endpoint_id: str, account_set_key: str | None, entity_types: str
+    user: dict,
+    endpoint_id: str,
+    account_set_key: str | None,
+    entity_types: str,
+    request: Request | None = None,
 ) -> dict:
     require_erp_portal(user)
     if not erp_target_projection_enabled_for(user.get("tenant_id"), user.get("id")):
         raise HTTPException(404, detail="erp.target_projection_unavailable")
-    if not _endpoint_visible(user, endpoint_id):
+    if not _endpoint_visible(user, endpoint_id, request):
         raise HTTPException(404, detail="erp.endpoint_not_found")
     try:
         state = load_state(
@@ -58,11 +70,16 @@ def _read_projection(
     return {"ok": True, "data": state}
 
 
-def _refresh_projection(user: dict, endpoint_id: str, account_set_key: str | None) -> dict:
+def _refresh_projection(
+    user: dict,
+    endpoint_id: str,
+    account_set_key: str | None,
+    request: Request | None = None,
+) -> dict:
     require_erp_portal(user)
     if not erp_target_projection_enabled_for(user.get("tenant_id"), user.get("id")):
         raise HTTPException(404, detail="erp.target_projection_unavailable")
-    endpoint = _resolve_endpoint(user, endpoint_id)
+    endpoint = _resolve_endpoint(user, endpoint_id, request)
     if endpoint is None:
         raise HTTPException(404, detail="erp.endpoint_not_found")
     adapter = str(endpoint.get("adapter") or "").strip().lower()
@@ -84,11 +101,16 @@ def _refresh_projection(user: dict, endpoint_id: str, account_set_key: str | Non
     return {"ok": True, "refresh": refresh, "adapter": adapter}
 
 
-def _refresh_status(user: dict, endpoint_id: str, request_id: str) -> dict:
+def _refresh_status(
+    user: dict,
+    endpoint_id: str,
+    request_id: str,
+    request: Request | None = None,
+) -> dict:
     require_erp_portal(user)
     if not erp_target_projection_enabled_for(user.get("tenant_id"), user.get("id")):
         raise HTTPException(404, detail="erp.target_projection_unavailable")
-    if not _endpoint_visible(user, endpoint_id):
+    if not _endpoint_visible(user, endpoint_id, request):
         raise HTTPException(404, detail="erp.endpoint_not_found")
     status = target_refresh.refresh_status(
         request_id,
@@ -109,7 +131,7 @@ async def erp_target_projection(
 ):
     user = await asyncio.to_thread(lambda: require_perm(request, "erp.endpoint.view"))
     return await asyncio.to_thread(
-        _read_projection, user, endpoint_id, account_set_key, entity_types
+        _read_projection, user, endpoint_id, account_set_key, entity_types, request
     )
 
 
@@ -120,7 +142,9 @@ async def refresh_erp_target_projection(
     account_set_key: str | None = Query(default=None, max_length=500),
 ):
     user = await asyncio.to_thread(lambda: require_perm(request, "erp.endpoint.view"))
-    result = await asyncio.to_thread(_refresh_projection, user, endpoint_id, account_set_key)
+    result = await asyncio.to_thread(
+        _refresh_projection, user, endpoint_id, account_set_key, request
+    )
     adapter = result.pop("adapter")
     if adapter == "mrerp":
         asyncio.create_task(
@@ -139,7 +163,7 @@ async def erp_target_projection_refresh_status(
     request: Request,
 ):
     user = await asyncio.to_thread(lambda: require_perm(request, "erp.endpoint.view"))
-    return await asyncio.to_thread(_refresh_status, user, endpoint_id, request_id)
+    return await asyncio.to_thread(_refresh_status, user, endpoint_id, request_id, request)
 
 
 __all__ = [

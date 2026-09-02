@@ -59,6 +59,142 @@ class TargetRefreshTests(unittest.TestCase):
             any("INSERT INTO erp_target_refresh_requests" in sql for sql, _ in cursor.executed)
         )
 
+    def test_request_expires_old_lease_before_allocating_a_new_request_id(self):
+        cursor = _Cursor(
+            [
+                {
+                    "id": "endpoint-1",
+                    "tenant_id": "tenant-1",
+                    "owner_tenant_id": "tenant-1",
+                    "binding_generation": 0,
+                },
+                None,
+                {"id": "22222222-2222-4222-8222-222222222222", "status": "requested"},
+            ]
+        )
+        with mock.patch.object(target_refresh.db, "get_cursor", return_value=_Context(cursor)):
+            result = target_refresh.request_refresh(
+                tenant_id="tenant-1",
+                user_id="user-1",
+                endpoint_id="endpoint-1",
+                account_set_key="@endpoint",
+                adapter="express",
+            )
+
+        expiry_sql = next(
+            sql
+            for sql, _ in cursor.executed
+            if "ERR_REFRESH_LEASE_EXPIRED" in sql and "tenant_id = %s" in sql
+        )
+        self.assertIn("lease_expires_at <= clock_timestamp()", expiry_sql)
+        self.assertEqual(result["request_id"], "22222222-2222-4222-8222-222222222222")
+        self.assertTrue(
+            any("INSERT INTO erp_target_refresh_requests" in sql for sql, _ in cursor.executed)
+        )
+
+    def test_request_coalesces_a_current_in_flight_lease(self):
+        request_id = "11111111-1111-4111-8111-111111111111"
+        cursor = _Cursor(
+            [
+                {
+                    "id": "endpoint-1",
+                    "tenant_id": "tenant-1",
+                    "owner_tenant_id": "tenant-1",
+                    "binding_generation": 0,
+                },
+                {"id": request_id, "status": "leased", "lease_expires_at": object()},
+                {"id": request_id, "status": "leased"},
+            ]
+        )
+        with mock.patch.object(target_refresh.db, "get_cursor", return_value=_Context(cursor)):
+            result = target_refresh.request_refresh(
+                tenant_id="tenant-1",
+                user_id="user-1",
+                endpoint_id="endpoint-1",
+                account_set_key="@endpoint",
+                adapter="express",
+            )
+
+        self.assertEqual(result["request_id"], request_id)
+        self.assertEqual(result["status"], "leased")
+        self.assertFalse(
+            any("INSERT INTO erp_target_refresh_requests" in sql for sql, _ in cursor.executed)
+        )
+
+    def test_express_live_lease_blocks_a_second_request_for_the_same_endpoint(self):
+        cursor = _Cursor(
+            [
+                {"id": "endpoint-1"},
+                {"id": "11111111-1111-4111-8111-111111111111"},
+                {
+                    "id": "22222222-2222-4222-8222-222222222222",
+                    "status": "requested",
+                    "account_set_key": "other-account",
+                },
+            ]
+        )
+
+        result = target_refresh.lease_express_refresh_with_cursor(cursor, "endpoint-1")
+
+        self.assertIsNone(result)
+        self.assertEqual(len(cursor.executed), 3)
+        live_guard_sql = cursor.executed[2][0]
+        self.assertIn("status = 'leased'", live_guard_sql)
+        self.assertIn("lease_expires_at > clock_timestamp()", live_guard_sql)
+        self.assertEqual(len(cursor.rows), 1)
+        self.assertFalse(any("SET status = 'leased'" in sql for sql, _ in cursor.executed))
+
+    def test_express_lease_marks_expired_attempt_failed_instead_of_reissuing_it(self):
+        cursor = _Cursor(
+            [
+                {"id": "endpoint-1"},
+                None,
+                None,
+            ]
+        )
+
+        result = target_refresh.lease_express_refresh_with_cursor(cursor, "endpoint-1")
+
+        self.assertIsNone(result)
+        fail_sql = next(
+            sql
+            for sql, _ in cursor.executed
+            if "ERR_REFRESH_LEASE_EXPIRED" in sql and "adapter = 'express'" in sql
+        )
+        self.assertIn("status = 'failed'", fail_sql)
+        self.assertIn("ERR_REFRESH_LEASE_EXPIRED", fail_sql)
+        self.assertIn("lease_expires_at <= clock_timestamp()", fail_sql)
+
+    def test_express_completion_requires_the_current_unexpired_lease_owner(self):
+        cursor = _Cursor([])
+
+        completed = target_refresh.complete_express_refresh_with_cursor(
+            cursor,
+            request_id="11111111-1111-4111-8111-111111111111",
+            endpoint_id="endpoint-1",
+            account_set_key=r"C:\EXPRESS\TEST",
+            scope_kind="account_set",
+            revision=3,
+        )
+
+        self.assertTrue(completed)
+        sql, params = cursor.executed[-1]
+        self.assertIn("status = 'leased'", sql)
+        self.assertIn("lease_owner = %s", sql)
+        self.assertIn("lease_expires_at > clock_timestamp()", sql)
+        self.assertEqual(params[-1], "endpoint-1")
+
+        cursor.rowcount = 0
+        with self.assertRaisesRegex(ValueError, "erp.target_refresh_stale_completion"):
+            target_refresh.complete_express_refresh_with_cursor(
+                cursor,
+                request_id="11111111-1111-4111-8111-111111111111",
+                endpoint_id="endpoint-1",
+                account_set_key=r"C:\EXPRESS\TEST",
+                scope_kind="account_set",
+                revision=4,
+            )
+
     def test_mrerp_processor_finishes_with_published_revision(self):
         request = {
             "id": "11111111-1111-4111-8111-111111111111",
@@ -133,19 +269,19 @@ class TargetRefreshTests(unittest.TestCase):
             revision=5,
         )
 
-    def test_invalid_companion_completion_id_never_touches_database(self):
+    def test_invalid_companion_completion_aborts_the_ingestion_transaction(self):
         cursor = _Cursor([])
 
-        completed = target_refresh.complete_express_refresh_with_cursor(
-            cursor,
-            request_id="not-a-uuid",
-            endpoint_id="endpoint-1",
-            account_set_key=r"C:\EXPRESS\TEST",
-            scope_kind="account_set",
-            revision=3,
-        )
+        with self.assertRaisesRegex(ValueError, "erp.target_refresh_stale_completion"):
+            target_refresh.complete_express_refresh_with_cursor(
+                cursor,
+                request_id="not-a-uuid",
+                endpoint_id="endpoint-1",
+                account_set_key=r"C:\EXPRESS\TEST",
+                scope_kind="account_set",
+                revision=3,
+            )
 
-        self.assertFalse(completed)
         self.assertEqual(cursor.executed, [])
 
 

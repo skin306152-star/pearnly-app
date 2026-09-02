@@ -4,7 +4,8 @@ import unittest
 from datetime import datetime, timezone
 from unittest import mock
 
-from services.erp import line_target_catalog
+from services.erp import line_target_catalog, line_target_projection
+from services.erp.shared_express_profile import profile_key
 
 
 class LineTargetProjectionSnapshotTests(unittest.TestCase):
@@ -110,6 +111,148 @@ class LineTargetProjectionSnapshotTests(unittest.TestCase):
             )
         self.assertIs(probe, expected)
         legacy.assert_called_once_with(self.endpoint, refresh=True)
+
+    def test_compact_initial_target_never_probes_or_loads_mrerp_catalog(self):
+        with (
+            mock.patch.object(
+                line_target_catalog,
+                "erp_target_projection_enabled_for",
+                return_value=True,
+            ),
+            mock.patch.object(line_target_catalog, "load_state") as load_state,
+            mock.patch.object(
+                line_target_catalog.target_readiness,
+                "probe_endpoint",
+            ) as live_probe,
+            mock.patch.object(
+                line_target_catalog,
+                "refresh_mrerp_account_catalog",
+            ) as refresh,
+        ):
+            probe = line_target_catalog._projection_probe(
+                self.endpoint,
+                tenant_id="tenant-1",
+                user_id="user-1",
+                refresh=False,
+                include_account_catalog=False,
+            )
+
+        self.assertIsNone(probe)
+        load_state.assert_not_called()
+        live_probe.assert_not_called()
+        refresh.assert_not_called()
+
+    def test_compact_managed_target_never_loads_projection_rows(self):
+        cursor = mock.Mock()
+        cursor.fetchall.return_value = [
+            {
+                "id": "express-1",
+                "adapter": "express",
+                "workspace_client_id": 7,
+            }
+        ]
+        workspace = {"id": 7, "name": "Client", "erp_endpoint_id": "express-1"}
+        with (
+            mock.patch.object(
+                line_target_catalog,
+                "erp_shared_express_endpoint_enabled_for",
+                return_value=True,
+            ),
+            mock.patch.object(
+                line_target_catalog,
+                "enable_shared_express_select",
+                return_value=True,
+            ),
+            mock.patch.object(
+                line_target_catalog.line_target_projection,
+                "active_push_state",
+                return_value=(False, False),
+            ),
+            mock.patch.object(
+                line_target_catalog.line_target_projection,
+                "managed_target",
+                return_value={"endpoint_id": "express-1"},
+            ) as project,
+            mock.patch.object(line_target_catalog, "load_state_with_cursor") as load_state,
+        ):
+            result = line_target_catalog.managed_targets(
+                cursor,
+                "tenant-1",
+                [workspace],
+                include_account_catalog=False,
+            )
+
+        self.assertEqual(result, [{"endpoint_id": "express-1"}])
+        load_state.assert_not_called()
+        self.assertIsNone(project.call_args.kwargs["account_sets"])
+        self.assertFalse(project.call_args.kwargs["account_catalog_loaded"])
+
+    def test_compact_managed_target_keeps_bound_year_and_account_without_snapshot(self):
+        account_dir = r"S:\2569\69EXP\TEST"
+        digest = profile_key("TEST", account_dir)
+        row = {
+            "id": "express-1",
+            "name": "Express",
+            "adapter": "express",
+            "enabled": True,
+            "shared_scope": True,
+            "workspace_client_id": 7,
+            "binding_generation": 2,
+            "bound_account_set": "test",
+            "bound_profile_key": digest,
+            "live_account_set": "test",
+            "live_profile_key": digest,
+            "agent_last_seen_at": datetime(2026, 9, 2, 7, 59, 50, tzinfo=timezone.utc),
+            "agent_version": "1.1.76",
+            "revoked_at": None,
+            "configured_account_set": "TEST",
+            "configured_account_dir": account_dir,
+            "configured_express_root": r"S:\2569\69EXP",
+            "configured_account_set_label": "Test company",
+            "server_now": datetime(2026, 9, 2, 8, 0, tzinfo=timezone.utc),
+        }
+        target = line_target_projection.managed_target(
+            row,
+            {"id": 7, "name": "Client", "erp_endpoint_id": "express-1"},
+            account_sets=None,
+            account_catalog_loaded=False,
+        )
+
+        self.assertFalse(target["account_catalog_loaded"])
+        self.assertEqual(target["selected_account_key"], "test")
+        self.assertEqual(target["account_choices"][0]["root_key"], r"s:\2569\69exp")
+        self.assertEqual(target["account_choices"][0]["root_label"], "69EXP")
+
+    def test_projection_derives_year_root_from_selected_account_path(self):
+        target = line_target_projection.managed_target(
+            {
+                "id": "express-1",
+                "name": "Express",
+                "adapter": "express",
+                "enabled": True,
+                "shared_scope": True,
+                "workspace_client_id": 7,
+                "binding_generation": 1,
+                "bound_account_set": "test",
+                "bound_profile_key": "profile-1",
+                "live_account_set": "test",
+                "live_profile_key": "profile-1",
+                "agent_last_seen_at": datetime(2026, 9, 2, 7, 59, 50, tzinfo=timezone.utc),
+                "agent_version": "1.1.76",
+                "revoked_at": None,
+                "server_now": datetime(2026, 9, 2, 8, 0, tzinfo=timezone.utc),
+            },
+            {"id": 7, "name": "Client", "erp_endpoint_id": "express-1"},
+            account_sets=[
+                {
+                    "source_id": "test",
+                    "label": "Test company",
+                    "attributes": {"path": r"S:\2569\69EXP\TEST", "writable": True},
+                }
+            ],
+        )
+
+        self.assertEqual(target["account_choices"][0]["root_key"], r"S:\2569\69EXP")
 
 
 if __name__ == "__main__":

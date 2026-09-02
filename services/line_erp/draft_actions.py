@@ -187,7 +187,7 @@ async def confirm(
                 ),
                 channel=CHANNEL,
             )
-        return {"ok": False, "status": 409, "detail": "line_erp.target_not_ready"}
+        return {"ok": False, "status": exc.status_code, "detail": exc.code}
     if selection["direction"] != mode:
         return {"ok": False, "status": 409, "detail": "line_erp.direction_changed"}
     records = records_loader(
@@ -288,7 +288,10 @@ async def confirm(
         endpoint_id=str(readiness["endpoint_id"]),
         workspace_client_id=selection["workspace_client_id"],
         posting_kind=selection.get("posting_kind"),
+        account_set_key=selection.get("account_set"),
         account_config=selection.get("account_config"),
+        catalog_refresh_request_id=selection.get("catalog_refresh_request_id"),
+        catalog_refresh_revision=selection.get("catalog_refresh_revision"),
     )
 
 

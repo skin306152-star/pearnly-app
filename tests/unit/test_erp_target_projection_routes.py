@@ -32,6 +32,41 @@ class TargetProjectionRouteTests(unittest.TestCase):
             mock.patch.object(routes, "load_state", return_value=state),
         )
 
+    def test_shared_projection_resolves_only_the_requested_endpoint(self):
+        request = mock.Mock()
+        endpoint = {
+            "id": "33333333-3333-4333-8333-333333333333",
+            "adapter": "express",
+            "enabled": True,
+        }
+        with (
+            mock.patch.object(
+                routes.team_access, "assigned_endpoint_for_request", return_value=None
+            ),
+            mock.patch.object(
+                routes.shared_express_access, "is_shared_endpoint_read", return_value=True
+            ),
+            mock.patch.object(
+                routes.shared_express_access,
+                "visible_endpoint_for_request",
+                return_value=endpoint,
+            ) as exact_lookup,
+            mock.patch.object(routes.shared_express_access, "list_shared_endpoint_items") as full,
+        ):
+            resolved = routes._resolve_endpoint(
+                self.user,
+                "33333333-3333-4333-8333-333333333333",
+                request,
+            )
+
+        self.assertEqual(resolved, endpoint)
+        exact_lookup.assert_called_once_with(
+            request,
+            self.user,
+            "33333333-3333-4333-8333-333333333333",
+        )
+        full.assert_not_called()
+
     def test_disabled_flag_hides_the_route_contract(self):
         auth, flag, visible, load = self._patches(enabled=False)
         with auth, flag, visible, load as load_mock:

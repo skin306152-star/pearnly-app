@@ -141,6 +141,24 @@ async function openErp(
             adapter: 'express',
             label: 'Express · MAIN',
             account_set_label: 'MAIN',
+            connection_label: 'Express',
+            selected_account_key: 'MAIN-2026',
+            account_choices: [
+                {
+                    key: 'MAIN-2025',
+                    label: 'MAIN 2025',
+                    root_key: '2025',
+                    root_label: '2025',
+                    writable: true,
+                },
+                {
+                    key: 'MAIN-2026',
+                    label: 'MAIN 2026',
+                    root_key: '2026',
+                    root_label: '2026',
+                    writable: true,
+                },
+            ],
             selectable: true,
             configured: true,
             connection_state: 'online',
@@ -157,6 +175,17 @@ async function openErp(
             adapter: 'express',
             label: 'Express · BRANCH',
             account_set_label: 'BRANCH',
+            connection_label: 'Express Branch',
+            selected_account_key: 'BRANCH-2026',
+            account_choices: [
+                {
+                    key: 'BRANCH-2026',
+                    label: 'BRANCH 2026',
+                    root_key: '2026',
+                    root_label: '2026',
+                    writable: true,
+                },
+            ],
             selectable: true,
             configured: true,
             connection_state: 'online',
@@ -173,6 +202,9 @@ async function openErp(
             adapter: 'mrerp',
             label: 'MR.ERP · Client A',
             account_set_label: 'Client A',
+            connection_label: 'MR.ERP',
+            selected_account_key: 'Client A',
+            account_choices: [{ key: 'Client A', label: 'Client A', writable: true }],
             selectable: true,
             configured: true,
             connection_state: 'online',
@@ -185,6 +217,9 @@ async function openErp(
             adapter: 'mrerp',
             label: 'MR.ERP · Client B',
             account_set_label: 'Client B',
+            connection_label: 'MR.ERP',
+            selected_account_key: 'Client B',
+            account_choices: [{ key: 'Client B', label: 'Client B', writable: true }],
             selectable: true,
             configured: true,
             connection_state: 'online',
@@ -200,6 +235,13 @@ async function openErp(
         posting_kind: adapter === 'express' ? 'stock' : null,
         payment: adapter === 'mrerp' ? (direction === 'sales' ? 'cash' : 'credit') : null,
         target_label: selectedTarget.label,
+        account_root:
+            adapter === 'express'
+                ? selectedTarget.account_choices.find(
+                      (choice) => choice.key === selectedTarget.selected_account_key
+                  ).root_key
+                : null,
+        account_set: selectedTarget.selected_account_key,
     };
     await installLiff(page);
     await page.route('**/api/line/erp/liff/config', (route) =>
@@ -282,6 +324,8 @@ async function openCowork(page, { draftRecords = coworkRecords() } = {}) {
         direction: 'purchase',
         posting_kind: 'stock',
         target_label: 'Express · 69EXP',
+        account_root: '2026',
+        account_set: '69EXP-2026',
     };
     const targets = [
         {
@@ -290,6 +334,24 @@ async function openCowork(page, { draftRecords = coworkRecords() } = {}) {
             adapter: 'express',
             label: 'Express · 69EXP',
             account_set_label: '69EXP',
+            connection_label: 'Express',
+            selected_account_key: '69EXP-2026',
+            account_choices: [
+                {
+                    key: '69EXP-2025',
+                    label: '69EXP 2025',
+                    root_key: '2025',
+                    root_label: '2025',
+                    writable: true,
+                },
+                {
+                    key: '69EXP-2026',
+                    label: '69EXP 2026',
+                    root_key: '2026',
+                    root_label: '2026',
+                    writable: true,
+                },
+            ],
             selectable: true,
             configured: true,
             connection_state: 'online',
@@ -347,8 +409,9 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
 }) => {
     const page = await browser.newPage({ ...devices['iPhone 13'] });
     const run = await openErp(page);
-    await expect(page.locator('.target-locked')).toHaveText('Express');
-    await expect(page.locator('[data-target-account-set]')).toHaveValue('express-1:69::MAIN');
+    await expect(page.locator('[data-target-erp]')).toHaveValue('express-1:69');
+    await expect(page.locator('[data-target-root]')).toHaveValue('2026');
+    await expect(page.locator('[data-target-account-set]')).toHaveValue('express-1:69::MAIN-2026');
     await expect(page.locator('[data-target-selection="posting_kind"]')).toHaveValue('stock');
     await page.screenshot({
         path: path.join(OUT, 'erp-mobile-target-selection.png'),
@@ -445,9 +508,11 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
     await page.close();
 });
 
-test('editor locks the conversation ERP and only switches its account set', async ({ page }) => {
+test('editor switches ERP connections without leaking another connection account set', async ({
+    page,
+}) => {
     const run = await openErp(page, { adapter: 'mrerp', direction: 'sales' });
-    await expect(page.locator('.target-locked')).toHaveText('MR.ERP');
+    await expect(page.locator('[data-target-erp]')).toHaveValue('mrerp-1:70');
     await expect(page.locator('[data-target-account-set] option')).toHaveCount(2);
     await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-1:70::Client A');
     await expect(page.locator('[data-target-account-set]')).not.toContainText('Express');
@@ -455,7 +520,11 @@ test('editor locks the conversation ERP and only switches its account set', asyn
     await page.locator('.review-row').first().click();
     await expect(page.locator('[data-kind]')).toHaveCount(0);
     await page.locator('[data-review-back]').click();
-    await page.locator('[data-target-account-set]').selectOption('mrerp-2:72::Client B');
+    await page.locator('[data-target-erp]').selectOption('mrerp-2:72');
+    await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-2:72::Client B');
+    await expect(page.locator('[data-target-account-set]')).not.toContainText('Client A');
+    await expect(page.locator('[data-target-selection="payment"]')).toHaveValue('');
+    await page.locator('[data-target-selection="payment"]').selectOption('cash');
     await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-2:72::Client B');
     await expect(page.locator('[data-target-selection="payment"]')).toHaveValue('cash');
     await expect(page.locator('[data-kind]')).toHaveCount(0);
@@ -469,6 +538,26 @@ test('editor locks the conversation ERP and only switches its account set', asyn
         account_set: 'Client B',
         target_label: 'MR.ERP · Client B',
     });
+});
+
+test('both editors clear the old Express account when the year changes', async ({ browser }) => {
+    for (const open of [openErp, openCowork]) {
+        const page = await browser.newPage({ ...devices['iPhone 13'] });
+        await open(page);
+        await expect(page.locator('[data-target-erp]')).toBeVisible();
+        await expect(page.locator('[data-target-root]')).toHaveValue('2026');
+        await page.locator('[data-target-root]').selectOption('2025');
+        await expect(page.locator('[data-target-account-set]')).toHaveValue('');
+        await expect(page.locator('[data-target-account-set]')).not.toContainText('2026');
+        await expect(page.locator('[data-review-action="confirm"]')).toBeDisabled();
+        const account = await page
+            .locator('[data-target-account-set] option:not([value=""])')
+            .first()
+            .getAttribute('value');
+        await page.locator('[data-target-account-set]').selectOption(account);
+        await expect(page.locator('[data-target-account-set]')).not.toHaveValue('');
+        await page.close();
+    }
 });
 
 test('both LINE editors localize system fields while preserving stored enum values', async ({
@@ -657,4 +746,239 @@ test('image originals remain inline instead of using the PDF viewer', async ({ b
     await expect(page.locator('.review-original img')).toBeVisible();
     await page.screenshot({ path: path.join(OUT, 'cowork-mobile-image-original.png') });
     await page.close();
+});
+
+test('shared LINE target selector refreshes in place without stale-cache or click loops', async ({
+    page,
+}) => {
+    await page.setContent('<main id="target"></main><button id="confirm">Confirm</button>');
+    await page.addScriptTag({
+        path: path.join(__dirname, '../../static/line-intake-review/target-select.js'),
+    });
+    await page.evaluate(() => {
+        const target = {
+            endpoint_id: 'express-1',
+            workspace_client_id: 69,
+            workspace_name: 'Sister Makeup',
+            adapter: 'express',
+            connection_label: 'Express',
+            selected_account_key: 'MAIN-2026',
+            account_catalog_loaded: false,
+            account_choices: [
+                {
+                    key: 'MAIN-2026',
+                    label: 'MAIN 2026',
+                    root_key: '2026',
+                    root_label: '2026',
+                    writable: true,
+                },
+            ],
+            selectable: true,
+            configured: true,
+            connection_state: 'online',
+            ready_checks: { erp_connection: true, companion_online: true },
+            mode_options: ['stock', 'service'],
+        };
+        const model = {
+            targets: [target],
+            selection: {
+                endpoint_id: 'express-1',
+                workspace_client_id: 69,
+                adapter: 'express',
+                direction: 'purchase',
+                posting_kind: 'stock',
+                account_root: '2026',
+                account_set: 'MAIN-2026',
+            },
+        };
+        const labels = {
+            target: '目标',
+            erp: 'ERP',
+            dataRoot: '年度',
+            accountSet: '套账',
+            noAccountSet: '无套账',
+            loadingAccounts: '正在读取最新 ERP 主档…',
+            loadingAccountsLong: '仍在扫描最新 ERP 主档，请保持页面打开…',
+            loadAccountsFailed: '加载失败，再点一次重试',
+            direction: '业务方向',
+            purchase: '采购',
+            sales: '销售',
+            mode: '模式',
+            stock: '库存',
+            service: '服务',
+            connected: '已连接',
+            online: '在线',
+            matched: '匹配',
+            preflightPending: '待检查',
+            blocked: '不可用',
+        };
+        const escape = (value) =>
+            String(value == null ? '' : value).replace(
+                /[&<>"']/g,
+                (char) =>
+                    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]
+            );
+        const loads = [];
+        let loadCount = 0;
+        let selector;
+        function render() {
+            const root = document.getElementById('target');
+            root.innerHTML = selector.html();
+            selector.bind(root, render);
+            document.getElementById('confirm').disabled = !selector.valid();
+        }
+        selector = window.lineIntakeTargetSelect.create({
+            model: () => model,
+            text: (key) => labels[key] || key,
+            escape,
+            loadTarget: () => {
+                loadCount += 1;
+                return new Promise((resolve, reject) => loads.push({ resolve, reject }));
+            },
+        });
+        window.targetHarness = {
+            fullTarget: {
+                ...target,
+                account_catalog_loaded: true,
+                account_choices: [
+                    {
+                        key: 'MAIN-2024',
+                        label: 'MAIN 2024',
+                        root_key: '2024',
+                        root_label: '2024',
+                        writable: true,
+                    },
+                    {
+                        key: 'MAIN-2026',
+                        label: 'MAIN 2026',
+                        root_key: '2026',
+                        root_label: '2026',
+                        writable: true,
+                    },
+                    {
+                        key: 'MAIN-2025',
+                        label: 'MAIN 2025',
+                        root_key: '2025',
+                        root_label: '2025',
+                        writable: true,
+                    },
+                ],
+            },
+            loadCount: () => loadCount,
+            resolve: () =>
+                loads.shift().resolve({
+                    target: window.targetHarness.fullTarget,
+                    catalog_refresh_request_id: 'refresh-' + loadCount,
+                    catalog_refresh_revision: loadCount,
+                }),
+            reject: () => loads.shift().reject(new Error('scan failed')),
+            selection: () => ({ ...model.selection }),
+        };
+        render();
+    });
+
+    await expect(page.locator('[data-target-root] option')).toHaveCount(2);
+    await expect(page.locator('#confirm')).toBeEnabled();
+    expect(await page.evaluate(() => window.targetHarness.loadCount())).toBe(0);
+
+    await page.locator('[data-target-root]').dispatchEvent('pointerdown');
+    await expect(page.locator('.target-load-state')).toContainText('正在读取最新 ERP 主档…');
+    await expect(page.locator('.target-load-state')).toHaveAttribute('role', 'status');
+    await expect(page.locator('.target-load-state')).toHaveAttribute('aria-live', 'polite');
+    await expect(page.locator('#confirm')).toBeDisabled();
+    await expect.poll(() => page.evaluate(() => window.targetHarness.loadCount())).toBe(1);
+
+    await page.evaluate(() => window.targetHarness.resolve());
+    await expect(page.locator('.target-load-state')).toHaveCount(0);
+    await expect(page.locator('[data-target-root] option')).toHaveText([
+        '—',
+        '2026',
+        '2025',
+        '2024',
+    ]);
+    await expect
+        .poll(() => page.evaluate(() => window.targetHarness.selection()))
+        .toMatchObject({
+            catalog_refresh_request_id: 'refresh-1',
+            catalog_refresh_revision: 1,
+        });
+
+    await page.locator('[data-target-root]').dispatchEvent('pointerdown');
+    await page.locator('[data-target-root]').focus();
+    await expect.poll(() => page.evaluate(() => window.targetHarness.loadCount())).toBe(1);
+    await page.locator('[data-target-root]').selectOption('2025');
+    await expect.poll(() => page.evaluate(() => window.targetHarness.loadCount())).toBe(1);
+    await expect(page.locator('[data-target-account-set]')).toHaveValue('');
+
+    await page.locator('[data-target-account-set]').dispatchEvent('pointerdown');
+    await expect(page.locator('.target-load-state')).toContainText('正在读取最新 ERP 主档…');
+    await expect.poll(() => page.evaluate(() => window.targetHarness.loadCount())).toBe(2);
+    await page.evaluate(() => window.targetHarness.resolve());
+    await page.locator('[data-target-account-set]').dispatchEvent('pointerdown');
+    await page.locator('[data-target-account-set]').focus();
+    await page.locator('[data-target-account-set]').selectOption('express-1:69::MAIN-2025');
+    await expect(page.locator('#confirm')).toBeEnabled();
+
+    await page.locator('[data-target-root]').dispatchEvent('pointerdown');
+    await expect.poll(() => page.evaluate(() => window.targetHarness.loadCount())).toBe(3);
+    await page.evaluate(() => window.targetHarness.reject());
+    await expect(page.locator('.target-load-error')).toContainText('加载失败，再点一次重试');
+    await expect(page.locator('#confirm')).toBeDisabled();
+    await expect
+        .poll(() => page.evaluate(() => window.targetHarness.selection().account_set))
+        .toBe('MAIN-2025');
+    await expect
+        .poll(() => page.evaluate(() => window.targetHarness.selection()))
+        .not.toHaveProperty('catalog_refresh_request_id');
+
+    await page.locator('[data-target-root]').dispatchEvent('pointerdown');
+    await expect.poll(() => page.evaluate(() => window.targetHarness.loadCount())).toBe(4);
+    await page.evaluate(() => window.targetHarness.resolve());
+    await expect(page.locator('.target-load-error')).toHaveCount(0);
+    await expect(page.locator('#confirm')).toBeEnabled();
+});
+
+test('shared LINE target refresh aborts hung POST and status requests', async ({ page }) => {
+    await page.setContent('<main></main>');
+    await page.addScriptTag({
+        path: path.join(__dirname, '../../static/line-intake-review/target-select.js'),
+    });
+    const result = await page.evaluate(async () => {
+        async function run(postSucceeds) {
+            let calls = 0;
+            let aborted = false;
+            const api = (_path, options) => {
+                calls += 1;
+                if (postSucceeds && calls === 1) {
+                    return Promise.resolve({ request_id: 'request-1' });
+                }
+                return new Promise((_resolve, reject) => {
+                    options.signal.addEventListener('abort', () => {
+                        aborted = true;
+                        reject(new DOMException('aborted', 'AbortError'));
+                    });
+                });
+            };
+            try {
+                await window.lineIntakeTargetSelect.refreshTarget(api, '/refresh', {
+                    requestTimeoutMs: 10,
+                    timeoutMs: 100,
+                });
+            } catch (error) {
+                return { aborted, calls, message: error.message };
+            }
+            return { aborted, calls, message: '' };
+        }
+        return { post: await run(false), status: await run(true) };
+    });
+    expect(result.post).toEqual({
+        aborted: true,
+        calls: 1,
+        message: 'target_refresh_request_timeout',
+    });
+    expect(result.status).toEqual({
+        aborted: true,
+        calls: 2,
+        message: 'target_refresh_request_timeout',
+    });
 });

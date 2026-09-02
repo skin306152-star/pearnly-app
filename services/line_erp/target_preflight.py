@@ -36,7 +36,11 @@ def _active_user(binding: dict[str, Any]) -> dict[str, Any]:
 
 
 def _project_targets(
-    binding: dict[str, Any], *, refresh: bool = False, lock_endpoint_id: str | None = None
+    binding: dict[str, Any],
+    *,
+    refresh: bool = False,
+    lock_endpoint_id: str | None = None,
+    include_account_catalog: bool = True,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, dict[str, Any]]]:
     user = _active_user(binding)
     tenant_id = str(binding.get("tenant_id") or "")
@@ -47,13 +51,21 @@ def _project_targets(
         authz = resolve(user, cur=cur)
         if not authz.has("erp.endpoint.view") or not authz.has("erp.push.operate"):
             raise TargetNotReady({"ready": False, "block_reason": "erp_user_inactive"})
-        targets, legacy_specs = line_target_catalog.collect_target_specs(cur, user, authz)
+        targets, legacy_specs = line_target_catalog.collect_target_specs(
+            cur,
+            user,
+            authz,
+            include_account_catalog=include_account_catalog,
+            account_catalog_endpoint_id=lock_endpoint_id,
+        )
     targets = line_target_catalog.project_legacy_targets(
         targets,
         legacy_specs,
         refresh_probes=refresh,
         tenant_id=tenant_id,
         user_id=user_id,
+        include_account_catalog=include_account_catalog,
+        account_catalog_endpoint_id=lock_endpoint_id,
     )
     endpoints = {str(endpoint.get("id") or ""): endpoint for endpoint, *_ in legacy_specs}
     return user, targets, endpoints
@@ -67,6 +79,7 @@ def inspect_targets(
     workspace_client_id: int | None = None,
     expected_endpoint_id: str | None = None,
     expected_workspace_client_id: int | None = None,
+    include_account_catalog: bool = True,
 ) -> dict[str, Any]:
     selected_endpoint = str(endpoint_id or expected_endpoint_id or "").strip()
     selected_workspace = (
@@ -76,6 +89,7 @@ def inspect_targets(
         binding,
         refresh=refresh,
         lock_endpoint_id=selected_endpoint or None,
+        include_account_catalog=include_account_catalog,
     )
     matches = [target for target in targets if target["endpoint_id"] == selected_endpoint]
     if selected_workspace is not None:
@@ -118,6 +132,7 @@ def require_ready(
     refresh: bool = False,
     expected_endpoint_id: str | None = None,
     expected_workspace_client_id: int | None = None,
+    include_account_catalog: bool = True,
 ) -> dict[str, Any]:
     result = inspect_targets(
         binding,
@@ -126,6 +141,7 @@ def require_ready(
         workspace_client_id=workspace_client_id,
         expected_endpoint_id=expected_endpoint_id,
         expected_workspace_client_id=expected_workspace_client_id,
+        include_account_catalog=include_account_catalog,
     )
     if not result["ready"]:
         raise TargetNotReady(result)

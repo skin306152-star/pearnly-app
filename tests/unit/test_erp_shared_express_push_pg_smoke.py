@@ -23,6 +23,7 @@ ENDPOINT = "33333333-3333-4333-8333-333333333333"
 HISTORY = "44444444-4444-4444-8444-444444444444"
 WORKSPACE = 101
 SNAPSHOT = "55555555-5555-4555-8555-555555555555"
+REFRESH = "66666666-6666-4666-8666-666666666666"
 SECOND_ACCOUNT = r"S:\70EXP\TEST2020"
 
 
@@ -82,7 +83,9 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
               created_at timestamptz not null default now()
             );
             CREATE TABLE erp_target_projection_snapshots (
-              id uuid primary key, source_hash text not null, observed_at timestamptz not null,
+              id uuid primary key, tenant_id uuid not null, endpoint_id uuid not null,
+              scope_kind text not null, scope_key text not null, revision bigint not null,
+              source_hash text not null, observed_at timestamptz not null,
               adapter text not null, collector jsonb not null, account_sets jsonb not null,
               form_schema jsonb not null, capabilities jsonb not null, entity_counts jsonb not null
             );
@@ -94,6 +97,12 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
               last_refresh_status text not null, last_refresh_error_code text,
               last_refresh_source jsonb not null, last_refresh_attempted_at timestamptz,
               last_observed_at timestamptz, updated_at timestamptz not null default now()
+            );
+            CREATE TABLE erp_target_refresh_requests (
+              id uuid primary key, tenant_id uuid not null, endpoint_id uuid not null,
+              account_set_key text not null, adapter text not null, status text not null,
+              result_revision bigint, requested_at timestamptz not null default now(),
+              created_at timestamptz not null default now()
             );
             """)
         cls.admin.commit()
@@ -114,7 +123,8 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
         self.admin.rollback()
         self.cur.execute(f'SET search_path TO "{self.schema}", public')
         self.cur.execute(
-            "TRUNCATE erp_target_projection_heads, erp_target_projection_snapshots, "
+            "TRUNCATE erp_target_refresh_requests, erp_target_projection_heads, "
+            "erp_target_projection_snapshots, "
             "erp_push_logs, sales_documents, purchase_docs, ocr_history, "
             "erp_endpoints, workspace_clients, users"
         )
@@ -145,14 +155,20 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
                 "source_id": SECOND_ACCOUNT.lower(),
                 "label": "TEST2020",
                 "active": True,
-                "attributes": {"path": SECOND_ACCOUNT, "writable": True},
+                "attributes": {
+                    "path": SECOND_ACCOUNT,
+                    "root": r"S:\70EXP",
+                    "writable": True,
+                },
             },
         ]
         self.cur.execute(
             "INSERT INTO erp_target_projection_snapshots "
-            "(id,source_hash,observed_at,adapter,collector,account_sets,form_schema,capabilities,entity_counts) "
-            "VALUES (%s,'hash',clock_timestamp(),'express','{}',%s::jsonb,'{}','{}','{}')",
-            (SNAPSHOT, json.dumps(account_sets)),
+            "(id,tenant_id,endpoint_id,scope_kind,scope_key,revision,source_hash,observed_at,"
+            "adapter,collector,account_sets,form_schema,capabilities,entity_counts) "
+            "VALUES (%s,%s,%s,'endpoint','@endpoint',1,'hash',clock_timestamp(),"
+            "'express','{}',%s::jsonb,'{}','{}','{}')",
+            (SNAPSHOT, TENANT, ENDPOINT, json.dumps(account_sets)),
         )
         self.cur.execute(
             "INSERT INTO erp_target_projection_heads "
@@ -162,6 +178,12 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
             "VALUES (%s,%s,'endpoint','@endpoint',%s,1,1,1,1,1,'fresh','{}',"
             "clock_timestamp(),clock_timestamp())",
             (TENANT, ENDPOINT, SNAPSHOT),
+        )
+        self.cur.execute(
+            "INSERT INTO erp_target_refresh_requests "
+            "(id,tenant_id,endpoint_id,account_set_key,adapter,status,result_revision) "
+            "VALUES (%s,%s,%s,'@endpoint','express','succeeded',1)",
+            (REFRESH, TENANT, ENDPOINT),
         )
         self.cur.execute(
             "INSERT INTO ocr_history "
@@ -266,10 +288,13 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
                     {
                         "account_set": SECOND_ACCOUNT.lower(),
                         "account_dir": SECOND_ACCOUNT,
+                        "root_key": r"S:\70EXP",
                     }
                     if account_set_key
                     else None
                 ),
+                catalog_refresh_request_id=REFRESH if account_set_key else None,
+                catalog_refresh_revision=1 if account_set_key else None,
             )
 
     def test_cross_actor_reuse_rollback_and_cross_tenant_are_atomic(self):

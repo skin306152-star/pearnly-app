@@ -5,10 +5,24 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+_COMPACT_DIRECTORY_KEYS = frozenset(
+    {
+        "reported_account_sets",
+        "reported_accounts",
+        "reported_products",
+        "reported_customers",
+        "reported_stock_acc_groups",
+        "reported_catalog",
+    }
+)
 
-def strip_endpoint_for_response(endpoint: Dict[str, Any]) -> Dict[str, Any]:
+
+def strip_endpoint_for_response(
+    endpoint: Dict[str, Any], *, compact: bool = False
+) -> Dict[str, Any]:
     """隐藏令牌、Agent 哈希和加密凭据,只把已配置标记发给前端。"""
     out = dict(endpoint)
+    had_config = "config" in out
     config = dict(out.get("config") or {})
     config.pop("agent_token_hash", None)
     if config.get("token"):
@@ -24,7 +38,16 @@ def strip_endpoint_for_response(endpoint: Dict[str, Any]) -> Dict[str, Any]:
         if config.get(sensitive):
             config[sensitive] = "***"
             config[f"_{sensitive}_set"] = True
-    out["config"] = config
+    if compact:
+        for key, value in tuple(config.items()):
+            if key in _COMPACT_DIRECTORY_KEYS or (
+                key.startswith("reported_") and isinstance(value, (dict, list))
+            ):
+                config.pop(key, None)
+    if had_config or config:
+        out["config"] = config
+    else:
+        out.pop("config", None)
     return out
 
 

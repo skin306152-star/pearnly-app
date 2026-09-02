@@ -15,6 +15,7 @@ from fastapi import HTTPException
 from routes import erp_endpoints_routes
 from services.authz.resolver import Authz
 from services.erp import shared_express_access, shared_express_store
+from services.erp.shared_express_profile import profile_key
 
 TENANT = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 ACTOR = "11111111-1111-1111-1111-111111111111"
@@ -28,6 +29,9 @@ SAFE_KEYS = {
     "enabled",
     "shared_scope",
     "account_set",
+    "account_choices",
+    "account_catalog_loaded",
+    "selected_account_key",
     "connection_state",
     "last_seen_at",
     "agent_version",
@@ -151,6 +155,54 @@ class SafeProjectionTests(unittest.TestCase):
                 self.assertEqual(item["account_set"], "TEST")
                 self.assertEqual(item["agent_version"], "1.1.64")
 
+    def test_managed_compact_projection_includes_bound_default_root_without_catalog(self):
+        account_dir = r"C:\EXPRESS\2569\TEST"
+        digest = profile_key("TEST", account_dir)
+        item = shared_express_store.safe_endpoint_dto(
+            self._managed(
+                config={
+                    **self._managed()["config"],
+                    "account_set": "TEST",
+                    "account_dir": account_dir,
+                    "express_root": r"C:\EXPRESS\2569",
+                    "account_set_label": "Test company",
+                },
+                bound_profile_key=digest,
+                live_profile_key=digest,
+            ),
+            NOW,
+        )
+
+        self.assertFalse(item["account_catalog_loaded"])
+        self.assertEqual(item["selected_account_key"], "test")
+        self.assertEqual(
+            item["account_choices"],
+            [
+                {
+                    "key": "test",
+                    "label": "Test company",
+                    "root_key": r"c:\express\2569",
+                    "root_label": "2569",
+                    "writable": True,
+                }
+            ],
+        )
+
+    def test_managed_compact_projection_does_not_reuse_stale_profile_path(self):
+        item = shared_express_store.safe_endpoint_dto(
+            self._managed(
+                bound_account_set="OTHER",
+                live_account_set="OTHER",
+                bound_profile_key="v1:other",
+                live_profile_key="v1:other",
+            ),
+            NOW,
+        )
+
+        self.assertEqual(item["selected_account_key"], "other")
+        self.assertEqual(item["account_choices"][0]["root_key"], "")
+        self.assertNotIn("EXPRESS", repr(item["account_choices"]))
+
     def test_managed_reader_rejects_clock_values_over_five_seconds_in_the_future(self):
         cases = (
             (NOW + timedelta(seconds=5), "online"),
@@ -219,13 +271,14 @@ class SafeProjectionTests(unittest.TestCase):
         item = shared_express_store.safe_endpoint_dto(_endpoint(), NOW)
         self.assertEqual(set(item), SAFE_KEYS)
         self.assertEqual(item["account_set"], "TEST")
+        self.assertEqual(item["selected_account_key"], "test")
+        self.assertEqual(item["account_choices"][0]["root_label"], "EXPRESS")
         self.assertEqual(item["connection_state"], "online")
         rendered = repr(item)
         for secret in (
             "never-return-this",
             "tail",
             "ACCOUNT-PC",
-            "EXPRESS",
             "reported_catalog",
             "reported_accounts",
             OWNER,
@@ -290,6 +343,30 @@ class SafeProjectionTests(unittest.TestCase):
 
 
 class SharedAccessTests(unittest.TestCase):
+    def test_exact_endpoint_lookup_does_not_expand_the_full_list(self):
+        row = _endpoint()
+        request = _request()
+        user = _user()
+        with (
+            mock.patch.object(shared_express_access, "require_perm") as require,
+            mock.patch.object(
+                shared_express_access.shared_express_store,
+                "list_visible_endpoints",
+                return_value=([row], NOW, False),
+            ) as store,
+        ):
+            item = shared_express_access.visible_endpoint_for_request(
+                request, user, "33333333-3333-4333-8333-333333333333"
+            )
+
+        self.assertEqual(item, shared_express_store.safe_endpoint_dto(row, NOW))
+        require.assert_called_once_with(request, "erp.endpoint.view")
+        store.assert_called_once_with(
+            request,
+            user,
+            endpoint_id="33333333-3333-4333-8333-333333333333",
+        )
+
     def test_owner_manage_gets_tenant_shared_manager_projection_and_deduplicates(self):
         actor = _user(actor=OWNER)
         shared = _endpoint(owner=ACTOR)
@@ -367,6 +444,20 @@ class _Cursor:
 
 
 class SharedStoreTests(unittest.TestCase):
+    def test_exact_endpoint_filter_is_applied_in_sql(self):
+        cursor = _Cursor([_endpoint()])
+        shared_express_store.fetch_visible_endpoint_rows(
+            cursor,
+            actor_id=ACTOR,
+            tenant_id=TENANT,
+            workspace_client_id=WORKSPACE,
+            endpoint_id="33333333-3333-4333-8333-333333333333",
+        )
+
+        sql, params = cursor.executed[-1]
+        self.assertIn("AND id = %s", sql)
+        self.assertEqual(params[-1], "33333333-3333-4333-8333-333333333333")
+
     def _load(
         self,
         authz,

@@ -44,9 +44,21 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
                 refresh=True,
             )
 
-        collect.assert_called_once_with(cursor, user, authz)
+        collect.assert_called_once_with(
+            cursor,
+            user,
+            authz,
+            include_account_catalog=True,
+            account_catalog_endpoint_id=None,
+        )
         project.assert_called_once_with(
-            [], specs, refresh_probes=True, tenant_id="t1", user_id="u1"
+            [],
+            specs,
+            refresh_probes=True,
+            tenant_id="t1",
+            user_id="u1",
+            include_account_catalog=True,
+            account_catalog_endpoint_id=None,
         )
         self.assertIs(projected_user, user)
         self.assertEqual(targets, [target])
@@ -81,6 +93,7 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
             "workspace_client_id": 7,
             "adapter": "mrerp",
             "label": "MR.ERP",
+            "selected_account_key": "15:1",
             "account_choices": [
                 {
                     "key": "15:1",
@@ -115,6 +128,7 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
             "workspace_client_id": 7,
             "adapter": "mrerp",
             "label": "MR.ERP · TEST2020",
+            "selected_account_key": "15:1",
             "account_choices": [
                 {
                     "key": "6:1",
@@ -130,10 +144,27 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        with mock.patch.object(
-            target_selection.target_preflight,
-            "require_ready",
-            return_value={"target": target},
+        compact = {
+            **target,
+            "account_choices": [target["account_choices"][1]],
+            "account_catalog_loaded": False,
+        }
+        with (
+            mock.patch.object(
+                target_selection.target_preflight,
+                "require_ready",
+                side_effect=[{"target": compact}, {"target": target}],
+            ),
+            mock.patch.object(
+                target_selection.target_catalog_evidence,
+                "validate_selection",
+                return_value={
+                    "ok": True,
+                    "proof_required": True,
+                    "request_id": "11111111-1111-4111-8111-111111111111",
+                    "revision": 7,
+                },
+            ),
         ):
             _, selected = target_selection.normalize(
                 {"user_id": "u1", "tenant_id": "t1"},
@@ -143,12 +174,72 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
                     "direction": "sales",
                     "payment": "cash",
                     "account_set": "6:1",
+                    "catalog_refresh_request_id": "11111111-1111-4111-8111-111111111111",
+                    "catalog_refresh_revision": 7,
                 },
             )
 
         self.assertEqual(selected["account_set"], "6:1")
         self.assertEqual(selected["account_config"], {"comidyear": "6", "seldb": "1"})
         self.assertEqual(selected["target_label"], "MR.ERP · TEST2019")
+        self.assertEqual(selected["catalog_refresh_revision"], 7)
+
+    def test_editor_requires_an_explicit_account_set_instead_of_falling_back(self):
+        target = {
+            "endpoint_id": "mr",
+            "workspace_client_id": 7,
+            "adapter": "mrerp",
+            "selected_account_key": "15:1",
+            "account_choices": [{"key": "15:1", "label": "TEST2020"}],
+        }
+        with mock.patch.object(
+            target_selection.target_preflight,
+            "require_ready",
+            return_value={"target": target},
+        ):
+            with self.assertRaises(target_selection.SelectionError) as caught:
+                target_selection.normalize(
+                    {"user_id": "u1", "tenant_id": "t1"},
+                    {
+                        "endpoint_id": "mr",
+                        "workspace_client_id": 7,
+                        "direction": "sales",
+                        "payment": "cash",
+                        "account_set": None,
+                    },
+                )
+
+        self.assertEqual(caught.exception.code, "line_erp.account_set_required")
+        self.assertEqual(caught.exception.status_code, 422)
+
+    def test_editor_rejects_an_account_from_a_different_express_root(self):
+        target = {
+            "endpoint_id": "express",
+            "workspace_client_id": 8,
+            "adapter": "express",
+            "selected_account_key": "MAIN-2026",
+            "account_choices": [{"key": "MAIN-2026", "label": "MAIN", "root_key": "2026"}],
+        }
+        with mock.patch.object(
+            target_selection.target_preflight,
+            "require_ready",
+            return_value={"target": target},
+        ):
+            with self.assertRaises(target_selection.SelectionError) as caught:
+                target_selection.normalize(
+                    {"user_id": "u1", "tenant_id": "t1"},
+                    {
+                        "endpoint_id": "express",
+                        "workspace_client_id": 8,
+                        "direction": "purchase",
+                        "posting_kind": "stock",
+                        "account_root": "2025",
+                        "account_set": "MAIN-2026",
+                    },
+                )
+
+        self.assertEqual(caught.exception.code, "line_erp.account_set_required")
+        self.assertEqual(caught.exception.status_code, 422)
 
     def test_selection_accepts_cowork_auto_workspace_target(self):
         target = {
@@ -158,6 +249,7 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
             "label": "MR.ERP · TEST2020",
             "selectable": True,
             "setup_action": "auto_create_workspace",
+            "selected_account_key": "15:1",
             "account_choices": [
                 {
                     "key": "15:1",
@@ -188,6 +280,7 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
             endpoint_id="mr",
             workspace_client_id=None,
             refresh=False,
+            include_account_catalog=False,
         )
         self.assertIsNone(selected["workspace_client_id"])
         self.assertEqual(selected["account_config"], {"comidyear": "15", "seldb": "1"})
@@ -301,14 +394,24 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
                 endpoint_id="ep-1",
                 workspace_client_id=9,
                 posting_kind="service",
+                account_set_key="15:2",
                 account_config={"account_set": "ACME"},
+                catalog_refresh_request_id="11111111-1111-4111-8111-111111111111",
+                catalog_refresh_revision=8,
             )
 
         self.assertTrue(result["push_ok"])
         self.assertEqual(dispatch.await_args.kwargs["endpoint_id"], "ep-1")
         self.assertEqual(dispatch.await_args.kwargs["workspace_client_id"], 9)
         self.assertEqual(dispatch.await_args.kwargs["posting_kind"], "service")
+        self.assertEqual(dispatch.await_args.kwargs["account_set_key"], "15:2")
         self.assertEqual(dispatch.await_args.kwargs["account_config"], {"account_set": "ACME"})
+        self.assertEqual(
+            dispatch.await_args.kwargs["target_refresh_request_id"],
+            "11111111-1111-4111-8111-111111111111",
+        )
+        self.assertEqual(dispatch.await_args.kwargs["target_projection_revision"], 8)
+        self.assertTrue(dispatch.await_args.kwargs["catalog_evidence_required"])
 
 
 if __name__ == "__main__":

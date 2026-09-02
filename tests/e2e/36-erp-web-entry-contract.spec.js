@@ -98,6 +98,12 @@ async function boot(page, entry, state = {}) {
         lineCodeCalls: 0,
         erpPushes: 0,
         erpPushBodies: [],
+        erpEndpointReads: 0,
+        erpEndpointQueries: [],
+        erpProjectionReads: 0,
+        erpProjectionRefreshes: 0,
+        erpProjectionStatusReads: 0,
+        erpTestConnectionReads: 0,
         salesExports: [],
     });
     await page.addInitScript((portal) => {
@@ -122,25 +128,30 @@ async function boot(page, entry, state = {}) {
     );
     await page.route('**/api/**', async (route) => {
         const req = route.request();
-        const pathname = new URL(req.url()).pathname;
+        const requestUrl = new URL(req.url());
+        const pathname = requestUrl.pathname;
         let status = 200;
         let body = { ok: true };
         if (pathname === '/api/ocr/recognize') {
             state.recognizes.push((req.postDataBuffer() || Buffer.alloc(0)).toString('utf8'));
             body = state.recognized || RECOGNIZED;
-        } else if (pathname === '/api/history/h1' && req.method() === 'PUT') {
+        } else if (/^\/api\/history\/[^/]+$/.test(pathname) && req.method() === 'PUT') {
             state.historyPuts += 1;
             status =
                 state.failSave || (state.failSaveAfterConfirm && state.historyPuts > 2) ? 500 : 200;
         } else if (pathname === '/api/ocr/commit' && req.method() === 'POST') {
             state.commits += 1;
-            body = { ok: true, committed: 1 };
+            body = { ok: true, committed: (req.postDataJSON().ids || []).length };
         } else if (pathname === '/api/ocr/convert-documents') {
             state.converts += 1;
+            const historyIds = req.postDataJSON().history_ids || ['h1'];
             body = {
-                converted: [
-                    { history_id: 'h1', doc_type: 'purchase', doc_id: 'doc-1', doc_no: 'ERP-001' },
-                ],
+                converted: historyIds.map((historyId, index) => ({
+                    history_id: historyId,
+                    doc_type: 'purchase',
+                    doc_id: `doc-${index + 1}`,
+                    doc_no: `ERP-${String(index + 1).padStart(3, '0')}`,
+                })),
                 skipped: [],
             };
         } else if (pathname === '/api/purchase/docs') {
@@ -228,6 +239,7 @@ async function boot(page, entry, state = {}) {
                 },
             };
         } else if (pathname === '/api/erp/test-connection') {
+            state.erpTestConnectionReads += 1;
             state.mrerpTestAuth = req.headers().authorization || '';
             body = {
                 ok: true,
@@ -240,8 +252,39 @@ async function boot(page, entry, state = {}) {
             state.erpEndpoints = [...(state.erpEndpoints || []), saved];
             body = saved;
         } else if (pathname === '/api/erp/endpoints') {
+            state.erpEndpointReads += 1;
+            state.erpEndpointQueries.push(requestUrl.search);
             body = { items: state.erpEndpoints || [] };
+        } else if (
+            /^\/api\/erp\/endpoints\/[^/]+\/target-projection\/refresh$/.test(pathname) &&
+            req.method() === 'POST'
+        ) {
+            state.erpProjectionRefreshes += 1;
+            if (state.erpProjectionRefreshDelayMs) {
+                await new Promise((resolve) =>
+                    setTimeout(resolve, state.erpProjectionRefreshDelayMs)
+                );
+            }
+            body = {
+                ok: true,
+                refresh: {
+                    request_id: `refresh-${state.erpProjectionRefreshes}`,
+                    status: 'requested',
+                },
+            };
+        } else if (
+            /^\/api\/erp\/endpoints\/[^/]+\/target-projection\/refresh\/[^/]+$/.test(pathname)
+        ) {
+            state.erpProjectionStatusReads += 1;
+            body = {
+                ok: true,
+                refresh: {
+                    status: state.erpProjectionRefreshStatus || 'succeeded',
+                    result_revision: 1,
+                },
+            };
         } else if (/^\/api\/erp\/endpoints\/[^/]+\/target-projection$/.test(pathname)) {
+            state.erpProjectionReads += 1;
             const endpointId = pathname.split('/')[4];
             body = state.targetProjections?.[endpointId] || { ok: true, data: { snapshot: null } };
         } else if (pathname === '/api/erp/push') {
@@ -620,6 +663,18 @@ test('ERP finish save failure stays in review without commit or result success',
 test('ERP step four sends the final Express year and account selected by the user', async ({
     page,
 }) => {
+    const recognized = JSON.parse(JSON.stringify(RECOGNIZED));
+    const secondInvoice = JSON.parse(JSON.stringify(recognized.invoices[0]));
+    recognized.history_ids = ['h1', 'h2'];
+    recognized.invoice_count = 2;
+    recognized.pages.push({ page_number: 2, fields: {} });
+    recognized.invoices[0].source_total = 2;
+    secondInvoice.history_id = 'h2';
+    secondInvoice.source_index = 2;
+    secondInvoice.source_total = 2;
+    secondInvoice.page_indices = [2];
+    secondInvoice.fields.invoice_number = 'ERP-002';
+    recognized.invoices.push(secondInvoice);
     const endpoint = {
         id: 'express-1',
         name: 'Express',
@@ -627,22 +682,47 @@ test('ERP step four sends the final Express year and account selected by the use
         enabled: true,
         is_default: true,
         connection_state: 'online',
-        config: { account_set: 'S:\\69EXP\\TEST2019' },
+        account_set: 'TEST2019',
+        selected_account_key: 'S:\\69EXP\\TEST2019',
+        account_catalog_loaded: false,
+        account_choices: [
+            {
+                key: 'S:\\69EXP\\TEST2019',
+                label: 'TEST2019',
+                root_key: 'S:\\69EXP',
+                root_label: '69EXP',
+                writable: true,
+            },
+        ],
+        config: {},
     };
     const state = {
+        recognized,
         modules: { inventory: { enabled: true } },
         erpEndpoints: [endpoint],
+        erpProjectionRefreshDelayMs: 250,
         targetProjections: {
             'express-1': {
                 ok: true,
                 data: {
                     snapshot: {
+                        revision: 1,
                         account_sets: [
                             {
                                 source_id: 'S:\\69EXP\\TEST2019',
                                 label: 'TEST2019',
                                 attributes: {
                                     path: 'S:\\69EXP\\TEST2019',
+                                    root: 'S:\\69EXP',
+                                    root_label: '69EXP',
+                                    writable: true,
+                                },
+                            },
+                            {
+                                source_id: 'S:\\69EXP\\ALT2019',
+                                label: 'ALT2019',
+                                attributes: {
+                                    path: 'S:\\69EXP\\ALT2019',
                                     root: 'S:\\69EXP',
                                     root_label: '69EXP',
                                     writable: true,
@@ -658,12 +738,25 @@ test('ERP step four sends the final Express year and account selected by the use
                                     writable: true,
                                 },
                             },
+                            {
+                                source_id: 'S:\\70EXP\\ALT2020',
+                                label: 'ALT2020',
+                                attributes: {
+                                    path: 'S:\\70EXP\\ALT2020',
+                                    root: 'S:\\70EXP',
+                                    root_label: '70EXP',
+                                    writable: true,
+                                },
+                            },
                         ],
                     },
                 },
             },
         },
-        erpPushResponses: [{ ok: true, status: 'pending' }],
+        erpPushResponses: [
+            { ok: true, status: 'pending' },
+            { ok: true, status: 'pending' },
+        ],
     };
     await boot(page, 'erp', state);
     await page.evaluate(() => {
@@ -679,21 +772,186 @@ test('ERP step four sends the final Express year and account selected by the use
     });
     await page.click('#dx-inv-start');
     await page.waitForSelector('#dx-s-inv-review.active');
-    await page.locator('select.dx-item-type').selectOption('stock');
+    const itemTypes = page.locator('select.dx-item-type');
+    await expect(itemTypes).toHaveCount(2);
+    await itemTypes.nth(0).selectOption('stock');
+    await itemTypes.nth(1).selectOption('stock');
     await page.click('.dx-confirm-one');
     await expect.poll(() => state.converts).toBe(1);
     await page.click('#dx-inv-rev-next');
     await page.waitForSelector('#dx-s-inv-submit.active');
     await page.click('[data-iv-out="erp"]');
-    const selector = page.locator('[data-erp-account-select="express-1"]');
-    await expect(selector).toBeVisible();
-    await expect(selector.locator('option')).toHaveCount(2);
-    await selector.selectOption('s:\\70exp\\test2020');
+    const card = page.locator('.dx-erp', {
+        has: page.locator('.dx-erp-head[data-iv-erp="express-1"]'),
+    });
+    const rootSelector = card.locator('[data-erp-root-select="express-1"]');
+    const accountSelector = card.locator('[data-erp-account-select="express-1"]');
+    await expect(card).toHaveCount(1);
+    await expect(card.locator(':scope > .dx-erp-fields')).toHaveCount(1);
+    await expect(rootSelector).toBeVisible();
+    await expect(accountSelector).toBeVisible();
+    await expect(page.locator('.dx-erp-account')).toHaveCount(0);
+    await expect(rootSelector).toHaveValue('s:\\69exp');
+    await expect(rootSelector.locator('option')).toHaveCount(2);
+    await expect(accountSelector).toHaveValue('s:\\69exp\\test2019');
+    await expect(accountSelector.locator('option')).toHaveCount(2);
+    await expect(page.locator('#dx-inv-finish')).toBeEnabled();
+    expect(state.erpProjectionReads).toBe(0);
+    expect(state.erpProjectionRefreshes).toBe(0);
+    expect(state.erpEndpointQueries).toContain('?compact=true');
+
+    await rootSelector.click();
+    await expect(card.locator('.dx-erp-fields-loading')).toBeVisible();
+    await expect(page.locator('#dx-inv-finish')).toBeDisabled();
+    await expect(card.locator('.dx-erp-fields-loading')).toContainText('正在读取最新 ERP 主档…');
+    await expect(card.locator('.dx-erp-fields-loading')).toHaveCount(0);
+    expect(state.erpProjectionRefreshes).toBe(1);
+    expect(state.erpProjectionReads).toBe(1);
+    await expect(rootSelector.locator('option')).toHaveCount(3);
+    await expect(accountSelector.locator('option')).toHaveCount(3);
+    await expect(accountSelector).not.toContainText('TEST2020');
+
+    await rootSelector.click();
+    await rootSelector.selectOption('s:\\70exp');
+    expect(state.erpProjectionRefreshes).toBe(1);
+    expect(state.erpProjectionReads).toBe(1);
+    await expect(accountSelector).toHaveValue('');
+    await expect(accountSelector.locator('option')).toHaveCount(3);
+    await expect(accountSelector).toContainText('TEST2020');
+    await expect(accountSelector).not.toContainText('TEST2019');
+    await expect(page.locator('#dx-inv-finish')).toBeDisabled();
+
+    await accountSelector.click();
+    await expect(card.locator('.dx-erp-fields-loading')).toBeVisible();
+    await expect(card.locator('.dx-erp-fields-loading')).toContainText('正在读取最新 ERP 主档…');
+    await expect(card.locator('.dx-erp-fields-loading')).toHaveCount(0);
+    expect(state.erpProjectionRefreshes).toBe(2);
+    expect(state.erpProjectionReads).toBe(2);
+    await accountSelector.click();
+    await accountSelector.selectOption('s:\\70exp\\test2020');
+    await expect(page.locator('#dx-inv-finish')).toBeEnabled();
     await expect(page.locator('.dx-scan')).toContainText('70EXP · TEST2020');
+    expect(state.erpProjectionRefreshes).toBe(2);
+    expect(state.erpProjectionReads).toBe(2);
+
+    state.erpProjectionRefreshStatus = 'failed';
+    await accountSelector.click();
+    await expect(card.locator('.dx-erp-fields-loading')).toBeVisible();
+    await expect(card.locator('.dx-erp-fields-loading')).toHaveCount(0);
+    expect(state.erpProjectionRefreshes).toBe(3);
+    expect(state.erpProjectionStatusReads).toBe(3);
+    expect(state.erpProjectionReads).toBe(2);
+    await expect(accountSelector).toHaveValue('s:\\70exp\\test2020');
+    await expect(page.locator('#mp-toast-wrap')).toContainText('读取最新 ERP 主档失败，请重试');
+    await expect(card.locator('.dx-erp-fields-error')).toContainText(
+        '读取最新 ERP 主档失败，请重试'
+    );
+    await expect(page.locator('#dx-inv-finish')).toBeDisabled();
+
+    state.erpProjectionRefreshStatus = 'succeeded';
+    await accountSelector.click();
+    await expect(card.locator('.dx-erp-fields-loading')).toBeVisible();
+    await expect(card.locator('.dx-erp-fields-loading')).toHaveCount(0);
+    expect(state.erpProjectionRefreshes).toBe(4);
+    expect(state.erpProjectionReads).toBe(3);
+    await expect(accountSelector).toHaveValue('s:\\70exp\\test2020');
+    await expect(page.locator('#dx-inv-finish')).toBeEnabled();
+
+    const endpointReadsBeforePush = state.erpEndpointReads;
+    const projectionReadsBeforePush = state.erpProjectionReads;
+    const projectionRefreshesBeforePush = state.erpProjectionRefreshes;
     await page.click('#dx-inv-finish');
 
-    await expect.poll(() => state.erpPushBodies.length).toBe(1);
-    expect(state.erpPushBodies[0].account_set_key).toBe('s:\\70exp\\test2020');
+    await expect.poll(() => state.erpPushBodies.length).toBe(2);
+    expect(state.erpPushBodies.map((body) => body.account_set_key)).toEqual([
+        's:\\70exp\\test2020',
+        's:\\70exp\\test2020',
+    ]);
+    expect(state.erpPushBodies.map((body) => body.target_refresh_request_id)).toEqual([
+        'refresh-4',
+        'refresh-4',
+    ]);
+    expect(state.erpPushBodies.map((body) => body.target_projection_revision)).toEqual([1, 1]);
+    expect(state.erpEndpointReads - endpointReadsBeforePush).toBe(1);
+    expect(state.erpProjectionReads - projectionReadsBeforePush).toBe(0);
+    expect(state.erpProjectionRefreshes - projectionRefreshesBeforePush).toBe(0);
+    expect(state.erpProjectionReads).toBe(3);
+});
+
+test('ERP step four keeps MR.ERP as one account selector inside the target card', async ({
+    page,
+}) => {
+    const state = {
+        modules: { inventory: { enabled: true } },
+        erpEndpoints: [
+            {
+                id: 'mrerp-1',
+                name: 'MR.ERP',
+                adapter: 'mrerp',
+                enabled: true,
+                is_default: true,
+                config: {
+                    comidyear: '15',
+                    seldb: '2',
+                    username_enc: '***',
+                    password_enc: '***',
+                    _username_enc_set: true,
+                    _password_enc_set: true,
+                },
+            },
+        ],
+        targetProjections: {
+            'mrerp-1': {
+                ok: true,
+                data: {
+                    snapshot: {
+                        account_sets: [
+                            {
+                                source_id: '15:1',
+                                label: 'TEST2019',
+                                attributes: { comidyear: '15', seldb: '1' },
+                            },
+                            {
+                                source_id: '15:2',
+                                label: 'TEST2020',
+                                attributes: { comidyear: '15', seldb: '2' },
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+    };
+    await boot(page, 'erp', state);
+    await page.evaluate(() => {
+        sessionStorage.setItem('pearnly_erp_intake_direction', 'purchase');
+        window.loadDmsIntake();
+        document.querySelectorAll('.page').forEach((node) => node.classList.remove('active'));
+        document.getElementById('page-dms-intake')?.classList.add('active');
+    });
+    await page.setInputFiles('#dx-inv-file', {
+        name: 'mrerp-target.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('invoice'),
+    });
+    await page.click('#dx-inv-start');
+    await page.waitForSelector('#dx-s-inv-review.active');
+    await page.locator('select.dx-item-type').selectOption('stock');
+    await page.click('.dx-confirm-one');
+    await page.click('#dx-inv-rev-next');
+    await page.waitForSelector('#dx-s-inv-submit.active');
+    await page.click('[data-iv-out="erp"]');
+
+    const card = page.locator('.dx-erp', {
+        has: page.locator('.dx-erp-head[data-iv-erp="mrerp-1"]'),
+    });
+    await expect(card.locator('[data-erp-root-select]')).toHaveCount(0);
+    await expect(card.locator(':scope > .dx-erp-fields.single')).toHaveCount(1);
+    await expect(card.locator('[data-erp-account-select="mrerp-1"]')).toHaveValue('15:2');
+    await expect(page.locator('#dx-inv-finish')).toBeEnabled();
+    expect(state.erpProjectionReads).toBe(0);
+    expect(state.erpProjectionRefreshes).toBe(0);
+    expect(state.erpTestConnectionReads).toBe(0);
 });
 
 test('ERP review save failure does not create a formal document', async ({ page }) => {

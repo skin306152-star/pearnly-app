@@ -69,7 +69,8 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
               id uuid primary key default gen_random_uuid(), tenant_id uuid not null,
               endpoint_id uuid not null, account_set_key text not null, adapter text not null,
               status text not null default 'requested', requested_at timestamptz not null default now(),
-              started_at timestamptz, lease_owner text, lease_expires_at timestamptz,
+              started_at timestamptz, completed_at timestamptz,
+              lease_owner text, lease_expires_at timestamptz, error_code text,
               updated_at timestamptz not null default now()
             );
             CREATE TABLE erp_target_projection_snapshots (

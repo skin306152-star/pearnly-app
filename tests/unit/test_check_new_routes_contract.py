@@ -74,7 +74,7 @@ class TestRouteModules(unittest.TestCase):
 
     def test_contract_test_named_like_route_is_not_a_route(self):
         # 契约测试自己叫 test_foo_routes.py · 别把它当新路由再要一层测试
-        self.assertEqual(route_modules(["tests/unit/test_erp_posting_preview_routes.py"]), [])
+        self.assertEqual(route_modules(["tests/unit/test_posting_profile.py"]), [])
 
     def test_normalizes_windows_separators(self):
         self.assertEqual(route_modules(["tests\\unit\\test_a_routes.py"]), [])

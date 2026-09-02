@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
@@ -9,18 +8,19 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jwt
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
-from pydantic import BaseModel, Field
 
 from core import db
-from core.auth import JWT_ALGORITHM, _jwt_secret, get_current_user_from_request
+from core.auth import JWT_ALGORITHM, get_current_user_from_request
 from core.feature_flags import erp_line_enabled_for
 from core.workspace_context import WS_HEADER
 from services.erp import selected_account_refresh, target_refresh
 from services.auth.entrance import require_erp_portal
 from services.erp import team_access
 from services.line_erp import (
+    catalog_refresh,
+    route_contract,
     store,
     target_preflight,
     target_selection,
@@ -36,30 +36,8 @@ CHANNEL = "erp"
 _ROOT = Path(__file__).resolve().parent.parent
 logger = logging.getLogger(__name__)
 
-
-class LiffAuthIn(BaseModel):
-    id_token: str = ""
-    draft_id: str = ""
-
-
-class DraftUpdateIn(BaseModel):
-    records: list[dict] = Field(default_factory=list)
-    pages: list[dict] = Field(default_factory=list)
-    fields: dict = Field(default_factory=dict)
-    endpoint_id: str = ""
-    workspace_client_id: int | None = None
-    direction: str = ""
-    adapter: str = ""
-    target_label: str = ""
-    account_root: str | None = None
-    account_set: str | None = None
-    posting_kind: str | None = None
-    payment: str | None = None
-
-
-def _draft_secret() -> str:
-    raw = (_jwt_secret() + "line_erp_draft:v1").encode("utf-8")
-    return hashlib.sha256(raw).hexdigest()
+LiffAuthIn = route_contract.LiffAuthIn
+DraftUpdateIn = route_contract.DraftUpdateIn
 
 
 def _require_erp_account(request: Request) -> dict:
@@ -115,7 +93,7 @@ async def erp_liff_auth(req: LiffAuthIn):
         "exp": int((now + timedelta(minutes=20)).timestamp()),
         "aud": "line_erp_draft",
     }
-    token = jwt.encode(token_claims, _draft_secret(), algorithm=JWT_ALGORITHM)
+    token = jwt.encode(token_claims, route_contract.draft_secret(), algorithm=JWT_ALGORITHM)
     return {"ok": True, "data": {"token": token, "username": user.get("username") or ""}}
 
 
@@ -189,7 +167,7 @@ def _draft_token(request: Request, draft_id: str) -> tuple[dict, dict, dict]:
     try:
         claims = jwt.decode(
             raw[7:].strip(),
-            _draft_secret(),
+            route_contract.draft_secret(),
             algorithms=[JWT_ALGORITHM],
             audience="line_erp_draft",
         )
@@ -275,6 +253,7 @@ async def erp_draft_get(request: Request, draft_id: str):
         endpoint_id=str(payload.get("endpoint_id") or "") or None,
         workspace_client_id=payload.get("workspace_client_id"),
         refresh=False,
+        include_account_catalog=False,
     )
     refresh_state = None
     refresh_request_id = str(payload.get("master_refresh_request_id") or "")
@@ -301,6 +280,51 @@ async def erp_draft_get(request: Request, draft_id: str):
     }
 
 
+@router.post("/api/line/erp/draft/{draft_id}/target/{endpoint_id}/refresh")
+async def erp_draft_target_refresh(
+    request: Request,
+    draft_id: str,
+    endpoint_id: str,
+    response: Response,
+    workspace_client_id: int | None = Query(default=None),
+):
+    claims, binding, _ = _draft_token(request, draft_id)
+    try:
+        refresh = await catalog_refresh.start(
+            binding,
+            str(claims["user_id"]),
+            endpoint_id,
+            workspace_client_id,
+        )
+    except catalog_refresh.CatalogRefreshError as exc:
+        raise HTTPException(exc.status_code, detail=f"line_erp.{exc.code}") from None
+    response.headers["Cache-Control"] = "no-store"
+    return {"ok": True, "data": refresh}
+
+
+@router.get("/api/line/erp/draft/{draft_id}/target/{endpoint_id}/refresh/{request_id}")
+async def erp_draft_target_refresh_status(
+    request: Request,
+    draft_id: str,
+    endpoint_id: str,
+    request_id: str,
+    response: Response,
+    workspace_client_id: int | None = Query(default=None),
+):
+    _, binding, _ = _draft_token(request, draft_id)
+    try:
+        data = await catalog_refresh.status(
+            binding,
+            endpoint_id,
+            workspace_client_id,
+            request_id,
+        )
+    except catalog_refresh.CatalogRefreshError as exc:
+        raise HTTPException(exc.status_code, detail=f"line_erp.{exc.code}") from None
+    response.headers["Cache-Control"] = "no-store"
+    return {"ok": True, "data": data}
+
+
 @router.put("/api/line/erp/draft/{draft_id}")
 async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
     claims, binding, session = _draft_token(request, draft_id)
@@ -319,6 +343,8 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
         "target_label": req.target_label,
         "account_root": req.account_root,
         "account_set": req.account_set,
+        "catalog_refresh_request_id": req.catalog_refresh_request_id,
+        "catalog_refresh_revision": req.catalog_refresh_revision,
         "posting_kind": req.posting_kind,
         "payment": req.payment,
     }

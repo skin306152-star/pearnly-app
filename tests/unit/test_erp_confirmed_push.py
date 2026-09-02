@@ -3,10 +3,123 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
+from fastapi import HTTPException
+
 from services.erp import confirmed_push
 
 
 class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
+    async def test_line_non_default_push_rechecks_proof_before_direct_outbound(self):
+        user = {"id": "owner", "tenant_id": "tenant", "entry": "erp"}
+        endpoint = {
+            "id": "endpoint-1",
+            "name": "MR.ERP",
+            "adapter": "mrerp",
+            "enabled": True,
+            "config": {"comidyear": "6", "seldb": "1"},
+        }
+        denied = HTTPException(
+            409,
+            detail={"code": "catalog_refresh_invalid", "reason": "refresh_superseded"},
+        )
+        with (
+            mock.patch.object(
+                confirmed_push.team_access, "assigned_endpoint_for_request", return_value=None
+            ),
+            mock.patch.object(
+                confirmed_push.shared_express_push,
+                "reserve_managed_manual_push",
+                return_value=None,
+            ),
+            mock.patch.object(
+                confirmed_push.db, "get_ocr_history_detail", return_value={"id": "history"}
+            ),
+            mock.patch.object(
+                confirmed_push.convert_svc, "history_is_converted", return_value=True
+            ),
+            mock.patch.object(confirmed_push.db, "get_erp_endpoint", return_value=endpoint),
+            mock.patch(
+                "services.erp.selected_account.require_catalog_evidence",
+                side_effect=denied,
+            ) as evidence,
+            mock.patch.object(confirmed_push.erp_push, "push_to_endpoint") as outbound,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                await confirmed_push.dispatch_confirmed_history(
+                    user=user,
+                    history_id="history",
+                    endpoint_id="endpoint-1",
+                    account_set_key="15:2",
+                    target_refresh_request_id="11111111-1111-4111-8111-111111111111",
+                    target_projection_revision=8,
+                    catalog_evidence_required=True,
+                )
+
+        self.assertIs(caught.exception, denied)
+        self.assertEqual(evidence.call_args.kwargs["account_set_key"], "15:2")
+        self.assertEqual(
+            evidence.call_args.kwargs["request_id"],
+            "11111111-1111-4111-8111-111111111111",
+        )
+        self.assertEqual(evidence.call_args.kwargs["revision"], 8)
+        outbound.assert_not_called()
+
+    async def test_web_non_default_push_cannot_bypass_catalog_evidence(self):
+        user = {"id": "owner", "tenant_id": "tenant", "entry": "main"}
+        endpoint = {
+            "id": "endpoint-1",
+            "name": "MR.ERP",
+            "adapter": "mrerp",
+            "enabled": True,
+            "config": {"comidyear": "6", "seldb": "1"},
+        }
+        denied = HTTPException(
+            409,
+            detail={"code": "catalog_refresh_invalid", "reason": "refresh_superseded"},
+        )
+        request = mock.Mock()
+        with (
+            mock.patch.object(
+                confirmed_push.team_access, "assigned_endpoint_for_request", return_value=None
+            ),
+            mock.patch.object(
+                confirmed_push.team_access, "record_creator_scope", return_value=None
+            ),
+            mock.patch.object(
+                confirmed_push.shared_express_push,
+                "maybe_reserve_manual_push",
+                new=mock.AsyncMock(return_value=None),
+            ) as managed,
+            mock.patch.object(
+                confirmed_push.db, "get_ocr_history_detail", return_value={"id": "history"}
+            ),
+            mock.patch.object(confirmed_push.db, "get_erp_endpoint", return_value=endpoint),
+            mock.patch(
+                "services.erp.selected_account.require_catalog_evidence",
+                side_effect=denied,
+            ) as evidence,
+            mock.patch.object(confirmed_push.erp_push, "push_to_endpoint") as outbound,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                await confirmed_push.dispatch_confirmed_history(
+                    user=user,
+                    request=request,
+                    history_id="history",
+                    endpoint_id="endpoint-1",
+                    account_set_key="15:2",
+                    target_refresh_request_id="11111111-1111-4111-8111-111111111111",
+                    target_projection_revision=7,
+                )
+
+        self.assertIs(caught.exception, denied)
+        self.assertEqual(
+            managed.call_args.kwargs["target_refresh_request_id"],
+            "11111111-1111-4111-8111-111111111111",
+        )
+        self.assertEqual(managed.call_args.kwargs["target_projection_revision"], 7)
+        self.assertEqual(evidence.call_args.kwargs["account_set_key"], "15:2")
+        outbound.assert_not_called()
+
     async def test_retryable_first_failure_is_presented_as_waiting(self):
         user = {"id": "owner", "tenant_id": "tenant", "entry": "erp"}
         endpoint = {
@@ -166,11 +279,22 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
                 user=user,
                 history_id="history",
                 workspace_client_id=7,
+                account_set_key="other",
+                target_refresh_request_id="11111111-1111-4111-8111-111111111111",
+                target_projection_revision=8,
+                catalog_evidence_required=True,
             )
 
         self.assertEqual(result, queued)
         self.assertEqual(reserve.call_args.kwargs["endpoint_id"], "shared-express")
         self.assertEqual(reserve.call_args.kwargs["requested_workspace_id"], 7)
+        self.assertEqual(reserve.call_args.kwargs["account_set_key"], "other")
+        self.assertEqual(
+            reserve.call_args.kwargs["target_refresh_request_id"],
+            "11111111-1111-4111-8111-111111111111",
+        )
+        self.assertEqual(reserve.call_args.kwargs["target_projection_revision"], 8)
+        self.assertTrue(reserve.call_args.kwargs["catalog_evidence_required"])
         outbound.assert_not_called()
 
 

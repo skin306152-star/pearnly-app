@@ -13,7 +13,11 @@ import {
     probeInvoiceErp,
 } from './dms-intake-invoice-erp.js';
 import { erpIntakeDirection, isErpEntry } from './erp-intake.js';
-import { selectErpAccount, type ErpEndpoint } from './dms-intake-erp-accounts.js';
+import type { ErpEndpoint } from './dms-intake-erp-accounts.js';
+import {
+    changeErpCatalogSelection,
+    preOpenErpCatalog,
+} from './dms-intake-erp-catalog-interaction.js';
 
 export type Dict = Record<string, unknown>;
 export interface IvFile {
@@ -104,8 +108,7 @@ export function rerenderInvoice() {
     else if (IV.view === 'submit') renderSubmit();
     else backToUploadStep();
 }
-// 回到步骤①(上传):四处入口(切任务重渲/复核页返回/推送前预览未声明过账去向的
-// 回退按钮/完成后开新一批)共用同一对渲染+步进调用,不重复四份。
+// 切任务、返回、预览回退和新批次共用同一个上传步骤入口。
 function backToUploadStep() {
     renderInvoiceUpload();
     showStepInv(1, 'dx-s-upload');
@@ -198,9 +201,7 @@ function queueHtml() {
         `<button class="btn primary" id="dx-inv-start"${IV.busy ? ' disabled' : ''}>${esc(t('btn-start'))}</button></div></div>`
     );
 }
-// 侧栏只放「本批要干什么活」的两级声明。原先的「当前流程」「设计原则」两个框已删:
-// 前者是把界面自己在做的事又用文字讲一遍,后者的正文与前者第三条是同一个 i18n key
-// (同一句话在同一屏印两遍)—— 都不承载决策,占的却是决策区的位置。
+// 侧栏只保留本批需要用户决定的两级声明。
 function sideHtml() {
     return `<div class="dx-side">${directionHtml()}${postingKindHtml()}</div>`;
 }
@@ -213,8 +214,7 @@ function choiceHtml(attr: string, on: boolean, tk: string, dk: string): string {
     );
 }
 
-// 「本批是进项还是销项」· 用户选了就按他选的做,不再拿税号去猜(税号读错=方向判反)。
-// 不选 = 沿用税号锚点自动判定,行为与今天一致。
+// 用户未选进销方向时，沿用税号锚点自动判定。
 function directionHtml(): string {
     const locked = isErpEntry() ? erpIntakeDirection() : '';
     const opt = (k: 'purchase' | 'sales', tk: string, dk: string) =>
@@ -432,13 +432,9 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
     }
     if (hit('dx-inv-go-int')) return (focusDxErpCards(), true);
     if (hit('dx-inv-sub-back')) return (renderReview(), true);
-    // 步④「未声明过账去向」诚实提示态的回退按钮(dms-intake-posting-preview.ts 渲染,
-    // 那份模块不直接依赖本文件的 showStepInv/renderInvoiceUpload,防循环依赖)。
-    if (tg.closest('[data-iv-pp-back-step1]')) return (backToUploadStep(), true);
     if (hit('dx-inv-finish')) return (void doFinish(), true);
     if (hit('dx-inv-view-rec')) return (go('history'), true);
-    // 推送日志早已从集成页拆成独立页(nav「Pearnly Cowork → 推送日志」),这里一直还在
-    // 往集成页跳 —— 点了看不到日志。
+    // 推送日志使用独立路由，不再跳到集成配置页。
     if (hit('dx-inv-view-push')) return (go('push-logs'), true);
     if (hit('dx-inv-new')) {
         resetInvoice();
@@ -446,6 +442,20 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
         return true;
     }
     return false;
+}
+
+export function onInvoiceErpCatalogPreOpen(tg: HTMLElement, source: 'pointer' | 'focus'): boolean {
+    return preOpenErpCatalog({
+        target: tg,
+        endpoints: IV.endpoints,
+        source,
+        render: renderSubmit,
+        onFailure: (result) =>
+            showToast(
+                t(result === 'timeout' ? 'dx-erp-catalog-timeout' : 'dx-erp-catalog-load-failed'),
+                'warn'
+            ),
+    });
 }
 export function onInvoiceChange(tg: HTMLElement): boolean {
     const id = (tg as HTMLInputElement).id;
@@ -458,13 +468,7 @@ export function onInvoiceChange(tg: HTMLElement): boolean {
         IV.tpl = (tg as HTMLSelectElement).value;
         return true;
     }
-    const endpointId = tg.getAttribute('data-erp-account-select');
-    if (endpointId) {
-        if (selectErpAccount(IV.endpoints, endpointId, (tg as HTMLSelectElement).value)) {
-            renderSubmit();
-        }
-        return true;
-    }
+    if (changeErpCatalogSelection(tg, IV.endpoints, renderSubmit)) return true;
     // 复核字段编辑:data-iv-field="fileIdx:invIdx:key"
     const fk = tg.getAttribute('data-iv-field');
     if (fk) {

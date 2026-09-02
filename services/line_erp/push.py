@@ -19,7 +19,10 @@ async def dispatch_confirmed(
     endpoint_id: str,
     workspace_client_id: int,
     posting_kind: str | None,
+    account_set_key: str | None = None,
     account_config: dict[str, Any] | None = None,
+    catalog_refresh_request_id: str | None = None,
+    catalog_refresh_revision: int | None = None,
 ) -> dict[str, Any]:
     results = []
     for history_id in history_ids:
@@ -30,7 +33,11 @@ async def dispatch_confirmed(
                 endpoint_id=endpoint_id,
                 workspace_client_id=workspace_client_id,
                 posting_kind=posting_kind,
+                account_set_key=account_set_key,
                 account_config=account_config,
+                target_refresh_request_id=catalog_refresh_request_id,
+                target_projection_revision=catalog_refresh_revision,
+                catalog_evidence_required=True,
             )
         except HTTPException as exc:
             detail = exc.detail

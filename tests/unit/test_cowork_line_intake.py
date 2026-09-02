@@ -10,7 +10,7 @@ import jwt
 from fastapi import HTTPException
 
 from routes import cowork_line_intake_routes as routes
-from services.cowork_line import intake
+from services.cowork_line import intake, intake_targets
 
 IDENTITY = {
     "tenant_id": "tenant-1",
@@ -43,16 +43,40 @@ PAYLOAD = {
 
 
 class IntakeServiceTest(unittest.TestCase):
-    def test_opening_a_new_draft_forces_latest_erp_projection(self):
+    def test_invalid_catalog_proof_is_rejected_before_page_or_session_write(self):
+        records = [{"id": "history-1", "pages": [{"fields": {}}]}]
+        with (
+            mock.patch.object(intake, "require_draft", return_value=({}, dict(PAYLOAD))),
+            mock.patch.object(intake, "_assert_owned_staged"),
+            mock.patch.object(
+                intake_targets,
+                "validated_selection",
+                side_effect=intake.CoworkLineIntakeError("catalog_refresh_required"),
+            ),
+            mock.patch.object(intake, "update_ocr_history_pages") as update_pages,
+            mock.patch.object(intake.session_store, "set_session") as set_session,
+        ):
+            with self.assertRaises(intake.CoworkLineIntakeError) as caught:
+                intake.save_draft(IDENTITY, "history-1", records, dict(PAYLOAD))
+
+        self.assertEqual(caught.exception.code, "catalog_refresh_required")
+        update_pages.assert_not_called()
+        set_session.assert_not_called()
+
+    def test_opening_a_new_draft_uses_only_compact_target_defaults(self):
         targets = SimpleNamespace(list_targets=mock.Mock(return_value=[]))
         with (
             mock.patch.object(intake, "require_draft", return_value=({}, dict(PAYLOAD))),
             mock.patch.object(intake, "_assert_owned_staged"),
             mock.patch.object(intake, "_records", return_value=[]),
-            mock.patch.object(intake, "_targets_service", return_value=targets),
+            mock.patch.object(intake_targets, "_service", return_value=targets),
         ):
             intake.get_draft(IDENTITY, "history-1")
-        targets.list_targets.assert_called_once_with(IDENTITY, refresh=True)
+        targets.list_targets.assert_called_once_with(
+            IDENTITY,
+            refresh=False,
+            include_account_catalog=False,
+        )
 
     def test_save_revalidates_target_and_auto_creates_workspace(self):
         initial = {
@@ -83,7 +107,7 @@ class IntakeServiceTest(unittest.TestCase):
         with (
             mock.patch.object(intake, "require_draft", return_value=({}, dict(PAYLOAD))),
             mock.patch.object(intake, "_assert_owned_staged"),
-            mock.patch.object(intake, "_targets_service", return_value=targets),
+            mock.patch.object(intake_targets, "_service", return_value=targets),
             mock.patch.object(intake, "update_ocr_history_pages", return_value=True) as update,
             mock.patch.object(intake, "_update_scope") as update_scope,
             mock.patch.object(intake, "_records", return_value=records),
@@ -107,7 +131,11 @@ class IntakeServiceTest(unittest.TestCase):
         saved_pages = update.call_args.args[2]
         self.assertEqual(saved_pages[0]["fields"]["direction"], "purchase")
         targets.require_target.assert_called_once_with(
-            IDENTITY, "endpoint-1", workspace_client_id=None
+            IDENTITY,
+            "endpoint-1",
+            None,
+            refresh_probe=False,
+            include_account_catalog=False,
         )
         targets.resolve_history_workspace.assert_called_once_with(
             IDENTITY,
@@ -133,15 +161,58 @@ class IntakeServiceTest(unittest.TestCase):
         payload = {**PAYLOAD, "payment": None, "posting_mode": "credit"}
         self.assertEqual(intake._selection(payload)["payment"], "credit")
 
+    def test_editor_requires_an_explicit_account_set_instead_of_falling_back(self):
+        target = {
+            "endpoint_id": "endpoint-1",
+            "workspace_client_id": 17,
+            "adapter": "mrerp",
+            "mode_options": ["credit"],
+            **MRERP_ACCOUNT,
+        }
+        with self.assertRaises(intake.CoworkLineIntakeError) as caught:
+            intake_targets.normalize_selection(
+                target,
+                {
+                    "direction": "purchase",
+                    "payment": "credit",
+                    "account_set": None,
+                },
+            )
+
+        self.assertEqual(caught.exception.code, "account_set_required")
+        self.assertEqual(caught.exception.status_code, 422)
+
+    def test_editor_rejects_an_account_from_a_different_express_root(self):
+        target = {
+            "endpoint_id": "express-1",
+            "workspace_client_id": 18,
+            "adapter": "express",
+            "mode_options": ["stock", "service"],
+            "account_choices": [{"key": "MAIN-2026", "label": "MAIN", "root_key": "2026"}],
+        }
+        with self.assertRaises(intake.CoworkLineIntakeError) as caught:
+            intake_targets.normalize_selection(
+                target,
+                {
+                    "direction": "purchase",
+                    "posting_kind": "stock",
+                    "account_root": "2025",
+                    "account_set": "MAIN-2026",
+                },
+            )
+
+        self.assertEqual(caught.exception.code, "account_set_required")
+        self.assertEqual(caught.exception.status_code, 422)
+
     def test_target_errors_are_scoped_and_do_not_leak_configuration(self):
         class TargetError(Exception):
             code = "target_not_ready"
 
         TargetError.__name__ = "CoworkLineErpTargetError"
         targets = SimpleNamespace(require_target=mock.Mock(side_effect=TargetError()))
-        with mock.patch.object(intake, "_targets_service", return_value=targets):
+        with mock.patch.object(intake_targets, "_service", return_value=targets):
             with self.assertRaises(intake.CoworkLineIntakeError) as caught:
-                intake._validated_selection(IDENTITY, PAYLOAD)
+                intake_targets.validated_selection(IDENTITY, PAYLOAD)
         self.assertEqual(caught.exception.code, "target_not_ready")
         self.assertEqual(caught.exception.status_code, 409)
 
@@ -195,7 +266,7 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch.object(intake, "require_draft", return_value=({}, payload)),
             mock.patch.object(intake, "_assert_owned_staged") as staged_precheck,
-            mock.patch.object(intake, "_targets_service", return_value=targets),
+            mock.patch.object(intake_targets, "_service", return_value=targets),
             mock.patch.object(intake, "_records", return_value=self._ready_records()),
             mock.patch.object(intake, "_dispatch_confirmed", side_effect=dispatch),
             mock.patch.object(intake.session_store, "clear_session") as clear,
@@ -207,6 +278,25 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["committed"], 1)
         staged_precheck.assert_not_called()
         clear.assert_called_once()
+
+    async def test_confirm_rechecks_catalog_proof_before_read_or_push(self):
+        payload = {**PAYLOAD, "workspace_client_id": 17}
+        with (
+            mock.patch.object(intake, "require_draft", return_value=({}, payload)),
+            mock.patch.object(
+                intake_targets,
+                "validated_selection",
+                side_effect=intake.CoworkLineIntakeError("catalog_refresh_invalid"),
+            ),
+            mock.patch.object(intake, "_records") as records,
+            mock.patch.object(intake, "_dispatch_confirmed") as dispatch,
+        ):
+            with self.assertRaises(intake.CoworkLineIntakeError) as caught:
+                await intake.confirm_and_push(IDENTITY, payload)
+
+        self.assertEqual(caught.exception.code, "catalog_refresh_invalid")
+        records.assert_not_called()
+        dispatch.assert_not_called()
 
     async def test_confirm_keeps_retryable_session_when_no_history_was_committed(self):
         target = {
@@ -225,7 +315,7 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch.object(intake, "require_draft", return_value=({}, payload)),
             mock.patch.object(intake, "_assert_owned_staged"),
-            mock.patch.object(intake, "_targets_service", return_value=targets),
+            mock.patch.object(intake_targets, "_service", return_value=targets),
             mock.patch.object(intake, "_records", return_value=self._ready_records()),
             mock.patch.object(
                 intake,
@@ -259,7 +349,7 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
         targets = SimpleNamespace(require_target=mock.Mock(return_value=target))
         with (
             mock.patch.object(intake, "require_draft", return_value=({}, payload)),
-            mock.patch.object(intake, "_targets_service", return_value=targets),
+            mock.patch.object(intake_targets, "_service", return_value=targets),
             mock.patch.object(
                 intake,
                 "_records",
@@ -312,6 +402,81 @@ class IntakeRouteTest(unittest.TestCase):
             with self.assertRaises(HTTPException) as caught:
                 routes._session_for(IDENTITY, "history-1")
         self.assertEqual(caught.exception.status_code, 403)
+
+    def test_catalog_refresh_status_rechecks_exact_workspace_before_lookup(self):
+        response = routes.Response()
+        with (
+            mock.patch.object(routes, "_draft_identity", return_value=IDENTITY),
+            mock.patch.object(
+                routes.intake,
+                "get_target",
+                side_effect=intake.CoworkLineIntakeError("target_not_found"),
+            ) as get_target,
+            mock.patch.object(routes.target_refresh, "refresh_status") as refresh_status,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                asyncio.run(
+                    routes.cowork_intake_target_refresh_status(
+                        None,
+                        "history-1",
+                        "endpoint-1",
+                        "refresh-1",
+                        response,
+                        workspace_client_id=99,
+                    )
+                )
+
+        self.assertEqual(caught.exception.status_code, 409)
+        get_target.assert_called_once_with(
+            IDENTITY,
+            "endpoint-1",
+            99,
+            include_account_catalog=False,
+        )
+        refresh_status.assert_not_called()
+
+    def test_successful_catalog_refresh_returns_exact_cowork_target(self):
+        compact = {"endpoint_id": "endpoint-1", "workspace_client_id": 69}
+        full = {
+            **compact,
+            "account_catalog_loaded": True,
+            "account_choices": [{"key": "69EXP", "label": "69EXP"}],
+        }
+        response = routes.Response()
+        with (
+            mock.patch.object(routes, "_draft_identity", return_value=IDENTITY),
+            mock.patch.object(
+                routes.intake,
+                "get_target",
+                side_effect=[compact, full],
+            ) as get_target,
+            mock.patch.object(routes, "erp_target_projection_enabled_for", return_value=True),
+            mock.patch.object(
+                routes.target_refresh,
+                "refresh_status",
+                return_value={
+                    "request_id": "refresh-1",
+                    "status": "succeeded",
+                    "account_set_key": routes.target_refresh.ENDPOINT_SCOPE_KEY,
+                },
+            ),
+        ):
+            result = asyncio.run(
+                routes.cowork_intake_target_refresh_status(
+                    None,
+                    "history-1",
+                    "endpoint-1",
+                    "refresh-1",
+                    response,
+                    workspace_client_id=69,
+                )
+            )
+
+        self.assertEqual(result["data"]["target"], full)
+        self.assertEqual(get_target.call_count, 2)
+        self.assertFalse(get_target.call_args_list[0].kwargs["include_account_catalog"])
+        self.assertTrue(get_target.call_args_list[1].kwargs["include_account_catalog"])
+        self.assertEqual(response.headers["cache-control"], "no-store")
 
 
 if __name__ == "__main__":

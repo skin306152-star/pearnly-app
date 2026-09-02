@@ -45,7 +45,7 @@ class ErpEndpointUpdate(BaseModel):
 
 
 @router.get("/api/erp/endpoints")
-async def erp_endpoints_list(request: Request):
+async def erp_endpoints_list(request: Request, compact: bool = False):
     user = get_current_user_from_request(request)
     require_erp_portal(user, also_allowed=(DMS,))  # DMS 录入工作台复用端点清单 → 窄 allowlist
     _check_push_access(user)
@@ -54,12 +54,12 @@ async def erp_endpoints_list(request: Request):
         assigned = team_access.assigned_endpoint_items(
             str(user.get("tenant_id") or ""), str(user.get("id") or "")
         )
-        return {"items": assigned}
+        return {"items": [_strip_endpoint_for_response(item, compact=compact) for item in assigned]}
     if shared_express_access.is_shared_endpoint_read(user):
         shared = shared_express_access.list_shared_endpoint_items(request, user)
-        return {"items": shared}
+        return {"items": [_strip_endpoint_for_response(item, compact=compact) for item in shared]}
     items = db.list_erp_endpoints(user["id"])
-    return {"items": [_strip_endpoint_for_response(it) for it in items]}
+    return {"items": [_strip_endpoint_for_response(it, compact=compact) for it in items]}
 
 
 @router.post("/api/erp/endpoints")

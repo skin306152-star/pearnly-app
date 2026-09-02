@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 import logging
+import ntpath
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
+from uuid import UUID
 
 from fastapi import HTTPException, Request
 
 from core import db
 from services.authz.resolver import resolve
+from services.erp.express_target_projection import normalize_express_account_key
+from services.erp.shared_express_profile import profile_key
 from services.erp.shared_express_schema import enable_shared_express_select
 
 logger = logging.getLogger(__name__)
@@ -75,8 +79,19 @@ def fetch_visible_endpoint_rows(
     actor_id: str,
     tenant_id: str,
     workspace_client_id: int,
+    endpoint_id: str | None = None,
 ) -> List[Dict[str, Any]]:
     """Merge actor legacy rows with this workspace's active shared Express row."""
+    endpoint_filter = "AND id = %s" if endpoint_id else ""
+    params: list[Any] = [
+        actor_id,
+        tenant_id,
+        workspace_client_id,
+        tenant_id,
+        workspace_client_id,
+    ]
+    if endpoint_id:
+        params.append(endpoint_id)
     cur.execute(
         """
         SELECT id, name, adapter, config, is_default, auto_push, enabled,
@@ -86,7 +101,7 @@ def fetch_visible_endpoint_rows(
                bound_account_set, bound_profile_key, live_account_set,
                live_profile_key, agent_last_seen_at, agent_version, revoked_at
         FROM erp_endpoints
-        WHERE (
+        WHERE ((
             user_id = %s
             AND binding_generation = 0
             AND (tenant_id IS NULL OR tenant_id = %s)
@@ -97,28 +112,30 @@ def fetch_visible_endpoint_rows(
             AND adapter = 'express'
             AND enabled = TRUE
             AND shared_scope = TRUE
-        )
+        ))
+        """
+        + endpoint_filter
+        + """
         ORDER BY is_default DESC, created_at ASC
         """,
-        (
-            actor_id,
-            tenant_id,
-            workspace_client_id,
-            tenant_id,
-            workspace_client_id,
-        ),
+        tuple(params),
     )
     return [dict(row) for row in cur.fetchall()]
 
 
 def list_visible_endpoints(
-    request: Request, user: dict
+    request: Request, user: dict, *, endpoint_id: str | None = None
 ) -> Tuple[List[Dict[str, Any]], datetime, bool]:
     """Read the shared view inside one tenant/user/workspace-bound transaction."""
     tenant_id = str(user.get("tenant_id") or "").strip()
     actor_id = str(user.get("id") or "").strip()
     if not tenant_id or not actor_id:
         raise _hidden()
+    if endpoint_id:
+        try:
+            endpoint_id = str(UUID(str(endpoint_id)))
+        except (TypeError, ValueError, AttributeError):
+            raise _hidden() from None
     try:
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=actor_id) as cur:
             workspace_id = _resolve_active_workspace(cur, request, tenant_id)
@@ -147,6 +164,7 @@ def list_visible_endpoints(
                 actor_id=actor_id,
                 tenant_id=tenant_id,
                 workspace_client_id=workspace_id,
+                endpoint_id=endpoint_id,
             )
             may_manage = authz.role_key == "owner" and authz.has("erp.endpoint.manage")
             return rows, server_now, may_manage
@@ -177,6 +195,61 @@ def _config_text(config: dict, key: str, limit: int) -> str:
     if not isinstance(value, str):
         return ""
     return value.strip()[:limit]
+
+
+def _configured_text(endpoint: Dict[str, Any], config: dict, key: str, limit: int = 500) -> str:
+    return _config_text(endpoint, f"configured_{key}", limit) or _config_text(config, key, limit)
+
+
+def _root_label(root: str) -> str:
+    clean = str(root or "").strip().rstrip("\\/")
+    return ntpath.basename(clean) or clean
+
+
+def _managed_config_matches_bound_profile(endpoint: Dict[str, Any], config: dict) -> bool:
+    account_set = _configured_text(endpoint, config, "account_set", 120)
+    account_dir = _configured_text(endpoint, config, "account_dir")
+    bound_profile = _config_text(endpoint, "bound_profile_key", 200)
+    if not account_set or not account_dir or not bound_profile:
+        return False
+    try:
+        return profile_key(account_set, account_dir) == bound_profile
+    except (TypeError, ValueError):
+        return False
+
+
+def _compact_express_default_choice(
+    endpoint: Dict[str, Any], *, managed: bool
+) -> Dict[str, Any] | None:
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    selected = (
+        _config_text(endpoint, "bound_account_set", 120)
+        or _config_text(endpoint, "live_account_set", 120)
+        if managed
+        else _config_text(config, "account_set", 500) or _config_text(config, "account_dir", 500)
+    )
+    key = normalize_express_account_key(selected)
+    if not key:
+        return None
+
+    config_matches = not managed or _managed_config_matches_bound_profile(endpoint, config)
+    configured_dir = _configured_text(endpoint, config, "account_dir") if config_matches else ""
+    configured_root = _configured_text(endpoint, config, "express_root") if config_matches else ""
+    raw_path = configured_dir or selected
+    root = configured_root or ntpath.dirname(raw_path.rstrip("\\/"))
+    label = (
+        _configured_text(endpoint, config, "account_set_label", 120)
+        or _configured_text(endpoint, config, "account_company", 120)
+        if config_matches
+        else ""
+    )
+    return {
+        "key": key,
+        "label": label or ntpath.basename(raw_path.rstrip("\\/")) or selected,
+        "root_key": normalize_express_account_key(root),
+        "root_label": _root_label(root),
+        "writable": True,
+    }
 
 
 def _connection_state(endpoint: Dict[str, Any], server_now: datetime) -> str:
@@ -246,6 +319,11 @@ def safe_endpoint_dto(endpoint: Dict[str, Any], server_now: datetime) -> Dict[st
         if managed
         else _config_text(config, "companion_version", 40) or None
     )
+    choice = (
+        _compact_express_default_choice(endpoint, managed=managed)
+        if str(endpoint.get("adapter") or "").strip().lower() == "express"
+        else None
+    )
     return {
         "id": str(endpoint.get("id") or ""),
         "name": str(endpoint.get("name") or "")[:80],
@@ -253,6 +331,9 @@ def safe_endpoint_dto(endpoint: Dict[str, Any], server_now: datetime) -> Dict[st
         "enabled": endpoint.get("enabled") is True,
         "shared_scope": endpoint.get("shared_scope") is True,
         "account_set": label or None,
+        "account_choices": [choice] if choice else [],
+        "account_catalog_loaded": False,
+        "selected_account_key": choice["key"] if choice else None,
         "connection_state": _connection_state(endpoint, server_now),
         "last_seen_at": seen.isoformat() if seen is not None else None,
         "agent_version": version,

@@ -11,7 +11,7 @@
   - 窄 allowlist(逐端点确证 · 禁用一刀切 URL 中间件):DMS 录入工作台(entry='dms')正当复用
     GET/POST/PATCH /api/erp/endpoints*、POST /api/erp/test-connection、
     POST /api/erp/endpoints/{id}/test-connection、GET /api/erp/logs(记录页)。
-    非 DMS 复用面的其它端点(push / posting-preview / mrerp-xlsx-batch / mappings / bridge)
+    非 DMS 复用面的其它端点(push / mrerp-xlsx-batch / mappings / bridge)
     对 dms 一律 403 —— 它们仅供 main/cowork/erp 主壳。
   - 不削弱 tenant_id / workspace_client_id / assigned scope / RLS:允许入口跨租户资源仍 404。
 
@@ -140,7 +140,6 @@ class ErpPortalRouteGuardTests(unittest.TestCase):
             erp_export_routes,
             erp_listing_routes,
             erp_mappings_routes,
-            erp_posting_preview_routes,
             erp_push_log_routes,
         )
 
@@ -151,7 +150,6 @@ class ErpPortalRouteGuardTests(unittest.TestCase):
             "export": erp_export_routes,
             "listing": erp_listing_routes,
             "mappings": erp_mappings_routes,
-            "preview": erp_posting_preview_routes,
             "pushlog": erp_push_log_routes,
         }
 
@@ -250,25 +248,6 @@ class ErpPortalRouteGuardTests(unittest.TestCase):
             m,
             m.download_mrerp_xlsx_batch,
             m.MrerpXlsxBatchRequest(history_ids=["h-1"]),
-            entry="pos",
-        )
-
-    # ── 画像预览类(dms 非复用面 · 一律拒)───────────────────────────
-    def test_posting_preview_dms_denied(self):
-        m = self.mod["preview"]
-        self._assert_denied(
-            m,
-            m.erp_posting_preview,
-            m.PostingPreviewRequest(history_ids=["h-1"], endpoint_id="ep-1"),
-            entry="dms",
-        )
-
-    def test_posting_preview_pos_denied(self):
-        m = self.mod["preview"]
-        self._assert_denied(
-            m,
-            m.erp_posting_preview,
-            m.PostingPreviewRequest(history_ids=["h-1"], endpoint_id="ep-1"),
             entry="pos",
         )
 

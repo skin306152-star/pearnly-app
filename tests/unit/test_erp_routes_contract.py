@@ -61,8 +61,6 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/logs/batch-retry"),
             ("POST", "/api/erp/logs/batch-delete"),
             ("POST", "/api/erp/mrerp-xlsx-batch"),
-            ("POST", "/api/erp/posting-preview"),
-            ("POST", "/api/erp/posting-profile"),
             ("POST", "/api/erp/endpoints/{endpoint_id}/shared/enroll"),
             ("POST", "/api/erp/endpoints/{endpoint_id}/shared/rebind"),
             ("POST", "/api/erp/endpoints/{endpoint_id}/shared/enable"),
@@ -77,7 +75,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             ),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 38)
+        self.assertEqual(len(router.routes), 36)
 
     def test_app_includes_erp_router(self):
         """防 include_router 漏挂 · app 必须能路由到 erp 推送"""
@@ -119,12 +117,21 @@ class ErpRoutesContractTests(unittest.TestCase):
         """关键 request model 字段契约"""
         self.assertEqual(
             set(ErpPushRequest.model_fields.keys()),
-            {"history_id", "endpoint_id", "posting_kind", "account_set_key"},
+            {
+                "history_id",
+                "endpoint_id",
+                "posting_kind",
+                "account_set_key",
+                "target_refresh_request_id",
+                "target_projection_revision",
+            },
         )
         self.assertEqual(ErpPushRequest(history_id="h1").endpoint_id, None)
         # posting_kind 每批过账开关(Express 库存/服务)· 缺省 None → 后端默认服务·销售(不回归)。
         self.assertEqual(ErpPushRequest(history_id="h1").posting_kind, None)
         self.assertEqual(ErpPushRequest(history_id="h1").account_set_key, None)
+        self.assertEqual(ErpPushRequest(history_id="h1").target_refresh_request_id, None)
+        self.assertEqual(ErpPushRequest(history_id="h1").target_projection_revision, None)
         self.assertEqual(set(ErpBatchDeleteRequest.model_fields.keys()), {"log_ids"})
         # ErpEndpointCreate 默认值
         m = ErpEndpointCreate(name="x", adapter="webhook")

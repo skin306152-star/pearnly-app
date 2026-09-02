@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from uuid import UUID
 
 from fastapi import HTTPException
 
 from core import db
-from services.authz.resolver import resolve
 from services.cowork_line.push_recovery import (
     LEGACY_RESERVATION_LEASE,
     settle_stale_legacy,
+)
+from services.cowork_line.push_reservation_access import (
+    require_active_actor as _active_actor,
+    require_identity as _identity,
+    require_uuid as _uuid,
 )
 from services.cowork_line.push_dedup import prior_success as _prior_success
 from services.cowork_line.push_history import staged_history as _staged_history
@@ -30,67 +33,9 @@ from services.erp.shared_express_push import (
 )
 from services.erp.shared_express_schema import enable_shared_express_select
 from services.erp.line_target_choice import endpoint_with_account_choice
-from services.erp.selected_account import resolve_endpoint_account
+from services.erp.selected_account import require_catalog_evidence, resolve_endpoint_account
 
 _ACCEPTED_STATUSES = {"success", "pending", "retrying", "skipped_dup"}
-
-
-def _uuid(value: object, code: str) -> str:
-    try:
-        return str(UUID(str(value)))
-    except (TypeError, ValueError, AttributeError) as exc:
-        raise HTTPException(404, detail=code) from exc
-
-
-def _identity(identity: dict[str, Any]) -> tuple[str, str]:
-    tenant_id = str(identity.get("tenant_id") or "").strip()
-    actor_id = str(identity.get("user_id") or "").strip()
-    if not tenant_id or not actor_id:
-        raise HTTPException(404, detail="authz.not_found")
-    return tenant_id, actor_id
-
-
-def _active_actor(cur, identity: dict[str, Any], workspace_id: int):
-    membership_id = str(identity.get("membership_id") or "").strip()
-    tenant_id = str(identity.get("tenant_id") or "").strip()
-    actor_id = str(identity.get("user_id") or "").strip()
-    line_user_id = str(identity.get("line_user_id") or "").strip()
-    if not membership_id or not tenant_id or not actor_id or not line_user_id:
-        raise HTTPException(403, detail="authz.forbidden")
-    cur.execute(
-        "SELECT u.role,u.invited_by FROM cowork_line_identities identity "
-        "JOIN memberships membership ON membership.id = identity.membership_id "
-        "AND membership.user_id = identity.user_id "
-        "AND membership.tenant_id = identity.tenant_id "
-        "JOIN users u ON u.id = identity.user_id AND u.tenant_id = identity.tenant_id "
-        "WHERE identity.membership_id = %s AND identity.tenant_id = %s "
-        "AND identity.user_id = %s AND identity.line_user_id = %s "
-        "AND identity.revoked_at IS NULL AND membership.status = 'active' "
-        "AND u.is_active = TRUE FOR SHARE OF identity,membership,u",
-        (membership_id, tenant_id, actor_id, line_user_id),
-    )
-    actor = cur.fetchone()
-    if not actor:
-        raise HTTPException(403, detail="authz.forbidden")
-    authz = resolve(
-        {
-            "id": actor_id,
-            "tenant_id": tenant_id,
-            "role": actor.get("role"),
-            "invited_by": actor.get("invited_by"),
-            "entry": "cowork",
-        },
-        cur=cur,
-        lock=True,
-    )
-    if (
-        str(authz.membership_id or "") != membership_id
-        or not authz.has("erp.endpoint.view")
-        or not authz.has("erp.push.operate")
-        or not authz.allows_workspace(workspace_id)
-    ):
-        raise HTTPException(403, detail="authz.forbidden")
-    return authz
 
 
 def confirmed_batch_result(
@@ -150,6 +95,8 @@ def reserve_managed_batch(
     posting_kind: str | None,
     account_set_key: str | None = None,
     account_config: dict[str, Any] | None = None,
+    catalog_refresh_request_id: str | None = None,
+    catalog_refresh_revision: int | None = None,
 ) -> list[dict[str, Any]]:
     """Confirm all staged rows and enqueue all Express intents in one transaction."""
     tenant_id, actor_id = _identity(identity)
@@ -190,6 +137,16 @@ def reserve_managed_batch(
             endpoint_id=managed_id,
             tenant_id=tenant_id,
             workspace_client_id=workspace_id,
+        )
+        require_catalog_evidence(
+            endpoint,
+            tenant_id=tenant_id,
+            user_id=actor_id,
+            account_set_key=account_set_key,
+            trusted_account_config=account_config,
+            request_id=catalog_refresh_request_id,
+            revision=catalog_refresh_revision,
+            cur=cur,
         )
         endpoint, selected_account = resolve_endpoint_account(
             endpoint,
@@ -332,6 +289,16 @@ def reserve_legacy_batch(
         )
         if not cur.fetchone():
             raise HTTPException(409, detail="erp.workspace_binding_changed")
+        require_catalog_evidence(
+            endpoint,
+            tenant_id=tenant_id,
+            user_id=actor_id,
+            account_set_key=(selection or {}).get("account_set"),
+            trusted_account_config=(selection or {}).get("account_config"),
+            request_id=(selection or {}).get("catalog_refresh_request_id"),
+            revision=(selection or {}).get("catalog_refresh_revision"),
+            cur=cur,
+        )
 
         for history_id in ids:
             history = _staged_history(cur, history_id, tenant_id, actor_id, workspace_id)

@@ -50,4 +50,23 @@ def list_shared_endpoint_items(request: Request, user: dict) -> List[Dict[str, A
     return items
 
 
-__all__ = ["is_shared_endpoint_read", "list_shared_endpoint_items"]
+def visible_endpoint_for_request(
+    request: Request, user: dict, endpoint_id: str
+) -> Dict[str, Any] | None:
+    """Resolve one exact endpoint without expanding the full workspace endpoint list."""
+    require_perm(request, "erp.endpoint.view")
+    rows, server_now, _ = shared_express_store.list_visible_endpoints(
+        request,
+        user,
+        endpoint_id=endpoint_id,
+    )
+    if not rows:
+        return None
+    return shared_express_store.safe_endpoint_dto(rows[0], server_now)
+
+
+__all__ = [
+    "is_shared_endpoint_read",
+    "list_shared_endpoint_items",
+    "visible_endpoint_for_request",
+]

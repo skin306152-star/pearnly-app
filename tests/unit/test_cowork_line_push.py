@@ -5,7 +5,12 @@ from unittest import mock
 
 from fastapi import HTTPException
 
-from services.cowork_line import push, push_recovery, push_reservation
+from services.cowork_line import (
+    push,
+    push_recovery,
+    push_reservation,
+    push_reservation_access,
+)
 
 IDENTITY = {
     "tenant_id": "tenant-1",
@@ -50,6 +55,120 @@ class _CursorContext:
 
 
 class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
+    def test_managed_batch_rejects_superseded_proof_before_queue_write(self):
+        cursor = _Cursor()
+        denied = HTTPException(
+            409,
+            detail={"code": "catalog_refresh_invalid", "reason": "refresh_superseded"},
+        )
+        endpoint_id = "33333333-3333-4333-8333-333333333333"
+        endpoint = {
+            "id": endpoint_id,
+            "adapter": "express",
+            "config": {"account_set": "MAIN"},
+            "bound_account_set": "MAIN",
+            "binding_generation": 2,
+        }
+        with (
+            mock.patch.object(
+                push_reservation.db,
+                "get_cursor_rls",
+                return_value=_CursorContext(cursor),
+            ),
+            mock.patch.object(push_reservation, "_legacy_selected", return_value=False),
+            mock.patch.object(
+                push_reservation, "erp_shared_express_endpoint_enabled_for", return_value=True
+            ),
+            mock.patch.object(push_reservation, "enable_shared_express_select", return_value=True),
+            mock.patch.object(push_reservation, "_managed_endpoint_id", return_value=endpoint_id),
+            mock.patch.object(push_reservation, "lock_endpoint_binding"),
+            mock.patch.object(push_reservation, "_active_actor"),
+            mock.patch.object(push_reservation, "_lock_actor_and_workspace"),
+            mock.patch.object(push_reservation, "_endpoint_after_lock", return_value=endpoint),
+            mock.patch.object(
+                push_reservation, "require_catalog_evidence", side_effect=denied
+            ) as evidence,
+            mock.patch.object(push_reservation, "resolve_endpoint_account") as resolve_account,
+            mock.patch.object(push_reservation, "_staged_history") as staged_history,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                push_reservation.reserve_managed_batch(
+                    IDENTITY,
+                    ["44444444-4444-4444-8444-444444444444"],
+                    {
+                        "endpoint_id": endpoint_id,
+                        "workspace_client_id": 17,
+                        "adapter": "express",
+                    },
+                    posting_kind="service",
+                    account_set_key="OTHER",
+                    catalog_refresh_request_id="55555555-5555-4555-8555-555555555555",
+                    catalog_refresh_revision=9,
+                )
+
+        self.assertIs(caught.exception, denied)
+        self.assertIs(evidence.call_args.kwargs["cur"], cursor)
+        self.assertEqual(
+            evidence.call_args.kwargs["request_id"],
+            "55555555-5555-4555-8555-555555555555",
+        )
+        self.assertEqual(evidence.call_args.kwargs["revision"], 9)
+        resolve_account.assert_not_called()
+        staged_history.assert_not_called()
+        self.assertFalse(any("INSERT INTO erp_push_logs" in sql for sql, _ in cursor.calls))
+
+    def test_legacy_batch_rejects_superseded_proof_before_outbox_write(self):
+        cursor = mock.MagicMock()
+        cursor.fetchone.side_effect = [
+            {
+                "id": "33333333-3333-4333-8333-333333333333",
+                "adapter": "mrerp",
+                "config": {"comidyear": "6", "seldb": "1"},
+                "enabled": True,
+            },
+            {"id": 17},
+        ]
+        denied = HTTPException(
+            409,
+            detail={"code": "catalog_refresh_invalid", "reason": "refresh_superseded"},
+        )
+        with (
+            mock.patch.object(
+                push_reservation.db,
+                "get_cursor_rls",
+                return_value=_CursorContext(cursor),
+            ),
+            mock.patch.object(push_reservation, "lock_endpoint_binding"),
+            mock.patch.object(push_reservation, "lock_legacy_endpoint", return_value=True),
+            mock.patch.object(push_reservation, "_active_actor"),
+            mock.patch.object(
+                push_reservation, "require_catalog_evidence", side_effect=denied
+            ) as evidence,
+            mock.patch.object(push_reservation, "_staged_history") as staged_history,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                push_reservation.reserve_legacy_batch(
+                    IDENTITY,
+                    ["44444444-4444-4444-8444-444444444444"],
+                    {
+                        "endpoint_id": "33333333-3333-4333-8333-333333333333",
+                        "workspace_client_id": 17,
+                        "adapter": "mrerp",
+                    },
+                    {
+                        "account_set": "15:2",
+                        "catalog_refresh_request_id": ("55555555-5555-4555-8555-555555555555"),
+                        "catalog_refresh_revision": 9,
+                    },
+                )
+
+        self.assertIs(caught.exception, denied)
+        self.assertIs(evidence.call_args.kwargs["cur"], cursor)
+        self.assertEqual(evidence.call_args.kwargs["account_set_key"], "15:2")
+        staged_history.assert_not_called()
+        statements = [call.args[0] for call in cursor.execute.call_args_list]
+        self.assertFalse(any("INSERT INTO erp_push_logs" in sql for sql in statements))
+
     def test_retryable_mrerp_failure_is_presented_as_waiting(self):
         cursor = _Cursor(rowcount=1)
         intent = {
@@ -100,7 +219,7 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
             has=mock.Mock(side_effect=lambda code: code == "erp.push.operate"),
             allows_workspace=mock.Mock(return_value=True),
         )
-        with mock.patch.object(push_reservation, "resolve", return_value=authz):
+        with mock.patch.object(push_reservation_access, "resolve", return_value=authz):
             with self.assertRaises(HTTPException):
                 push_reservation._active_actor(cursor, IDENTITY, 17)
 
@@ -141,6 +260,8 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
                 "account_set": r"S:\\70EXP\\TEST2020",
                 "root_key": r"S:\\70EXP",
             },
+            "catalog_refresh_request_id": "11111111-1111-4111-8111-111111111111",
+            "catalog_refresh_revision": 8,
         }
         with mock.patch.object(push, "reserve_managed_batch", return_value=queued) as reserve:
             result = await push.dispatch_confirmed(IDENTITY, ["history-1"], target, selection)
@@ -155,6 +276,8 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
             posting_kind="stock",
             account_set_key=selection["account_set"],
             account_config=selection["account_config"],
+            catalog_refresh_request_id=selection["catalog_refresh_request_id"],
+            catalog_refresh_revision=selection["catalog_refresh_revision"],
         )
 
     async def test_legacy_reserves_intent_before_external_push_and_finalizes_same_log(self):

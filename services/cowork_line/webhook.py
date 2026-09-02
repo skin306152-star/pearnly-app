@@ -55,7 +55,7 @@ _COPY = {
         "upload": "连接预检通过，请上传图片或 PDF。",
         "processing": "正在识别单据，请稍候。",
         "finish_draft": "请先确定入账、编辑或丢弃当前单据。",
-        "choose": "请从菜单开始，选择 ERP 和账套后再上传单据。",
+        "choose": "请从菜单开始，选择 ERP 后再上传单据。",
         "target_changed": "ERP 连接状态已变化，请从菜单重新选择。",
         "read_failed": "单据识别失败，请重新上传。",
         "no_document": "没有识别到可用单据，请重新上传。",
@@ -72,7 +72,7 @@ _COPY = {
         "upload": "Connection checks passed. Send an image or PDF.",
         "processing": "Reading the document. Please wait.",
         "finish_draft": "Confirm, edit, or discard the current document first.",
-        "choose": "Start from the menu and choose an ERP account set before uploading.",
+        "choose": "Start from the menu and choose an ERP before uploading.",
         "target_changed": "The ERP connection changed. Choose it again from the menu.",
         "read_failed": "The document could not be read. Send it again.",
         "no_document": "No usable document was found. Send it again.",
@@ -89,7 +89,7 @@ _COPY = {
         "upload": "接続確認が完了しました。画像または PDF を送信してください。",
         "processing": "書類を読み取り中です。お待ちください。",
         "finish_draft": "現在の書類を確認、編集、または破棄してください。",
-        "choose": "メニューから ERP と帳簿を選択してからアップロードしてください。",
+        "choose": "メニューから ERP を選択してからアップロードしてください。",
         "target_changed": "ERP 接続が変更されました。メニューから選び直してください。",
         "read_failed": "書類を読み取れませんでした。再送してください。",
         "no_document": "有効な書類が見つかりませんでした。再送してください。",
@@ -266,7 +266,11 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
             key = "processing" if session.get("state") == "ocr_processing" else "finish_draft"
             _reply_text(reply_token, _text(lang, key))
             return
-        targets = await asyncio.to_thread(erp_targets.list_targets, identity)
+        targets = await asyncio.to_thread(
+            erp_targets.list_targets,
+            identity,
+            include_account_catalog=False,
+        )
         if not targets:
             _set(identity, "select_erp", payload)
             _reply_text(reply_token, _text(lang, "configure"))
@@ -276,7 +280,7 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
         return
     expected_states = {
         "cowork_erp_type": {"select_erp", "select_account"},
-        "cowork_erp_target": {"select_account"},
+        "cowork_erp_target": {"select_erp", "select_account"},
         "cowork_direction": {"select_direction"},
         "cowork_posting_mode": {"select_mode"},
         "cowork_discard": {"draft", "editing"},
@@ -290,50 +294,40 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
             page = max(0, int(params.get("page") or 0))
         except (TypeError, ValueError):
             page = 0
-        targets = [
+        targets = await asyncio.to_thread(
+            erp_targets.list_targets,
+            identity,
+            include_account_catalog=False,
+        )
+        matches = [
             item
-            for item in await asyncio.to_thread(erp_targets.list_targets, identity)
-            if item.get("adapter") == adapter
+            for item in targets
+            if item.get("selectable") and str(item.get("adapter") or "").lower() == adapter.lower()
         ]
+        if adapter and len(matches) == 1:
+            target = matches[0]
+            params = {
+                "endpoint": str(target.get("endpoint_id") or ""),
+                "workspace": str(target.get("workspace_client_id") or ""),
+            }
+            selected = await _default_target_selection(identity, params, lang)
+            if not selected:
+                _reply_text(reply_token, _text(lang, "target_changed"))
+                return
+            _set(identity, "select_direction", selected)
+            _reply_card(reply_token, flow_cards.direction_card(lang))
+            return
         if not targets:
             _reply_text(reply_token, _text(lang, "configure"))
             return
-        _set(identity, "select_account", {"lang": lang, "adapter": adapter})
-        _reply_card(
-            reply_token,
-            flow_cards.account_picker_card(targets, adapter, lang, page=page),
-        )
+        _set(identity, "select_erp", {"lang": lang})
+        _reply_card(reply_token, flow_cards.erp_picker_card(targets, lang, page=page))
         return
     if action == "cowork_erp_target":
-        target = await _require_target(identity, params)
-        if not target:
+        selected = await _default_target_selection(identity, params, lang)
+        if not selected:
             _reply_text(reply_token, _text(lang, "target_changed"))
             return
-        account_ref = str(params.get("account") or "").strip()
-        account = find_account_choice(
-            target,
-            account_ref=account_ref,
-            account_key=None if account_ref else target.get("selected_account_key"),
-        )
-        if target.get("account_choices") and not account:
-            _reply_text(reply_token, _text(lang, "target_changed"))
-            return
-        selected = {
-            "lang": lang,
-            "endpoint_id": target["endpoint_id"],
-            "workspace_client_id": target.get("workspace_client_id"),
-            "adapter": target["adapter"],
-            "target_label": (
-                target_label_for_account(target, account) if account else target.get("label")
-            ),
-        }
-        if account:
-            selected.update(
-                {
-                    "account_root": str(account.get("root_key") or "").strip() or None,
-                    "account_set": str(account.get("key") or account.get("account_set") or ""),
-                }
-            )
         _set(identity, "select_direction", selected)
         _reply_card(reply_token, flow_cards.direction_card(lang))
         return
@@ -380,10 +374,37 @@ async def _require_target(
             str(selection.get("endpoint") or selection.get("endpoint_id") or ""),
             selection.get("workspace") or selection.get("workspace_client_id"),
             refresh_probe=refresh_probe,
+            include_account_catalog=False,
         )
     except Exception:
         logger.info("Cowork LINE target no longer selectable", exc_info=True)
         return None
+
+
+async def _default_target_selection(identity: dict, params: dict, lang: str) -> dict | None:
+    target = await _require_target(identity, params)
+    if not target:
+        return None
+    account = find_account_choice(target, account_key=target.get("selected_account_key"))
+    if target.get("account_choices") and not account:
+        return None
+    selected = {
+        "lang": lang,
+        "endpoint_id": target["endpoint_id"],
+        "workspace_client_id": target.get("workspace_client_id"),
+        "adapter": target["adapter"],
+        "target_label": (
+            target_label_for_account(target, account) if account else target.get("label")
+        ),
+    }
+    if account:
+        selected.update(
+            {
+                "account_root": str(account.get("root_key") or "").strip() or None,
+                "account_set": str(account.get("key") or account.get("account_set") or ""),
+            }
+        )
+    return selected
 
 
 async def _queue_document(

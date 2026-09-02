@@ -210,7 +210,7 @@ def require_erp_portal(user: dict, *, also_allowed: Optional[Set[str]] = None) -
       - entry ∈ {pos, ai, dms, daily} 且不在 also_allowed → 403 authz.entrance_scope;
       - 其余(main/cowork/erp/…)→ 放行。
     also_allowed 必须是逐端点确证的窄白名单(如 DMS 正当复用 /api/erp/endpoints · push ·
-    posting-preview · mrerp-xlsx-batch),禁止一刀切 URL 中间件。返回 user 便于原地透传。
+    mrerp-xlsx-batch),禁止一刀切 URL 中间件。返回 user 便于原地透传。
     """
     if user.get("is_super_admin"):
         return user

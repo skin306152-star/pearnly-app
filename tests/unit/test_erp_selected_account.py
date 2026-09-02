@@ -13,6 +13,40 @@ def _state(rows):
 
 
 class SelectedAccountTests(unittest.TestCase):
+    def test_non_default_catalog_failure_is_returned_as_a_conflict(self):
+        endpoint = {
+            "id": "endpoint-2",
+            "adapter": "mrerp",
+            "config": {"comidyear": "6", "seldb": "1"},
+        }
+        invalid = {
+            "ok": False,
+            "error_code": "catalog_refresh_invalid",
+            "reason": "refresh_superseded",
+        }
+        with mock.patch.object(
+            selected_account.target_catalog_evidence,
+            "validate_selection",
+            return_value=invalid,
+        ) as validate:
+            with self.assertRaises(HTTPException) as caught:
+                selected_account.require_catalog_evidence(
+                    endpoint,
+                    tenant_id="tenant",
+                    user_id="user",
+                    account_set_key="15:2",
+                    request_id="request",
+                    revision=7,
+                )
+
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(
+            caught.exception.detail,
+            {"code": "catalog_refresh_invalid", "reason": "refresh_superseded"},
+        )
+        self.assertEqual(validate.call_args.kwargs["selected_account_set_key"], "15:2")
+        self.assertEqual(validate.call_args.kwargs["bound_account_set_key"], "6:1")
+
     def test_express_choice_uses_exact_projected_path_not_tax_id(self):
         endpoint = {
             "id": "endpoint-1",
@@ -87,17 +121,32 @@ class SelectedAccountTests(unittest.TestCase):
         self.assertEqual(choice["comidyear"], "15")
         self.assertEqual(choice["seldb"], "2")
 
-    def test_mrerp_choice_uses_cached_server_probe_when_projection_is_missing(self):
+    def test_non_default_mrerp_does_not_fall_back_to_a_live_probe(self):
         endpoint = {"id": "endpoint-2", "adapter": "mrerp", "config": {}}
-        probe = {
-            "ok": True,
-            "companies": [{"label": "2025 / Main", "comidyear": "15", "seldb": "2"}],
-        }
         with (
             mock.patch.object(selected_account, "load_state", return_value=None),
-            mock.patch.object(
-                selected_account.target_readiness, "probe_endpoint", return_value=probe
-            ) as readiness,
+            mock.patch("services.erp.target_readiness.probe_endpoint") as readiness,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                selected_account.resolve_account_choice(
+                    endpoint,
+                    tenant_id="tenant",
+                    user_id="user",
+                    account_set_key="15:2",
+                )
+
+        self.assertEqual(caught.exception.detail, "erp.account_set_unavailable")
+        readiness.assert_not_called()
+
+    def test_default_mrerp_needs_no_projection_or_live_probe(self):
+        endpoint = {
+            "id": "endpoint-2",
+            "adapter": "mrerp",
+            "config": {"comidyear": "15", "seldb": "2"},
+        }
+        with (
+            mock.patch.object(selected_account, "load_state") as load_state,
+            mock.patch("services.erp.target_readiness.probe_endpoint") as readiness,
         ):
             choice = selected_account.resolve_account_choice(
                 endpoint,
@@ -106,9 +155,9 @@ class SelectedAccountTests(unittest.TestCase):
                 account_set_key="15:2",
             )
 
-        readiness.assert_called_once_with(endpoint, refresh=False)
-        self.assertEqual(choice["comidyear"], "15")
-        self.assertEqual(choice["seldb"], "2")
+        self.assertEqual(choice["key"], "15:2")
+        load_state.assert_not_called()
+        readiness.assert_not_called()
 
     def test_server_validated_line_choice_survives_projection_migration(self):
         endpoint = {"id": "endpoint-2", "adapter": "mrerp", "config": {}}

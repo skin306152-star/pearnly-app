@@ -9,13 +9,18 @@ import {
     fetchErpEndpoints,
     pickDefaultTarget,
     erpTargetCardsHtml,
+    isErpAccountSelectionComplete,
     isErpTargetReady,
     pushHistory,
     selectedAccountKey,
-    selectErpAccount,
+    selectedCatalogEvidence,
     type ErpEndpoint,
 } from './dms-intake-erp-push.js';
 import { focusDxErpCards } from './dms-intake-erp-cards.js';
+import {
+    changeErpCatalogSelection,
+    preOpenErpCatalog,
+} from './dms-intake-erp-catalog-interaction.js';
 import { CONVERT_REASON_KEY } from './dms-intake-review-convert.js';
 
 function t(k: string): string {
@@ -128,7 +133,8 @@ function pushPanelHtml(): string {
             `<h4>${esc(t('dxi-erp-empty-t'))}</h4><p>${esc(t('dxi-erp-empty-d'))}</p>` +
             `<button class="btn" id="dxb-go-int">${esc(t('dxi-erp-empty-btn'))}</button></div>`;
     } else {
-        const pushDisabled = _pushing || !_target;
+        const pushDisabled =
+            _pushing || !_target || !isErpAccountSelectionComplete(_endpoints, _target);
         body =
             erpTargetCardsHtml(_endpoints, _target) +
             '<div class="dx-foot" style="margin-top:12px"><div class="dx-note"></div>' +
@@ -221,11 +227,21 @@ export async function enterBatchSubmit() {
 async function doPush(): Promise<void> {
     const ids = createdIds();
     if (_pushing || !ids.length || !_target) return;
+    if (!isErpAccountSelectionComplete(_endpoints, _target)) {
+        showToast(t('dxi-need-erp-account'), 'warn');
+        render();
+        return;
+    }
     _endpoints = await fetchErpEndpoints(true, _endpoints);
     if (!isErpTargetReady(_endpoints, _target)) {
         _target = pickDefaultTarget(_endpoints, _target);
         render();
         showToast(t('dxi-need-erp'), 'warn');
+        return;
+    }
+    if (!isErpAccountSelectionComplete(_endpoints, _target)) {
+        render();
+        showToast(t('dxi-need-erp-account'), 'warn');
         return;
     }
     _pushing = true;
@@ -238,7 +254,8 @@ async function doPush(): Promise<void> {
             id,
             _target,
             undefined,
-            selectedAccountKey(_endpoints, _target)
+            selectedAccountKey(_endpoints, _target),
+            selectedCatalogEvidence(_endpoints, _target)
         );
         if (outcome === 'success') ok++;
         else if (outcome === 'waiting') pending++;
@@ -277,9 +294,20 @@ export function onBatchSubmitClick(tg: HTMLElement): boolean {
     return false;
 }
 
+export function onBatchErpCatalogPreOpen(tg: HTMLElement, source: 'pointer' | 'focus'): boolean {
+    return preOpenErpCatalog({
+        target: tg,
+        endpoints: _endpoints,
+        source,
+        render,
+        onFailure: (result) =>
+            showToast(
+                t(result === 'timeout' ? 'dx-erp-catalog-timeout' : 'dx-erp-catalog-load-failed'),
+                'warn'
+            ),
+    });
+}
+
 export function onBatchSubmitChange(tg: HTMLElement): boolean {
-    const endpointId = tg.getAttribute('data-erp-account-select');
-    if (!endpointId) return false;
-    if (selectErpAccount(_endpoints, endpointId, (tg as HTMLSelectElement).value)) render();
-    return true;
+    return changeErpCatalogSelection(tg, _endpoints, render);
 }

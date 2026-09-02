@@ -29,6 +29,12 @@ class ErpPushRequest(BaseModel):
     account_set_key: Optional[str] = Field(
         None, max_length=500, description="最终选择的年度/账套键"
     )
+    target_refresh_request_id: Optional[str] = Field(
+        None, max_length=64, description="用户改选目标时对应的本次主档刷新请求"
+    )
+    target_projection_revision: Optional[int] = Field(
+        None, gt=0, description="用户改选目标时读取的主档投影版本"
+    )
 
 
 @router.post("/api/erp/push")
@@ -44,6 +50,8 @@ async def erp_push(req: ErpPushRequest, request: Request):
         endpoint_id=req.endpoint_id,
         posting_kind=req.posting_kind,
         account_set_key=req.account_set_key,
+        target_refresh_request_id=req.target_refresh_request_id,
+        target_projection_revision=req.target_projection_revision,
     )
 
 

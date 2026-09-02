@@ -51,13 +51,37 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
             self.assertIn("'" + mode + "'", self.target_select)
         self.assertIn("target.workspace_name", self.target_select)
         self.assertIn("target.account_set_label", self.target_select)
+        self.assertIn("data-target-erp", self.target_select)
         self.assertIn("data-target-account-set", self.target_select)
         self.assertIn("data-target-root", self.target_select)
         self.assertIn("account_choices", self.target_select)
         self.assertIn("account_root: selection.account_root", self.app)
         self.assertIn("account_set: selection.account_set", self.app)
-        self.assertIn("lockedAdapter", self.target_select)
+        self.assertNotIn("lockedAdapter", self.target_select)
+        self.assertIn("selection().account_set = null", self.target_select)
+        self.assertNotIn("if (first) applyAccount(first)", self.target_select)
         self.assertNotIn("data-target-option", self.target_select)
+        self.assertNotIn("</select></select>", self.target_select)
+
+    def test_target_catalog_refresh_is_scoped_visible_and_never_persistently_cached(self):
+        self.assertIn("T.refreshTarget(api, path)", self.app)
+        self.assertIn("/target/", self.app)
+        self.assertIn("'/refresh'", self.app)
+        self.assertIn("method: 'POST', cache: 'no-store'", self.target_select)
+        self.assertIn("timedApi(statusUrl(requestId), { cache: 'no-store' })", self.target_select)
+        self.assertIn("new AbortController()", self.target_select)
+        self.assertIn("{ signal: controller.signal }", self.target_select)
+        self.assertIn("catalog_refresh_request_id", self.app)
+        self.assertIn("catalog_refresh_revision", self.app)
+        self.assertNotIn("catalogLoaded", self.target_select)
+        self.assertIn('role="status" aria-live="polite"', self.target_select)
+        self.assertIn(
+            "loadState.state === 'loading' || loadState.state === 'failed'", self.target_select
+        )
+        self.assertIn("rootYear(right.label) - rootYear(left.label)", self.target_select)
+        self.assertIn("numeric: true", self.target_select)
+        self.assertIn("16 * 60 * 1000", self.target_select)
+        self.assertIn("elapsed < 120000 ? 750 : 2500", self.target_select)
 
     def test_line_primary_redirect_restores_scoped_draft(self):
         self.assertIn("direct.get('liff.state')", self.runtime)
@@ -87,6 +111,9 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
             self.assertIn(language, self.i18n)
         self.assertEqual(self.i18n.count("pushFailed:"), 4)
         self.assertEqual(self.i18n.count("recoverable:"), 4)
+        self.assertEqual(self.i18n.count("loadingAccounts:"), 4)
+        self.assertEqual(self.i18n.count("loadingAccountsLong:"), 4)
+        self.assertEqual(self.i18n.count("loadAccountsFailed:"), 4)
 
 
 if __name__ == "__main__":

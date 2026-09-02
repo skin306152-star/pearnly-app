@@ -292,7 +292,11 @@ class SelectionTests(unittest.TestCase):
             )
 
         self.assertIs(selected, ready)
-        project.assert_called_once_with({"membership_id": "m1"}, lock_endpoint_id="ep-1")
+        project.assert_called_once_with(
+            {"membership_id": "m1"},
+            lock_endpoint_id="ep-1",
+            include_account_catalog=True,
+        )
 
     def test_require_target_forces_fresh_probe_before_ocr_or_push(self):
         ready = {
@@ -312,6 +316,7 @@ class SelectionTests(unittest.TestCase):
         project.assert_called_once_with(
             {"membership_id": "m1"},
             lock_endpoint_id="ep-1",
+            include_account_catalog=True,
             refresh_probes=True,
         )
 

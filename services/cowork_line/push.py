@@ -162,6 +162,8 @@ async def dispatch_confirmed(
                 posting_kind=selection.get("posting_kind"),
                 account_set_key=selection.get("account_set"),
                 account_config=selection.get("account_config"),
+                catalog_refresh_request_id=selection.get("catalog_refresh_request_id"),
+                catalog_refresh_revision=selection.get("catalog_refresh_revision"),
             )
             committed = len(results)
         except Exception as exc:

@@ -3,46 +3,18 @@
 from __future__ import annotations
 
 from core import db
-from services.cowork_line import session_store
+from services.cowork_line import intake_targets, session_store
 from services.cowork_line.review_fields import (
     pages_with_direction as _pages_with_direction,
     selection_from_payload as _selection,
 )
 from services.erp import selected_account_refresh
-from services.erp.line_target_choice import find_account_choice, target_label_for_account
 from services.ocr_history.mutations import update_ocr_history_pages
 from services.ocr_history.queries import get_history_pdf_info, get_ocr_history_detail
 from services.ocr_history.staged import discard_staged_ocr_history_with_pdf_paths
 
-
-class CoworkLineIntakeError(Exception):
-    def __init__(self, code: str, status_code: int = 409):
-        self.code = code
-        self.status_code = status_code
-        super().__init__(code)
-
-
-def _targets_service():
-    from services.cowork_line import erp_targets
-
-    return erp_targets
-
-
-def _target_error(exc: Exception) -> CoworkLineIntakeError:
-    code = str(getattr(exc, "code", "target_not_ready"))
-    status = (
-        403 if code in {"forbidden", "identity_inactive", "workspace_manage_forbidden"} else 409
-    )
-    return CoworkLineIntakeError(code, status)
-
-
-def _list_targets(identity: dict, *, refresh: bool = False) -> list[dict]:
-    try:
-        return _targets_service().list_targets(identity, refresh=refresh)
-    except Exception as exc:
-        if exc.__class__.__name__ != "CoworkLineErpTargetError":
-            raise
-        raise _target_error(exc) from exc
+CoworkLineIntakeError = intake_targets.CoworkLineIntakeError
+get_target = intake_targets.get_target
 
 
 def _ids(payload: dict) -> list[str]:
@@ -119,122 +91,13 @@ def get_draft(identity: dict, draft_id: str) -> dict:
     return {
         "draft_id": str(draft_id),
         "records": _records(identity, str(draft_id), history_ids),
-        "targets": _list_targets(identity, refresh=True),
+        "targets": intake_targets.list_targets(
+            identity,
+            refresh=False,
+            include_account_catalog=False,
+        ),
         "selection": _selection(payload),
     }
-
-
-def _normalize_selection(target: dict, selection: dict) -> dict:
-    adapter = str(target.get("adapter") or "").lower()
-    direction = str(selection.get("direction") or "").lower()
-    if direction not in {"purchase", "sales"}:
-        raise CoworkLineIntakeError("direction_required", 422)
-    mode_key = "posting_kind" if adapter == "express" else "payment"
-    mode = str(selection.get(mode_key) or "").lower()
-    allowed = {str(value).lower() for value in target.get("mode_options") or []}
-    if not mode or (allowed and mode not in allowed):
-        raise CoworkLineIntakeError("mode_required", 422)
-    account_key = str(
-        selection.get("account_set") or target.get("selected_account_key") or ""
-    ).strip()
-    account = find_account_choice(target, account_key=account_key)
-    if not account:
-        raise CoworkLineIntakeError("account_set_required", 422)
-    workspace_client_id = target.get("workspace_client_id")
-    return {
-        "endpoint_id": str(target["endpoint_id"]),
-        "workspace_client_id": (
-            int(workspace_client_id) if workspace_client_id is not None else None
-        ),
-        "adapter": adapter,
-        "target_label": target_label_for_account(target, account),
-        "account_root": str(account.get("root_key") or "").strip() or None,
-        "account_set": account_key,
-        "account_config": {
-            key: account.get(key)
-            for key in (
-                "comidyear",
-                "seldb",
-                "account_set",
-                "account_dir",
-                "account_company",
-                "account_set_row",
-                "root_key",
-                "mapping",
-            )
-            if account.get(key) not in (None, "")
-        },
-        "direction": direction,
-        "posting_kind": mode if adapter == "express" else None,
-        "payment": mode if adapter != "express" else None,
-    }
-
-
-def _validated_selection(
-    identity: dict,
-    selection: dict,
-    *,
-    refresh_probe: bool = False,
-) -> tuple[dict, dict]:
-    endpoint_id = str(selection.get("endpoint_id") or "").strip()
-    workspace_client_id = selection.get("workspace_client_id")
-    if not endpoint_id:
-        raise CoworkLineIntakeError("target_required", 422)
-    try:
-        target_kwargs = {"workspace_client_id": workspace_client_id}
-        if refresh_probe:
-            target_kwargs["refresh_probe"] = True
-        target = _targets_service().require_target(identity, endpoint_id, **target_kwargs)
-    except Exception as exc:
-        if exc.__class__.__name__ != "CoworkLineErpTargetError":
-            raise
-        raise _target_error(exc) from exc
-    return target, _normalize_selection(target, selection)
-
-
-def _preflight_target(
-    identity: dict, target: dict, history_ids: list[str], selection: dict
-) -> dict:
-    missing = list(target.get("missing") or [])
-    for history_id in history_ids:
-        result = _targets_service().preflight_document(
-            identity,
-            target,
-            history_id,
-            selection["direction"],
-            posting_kind=selection.get("posting_kind"),
-            payment=selection.get("payment"),
-            account_config=selection.get("account_config"),
-        )
-        for code in result.get("missing") or []:
-            if code not in missing:
-                missing.append(code)
-    projected = dict(target)
-    checks = dict(projected.get("ready_checks") or {})
-    checks["document_preflight"] = not missing
-    projected.update(
-        {
-            "ready_checks": checks,
-            "missing": missing,
-            "block_reason": missing[0] if missing else None,
-            "selectable": bool(projected.get("selectable", True)) and not missing,
-        }
-    )
-    return projected
-
-
-def _replace_target(targets: list[dict], selected: dict) -> list[dict]:
-    return [
-        (
-            selected
-            if (
-                str(target.get("endpoint_id")) == str(selected.get("endpoint_id"))
-                and target.get("workspace_client_id") == selected.get("workspace_client_id")
-            )
-            else target
-        )
-        for target in targets
-    ]
 
 
 def _update_scope(identity: dict, history_ids: list[str], selection: dict) -> None:
@@ -264,7 +127,7 @@ def save_draft(identity: dict, draft_id: str, records: list[dict], selection: di
     if submitted_ids != history_ids:
         raise CoworkLineIntakeError("records_incomplete")
     _assert_owned_staged(identity, history_ids)
-    target, normalized = _validated_selection(identity, selection)
+    target, normalized = intake_targets.validated_selection(identity, selection)
     for record in records:
         history_id = str(record.get("id") or record.get("history_id") or "")
         pages = record.get("pages")
@@ -278,19 +141,14 @@ def save_draft(identity: dict, draft_id: str, records: list[dict], selection: di
             tenant_id=str(identity["tenant_id"]),
         ):
             raise CoworkLineIntakeError("draft_save_failed")
-    try:
-        target = _targets_service().resolve_history_workspace(
-            identity,
-            target,
-            history_ids,
-            normalized["direction"],
-            provisional_history_assignment=True,
-        )
-    except Exception as exc:
-        if exc.__class__.__name__ != "CoworkLineErpTargetError":
-            raise
-        raise _target_error(exc) from exc
-    normalized = _normalize_selection(target, normalized)
+    target = intake_targets.resolve_history_workspace(
+        identity,
+        target,
+        history_ids,
+        normalized["direction"],
+        provisional_history_assignment=True,
+    )
+    normalized = intake_targets.normalize_selection(target, normalized)
     if normalized["workspace_client_id"] is None:
         raise CoworkLineIntakeError("workspace_required", 409)
     _update_scope(identity, history_ids, normalized)
@@ -306,7 +164,7 @@ def save_draft(identity: dict, draft_id: str, records: list[dict], selection: di
             )
             if not result.ok:
                 raise CoworkLineIntakeError("draft_save_failed")
-    target = _preflight_target(identity, target, history_ids, normalized)
+    target = intake_targets.preflight_target(identity, target, history_ids, normalized)
     try:
         master_refresh = selected_account_refresh.ensure_for_editor(
             identity,
@@ -345,7 +203,7 @@ def save_draft(identity: dict, draft_id: str, records: list[dict], selection: di
     return {
         "draft_id": str(draft_id),
         "records": _records(identity, str(draft_id), history_ids),
-        "targets": _replace_target(_list_targets(identity), target),
+        "targets": intake_targets.replace_target(intake_targets.list_targets(identity), target),
         "selection": _selection(next_payload),
         "master_refresh": master_refresh,
     }
@@ -367,7 +225,7 @@ async def confirm_and_push(identity: dict, draft: str | dict) -> dict:
     history_ids = _ids(payload)
     if supplied is not None and supplied_ids != history_ids:
         raise CoworkLineIntakeError("records_incomplete")
-    target, normalized = _validated_selection(
+    target, normalized = intake_targets.validated_selection(
         identity,
         _selection(payload),
         refresh_probe=True,
@@ -390,7 +248,7 @@ async def confirm_and_push(identity: dict, draft: str | dict) -> dict:
     records = _records(identity, draft_id, history_ids)
     if batch_issues(records, normalized["direction"], require_posting_kind=False):
         raise CoworkLineIntakeError("document_not_ready", 422)
-    target = _preflight_target(identity, target, history_ids, normalized)
+    target = intake_targets.preflight_target(identity, target, history_ids, normalized)
     if not target["selectable"]:
         raise CoworkLineIntakeError(str(target.get("block_reason") or "document_not_ready"))
     result = await _dispatch_confirmed(identity, history_ids, target, normalized)

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import math
-
 from services.cowork_line.card_fields import HEADER_KEYS, HEADER_LABELS
-from services.erp.line_target_choice import account_option_label, account_reference
+from services.line_erp.selection_messages import erp_connection_page
 from services.line_platform.quick_replies import (
     postback_action as _postback,
     question as _question,
@@ -260,75 +258,26 @@ def _row(title: str, subtitle: str, action: dict | None = None, *, muted: bool =
     return row
 
 
-def erp_picker_card(targets: list[dict], lang: str) -> dict:
-    items = []
-    for adapter, label in (("mrerp", "MR.ERP"), ("express", "Express")):
-        available = any(
-            str(target.get("adapter") or "").lower() == adapter and target.get("selectable")
-            for target in targets
+def erp_picker_card(targets: list[dict], lang: str, *, page: int = 0) -> dict:
+    options, page, page_count = erp_connection_page(targets, page=page)
+    items = [
+        _quick_reply_item(
+            label,
+            "cowork_erp_target",
+            endpoint=target.get("endpoint_id") or target.get("id"),
+            workspace=target.get("workspace_client_id"),
         )
-        if available:
-            items.append(_quick_reply_item(label, "cowork_erp_type", erp=adapter))
+        for target, label in options
+    ]
+    if page > 0:
+        items.insert(0, _quick_reply_item(_t(lang, "prev"), "cowork_erp_type", page=page - 1))
+    if page + 1 < page_count:
+        items.append(_quick_reply_item(_t(lang, "more"), "cowork_erp_type", page=page + 1))
     return _question(
         _t(lang, "pick_erp"),
         "\n".join(
             value
             for value in (_t(lang, "pick_erp_subtitle"), _status_lines(targets, lang))
-            if value
-        ),
-        items,
-    )
-
-
-def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: int = 0) -> dict:
-    ready_targets = [target for target in targets if target.get("selectable")]
-    account_options = []
-    for target in ready_targets:
-        choices = [
-            choice
-            for choice in target.get("account_choices") or []
-            if isinstance(choice, dict)
-            and str(choice.get("key") or choice.get("account_set") or "").strip()
-            and choice.get("writable") is not False
-        ]
-        account_options.extend((target, choice) for choice in choices)
-        if not choices:
-            account_options.append((target, None))
-    page_count = max(1, math.ceil(len(account_options) / QR_PAGE_SIZE))
-    page = max(0, min(int(page), page_count - 1))
-    start = page * QR_PAGE_SIZE
-    items = [
-        _quick_reply_item(
-            (
-                account_option_label(target, account)
-                if account
-                else str(target.get("label") or target.get("name") or adapter)
-            ),
-            "cowork_erp_target",
-            endpoint=target.get("endpoint_id") or target.get("id"),
-            workspace=target.get("workspace_client_id"),
-            account=(
-                account_reference(account.get("key") or account.get("account_set"))
-                if account
-                else None
-            ),
-        )
-        for target, account in account_options[start : start + QR_PAGE_SIZE]
-    ]
-    if page > 0:
-        items.insert(
-            0,
-            _quick_reply_item(_t(lang, "prev"), "cowork_erp_type", erp=adapter, page=page - 1),
-        )
-    if page + 1 < page_count:
-        items.append(
-            _quick_reply_item(_t(lang, "more"), "cowork_erp_type", erp=adapter, page=page + 1)
-        )
-    return _question(
-        _t(lang, "pick_account"),
-        "\n".join(
-            value
-            for value in (_t(lang, "pick_account_subtitle"), _status_lines(targets, lang))
             if value
         ),
         items,

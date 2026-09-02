@@ -5,7 +5,6 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from services.cowork_line import flow_cards, webhook, webhook_documents
-from services.erp.line_target_choice import account_reference
 
 IDENTITY = {
     "membership_id": "membership-1",
@@ -410,33 +409,42 @@ class CoworkLineFlexRegressionTests(unittest.TestCase):
         self.assertIn("Express", serialized)
         self.assertIn("小助手离线", serialized)
 
-        account_question = flow_cards.account_picker_card(
+        action = erp_items[0]["action"]["data"]
+        self.assertIn("a=cowork_erp_target", action)
+        self.assertIn("endpoint=endpoint-1", action)
+        self.assertIn("workspace=1", action)
+        self.assertNotIn("account=", action)
+
+    def test_same_adapter_connections_show_their_workspaces(self):
+        question = flow_cards.erp_picker_card(
             [
                 {
                     "adapter": "mrerp",
-                    "endpoint_id": "endpoint-ready",
-                    "workspace_client_id": 1,
-                    "label": "账套 A",
+                    "endpoint_id": "endpoint-bkk",
+                    "workspace_client_id": 11,
+                    "connection_label": "MR.ERP",
+                    "workspace_name": "Bangkok",
                     "selectable": True,
                 },
                 {
                     "adapter": "mrerp",
-                    "endpoint_id": "endpoint-disabled",
-                    "workspace_client_id": 2,
-                    "label": "账套 B",
-                    "selectable": False,
-                    "missing": ["endpoint_disabled"],
+                    "endpoint_id": "endpoint-cnx",
+                    "workspace_client_id": 12,
+                    "connection_label": "MR.ERP",
+                    "workspace_name": "Chiang Mai",
+                    "selectable": True,
                 },
             ],
-            "mrerp",
             "zh",
         )
-        account_items = quick_reply_items(account_question)
 
-        self.assertEqual([item["action"]["label"] for item in account_items], ["账套 A"])
-        serialized = json.dumps(account_question, ensure_ascii=False)
-        self.assertIn("账套 B", serialized)
-        self.assertIn("已停用", serialized)
+        items = quick_reply_items(question)
+        self.assertEqual(
+            [item["action"]["label"] for item in items],
+            ["MR.ERP · Bangkok", "MR.ERP · Chiang Mai"],
+        )
+        self.assertIn("endpoint=endpoint-bkk&workspace=11", items[0]["action"]["data"])
+        self.assertIn("endpoint=endpoint-cnx&workspace=12", items[1]["action"]["data"])
 
     def test_direction_and_posting_mode_are_quick_reply_questions(self):
         direction = flow_cards.direction_card("zh")
@@ -452,32 +460,35 @@ class CoworkLineFlexRegressionTests(unittest.TestCase):
             ["库存商品", "服务 / 非库存"],
         )
 
-    def test_one_mrerp_connection_expands_to_distinct_year_choices(self):
-        account_question = flow_cards.account_picker_card(
+    def test_one_mrerp_connection_is_one_default_target_choice(self):
+        erp_question = flow_cards.erp_picker_card(
             [
                 {
                     "adapter": "mrerp",
                     "endpoint_id": "endpoint-1",
                     "workspace_client_id": 1,
                     "workspace_name": "บริษัท มานะชัยบริการ จำกัด",
+                    "connection_label": "MR.ERP",
                     "label": "MR.ERP · TEST2020",
                     "selectable": True,
+                    "selected_account_key": "15:1",
                     "account_choices": [
                         {"key": "6:1", "label": "TEST2019"},
                         {"key": "15:1", "label": "TEST2020"},
                     ],
                 }
             ],
-            "mrerp",
             "zh",
         )
 
-        items = quick_reply_items(account_question)
-        self.assertEqual(
-            [item["action"]["label"] for item in items],
-            ["TEST2019 · บริษัท มา", "TEST2020 · บริษัท มา"],
-        )
-        self.assertTrue(all("account=" in item["action"]["data"] for item in items))
+        items = quick_reply_items(erp_question)
+        label = items[0]["action"]["label"]
+        self.assertTrue(label.startswith("MR.ERP · "))
+        self.assertIn("บริษัท", label)
+        self.assertNotIn("TEST2019", label)
+        self.assertNotIn("TEST2020", label)
+        self.assertIn("endpoint=endpoint-1", items[0]["action"]["data"])
+        self.assertNotIn("account=", items[0]["action"]["data"])
 
     def test_preview_reuses_erp_header_and_footer_hierarchy(self):
         card = flow_cards.preview_card(
@@ -531,14 +542,15 @@ class CoworkLineFlexRegressionTests(unittest.TestCase):
         self.assertLess(len(serialized), 30_000)
 
 
-class CoworkLineAccountPaginationRegressionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_selected_year_is_saved_before_direction_and_ocr(self):
+class CoworkLineConnectionPaginationRegressionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_old_account_postback_uses_bound_default_before_direction(self):
         target = {
             "adapter": "mrerp",
             "endpoint_id": "endpoint-1",
             "workspace_client_id": 7,
             "connection_label": "MR.ERP",
             "label": "MR.ERP · TEST2020",
+            "selected_account_key": "15:1",
             "account_choices": [
                 {"key": "6:1", "label": "TEST2019"},
                 {"key": "15:1", "label": "TEST2020"},
@@ -553,8 +565,7 @@ class CoworkLineAccountPaginationRegressionTests(unittest.IsolatedAsyncioTestCas
         ):
             await webhook._handle_postback(
                 postback_event(
-                    "a=cowork_erp_target&endpoint=endpoint-1&workspace=7&account="
-                    + account_reference("6:1")
+                    "a=cowork_erp_target&endpoint=endpoint-1&workspace=7&account=stale-year"
                 ),
                 IDENTITY,
                 "reply-1",
@@ -563,10 +574,10 @@ class CoworkLineAccountPaginationRegressionTests(unittest.IsolatedAsyncioTestCas
 
         saved = set_session.call_args.args[2]
         self.assertEqual(set_session.call_args.args[1], "select_direction")
-        self.assertEqual(saved["account_set"], "6:1")
-        self.assertEqual(saved["target_label"], "MR.ERP · TEST2019")
+        self.assertEqual(saved["account_set"], "15:1")
+        self.assertEqual(saved["target_label"], "MR.ERP · TEST2020")
 
-    async def test_thirteenth_account_is_reachable_through_postback_pagination(self):
+    async def test_thirteenth_connection_is_reachable_through_postback_pagination(self):
         targets = [
             {
                 "adapter": "express",

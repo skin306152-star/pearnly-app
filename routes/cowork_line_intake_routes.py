@@ -9,11 +9,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jwt
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from core.auth import JWT_ALGORITHM, _jwt_secret
+from core.feature_flags import erp_target_projection_enabled_for
+from services.erp import target_refresh
 from services.cowork_line import identity_store, intake, session_store
 from services.line_platform.liff import verify_id_token
 
@@ -35,6 +37,8 @@ class DraftUpdateIn(BaseModel):
     target_label: str = ""
     account_root: str | None = None
     account_set: str | None = None
+    catalog_refresh_request_id: str | None = None
+    catalog_refresh_revision: int | None = None
     posting_kind: str | None = None
     payment: str | None = None
 
@@ -145,6 +149,99 @@ async def cowork_intake_draft(request: Request, draft_id: str):
         data = await asyncio.to_thread(intake.get_draft, identity, draft_id)
     except intake.CoworkLineIntakeError as exc:
         raise _error(exc) from exc
+    return {"ok": True, "data": data}
+
+
+@router.post("/api/cowork-line/intake/draft/{draft_id}/target/{endpoint_id}/refresh")
+async def cowork_intake_target_refresh(
+    request: Request,
+    draft_id: str,
+    endpoint_id: str,
+    response: Response,
+    workspace_client_id: int | None = Query(default=None),
+):
+    identity = _draft_identity(request, draft_id)
+    try:
+        target = await asyncio.to_thread(
+            intake.get_target,
+            identity,
+            endpoint_id,
+            workspace_client_id,
+            include_account_catalog=False,
+        )
+    except intake.CoworkLineIntakeError as exc:
+        raise _error(exc) from exc
+    adapter = str(target.get("adapter") or "").lower()
+    if not erp_target_projection_enabled_for(identity["tenant_id"], identity["user_id"]):
+        raise HTTPException(409, detail="cowork_line_intake.target_refresh_unavailable")
+    if adapter == "express" and not target.get("supports_master_refresh"):
+        raise HTTPException(409, detail="cowork_line_intake.companion_update_required")
+    try:
+        refresh = await asyncio.to_thread(
+            target_refresh.request_refresh,
+            tenant_id=str(identity["tenant_id"]),
+            user_id=str(identity["user_id"]),
+            endpoint_id=str(target["endpoint_id"]),
+            account_set_key=target_refresh.ENDPOINT_SCOPE_KEY,
+            adapter=adapter,
+            reason="cowork_line_editor_account_catalog",
+        )
+    except ValueError as exc:
+        raise HTTPException(409, detail=str(exc)) from None
+    if adapter == "mrerp":
+        asyncio.create_task(
+            asyncio.to_thread(target_refresh.process_mrerp_request, refresh["request_id"])
+        )
+    response.headers["Cache-Control"] = "no-store"
+    return {"ok": True, "data": refresh}
+
+
+@router.get("/api/cowork-line/intake/draft/{draft_id}/target/{endpoint_id}/refresh/{request_id}")
+async def cowork_intake_target_refresh_status(
+    request: Request,
+    draft_id: str,
+    endpoint_id: str,
+    request_id: str,
+    response: Response,
+    workspace_client_id: int | None = Query(default=None),
+):
+    identity = _draft_identity(request, draft_id)
+    try:
+        await asyncio.to_thread(
+            intake.get_target,
+            identity,
+            endpoint_id,
+            workspace_client_id,
+            include_account_catalog=False,
+        )
+    except intake.CoworkLineIntakeError as exc:
+        raise _error(exc) from exc
+    if not erp_target_projection_enabled_for(identity["tenant_id"], identity["user_id"]):
+        raise HTTPException(409, detail="cowork_line_intake.target_refresh_unavailable")
+    refresh = await asyncio.to_thread(
+        target_refresh.refresh_status,
+        request_id,
+        tenant_id=str(identity["tenant_id"]),
+        endpoint_id=endpoint_id,
+    )
+    if (
+        not refresh
+        or str(refresh.get("account_set_key") or "") != target_refresh.ENDPOINT_SCOPE_KEY
+    ):
+        raise HTTPException(404, detail="cowork_line_intake.target_refresh_missing")
+    data = {"refresh": refresh}
+    if str(refresh.get("status") or "") == "succeeded":
+        try:
+            data["target"] = await asyncio.to_thread(
+                intake.get_target,
+                identity,
+                endpoint_id,
+                workspace_client_id,
+                include_account_catalog=True,
+            )
+        except intake.CoworkLineIntakeError as exc:
+            raise _error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
     return {"ok": True, "data": data}
 
 

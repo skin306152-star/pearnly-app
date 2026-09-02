@@ -79,7 +79,12 @@ def workspaces(cur, tenant_id: str) -> list[dict[str, Any]]:
 
 
 def managed_targets(
-    cur, tenant_id: str, visible_workspaces: list[dict[str, Any]]
+    cur,
+    tenant_id: str,
+    visible_workspaces: list[dict[str, Any]],
+    *,
+    include_account_catalog: bool = True,
+    account_catalog_endpoint_id: str | None = None,
 ) -> list[dict[str, Any]]:
     if not erp_shared_express_endpoint_enabled_for(tenant_id):
         return []
@@ -94,7 +99,13 @@ def managed_targets(
             SELECT id, name, adapter, enabled, shared_scope, workspace_client_id,
                    binding_generation, bound_account_set, bound_profile_key,
                    live_account_set, live_profile_key, agent_last_seen_at,
-                   agent_version, revoked_at, clock_timestamp() AS server_now
+                   agent_version, revoked_at,
+                   config ->> 'account_set' AS configured_account_set,
+                   config ->> 'account_dir' AS configured_account_dir,
+                   config ->> 'express_root' AS configured_express_root,
+                   config ->> 'account_set_label' AS configured_account_set_label,
+                   config ->> 'account_company' AS configured_account_company,
+                   clock_timestamp() AS server_now
             FROM erp_endpoints
             WHERE tenant_id = %s
               AND workspace_client_id = %s
@@ -111,10 +122,18 @@ def managed_targets(
             cloud_in_flight, waiting_lock = line_target_projection.active_push_state(
                 cur, str(row["id"])
             )
-            projection_state = load_state_with_cursor(
-                cur,
-                tenant_id=tenant_id,
-                endpoint_id=str(row["id"]),
+            endpoint_id = str(row["id"])
+            load_account_catalog = include_account_catalog and (
+                not account_catalog_endpoint_id or endpoint_id == account_catalog_endpoint_id
+            )
+            projection_state = (
+                load_state_with_cursor(
+                    cur,
+                    tenant_id=tenant_id,
+                    endpoint_id=endpoint_id,
+                )
+                if load_account_catalog
+                else None
             )
             targets.append(
                 line_target_projection.managed_target(
@@ -126,6 +145,7 @@ def managed_targets(
                     account_sets=((projection_state or {}).get("snapshot") or {}).get(
                         "account_sets"
                     ),
+                    account_catalog_loaded=load_account_catalog,
                 )
             )
     return targets
@@ -188,13 +208,26 @@ def legacy_target_specs(
     return _deduplicate_legacy_specs(specs)
 
 
-def collect_target_specs(cur, user: dict[str, Any], authz):
+def collect_target_specs(
+    cur,
+    user: dict[str, Any],
+    authz,
+    *,
+    include_account_catalog: bool = True,
+    account_catalog_endpoint_id: str | None = None,
+):
     tenant_id = str(user["tenant_id"])
     all_workspaces = workspaces(cur, tenant_id)
     allowed_workspaces = [
         workspace for workspace in all_workspaces if authz.allows_workspace(int(workspace["id"]))
     ]
-    targets = managed_targets(cur, tenant_id, allowed_workspaces)
+    targets = managed_targets(
+        cur,
+        tenant_id,
+        allowed_workspaces,
+        include_account_catalog=include_account_catalog,
+        account_catalog_endpoint_id=account_catalog_endpoint_id,
+    )
     specs = legacy_target_specs(
         cur,
         user_id=str(user["id"]),
@@ -213,16 +246,22 @@ def project_legacy_targets(
     refresh_probes: bool = False,
     tenant_id: str | None = None,
     user_id: str | None = None,
+    include_account_catalog: bool = True,
+    account_catalog_endpoint_id: str | None = None,
 ) -> list[dict[str, Any]]:
     probes: dict[str, dict[str, Any]] = {}
     for endpoint, workspace, binding_count, can_auto_create in specs:
         endpoint_id = str(endpoint.get("id") or "")
+        load_account_catalog = include_account_catalog and (
+            not account_catalog_endpoint_id or endpoint_id == account_catalog_endpoint_id
+        )
         if endpoint_id not in probes:
             probes[endpoint_id] = _projection_probe(
                 endpoint,
                 tenant_id=tenant_id,
                 user_id=user_id,
                 refresh=refresh_probes,
+                include_account_catalog=load_account_catalog,
             )
         targets.append(
             line_target_projection.legacy_target(
@@ -231,6 +270,7 @@ def project_legacy_targets(
                 binding_count=binding_count,
                 can_auto_create=can_auto_create,
                 probe=probes[endpoint_id],
+                include_account_catalog=load_account_catalog,
             )
         )
     return targets
@@ -242,10 +282,13 @@ def _projection_probe(
     tenant_id: str | None,
     user_id: str | None,
     refresh: bool,
-) -> dict[str, Any]:
+    include_account_catalog: bool = True,
+) -> dict[str, Any] | None:
     adapter = str(endpoint.get("adapter") or "").strip().lower()
     enabled = bool(tenant_id and user_id and erp_target_projection_enabled_for(tenant_id, user_id))
-    if adapter == "express" and enabled:
+    if not include_account_catalog:
+        return None
+    if adapter == "express" and enabled and include_account_catalog:
         probe = target_readiness.probe_endpoint(endpoint, refresh=False)
         state = load_state(
             tenant_id=str(tenant_id),

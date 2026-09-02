@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from core import db
+from services.erp import target_catalog_evidence
 from services.erp.line_target_choice import find_account_choice, target_label_for_account
 from services.line_erp import target_preflight
 
@@ -33,6 +34,8 @@ def from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "target_label": payload.get("target_label"),
         "account_root": payload.get("account_root"),
         "account_set": payload.get("account_set"),
+        "catalog_refresh_request_id": payload.get("catalog_refresh_request_id"),
+        "catalog_refresh_revision": payload.get("catalog_refresh_revision"),
         "direction": payload.get("mode") or payload.get("direction"),
         "posting_kind": payload.get("posting_kind")
         or (posting_mode if adapter == "express" else None),
@@ -51,12 +54,15 @@ def normalize(
     workspace_id = values.get("workspace_client_id")
     if not endpoint_id:
         raise SelectionError("line_erp.target_required", 422)
+    if not str(values.get("account_set") or "").strip():
+        raise SelectionError("line_erp.account_set_required", 422)
     try:
-        readiness = target_preflight.require_ready(
+        compact_readiness = target_preflight.require_ready(
             binding,
             endpoint_id=endpoint_id,
             workspace_client_id=(int(workspace_id) if workspace_id is not None else None),
-            refresh=refresh,
+            refresh=False,
+            include_account_catalog=False,
         )
     except (TypeError, ValueError):
         raise SelectionError("line_erp.target_required", 422) from None
@@ -65,8 +71,47 @@ def normalize(
             str(exc.result.get("block_reason") or "line_erp.target_not_ready"),
             readiness=exc.result,
         ) from exc
+    compact_target = dict(compact_readiness["target"])
+    adapter = str(compact_target.get("adapter") or "").lower()
+    requested_account = str(values.get("account_set") or "").strip()
+    compact_account = find_account_choice(compact_target, account_key=requested_account)
+    requested_root = str(values.get("account_root") or "").strip() or None
+    if compact_account and requested_root != (
+        str(compact_account.get("root_key") or "").strip() or None
+    ):
+        raise SelectionError("line_erp.account_set_required", 422)
+    bound_key = str(compact_target.get("selected_account_key") or "").strip()
+    bound_choice = find_account_choice(compact_target, account_key=bound_key) or {}
+    evidence = target_catalog_evidence.validate_selection(
+        tenant_id=str(binding.get("tenant_id") or ""),
+        user_id=str(binding.get("user_id") or ""),
+        endpoint_id=endpoint_id,
+        adapter=adapter,
+        selected_account_set_key=requested_account,
+        bound_account_set_key=bound_key,
+        selected_root_key=requested_root,
+        bound_root_key=bound_choice.get("root_key"),
+        request_id=values.get("catalog_refresh_request_id"),
+        revision=values.get("catalog_refresh_revision"),
+    )
+    if not evidence["ok"]:
+        raise SelectionError(f"line_erp.{evidence['error_code']}")
+    readiness = compact_readiness
+    if evidence["proof_required"]:
+        try:
+            readiness = target_preflight.require_ready(
+                binding,
+                endpoint_id=endpoint_id,
+                workspace_client_id=(int(workspace_id) if workspace_id is not None else None),
+                refresh=False,
+                include_account_catalog=True,
+            )
+        except target_preflight.TargetNotReady as exc:
+            raise SelectionError(
+                str(exc.result.get("block_reason") or "line_erp.target_not_ready"),
+                readiness=exc.result,
+            ) from exc
     target = dict(readiness["target"])
-    adapter = str(target.get("adapter") or "").lower()
     if adapter == "express":
         posting_kind = str(values.get("posting_kind") or "").lower()
         if posting_kind not in {"stock", "service"}:
@@ -80,9 +125,15 @@ def normalize(
         posting_kind = None
     else:
         raise SelectionError("line_erp.adapter_not_supported", 422)
-    account_key = str(values.get("account_set") or target.get("selected_account_key") or "").strip()
+    account_key = str(values.get("account_set") or "").strip()
+    if not account_key:
+        raise SelectionError("line_erp.account_set_required", 422)
     account = find_account_choice(target, account_key=account_key)
     if not account:
+        raise SelectionError("line_erp.account_set_required", 422)
+    account_root = str(account.get("root_key") or "").strip() or None
+    requested_root = str(values.get("account_root") or "").strip() or None
+    if requested_root and requested_root != account_root:
         raise SelectionError("line_erp.account_set_required", 422)
     normalized = {
         "endpoint_id": str(target["endpoint_id"]),
@@ -93,7 +144,7 @@ def normalize(
         ),
         "adapter": adapter,
         "target_label": target_label_for_account(target, account),
-        "account_root": str(account.get("root_key") or "").strip() or None,
+        "account_root": account_root,
         "account_set": account_key,
         "account_config": {
             key: account.get(key)
@@ -118,6 +169,9 @@ def normalize(
     refresh_request_id = str(values.get("master_refresh_request_id") or "").strip()
     if refresh_request_id:
         normalized["master_refresh_request_id"] = refresh_request_id[:36]
+    if evidence["proof_required"]:
+        normalized["catalog_refresh_request_id"] = evidence["request_id"]
+        normalized["catalog_refresh_revision"] = evidence["revision"]
     return readiness, normalized
 
 

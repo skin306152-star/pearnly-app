@@ -75,6 +75,7 @@ def _project_targets(
     *,
     lock_endpoint_id: str | None = None,
     refresh_probes: bool = False,
+    include_account_catalog: bool = True,
 ):
     tenant_id = str(identity.get("tenant_id") or "").strip()
     user_id = str(identity.get("user_id") or "").strip()
@@ -82,19 +83,36 @@ def _project_targets(
         if lock_endpoint_id:
             lock_endpoint_binding(cur, lock_endpoint_id)
         user, authz = _active_actor(cur, identity)
-        targets, legacy_specs = line_target_catalog.collect_target_specs(cur, user, authz)
+        targets, legacy_specs = line_target_catalog.collect_target_specs(
+            cur,
+            user,
+            authz,
+            include_account_catalog=include_account_catalog,
+            account_catalog_endpoint_id=lock_endpoint_id,
+        )
     return line_target_catalog.project_legacy_targets(
         targets,
         legacy_specs,
         refresh_probes=refresh_probes,
         tenant_id=tenant_id,
         user_id=user_id,
+        include_account_catalog=include_account_catalog,
+        account_catalog_endpoint_id=lock_endpoint_id,
     )
 
 
-def list_targets(identity: dict[str, Any], *, refresh: bool = False) -> list[dict[str, Any]]:
+def list_targets(
+    identity: dict[str, Any],
+    *,
+    refresh: bool = False,
+    include_account_catalog: bool = True,
+) -> list[dict[str, Any]]:
     """List only ERP targets currently visible to this active LINE member."""
-    return _project_targets(identity, refresh_probes=refresh)
+    return _project_targets(
+        identity,
+        refresh_probes=refresh,
+        include_account_catalog=include_account_catalog,
+    )
 
 
 def require_target(
@@ -103,12 +121,16 @@ def require_target(
     workspace_client_id: int | None = None,
     *,
     refresh_probe: bool = False,
+    include_account_catalog: bool = True,
 ) -> dict[str, Any]:
     """Re-read and lock a target before a later push flow accepts the selection."""
     endpoint_id = str(endpoint_id or "").strip()
     if not endpoint_id:
         raise CoworkLineErpTargetError("target_not_found")
-    project_kwargs: dict[str, Any] = {"lock_endpoint_id": endpoint_id}
+    project_kwargs: dict[str, Any] = {
+        "lock_endpoint_id": endpoint_id,
+        "include_account_catalog": include_account_catalog,
+    }
     if refresh_probe:
         project_kwargs["refresh_probes"] = True
     targets = _project_targets(identity, **project_kwargs)

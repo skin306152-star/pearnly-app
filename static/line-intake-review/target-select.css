@@ -32,6 +32,49 @@
   color: var(--ink);
   font: inherit;
 }
+.target-select-control {
+  position: relative;
+  display: block;
+}
+.target-select-control select {
+  display: block;
+}
+.target-load-state {
+  position: absolute;
+  inset: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  color: var(--ink2);
+  font-size: 12px;
+  pointer-events: none;
+}
+.target-load-error {
+  color: var(--bad);
+  font-size: 12px;
+}
+.target-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: target-spin 0.7s linear infinite;
+}
+@keyframes target-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .target-spinner {
+    animation-duration: 1.4s;
+  }
+}
 .target-locked {
   display: flex;
   align-items: center;

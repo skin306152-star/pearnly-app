@@ -79,7 +79,6 @@
   "erp_shared_express_profile_routes": "C",
   "erp_team_routes": "C",
   "line_erp_routes": "D",
-  "erp_posting_preview_routes": "B",
   "exceptions_routes": "B",
   "front_desk_routes": "C",
   "steward_routes": "C",

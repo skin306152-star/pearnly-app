@@ -2,103 +2,69 @@
 
 from __future__ import annotations
 
-import math
-
-from services.erp.line_target_choice import account_option_label, account_reference
 from services.line_erp import target_preflight
 from services.line_platform.quick_replies import question, quick_reply_item
 
 QR_LIMIT = 13
 QR_PAGE_SIZE = 11
-_ADAPTERS = (("mrerp", "MR.ERP"), ("express", "Express"))
+
+
+def _connection_name(target: dict) -> str:
+    adapter = str(target.get("adapter") or "").lower()
+    connection = str(
+        target.get("connection_label")
+        or ("MR.ERP" if adapter == "mrerp" else "Express" if adapter == "express" else "ERP")
+    ).strip()
+    workspace = str(target.get("workspace_name") or target.get("workspace_label") or "").strip()
+    return " · ".join(value for value in (connection, workspace) if value)
+
+
+def erp_connection_page(
+    targets: list[dict], *, page: int = 0
+) -> tuple[list[tuple[dict, str]], int, int]:
+    """Return one LINE-safe page of selectable ERP connections."""
+    ready = [target for target in targets if target.get("selectable")]
+    names = [_connection_name(target)[:20] for target in ready]
+    totals = {name: names.count(name) for name in set(names)}
+    seen: dict[str, int] = {}
+    options: list[tuple[dict, str]] = []
+    for target, name in zip(ready, names, strict=True):
+        seen[name] = seen.get(name, 0) + 1
+        suffix = f" {seen[name]}" if totals[name] > 1 else ""
+        options.append((target, name[: 20 - len(suffix)] + suffix))
+    page_count = max(1, (len(options) + QR_PAGE_SIZE - 1) // QR_PAGE_SIZE)
+    page = max(0, min(int(page or 0), page_count - 1))
+    start = page * QR_PAGE_SIZE
+    return options[start : start + QR_PAGE_SIZE], page, page_count
 
 
 def _status(targets: list[dict]) -> str:
     return target_preflight.status_text({"targets": targets})
 
 
-def erp_picker_message(targets: list[dict], mode: str) -> dict:
-    items = [
-        quick_reply_item(label, "erp-type", erp=adapter, mode=mode)
-        for adapter, label in _ADAPTERS
-        if any(
-            str(target.get("adapter") or "").lower() == adapter and target.get("selectable")
-            for target in targets
-        )
-    ]
-    return question(
-        "เลือก ERP",
-        f"เลือกปลายทางสำหรับเอกสารชุดนี้\n{_status(targets)}",
-        items,
-    )
-
-
-def account_picker_message(targets: list[dict], adapter: str, mode: str, *, page: int = 0) -> dict:
-    adapter = str(adapter or "").lower()
-    adapter_targets = [
-        target for target in targets if str(target.get("adapter") or "").lower() == adapter
-    ]
-    account_options = [
-        (target, account)
-        for target in adapter_targets
-        if target.get("selectable")
-        for account in target.get("account_choices") or []
-        if isinstance(account, dict)
-        and str(account.get("key") or "").strip()
-        and account.get("writable") is not False
-    ]
-    page_count = max(1, math.ceil(len(account_options) / QR_PAGE_SIZE))
-    page = max(0, min(int(page or 0), page_count - 1))
-    start = page * QR_PAGE_SIZE
+def erp_picker_message(targets: list[dict], mode: str, *, page: int = 0) -> dict:
+    options, page, page_count = erp_connection_page(targets, page=page)
     items = [
         quick_reply_item(
-            account_option_label(target, account),
+            label,
             "target",
             mode=mode,
-            endpoint=target.get("endpoint_id"),
+            endpoint=target.get("endpoint_id") or target.get("id"),
             workspace=target.get("workspace_client_id"),
-            account=account_reference(account.get("key")),
         )
-        for target, account in account_options[start : start + QR_PAGE_SIZE]
+        for target, label in options
     ]
     if page > 0:
         items.insert(
             0,
-            quick_reply_item(
-                "ก่อนหน้า",
-                "erp-type",
-                erp=adapter,
-                mode=mode,
-                page=page - 1,
-            ),
+            quick_reply_item("ก่อนหน้า", "erp-type", mode=mode, page=page - 1),
         )
     if page + 1 < page_count:
-        items.append(
-            quick_reply_item(
-                "เพิ่มเติม",
-                "erp-type",
-                erp=adapter,
-                mode=mode,
-                page=page + 1,
-            )
-        )
+        items.append(quick_reply_item("เพิ่มเติม", "erp-type", mode=mode, page=page + 1))
     return question(
-        "เลือกชุดบัญชี",
-        f"ระบบตรวจสอบการเชื่อมต่อก่อนให้เลือก\n{_status(adapter_targets)}",
+        "เลือก ERP",
+        f"เลือกปลายทางสำหรับเอกสารชุดนี้\n{_status(targets)}",
         items,
-    )
-
-
-def account_refresh_message(adapter: str, mode: str, *, failed: bool = False) -> dict:
-    text = (
-        "อัปเดตรายการบัญชี ERP ไม่สำเร็จ กรุณาลองใหม่"
-        if failed
-        else "กำลังอ่านรายการบัญชีล่าสุดจาก ERP แล้วแตะตรวจสอบอีกครั้ง"
-    )
-    return question(
-        "อัปเดตข้อมูล ERP",
-        text,
-        [quick_reply_item("ตรวจสอบอีกครั้ง", "erp-type", erp=adapter, mode=mode)],
     )
 
 
@@ -127,9 +93,7 @@ def posting_mode_message(mode: str, target: dict) -> dict:
 __all__ = [
     "QR_LIMIT",
     "QR_PAGE_SIZE",
-    "account_reference",
-    "account_picker_message",
-    "account_refresh_message",
+    "erp_connection_page",
     "erp_picker_message",
     "posting_mode_message",
 ]

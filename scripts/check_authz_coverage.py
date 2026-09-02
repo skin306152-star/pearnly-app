@@ -85,6 +85,14 @@ PUBLIC_ROUTES = {
     # Cowork LIFF 草稿接口以 20 分钟 scoped JWT + session nonce 作为凭证；
     # 每次调用还会回读活跃成员身份与当前草稿归属。
     ("GET", "/api/cowork-line/intake/draft/{draft_id}"),
+    (
+        "POST",
+        "/api/cowork-line/intake/draft/{draft_id}/target/{endpoint_id}/refresh",
+    ),
+    (
+        "GET",
+        "/api/cowork-line/intake/draft/{draft_id}/target/{endpoint_id}/refresh/{request_id}",
+    ),
     ("PUT", "/api/cowork-line/intake/draft/{draft_id}"),
     ("POST", "/api/cowork-line/intake/draft/{draft_id}/confirm"),
     ("POST", "/api/cowork-line/intake/draft/{draft_id}/discard"),

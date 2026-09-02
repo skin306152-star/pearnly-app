@@ -70,6 +70,18 @@ def request_refresh(
             )
         cur.execute(
             """
+            UPDATE erp_target_refresh_requests
+            SET status = 'failed', completed_at = clock_timestamp(),
+                error_code = 'ERR_REFRESH_LEASE_EXPIRED', lease_owner = NULL,
+                lease_expires_at = NULL, updated_at = clock_timestamp()
+            WHERE tenant_id = %s AND endpoint_id = %s AND account_set_key = %s
+              AND status = 'leased'
+              AND (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp())
+            """,
+            (tenant_id, endpoint_id, account_set_key),
+        )
+        cur.execute(
+            """
             SELECT id, status, lease_expires_at
             FROM erp_target_refresh_requests
             WHERE tenant_id = %s AND endpoint_id = %s AND account_set_key = %s
@@ -84,15 +96,6 @@ def request_refresh(
                 """
                 UPDATE erp_target_refresh_requests
                 SET requested_at = clock_timestamp(), reason = %s,
-                    status = CASE
-                        WHEN status = 'leased' AND lease_expires_at > clock_timestamp()
-                        THEN 'leased' ELSE 'requested' END,
-                    lease_owner = CASE
-                        WHEN status = 'leased' AND lease_expires_at > clock_timestamp()
-                        THEN lease_owner ELSE NULL END,
-                    lease_expires_at = CASE
-                        WHEN status = 'leased' AND lease_expires_at > clock_timestamp()
-                        THEN lease_expires_at ELSE NULL END,
                     updated_at = clock_timestamp()
                 WHERE id = %s
                 RETURNING id, status, requested_at
@@ -262,12 +265,47 @@ def lease_express_refresh_with_cursor(
         return None
     cur.execute(
         """
+        SELECT id
+        FROM erp_endpoints
+        WHERE id = %s AND adapter = 'express' AND enabled = TRUE
+        FOR UPDATE
+        """,
+        (endpoint_id,),
+    )
+    if not cur.fetchone():
+        return None
+    cur.execute(
+        """
+        UPDATE erp_target_refresh_requests
+        SET status = 'failed', completed_at = clock_timestamp(),
+            error_code = 'ERR_REFRESH_LEASE_EXPIRED', lease_owner = NULL,
+            lease_expires_at = NULL, updated_at = clock_timestamp()
+        WHERE endpoint_id = %s AND adapter = 'express' AND status = 'leased'
+          AND (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp())
+        """,
+        (endpoint_id,),
+    )
+    cur.execute(
+        """
+        SELECT id
+        FROM erp_target_refresh_requests
+        WHERE endpoint_id = %s AND adapter = 'express' AND status = 'leased'
+          AND lease_expires_at > clock_timestamp()
+        LIMIT 1
+        FOR UPDATE
+        """,
+        (endpoint_id,),
+    )
+    if cur.fetchone():
+        return None
+    cur.execute(
+        """
         SELECT r.id, r.account_set_key, r.requested_at, r.status, r.lease_expires_at
         FROM erp_target_refresh_requests r
         JOIN erp_endpoints ep ON ep.id = r.endpoint_id
         WHERE r.endpoint_id = %s AND r.adapter = 'express' AND ep.enabled = TRUE
           AND (%s = '' OR r.account_set_key IN (%s, %s))
-          AND r.status IN ('requested', 'leased')
+          AND r.status = 'requested'
         ORDER BY CASE
             WHEN r.account_set_key = %s THEN 0
             WHEN r.account_set_key = %s THEN 1
@@ -288,28 +326,19 @@ def lease_express_refresh_with_cursor(
     row = cur.fetchone()
     if not row:
         return None
-    if str(row["status"]) == "requested" or row.get("lease_expires_at") is None:
-        cur.execute(
-            """
-            UPDATE erp_target_refresh_requests
-            SET status = 'leased', started_at = COALESCE(started_at, clock_timestamp()),
-                lease_owner = %s,
-                lease_expires_at = clock_timestamp() + (%s * interval '1 second'),
-                updated_at = clock_timestamp()
-            WHERE id = %s
-            """,
-            (endpoint_id, _EXPRESS_LEASE_SECONDS, str(row["id"])),
-        )
-    elif row.get("lease_expires_at") is not None:
-        cur.execute(
-            """
-            UPDATE erp_target_refresh_requests
-            SET lease_expires_at = clock_timestamp() + (%s * interval '1 second'),
-                updated_at = clock_timestamp()
-            WHERE id = %s
-            """,
-            (_EXPRESS_LEASE_SECONDS, str(row["id"])),
-        )
+    cur.execute(
+        """
+        UPDATE erp_target_refresh_requests
+        SET status = 'leased', started_at = COALESCE(started_at, clock_timestamp()),
+            lease_owner = %s,
+            lease_expires_at = clock_timestamp() + (%s * interval '1 second'),
+            updated_at = clock_timestamp()
+        WHERE id = %s AND status = 'requested'
+        """,
+        (endpoint_id, _EXPRESS_LEASE_SECONDS, str(row["id"])),
+    )
+    if cur.rowcount != 1:
+        return None
     return {
         "request_id": str(row["id"]),
         "account_set_key": str(row["account_set_key"]),
@@ -339,7 +368,7 @@ def complete_express_refresh_with_cursor(
     try:
         request_id = str(uuid.UUID(str(request_id)))
     except (TypeError, ValueError, AttributeError):
-        return False
+        raise ValueError("erp.target_refresh_stale_completion") from None
     expected_key = (
         ENDPOINT_SCOPE_KEY
         if str(scope_kind or "").strip() == "endpoint"
@@ -352,7 +381,8 @@ def complete_express_refresh_with_cursor(
             result_revision = %s, lease_owner = NULL, lease_expires_at = NULL,
             updated_at = clock_timestamp()
         WHERE id = %s AND endpoint_id = %s AND adapter = 'express'
-          AND account_set_key = %s AND status IN ('requested', 'leased')
+          AND account_set_key = %s AND status = 'leased'
+          AND lease_owner = %s AND lease_expires_at > clock_timestamp()
         """,
         (
             "failed" if error_code else "succeeded",
@@ -361,9 +391,12 @@ def complete_express_refresh_with_cursor(
             request_id,
             str(endpoint_id),
             expected_key,
+            str(endpoint_id),
         ),
     )
-    return cur.rowcount == 1
+    if cur.rowcount != 1:
+        raise ValueError("erp.target_refresh_stale_completion")
+    return True
 
 
 def refresh_status(request_id: Any, *, tenant_id: str, endpoint_id: str) -> dict[str, Any] | None:

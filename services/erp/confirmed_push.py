@@ -33,6 +33,9 @@ async def dispatch_confirmed_history(
     workspace_client_id: Optional[int] = None,
     account_config: Optional[dict[str, Any]] = None,
     account_set_key: Optional[str] = None,
+    target_refresh_request_id: Optional[str] = None,
+    target_projection_revision: Optional[int] = None,
+    catalog_evidence_required: bool = False,
 ) -> dict[str, Any]:
     """Reuse the web push path from LINE without exposing endpoint selection."""
     assigned_endpoint = team_access.assigned_endpoint_for_request(user, endpoint_id)
@@ -59,6 +62,8 @@ async def dispatch_confirmed_history(
             posting_kind=posting_kind,
             account_set_key=account_set_key,
             account_config=account_config,
+            target_refresh_request_id=target_refresh_request_id,
+            target_projection_revision=target_projection_revision,
         )
     else:
         managed = await asyncio.to_thread(
@@ -70,6 +75,9 @@ async def dispatch_confirmed_history(
             posting_kind=posting_kind,
             account_set_key=account_set_key,
             account_config=account_config,
+            target_refresh_request_id=target_refresh_request_id,
+            target_projection_revision=target_projection_revision,
+            catalog_evidence_required=catalog_evidence_required,
         )
     if managed is not None:
         return managed
@@ -96,7 +104,18 @@ async def dispatch_confirmed_history(
         raise HTTPException(400, detail="erp.endpoint_disabled")
 
     from services.erp.line_target_choice import endpoint_with_account_choice
-    from services.erp.selected_account import resolve_account_choice
+    from services.erp.selected_account import require_catalog_evidence, resolve_account_choice
+
+    if request is not None or catalog_evidence_required:
+        require_catalog_evidence(
+            endpoint,
+            tenant_id=str(_tid(user)),
+            user_id=str(user["id"]),
+            account_set_key=account_set_key,
+            trusted_account_config=account_config,
+            request_id=target_refresh_request_id,
+            revision=target_projection_revision,
+        )
 
     if account_set_key or account_config:
         selected_choice = resolve_account_choice(

@@ -81,6 +81,15 @@ def _mrerp_account_choices(probe: dict[str, Any] | None) -> list[dict[str, Any]]
     return choices
 
 
+def _mrerp_default_account_choice(endpoint: dict[str, Any]) -> list[dict[str, Any]]:
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    comidyear = str(config.get("comidyear") or "6").strip()
+    seldb = str(config.get("seldb") or "1").strip()
+    key = _choice_key(comidyear, seldb)
+    label = str(config.get("account_set_label") or config.get("company_name") or key).strip()
+    return [{"key": key, "label": label, "comidyear": comidyear, "seldb": seldb}]
+
+
 def _projection_express_choices(probe: dict[str, Any] | None) -> list[dict[str, Any]]:
     choices = []
     for row in (probe or {}).get("account_sets") or []:
@@ -90,15 +99,18 @@ def _projection_express_choices(probe: dict[str, Any] | None) -> list[dict[str, 
         key = normalize_express_account_key(row.get("source_id"))
         if not key:
             continue
+        account_dir = str(attributes.get("path") or key).strip()
+        root = str(attributes.get("root") or "").strip() or ntpath.dirname(
+            account_dir.rstrip("\\/")
+        )
         choices.append(
             {
                 "key": key,
                 "label": str(row.get("label") or key).strip(),
-                "root_key": str(attributes.get("root") or "").strip(),
-                "root_label": str(attributes.get("root_label") or "").strip()
-                or _root_label(str(attributes.get("root") or "")),
+                "root_key": root,
+                "root_label": str(attributes.get("root_label") or "").strip() or _root_label(root),
                 "account_set": key,
-                "account_dir": str(attributes.get("path") or key).strip(),
+                "account_dir": account_dir,
                 "account_company": str(attributes.get("company") or "").strip(),
                 "account_set_row": _int_value(attributes.get("row")),
                 "writable": bool(attributes.get("writable", True)),
@@ -169,6 +181,31 @@ def _express_account_choices(
     return choices
 
 
+def _express_default_account_choice(endpoint: dict[str, Any]) -> list[dict[str, Any]]:
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    current = str(config.get("account_set") or config.get("account_dir") or "").strip()
+    key = normalize_express_account_key(current)
+    if not key:
+        return []
+    root = str(config.get("express_root") or "").strip() or ntpath.dirname(current.rstrip("\\/"))
+    return [
+        {
+            "key": key,
+            "label": str(config.get("account_set_label") or "").strip()
+            or ntpath.basename(current.rstrip("\\/"))
+            or current,
+            "root_key": root,
+            "root_label": _root_label(root),
+            "account_set": key,
+            "account_dir": str(config.get("account_dir") or current).strip(),
+            "account_company": str(config.get("account_company") or "").strip(),
+            "account_set_row": _int_value(config.get("account_set_row")),
+            "writable": True,
+            "mapping": {},
+        }
+    ]
+
+
 def _legacy_account_choices(
     endpoint: dict[str, Any], adapter: str, probe: dict[str, Any] | None
 ) -> list[dict[str, Any]]:
@@ -233,6 +270,7 @@ def managed_target(
     cloud_in_flight: bool = False,
     waiting_lock: bool = False,
     account_sets: list[dict[str, Any]] | None = None,
+    account_catalog_loaded: bool = True,
 ) -> dict[str, Any]:
     endpoint_id = str(row.get("id") or "")
     workspace_id = int(workspace["id"])
@@ -267,16 +305,10 @@ def managed_target(
         missing.append("companion_not_ready")
     profile_label = str(dto.get("account_set") or "").strip()
     endpoint_label = str(row.get("name") or "Express").strip()[:80]
+    compact_choices = dto.get("account_choices")
     account_choices = _projection_express_choices({"account_sets": account_sets or []}) or (
-        [
-            {
-                "key": profile_label,
-                "label": profile_label,
-                "account_set": profile_label,
-                "writable": True,
-            }
-        ]
-        if profile_label
+        [dict(choice) for choice in compact_choices if isinstance(choice, dict)]
+        if isinstance(compact_choices, list)
         else []
     )
     profile_key = normalize_express_account_key(profile_label)
@@ -299,6 +331,7 @@ def managed_target(
         "label": f"{endpoint_label} · {account_label}" if account_label else endpoint_label,
         "account_set_label": account_label or None,
         "account_choices": account_choices,
+        "account_catalog_loaded": account_catalog_loaded,
         "selected_account_key": selected_account_key or None,
         "connection_state": state,
         "configured": configured,
@@ -330,6 +363,7 @@ def legacy_target(
     binding_count: int,
     can_auto_create: bool = False,
     probe: dict[str, Any] | None = None,
+    include_account_catalog: bool = True,
 ) -> dict[str, Any]:
     adapter = str(endpoint.get("adapter") or "mrerp").strip().lower()
     status = target_readiness.endpoint_status({**endpoint, "adapter": adapter}, probe=probe)
@@ -344,7 +378,12 @@ def legacy_target(
     elif binding_count != 1:
         missing.append("workspace_binding_conflict")
     state = str(status["connection_state"])
-    account_choices = _legacy_account_choices(endpoint, adapter, probe)
+    if include_account_catalog:
+        account_choices = _legacy_account_choices(endpoint, adapter, probe)
+    elif adapter == "mrerp":
+        account_choices = _mrerp_default_account_choice(endpoint)
+    else:
+        account_choices = _express_default_account_choice(endpoint)
     account_label = _legacy_account_label(endpoint, adapter, account_choices)
     config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
     configured_account_key = (
@@ -377,6 +416,7 @@ def legacy_target(
         "label": f"{endpoint_label} · {account_label}" if account_label else endpoint_label,
         "account_set_label": account_label or None,
         "account_choices": account_choices,
+        "account_catalog_loaded": include_account_catalog,
         "selected_account_key": selected_account_key or None,
         "connection_state": state,
         "configured": configured,

@@ -13,6 +13,8 @@ def selection_from_payload(payload: dict) -> dict:
         "target_label": payload.get("target_label"),
         "account_root": payload.get("account_root"),
         "account_set": payload.get("account_set"),
+        "catalog_refresh_request_id": payload.get("catalog_refresh_request_id"),
+        "catalog_refresh_revision": payload.get("catalog_refresh_revision"),
         "direction": payload.get("direction"),
         "posting_kind": payload.get("posting_kind")
         or (posting_mode if adapter == "express" else None),

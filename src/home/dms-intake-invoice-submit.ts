@@ -11,14 +11,15 @@ import type { Dict, Endpoint } from './dms-intake-invoice.js';
 import {
     erpTargetCardsHtml,
     fetchErpEndpoints,
+    isErpAccountSelectionComplete,
     isErpTargetReady,
     pickDefaultTarget,
     pushHistory,
     selectedAccountKey,
     selectedAccountLabel,
+    selectedCatalogEvidence,
 } from './dms-intake-erp-push.js';
 import { renderReview } from './dms-intake-review.js';
-import { postingPreviewContainer, refreshPostingPreview } from './dms-intake-posting-preview.js';
 import {
     confirmIndices,
     confirmedIndices,
@@ -81,19 +82,10 @@ export function renderSubmit() {
         '</div>' +
         (IV.output.excel ? tplRowHtml() : '') +
         (IV.output.erp ? erpTargetsHtml() : '') +
-        (IV.output.erp && isExpressTarget() ? postingPreviewContainer() : '') +
         '</div>' +
         summaryHtml() +
         submitFootHtml();
     showStepInv(4, 'dx-s-inv-submit');
-    // 推送前预览(记账画像 gate)· 仅 Express 目标 · 异步填充,不阻塞渲染。
-    if (IV.output.erp && isExpressTarget()) {
-        void refreshPostingPreview(allHistoryIds(), IV.target);
-    }
-}
-function isExpressTarget(): boolean {
-    const e = IV.endpoints.find((x) => String(x.id) === IV.target);
-    return (e?.adapter || '').toLowerCase() === 'express';
 }
 function outChoice(key: 'excel' | 'erp', tk: string, dk: string) {
     const on = IV.output[key] ? ' active' : '';
@@ -155,22 +147,34 @@ function targetSummary(): string {
 function submitFootHtml() {
     // 空选 → 按钮=「完成」(仅落识别记录);选了导出/推送 → 「执行导出 / 推送」。两者都先落识别记录。
     const goKey = IV.output.excel || IV.output.erp ? 'dxi-submit-go' : 'dxi-submit-finish-only';
+    const disabled =
+        IV.busy || (IV.output.erp && !isErpAccountSelectionComplete(IV.endpoints, IV.target));
     return (
         `<div class="dx-foot"><div class="dx-note">${esc(t('dxi-submit-hint'))}</div>` +
         '<div style="display:flex;gap:8px">' +
         `<button class="btn" id="dx-inv-sub-back">${esc(t('dxi-submit-back'))}</button>` +
-        `<button class="btn primary" id="dx-inv-finish"${IV.busy ? ' disabled' : ''}>${esc(t(goKey))}</button></div></div>`
+        `<button class="btn primary" id="dx-inv-finish"${disabled ? ' disabled' : ''}>${esc(t(goKey))}</button></div></div>`
     );
 }
 
 export async function doFinish() {
     if (IV.busy) return;
+    if (IV.output.erp && !isErpAccountSelectionComplete(IV.endpoints, IV.target)) {
+        showToast(t('dxi-need-erp-account'), 'warn');
+        renderSubmit();
+        return;
+    }
     if (!(await ensureErpFormalConfirmation())) return;
     // 空选合法(= 仅完成入库);只在选了推送但无可用端点时拦。
     if (IV.output.erp) {
         IV.endpoints = (await fetchErpEndpoints(true, IV.endpoints)) as Endpoint[];
         if (!isErpTargetReady(IV.endpoints, IV.target)) {
             showToast(t('dxi-need-erp'), 'warn');
+            renderSubmit();
+            return;
+        }
+        if (!isErpAccountSelectionComplete(IV.endpoints, IV.target)) {
+            showToast(t('dxi-need-erp-account'), 'warn');
             renderSubmit();
             return;
         }
@@ -326,7 +330,8 @@ async function pushOne(historyId: string): Promise<import('./dms-intake-erp-push
         historyId,
         IV.target,
         IV.postingKind,
-        selectedAccountKey(IV.endpoints, IV.target)
+        selectedAccountKey(IV.endpoints, IV.target),
+        selectedCatalogEvidence(IV.endpoints, IV.target)
     );
 }
 function downloadBlob(blob: Blob, name: string) {

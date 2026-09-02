@@ -33,6 +33,19 @@
         return fetch(path, options).then(window.lineIntakeLiff.responseJson);
     }
 
+    function loadTarget(target) {
+        var path =
+            '/api/cowork-line/intake/draft/' +
+            encodeURIComponent(draftId) +
+            '/target/' +
+            encodeURIComponent(target.endpoint_id || target.id || '') +
+            '/refresh';
+        if (target.workspace_client_id != null) {
+            path += '?workspace_client_id=' + encodeURIComponent(target.workspace_client_id);
+        }
+        return T.refreshTarget(api, path);
+    }
+
     function records() {
         return model && Array.isArray(model.records) ? model.records : [];
     }
@@ -96,6 +109,8 @@
             target_label: selection.target_label,
             account_root: selection.account_root,
             account_set: selection.account_set,
+            catalog_refresh_request_id: selection.catalog_refresh_request_id,
+            catalog_refresh_revision: selection.catalog_refresh_revision,
             posting_kind: selection.posting_kind,
             payment: selection.payment,
         };
@@ -188,6 +203,7 @@
             },
             text: t,
             escape: R.escape,
+            loadTarget: loadTarget,
         });
         review = R.create({
             root: form,

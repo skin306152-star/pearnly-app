@@ -14,6 +14,7 @@ import {
     onInvoiceClick,
     onInvoiceChange,
     onInvoiceDrop,
+    onInvoiceErpCatalogPreOpen,
 } from './dms-intake-invoice.js';
 import { readStep } from './step-resume.js';
 import { renderDxErpCards } from './dms-intake-erp-cards.js';
@@ -27,7 +28,11 @@ import {
     onBatchDrop,
 } from './dms-intake-batch.js';
 import { onBatchReviewClick, rerenderBatchReview } from './dms-intake-batch-review.js';
-import { onBatchSubmitChange, onBatchSubmitClick } from './dms-intake-batch-submit.js';
+import {
+    onBatchErpCatalogPreOpen,
+    onBatchSubmitChange,
+    onBatchSubmitClick,
+} from './dms-intake-batch-submit.js';
 import { isErpEntry } from './erp-intake.js';
 
 // ── 导航 / 重置 ──────────────────────────────────────────────
@@ -65,6 +70,19 @@ function bind() {
     const el = sec();
     if (!el || (el as HTMLElement).dataset.dxBound) return;
     (el as HTMLElement).dataset.dxBound = '1';
+
+    const preOpenErpCatalog = (target: HTMLElement, source: 'pointer' | 'focus') =>
+        S.task === 'summary_batch'
+            ? onBatchErpCatalogPreOpen(target, source)
+            : onInvoiceErpCatalogPreOpen(target, source);
+
+    el.addEventListener('pointerdown', (ev) => {
+        if (preOpenErpCatalog(ev.target as HTMLElement, 'pointer')) ev.preventDefault();
+    });
+
+    el.addEventListener('focusin', (ev) => {
+        preOpenErpCatalog(ev.target as HTMLElement, 'focus');
+    });
 
     el.addEventListener('click', (ev) => {
         const tg = ev.target as HTMLElement;

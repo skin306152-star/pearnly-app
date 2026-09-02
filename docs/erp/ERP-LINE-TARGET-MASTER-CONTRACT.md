@@ -1,7 +1,7 @@
 # ERP LINE 目标、套账与主档一致性合同
 
-> 状态：`P3A_IMPLEMENTED / FEATURE_FLAG_OFF / ADAPTER_AND_LINE_INTEGRATION_PENDING`
-> P3a 实现：`fc9e48b9`；部署与生产回读完成前只视为候选版本。
+> 状态：`P3A_DEPLOYED / FEATURE_FLAG_OFF / ADAPTER_AND_LINE_INTEGRATION_PENDING`
+> P3a 实现：`fc9e48b9`；运行时发布：`e574e9b0`，Manual CD `33588085006`。
 > 本文只定义连接、套账、主档与 LINE 选择的一致性边界；第三方 ERP 推送状态继续唯一来自
 > `erp_push_logs`，不在这里建立第二套推送状态。
 

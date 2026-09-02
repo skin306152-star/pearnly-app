@@ -1,6 +1,6 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 09-02 ERP 最新主档 P3a READY_FOR_RELEASE
+## 当前状态卡 · 09-02 ERP 最新主档 P3a READY_FOR_BACKEND_ACCEPTANCE
 
 - **▶ 当前 task**:第三方 ERP 套账、主档、字段与按钮统一投影 P3a；运行时实现=`fc9e48b9`，测试闸修正=`511d9069`。
 - **✅ 本批交付**:immutable snapshot + current head + normalized items；endpoint/account-set 双 scope；稳定 hash、单调 revision、四类 component revision 与刷新 freshness 单源。
@@ -9,7 +9,8 @@
 - **🚧 明确未做**:MR.ERP live fetch、Express Companion refresh/ingestion、网页与 LINE 消费、确认前 revision CAS 均未接；当前 LINE 下拉不会因 P3a 自动出现第三方新增内容。
 - **🚦 开关**:`erp_target_projection` 默认关闭；关闭时新增只读 API 返回 404，现有 `/cowork`、`/erp` 网页与 LINE 行为不切流。
 - **✅ 本地证据**:完整 pre-push 全绿（unittest 1114 模块/6 片）；P3a 11 个 contract/schema/route tests + 5 个真实 PostgreSQL smoke；RLS、权限覆盖、Alembic head 与 app import 通过。
-- **⏭ 批次门**:先完成 pinned-SHA 生产部署与 schema/ready 回读；用户确认 P3a 后才进入 P3b MR.ERP live projection，不提前接 LINE。
+- **✅ 生产证据**:运行时发布=`e574e9b0`，Manual CD `33588085006`；production HEAD/service/health/ready 回读通过，`/erp`、`/cowork` 均 200；三张新表 RLS policy 就绪且 0 行，功能闸无记录/无名单。
+- **⏭ 批次门**:等待用户确认 P3a；确认后才进入 P3b MR.ERP live projection，不提前接 LINE。
 
 ---
 

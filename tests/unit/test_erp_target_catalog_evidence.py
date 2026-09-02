@@ -40,6 +40,9 @@ def _refresh(**overrides):
         "account_set_key": "@endpoint",
         "adapter": "mrerp",
         "result_revision": 7,
+        "head_status": "fresh",
+        "head_revision": 7,
+        "snapshot_adapter": "mrerp",
         **overrides,
     }
 
@@ -71,7 +74,56 @@ def _validate(**overrides):
     return evidence.validate_selection(**values)
 
 
+def _validate_receipt(**overrides):
+    values = {
+        "tenant_id": "tenant-1",
+        "user_id": "user-1",
+        "endpoint_id": "endpoint-1",
+        "adapter": "mrerp",
+        "request_id": REQUEST_ID,
+        "request_revision": 7,
+        "catalog_revision": 7,
+    }
+    values.update(overrides)
+    return evidence.validate_refresh_receipt(**values)
+
+
 class TargetCatalogEvidenceTests(unittest.TestCase):
+    def test_refresh_receipt_matches_latest_request_and_current_snapshot(self):
+        cursor = _Cursor([_refresh()])
+        with mock.patch.object(evidence.db, "get_cursor_rls", return_value=_Context(cursor)):
+            result = _validate_receipt()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["reason"], "validated_snapshot")
+        self.assertEqual(len(cursor.executed), 1)
+        self.assertIn("erp_target_projection_heads", cursor.executed[0][0])
+        self.assertIn("ORDER BY r.requested_at DESC, r.created_at DESC", cursor.executed[0][0])
+
+    def test_refresh_receipt_rejects_a_mixed_catalog_without_database_access(self):
+        with mock.patch.object(evidence.db, "get_cursor_rls") as get_cursor:
+            result = _validate_receipt(catalog_revision=8)
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "revision_mismatch")
+        get_cursor.assert_not_called()
+
+    def test_refresh_receipt_rejects_a_newer_endpoint_request(self):
+        cursor = _Cursor([_refresh(id=NEW_REQUEST_ID, status="requested")])
+        with mock.patch.object(evidence.db, "get_cursor_rls", return_value=_Context(cursor)):
+            result = _validate_receipt()
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "refresh_superseded")
+
+    def test_refresh_receipt_rejects_a_superseded_projection_head(self):
+        cursor = _Cursor([_refresh(head_revision=8)])
+        with mock.patch.object(evidence.db, "get_cursor_rls", return_value=_Context(cursor)):
+            result = _validate_receipt()
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "snapshot_superseded")
+
     def test_bound_default_needs_no_database_proof(self):
         with mock.patch.object(evidence.db, "get_cursor_rls") as get_cursor:
             result = _validate(

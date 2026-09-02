@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from services.erp import selected_account_refresh, target_refresh
+from services.erp import mrerp_refresh_worker, selected_account_refresh, target_refresh
 
 
 class _Cursor:
@@ -22,11 +22,13 @@ class _Cursor:
 class _Context:
     def __init__(self, cursor):
         self.cursor = cursor
+        self.exit_args = None
 
     def __enter__(self):
         return self.cursor
 
-    def __exit__(self, *_args):
+    def __exit__(self, *args):
+        self.exit_args = args
         return False
 
 
@@ -87,12 +89,46 @@ class TargetRefreshTests(unittest.TestCase):
             if "ERR_REFRESH_LEASE_EXPIRED" in sql and "tenant_id = %s" in sql
         )
         self.assertIn("lease_expires_at <= clock_timestamp()", expiry_sql)
+        self.assertIn("requested_at > started_at", expiry_sql)
+        self.assertIn("THEN 'requested'", expiry_sql)
         self.assertEqual(result["request_id"], "22222222-2222-4222-8222-222222222222")
         self.assertTrue(
             any("INSERT INTO erp_target_refresh_requests" in sql for sql, _ in cursor.executed)
         )
 
-    def test_request_coalesces_a_current_in_flight_lease(self):
+    def test_request_replaces_a_current_lease_with_a_new_scan(self):
+        old_request_id = "11111111-1111-4111-8111-111111111111"
+        new_request_id = "22222222-2222-4222-8222-222222222222"
+        cursor = _Cursor(
+            [
+                {
+                    "id": "endpoint-1",
+                    "tenant_id": "tenant-1",
+                    "owner_tenant_id": "tenant-1",
+                    "binding_generation": 0,
+                },
+                {"id": old_request_id, "status": "leased", "lease_expires_at": object()},
+                {"id": new_request_id, "status": "requested"},
+            ]
+        )
+        with mock.patch.object(target_refresh.db, "get_cursor", return_value=_Context(cursor)):
+            result = target_refresh.request_refresh(
+                tenant_id="tenant-1",
+                user_id="user-1",
+                endpoint_id="endpoint-1",
+                account_set_key="@endpoint",
+                adapter="express",
+            )
+
+        self.assertEqual(result["request_id"], new_request_id)
+        self.assertEqual(result["status"], "requested")
+        supersede_sql = next(sql for sql, _ in cursor.executed if "ERR_REFRESH_SUPERSEDED" in sql)
+        self.assertIn("status = 'failed'", supersede_sql)
+        self.assertTrue(
+            any("INSERT INTO erp_target_refresh_requests" in sql for sql, _ in cursor.executed)
+        )
+
+    def test_request_coalesces_before_collection_has_started(self):
         request_id = "11111111-1111-4111-8111-111111111111"
         cursor = _Cursor(
             [
@@ -102,8 +138,8 @@ class TargetRefreshTests(unittest.TestCase):
                     "owner_tenant_id": "tenant-1",
                     "binding_generation": 0,
                 },
-                {"id": request_id, "status": "leased", "lease_expires_at": object()},
-                {"id": request_id, "status": "leased"},
+                {"id": request_id, "status": "requested", "lease_expires_at": None},
+                {"id": request_id, "status": "requested"},
             ]
         )
         with mock.patch.object(target_refresh.db, "get_cursor", return_value=_Context(cursor)):
@@ -116,7 +152,8 @@ class TargetRefreshTests(unittest.TestCase):
             )
 
         self.assertEqual(result["request_id"], request_id)
-        self.assertEqual(result["status"], "leased")
+        self.assertEqual(result["status"], "requested")
+        self.assertIn("requested_at = clock_timestamp()", cursor.executed[-1][0])
         self.assertFalse(
             any("INSERT INTO erp_target_refresh_requests" in sql for sql, _ in cursor.executed)
         )
@@ -144,7 +181,7 @@ class TargetRefreshTests(unittest.TestCase):
         self.assertEqual(len(cursor.rows), 1)
         self.assertFalse(any("SET status = 'leased'" in sql for sql, _ in cursor.executed))
 
-    def test_express_lease_marks_expired_attempt_failed_instead_of_reissuing_it(self):
+    def test_express_lease_preserves_a_click_recorded_during_an_expired_attempt(self):
         cursor = _Cursor(
             [
                 {"id": "endpoint-1"},
@@ -161,7 +198,9 @@ class TargetRefreshTests(unittest.TestCase):
             for sql, _ in cursor.executed
             if "ERR_REFRESH_LEASE_EXPIRED" in sql and "adapter = 'express'" in sql
         )
-        self.assertIn("status = 'failed'", fail_sql)
+        self.assertIn("requested_at > started_at", fail_sql)
+        self.assertIn("THEN 'requested'", fail_sql)
+        self.assertIn("ELSE 'failed'", fail_sql)
         self.assertIn("ERR_REFRESH_LEASE_EXPIRED", fail_sql)
         self.assertIn("lease_expires_at <= clock_timestamp()", fail_sql)
 
@@ -182,6 +221,8 @@ class TargetRefreshTests(unittest.TestCase):
         self.assertIn("status = 'leased'", sql)
         self.assertIn("lease_owner = %s", sql)
         self.assertIn("lease_expires_at > clock_timestamp()", sql)
+        self.assertIn("requested_at > started_at", sql)
+        self.assertIn("THEN 'requested'", sql)
         self.assertEqual(params[-1], "endpoint-1")
 
         cursor.rowcount = 0
@@ -195,7 +236,23 @@ class TargetRefreshTests(unittest.TestCase):
                 revision=4,
             )
 
-    def test_mrerp_processor_finishes_with_published_revision(self):
+    def test_mrerp_claim_preserves_a_click_recorded_during_an_expired_attempt(self):
+        cursor = _Cursor([None])
+        request_id = "11111111-1111-4111-8111-111111111111"
+        with mock.patch.object(target_refresh.db, "get_cursor", return_value=_Context(cursor)):
+            claimed = target_refresh._claim_mrerp(request_id)
+
+        self.assertIsNone(claimed)
+        expiry_sql = cursor.executed[0][0]
+        claim_sql = cursor.executed[1][0]
+        self.assertIn("ERR_REFRESH_LEASE_EXPIRED", expiry_sql)
+        self.assertIn("lease_expires_at <= clock_timestamp()", expiry_sql)
+        self.assertIn("requested_at > started_at", expiry_sql)
+        self.assertIn("THEN 'requested'", expiry_sql)
+        self.assertIn("r.status = 'requested'", claim_sql)
+        self.assertNotIn("r.status = 'leased'", claim_sql)
+
+    def test_mrerp_processor_commits_the_collected_result(self):
         request = {
             "id": "11111111-1111-4111-8111-111111111111",
             "tenant_id": "tenant-1",
@@ -206,29 +263,47 @@ class TargetRefreshTests(unittest.TestCase):
             "config": {},
             "lease_owner": "worker-1",
         }
+        result = {"ok": True, "observed_at": object(), "observations": [{"adapter": "mrerp"}]}
         with (
             mock.patch.object(target_refresh, "_claim_mrerp", return_value=request),
-            mock.patch(
-                "services.erp.mrerp_target_projection.refresh_mrerp_projection",
-                return_value={
-                    "ok": True,
-                    "projection": {"revision": 7},
-                    "error_code": None,
-                },
-            ) as refresh,
-            mock.patch.object(target_refresh, "_finish_mrerp") as finish,
+            mock.patch.object(mrerp_refresh_worker, "collect", return_value=result) as collect,
+            mock.patch.object(mrerp_refresh_worker, "commit", return_value=True) as commit,
         ):
             processed = target_refresh.process_mrerp_request(request["id"])
 
         self.assertTrue(processed)
-        refresh.assert_called_once()
-        finish.assert_called_once_with(
-            request["id"],
-            "worker-1",
-            success=True,
-            error_code=None,
-            revision=7,
+        collect.assert_called_once_with(
+            request,
+            endpoint_scope_key=target_refresh.ENDPOINT_SCOPE_KEY,
         )
+        commit.assert_called_once_with(request, result)
+
+    def test_mrerp_processor_rescans_after_config_changes_during_collection(self):
+        request = {
+            **self._leased_mrerp_request(),
+            "user_id": "user-1",
+            "config": {},
+        }
+        first_result = {"ok": True, "observations": [{"scan": 1}]}
+        second_result = {"ok": True, "observations": [{"scan": 2}]}
+        with (
+            mock.patch.object(target_refresh, "_claim_mrerp", side_effect=[request, request]),
+            mock.patch.object(
+                mrerp_refresh_worker,
+                "collect",
+                side_effect=[first_result, second_result],
+            ) as collect,
+            mock.patch.object(
+                mrerp_refresh_worker,
+                "commit",
+                side_effect=[False, True],
+            ) as commit,
+        ):
+            processed = target_refresh.process_mrerp_request(request["id"])
+
+        self.assertTrue(processed)
+        self.assertEqual(collect.call_count, 2)
+        self.assertEqual(commit.call_count, 2)
 
     def test_mrerp_endpoint_request_only_refreshes_account_catalog(self):
         request = {
@@ -241,33 +316,228 @@ class TargetRefreshTests(unittest.TestCase):
             "config": {},
             "lease_owner": "worker-1",
         }
-        with (
-            mock.patch.object(target_refresh, "_claim_mrerp", return_value=request),
-            mock.patch(
-                "services.erp.mrerp_target_projection.refresh_mrerp_account_catalog",
-                return_value={
-                    "ok": True,
-                    "catalog": {"revision": 5},
-                    "error_code": None,
-                },
-            ) as refresh_catalog,
-            mock.patch(
-                "services.erp.mrerp_target_projection.refresh_mrerp_projection"
-            ) as refresh_full,
-            mock.patch.object(target_refresh, "_finish_mrerp") as finish,
-        ):
-            processed = target_refresh.process_mrerp_request(request["id"])
+        account_result = {
+            "ok": True,
+            "companies": [{"comidyear": "6", "seldb": "1", "label": "TEST2019"}],
+        }
+        with mock.patch.object(
+            mrerp_refresh_worker.projection, "_run_live", return_value=account_result
+        ) as run_live:
+            result = mrerp_refresh_worker.collect(
+                request,
+                endpoint_scope_key=target_refresh.ENDPOINT_SCOPE_KEY,
+            )
 
-        self.assertTrue(processed)
-        refresh_catalog.assert_called_once()
-        refresh_full.assert_not_called()
-        finish.assert_called_once_with(
-            request["id"],
-            "worker-1",
-            success=True,
-            error_code=None,
-            revision=5,
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(result["observations"]), 1)
+        self.assertNotIn("account_set_key", result["observations"][0])
+        run_live.assert_called_once_with(
+            mrerp_refresh_worker.projection.test_mrerp_endpoint,
+            {},
         )
+
+    def test_mrerp_account_collection_does_not_publish_before_fence(self):
+        request = {
+            "account_set_key": "6:1",
+            "config": {},
+        }
+        results = [
+            {
+                "ok": True,
+                "companies": [{"comidyear": "6", "seldb": "1", "label": "TEST2019"}],
+            },
+            {"ok": True, "products": [{"code": "P1", "name": "Product"}]},
+            {"ok": True, "customers": [{"code": "C1", "name": "Customer"}]},
+        ]
+        with (
+            mock.patch.object(
+                mrerp_refresh_worker.projection, "_run_live", side_effect=results
+            ) as run_live,
+            mock.patch.object(mrerp_refresh_worker.projection, "publish_projection") as publish,
+        ):
+            result = mrerp_refresh_worker.collect(
+                request,
+                endpoint_scope_key=target_refresh.ENDPOINT_SCOPE_KEY,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(result["observations"]), 1)
+        self.assertEqual(result["observations"][0]["account_set_key"], "6:1")
+        self.assertEqual(run_live.call_count, 3)
+        publish.assert_not_called()
+
+    @staticmethod
+    def _leased_mrerp_request():
+        return {
+            "id": "11111111-1111-4111-8111-111111111111",
+            "tenant_id": "22222222-2222-4222-8222-222222222222",
+            "endpoint_id": "33333333-3333-4333-8333-333333333333",
+            "account_set_key": "6:1",
+            "lease_owner": "worker-1",
+        }
+
+    def test_mrerp_commit_fences_before_publishing_in_the_same_transaction(self):
+        request = self._leased_mrerp_request()
+        cursor = _Cursor(
+            [
+                {
+                    "id": request["id"],
+                    "requested_at": 1,
+                    "started_at": 2,
+                }
+            ]
+        )
+        context = _Context(cursor)
+        result = {"ok": True, "observed_at": object(), "observations": [{"raw": True}]}
+        with (
+            mock.patch.object(mrerp_refresh_worker.db, "get_cursor", return_value=context),
+            mock.patch.object(
+                mrerp_refresh_worker.projection,
+                "claim_endpoint_tenant_with_cursor",
+                return_value={"config": {}},
+            ) as claim_endpoint,
+            mock.patch.object(
+                mrerp_refresh_worker, "normalize_projection", return_value="normalized"
+            ),
+            mock.patch.object(
+                mrerp_refresh_worker, "publish_with_cursor", return_value={"revision": 7}
+            ) as publish,
+        ):
+            mrerp_refresh_worker.commit(request, result)
+
+        claim_endpoint.assert_called_once_with(
+            cursor,
+            tenant_id=request["tenant_id"],
+            endpoint_id=request["endpoint_id"],
+        )
+        fence_sql = cursor.executed[0][0]
+        finish_sql = cursor.executed[-1][0]
+        self.assertIn("r.status = 'leased'", fence_sql)
+        self.assertIn("r.lease_owner = %s", fence_sql)
+        self.assertIn("r.lease_expires_at > clock_timestamp()", fence_sql)
+        self.assertIn("NOT EXISTS", fence_sql)
+        self.assertIn("lease_expires_at > clock_timestamp()", finish_sql)
+        publish.assert_called_once_with(
+            cursor,
+            tenant_id=request["tenant_id"],
+            endpoint_id=request["endpoint_id"],
+            projection="normalized",
+        )
+        self.assertEqual(cursor.executed[-1][1][2], 7)
+        self.assertIsNone(context.exit_args[0])
+
+    def test_stale_mrerp_worker_cannot_publish(self):
+        request = self._leased_mrerp_request()
+        cursor = _Cursor([None])
+        context = _Context(cursor)
+        result = {"ok": True, "observed_at": object(), "observations": [{"raw": True}]}
+        with (
+            mock.patch.object(mrerp_refresh_worker.db, "get_cursor", return_value=context),
+            mock.patch.object(
+                mrerp_refresh_worker.projection,
+                "claim_endpoint_tenant_with_cursor",
+                return_value={"config": {}},
+            ),
+            mock.patch.object(mrerp_refresh_worker, "publish_with_cursor") as publish,
+        ):
+            with self.assertRaisesRegex(ValueError, "erp.target_refresh_stale_completion"):
+                mrerp_refresh_worker.commit(request, result)
+
+        publish.assert_not_called()
+        self.assertIs(context.exit_args[0], ValueError)
+
+    def test_mrerp_commit_requeues_when_clicked_during_collection(self):
+        request = {**self._leased_mrerp_request(), "config": {"seldb": "1"}}
+        cursor = _Cursor(
+            [
+                {
+                    "id": request["id"],
+                    "requested_at": 3,
+                    "started_at": 2,
+                }
+            ]
+        )
+        result = {"ok": True, "observed_at": object(), "observations": [{"raw": True}]}
+        with (
+            mock.patch.object(mrerp_refresh_worker.db, "get_cursor", return_value=_Context(cursor)),
+            mock.patch.object(
+                mrerp_refresh_worker.projection,
+                "claim_endpoint_tenant_with_cursor",
+                return_value={"config": {"seldb": "1"}},
+            ),
+            mock.patch.object(mrerp_refresh_worker, "publish_with_cursor") as publish,
+        ):
+            completed = mrerp_refresh_worker.commit(request, result)
+
+        self.assertFalse(completed)
+        publish.assert_not_called()
+        requeue_sql = cursor.executed[-1][0]
+        self.assertIn("SET status = 'requested'", requeue_sql)
+        self.assertIn("started_at = NULL", requeue_sql)
+
+    def test_mrerp_commit_requeues_when_endpoint_config_changed(self):
+        request = {**self._leased_mrerp_request(), "config": {"seldb": "1"}}
+        cursor = _Cursor(
+            [
+                {
+                    "id": request["id"],
+                    "requested_at": 1,
+                    "started_at": 2,
+                }
+            ]
+        )
+        result = {"ok": True, "observed_at": object(), "observations": [{"raw": True}]}
+        with (
+            mock.patch.object(mrerp_refresh_worker.db, "get_cursor", return_value=_Context(cursor)),
+            mock.patch.object(
+                mrerp_refresh_worker.projection,
+                "claim_endpoint_tenant_with_cursor",
+                return_value={"config": {"seldb": "2"}},
+            ),
+            mock.patch.object(mrerp_refresh_worker, "publish_with_cursor") as publish,
+        ):
+            completed = mrerp_refresh_worker.commit(request, result)
+
+        self.assertFalse(completed)
+        publish.assert_not_called()
+        self.assertIn("SET status = 'requested'", cursor.executed[-1][0])
+
+    def test_mrerp_commit_rolls_back_if_lease_expires_during_publication(self):
+        request = self._leased_mrerp_request()
+        cursor = _Cursor(
+            [
+                {
+                    "id": request["id"],
+                    "requested_at": 1,
+                    "started_at": 2,
+                }
+            ]
+        )
+        context = _Context(cursor)
+        result = {"ok": True, "observed_at": object(), "observations": [{"raw": True}]}
+
+        def publish_then_expire(*_args, **_kwargs):
+            cursor.rowcount = 0
+            return {"revision": 8}
+
+        with (
+            mock.patch.object(mrerp_refresh_worker.db, "get_cursor", return_value=context),
+            mock.patch.object(
+                mrerp_refresh_worker.projection,
+                "claim_endpoint_tenant_with_cursor",
+                return_value={"config": {}},
+            ),
+            mock.patch.object(
+                mrerp_refresh_worker, "normalize_projection", return_value="normalized"
+            ),
+            mock.patch.object(
+                mrerp_refresh_worker, "publish_with_cursor", side_effect=publish_then_expire
+            ),
+        ):
+            with self.assertRaisesRegex(ValueError, "erp.target_refresh_stale_completion"):
+                mrerp_refresh_worker.commit(request, result)
+
+        self.assertIs(context.exit_args[0], ValueError)
 
     def test_invalid_companion_completion_aborts_the_ingestion_transaction(self):
         cursor = _Cursor([])

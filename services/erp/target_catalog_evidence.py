@@ -75,6 +75,21 @@ def _result(
     }
 
 
+def _receipt_result(
+    *,
+    ok: bool,
+    reason: str,
+    request_id: str | None,
+    revision: int | None,
+) -> dict[str, Any]:
+    return {
+        "ok": ok,
+        "reason": reason,
+        "request_id": request_id,
+        "revision": revision,
+    }
+
+
 def _account_sets(value: Any) -> list[Mapping[str, Any]] | None:
     if isinstance(value, str):
         try:
@@ -308,8 +323,107 @@ def validate_selection(
         return _validate_proof_with_cursor(rls_cur, **proof_kwargs)
 
 
+def validate_refresh_receipt(
+    *,
+    tenant_id: str,
+    user_id: str,
+    endpoint_id: str,
+    adapter: str,
+    request_id: Any,
+    request_revision: Any,
+    catalog_revision: Any,
+) -> dict[str, Any]:
+    """Match one succeeded refresh to the catalog snapshot returned to the caller."""
+    validated_request_id = _request_id(request_id)
+    validated_request_revision = _revision(request_revision)
+    validated_catalog_revision = _revision(catalog_revision)
+    tenant_id = str(tenant_id or "").strip()
+    user_id = str(user_id or "").strip()
+    endpoint_id = str(endpoint_id or "").strip()
+    adapter = _adapter(adapter)
+    if (
+        not validated_request_id
+        or validated_request_revision is None
+        or validated_catalog_revision is None
+        or not tenant_id
+        or not user_id
+        or not endpoint_id
+        or adapter not in {"mrerp", "express"}
+    ):
+        return _receipt_result(
+            ok=False,
+            reason="receipt_malformed",
+            request_id=validated_request_id,
+            revision=validated_request_revision,
+        )
+    if validated_catalog_revision != validated_request_revision:
+        return _receipt_result(
+            ok=False,
+            reason="revision_mismatch",
+            request_id=validated_request_id,
+            revision=validated_request_revision,
+        )
+
+    with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=False) as cur:
+        cur.execute(
+            """
+            SELECT r.id, r.status, r.account_set_key, r.adapter, r.result_revision,
+                   h.last_refresh_status AS head_status,
+                   h.current_revision AS head_revision,
+                   s.adapter AS snapshot_adapter
+            FROM erp_target_refresh_requests r
+            LEFT JOIN erp_target_projection_heads h
+              ON h.tenant_id = r.tenant_id AND h.endpoint_id = r.endpoint_id
+             AND h.scope_kind = 'endpoint' AND h.scope_key = %s
+            LEFT JOIN erp_target_projection_snapshots s ON s.id = h.current_snapshot_id
+            WHERE r.tenant_id = %s AND r.endpoint_id = %s AND r.account_set_key = %s
+            ORDER BY r.requested_at DESC, r.created_at DESC, r.id DESC
+            LIMIT 1
+            """,
+            (ENDPOINT_SCOPE_KEY, tenant_id, endpoint_id, ENDPOINT_SCOPE_KEY),
+        )
+        refresh = cur.fetchone()
+        if not refresh:
+            reason = "refresh_not_found"
+        elif str(refresh.get("id") or "") != validated_request_id:
+            reason = "refresh_superseded"
+        elif str(refresh.get("status") or "") != "succeeded":
+            reason = "refresh_not_succeeded"
+        elif str(refresh.get("account_set_key") or "") != ENDPOINT_SCOPE_KEY:
+            reason = "refresh_scope_mismatch"
+        elif _adapter(refresh.get("adapter")) != adapter:
+            reason = "adapter_mismatch"
+        elif _revision(refresh.get("result_revision")) != validated_request_revision:
+            reason = "revision_mismatch"
+        else:
+            reason = ""
+        if reason:
+            return _receipt_result(
+                ok=False,
+                reason=reason,
+                request_id=validated_request_id,
+                revision=validated_request_revision,
+            )
+
+        if str(refresh.get("head_status") or "") != "fresh":
+            reason = "projection_not_fresh"
+        elif _revision(refresh.get("head_revision")) != validated_request_revision:
+            reason = "snapshot_superseded"
+        elif _adapter(refresh.get("snapshot_adapter")) != adapter:
+            reason = "adapter_mismatch"
+        else:
+            reason = ""
+        return _receipt_result(
+            ok=not reason,
+            reason=reason or "validated_snapshot",
+            request_id=validated_request_id,
+            revision=validated_request_revision,
+        )
+
+
 __all__ = [
     "CATALOG_REFRESH_INVALID",
     "CATALOG_REFRESH_REQUIRED",
+    "validate_refresh_receipt",
     "validate_selection",
 ]

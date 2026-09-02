@@ -217,11 +217,16 @@ class ErpChannelTests(unittest.TestCase):
         refresh_status.assert_not_called()
 
     def test_successful_catalog_refresh_returns_only_the_exact_full_target(self):
-        compact = {"endpoint_id": "ep-1", "workspace_client_id": 7}
+        compact = {
+            "endpoint_id": "ep-1",
+            "workspace_client_id": 7,
+            "adapter": "mrerp",
+        }
         full = {
             **compact,
             "account_catalog_loaded": True,
             "account_choices": [{"key": "2026", "label": "2026"}],
+            "projection_revision": 7,
         }
         response = routes.Response()
         with (
@@ -249,8 +254,14 @@ class ErpChannelTests(unittest.TestCase):
                     "request_id": "refresh-1",
                     "status": "succeeded",
                     "account_set_key": routes.catalog_refresh.target_refresh.ENDPOINT_SCOPE_KEY,
+                    "result_revision": 7,
                 },
             ),
+            mock.patch.object(
+                routes.catalog_refresh.target_catalog_evidence,
+                "validate_refresh_receipt",
+                return_value={"ok": True},
+            ) as validate_receipt,
         ):
             result = asyncio.run(
                 routes.erp_draft_target_refresh_status(
@@ -267,7 +278,68 @@ class ErpChannelTests(unittest.TestCase):
         self.assertEqual(require.call_count, 2)
         self.assertFalse(require.call_args_list[0].kwargs["include_account_catalog"])
         self.assertTrue(require.call_args_list[1].kwargs["include_account_catalog"])
+        validate_receipt.assert_called_once_with(
+            tenant_id="t1",
+            user_id="u1",
+            endpoint_id="ep-1",
+            adapter="mrerp",
+            request_id="refresh-1",
+            request_revision=7,
+            catalog_revision=7,
+        )
         self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_catalog_refresh_rejects_a_superseded_catalog_snapshot(self):
+        compact = {"endpoint_id": "ep-1", "workspace_client_id": 7, "adapter": "mrerp"}
+        full = {**compact, "projection_revision": 8, "account_catalog_loaded": True}
+        response = routes.Response()
+        with (
+            mock.patch.object(
+                routes,
+                "_draft_token",
+                return_value=(
+                    {"user_id": "u1"},
+                    {"tenant_id": "t1", "user_id": "u1"},
+                    {"payload": {}},
+                ),
+            ),
+            mock.patch.object(
+                routes.catalog_refresh.target_preflight,
+                "require_ready",
+                side_effect=[{"target": compact}, {"target": full}],
+            ),
+            mock.patch.object(
+                routes.catalog_refresh, "erp_target_projection_enabled_for", return_value=True
+            ),
+            mock.patch.object(
+                routes.catalog_refresh.target_refresh,
+                "refresh_status",
+                return_value={
+                    "status": "succeeded",
+                    "account_set_key": routes.catalog_refresh.target_refresh.ENDPOINT_SCOPE_KEY,
+                    "result_revision": 7,
+                },
+            ),
+            mock.patch.object(
+                routes.catalog_refresh.target_catalog_evidence,
+                "validate_refresh_receipt",
+                return_value={"ok": False, "reason": "revision_mismatch"},
+            ),
+        ):
+            with self.assertRaises(routes.HTTPException) as caught:
+                asyncio.run(
+                    routes.erp_draft_target_refresh_status(
+                        None,
+                        "d1",
+                        "ep-1",
+                        "refresh-1",
+                        response,
+                        workspace_client_id=7,
+                    )
+                )
+
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(caught.exception.detail, "line_erp.target_refresh_superseded")
 
 
 class ErpDraftSelectionTests(unittest.IsolatedAsyncioTestCase):

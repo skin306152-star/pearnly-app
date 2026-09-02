@@ -10,7 +10,12 @@ from fastapi import HTTPException, Request
 
 from core import db
 from core.route_helpers import _tid
-from services.erp import erp_push, shared_express_push, team_access
+from services.erp import (
+    confirmed_push_reservation,
+    erp_push,
+    shared_express_push,
+    team_access,
+)
 from services.intake_bridge import convert as convert_svc
 
 logger = logging.getLogger("mr-pilot")
@@ -21,6 +26,135 @@ def _request_source(user: dict[str, Any]) -> str:
         "cowork": "cowork_line",
         "erp": "line_erp",
     }.get(str(user.get("entry") or ""), "main")
+
+
+async def _dispatch_reserved_push(
+    reservation: dict[str, Any], *, posting_kind: Optional[str]
+) -> dict[str, Any]:
+    endpoint = reservation["endpoint"]
+    try:
+        result = await asyncio.to_thread(
+            erp_push.push_to_endpoint,
+            endpoint,
+            reservation["history"],
+            posting_kind=posting_kind,
+        )
+    except Exception as exc:
+        logger.exception(
+            "[erp-push] reserved legacy dispatch failed · log=%s",
+            str(reservation["log_id"])[:8],
+        )
+        await asyncio.to_thread(
+            confirmed_push_reservation.mark_reserved_push_unknown,
+            reservation,
+        )
+        db.update_history_push_status(reservation["history_id"], "manual")
+        return {
+            "ok": False,
+            "log_id": reservation["log_id"],
+            "status": "manual",
+            "skipped_dup": False,
+            "http_status": None,
+            "error_msg": "push_result_unknown",
+            "elapsed_ms": None,
+            "endpoint_name": endpoint.get("name"),
+        }
+
+    classified_status = db.classify_push_status(
+        bool(result.get("success")), result.get("error_msg")
+    )
+    adapter = str(endpoint.get("adapter") or "").strip().lower()
+    ambiguous_mrerp = (
+        adapter == "mrerp"
+        and classified_status == "failed"
+        and not db.is_user_data_error(result.get("error_msg"))
+    )
+    if ambiguous_mrerp:
+        await asyncio.to_thread(
+            confirmed_push_reservation.mark_reserved_push_unknown,
+            reservation,
+            result,
+        )
+        db.update_history_push_status(reservation["history_id"], "manual")
+        return {
+            "ok": False,
+            "log_id": reservation["log_id"],
+            "status": "manual",
+            "skipped_dup": False,
+            "http_status": result.get("http_status"),
+            "error_msg": "push_result_unknown",
+            "elapsed_ms": result.get("elapsed_ms"),
+            "endpoint_name": endpoint.get("name"),
+        }
+
+    retry_delay = None
+    if (
+        adapter == "express"
+        and classified_status == "failed"
+        and not db.is_user_data_error(result.get("error_msg"))
+    ):
+        retry_delay = db.get_erp_retry_delay_sec(0)
+    final_status = await asyncio.to_thread(
+        confirmed_push_reservation.finalize_reserved_push,
+        reservation,
+        result,
+        retry_delay_sec=retry_delay,
+    )
+    if final_status is None:
+        persisted = await asyncio.to_thread(
+            confirmed_push_reservation.read_reserved_push_result,
+            reservation,
+        )
+        persisted_status = str((persisted or {}).get("status") or "")
+        if persisted_status in {
+            "success",
+            "skipped_dup",
+            "failed",
+            "pending",
+            "manual",
+        } and not (
+            persisted or {}
+        ).get("lease_owner"):
+            final_status = persisted_status
+            retry_delay = (
+                retry_delay if (persisted or {}).get("next_retry_at") is not None else None
+            )
+        else:
+            await asyncio.to_thread(
+                confirmed_push_reservation.mark_reserved_push_unknown,
+                reservation,
+            )
+            db.update_history_push_status(reservation["history_id"], "manual")
+            return {
+                "ok": False,
+                "log_id": reservation["log_id"],
+                "status": "manual",
+                "skipped_dup": False,
+                "http_status": None,
+                "error_msg": "push_result_unknown",
+                "elapsed_ms": result.get("elapsed_ms"),
+                "endpoint_name": endpoint.get("name"),
+            }
+
+    db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
+    db.update_history_push_status(reservation["history_id"], final_status)
+    retry_scheduled = final_status == "failed" and retry_delay is not None
+    if final_status == "success":
+        from services.erp.line_push_notification import notify_success
+
+        await asyncio.to_thread(notify_success, str(reservation["log_id"]))
+
+    presented_status = "retrying" if retry_scheduled else final_status
+    return {
+        "ok": bool(result.get("success") or final_status == "skipped_dup" or retry_scheduled),
+        "log_id": reservation["log_id"],
+        "status": presented_status,
+        "skipped_dup": final_status == "skipped_dup",
+        "http_status": result.get("http_status"),
+        "error_msg": result.get("error_msg"),
+        "elapsed_ms": result.get("elapsed_ms"),
+        "endpoint_name": endpoint.get("name"),
+    }
 
 
 async def dispatch_confirmed_history(
@@ -106,8 +240,9 @@ async def dispatch_confirmed_history(
     from services.erp.line_target_choice import endpoint_with_account_choice
     from services.erp.selected_account import require_catalog_evidence, resolve_account_choice
 
+    catalog_evidence = None
     if request is not None or catalog_evidence_required:
-        require_catalog_evidence(
+        catalog_evidence = require_catalog_evidence(
             endpoint,
             tenant_id=str(_tid(user)),
             user_id=str(user["id"]),
@@ -116,6 +251,25 @@ async def dispatch_confirmed_history(
             request_id=target_refresh_request_id,
             revision=target_projection_revision,
         )
+
+    if catalog_evidence and catalog_evidence.get("proof_required"):
+        reservation = await asyncio.to_thread(
+            confirmed_push_reservation.reserve_catalog_selected_push,
+            user=user,
+            endpoint_id=str(endpoint["id"]),
+            history=history,
+            assigned=assigned_endpoint is not None,
+            account_set_key=account_set_key,
+            account_config=account_config,
+            refresh_request_id=target_refresh_request_id,
+            projection_revision=target_projection_revision,
+            source=_request_source(user),
+            workspace_client_id=workspace_client_id,
+            posting_kind=posting_kind,
+        )
+        if not reservation.get("dispatch"):
+            return dict(reservation["response"])
+        return await _dispatch_reserved_push(reservation, posting_kind=posting_kind)
 
     if account_set_key or account_config:
         selected_choice = resolve_account_choice(

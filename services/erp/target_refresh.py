@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import socket
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from core import db
@@ -71,8 +72,20 @@ def request_refresh(
         cur.execute(
             """
             UPDATE erp_target_refresh_requests
-            SET status = 'failed', completed_at = clock_timestamp(),
-                error_code = 'ERR_REFRESH_LEASE_EXPIRED', lease_owner = NULL,
+            SET status = CASE
+                    WHEN requested_at > started_at THEN 'requested'
+                    ELSE 'failed'
+                END,
+                started_at = CASE WHEN requested_at > started_at THEN NULL ELSE started_at END,
+                completed_at = CASE
+                    WHEN requested_at > started_at THEN NULL
+                    ELSE clock_timestamp()
+                END,
+                error_code = CASE
+                    WHEN requested_at > started_at THEN NULL
+                    ELSE 'ERR_REFRESH_LEASE_EXPIRED'
+                END,
+                lease_owner = NULL,
                 lease_expires_at = NULL, updated_at = clock_timestamp()
             WHERE tenant_id = %s AND endpoint_id = %s AND account_set_key = %s
               AND status = 'leased'
@@ -91,7 +104,7 @@ def request_refresh(
             (tenant_id, endpoint_id, account_set_key),
         )
         active = cur.fetchone()
-        if active:
+        if active and str(active.get("status") or "") == "requested":
             cur.execute(
                 """
                 UPDATE erp_target_refresh_requests
@@ -103,6 +116,20 @@ def request_refresh(
                 (str(reason or "line_new_document")[:80], str(active["id"])),
             )
         else:
+            if active:
+                cur.execute(
+                    """
+                    UPDATE erp_target_refresh_requests
+                    SET status = 'failed', completed_at = clock_timestamp(),
+                        error_code = 'ERR_REFRESH_SUPERSEDED', result_revision = NULL,
+                        lease_owner = NULL, lease_expires_at = NULL,
+                        updated_at = clock_timestamp()
+                    WHERE id = %s AND status = 'leased'
+                    """,
+                    (str(active["id"]),),
+                )
+                if cur.rowcount != 1:
+                    raise ValueError("erp.target_refresh_changed")
             cur.execute(
                 """
                 INSERT INTO erp_target_refresh_requests (
@@ -142,13 +169,36 @@ def _claim_mrerp(request_id: str | None = None) -> dict[str, Any] | None:
     with db.get_cursor(commit=True) as cur:
         cur.execute(
             """
+            UPDATE erp_target_refresh_requests
+            SET status = CASE
+                    WHEN requested_at > started_at THEN 'requested'
+                    ELSE 'failed'
+                END,
+                started_at = CASE WHEN requested_at > started_at THEN NULL ELSE started_at END,
+                completed_at = CASE
+                    WHEN requested_at > started_at THEN NULL
+                    ELSE clock_timestamp()
+                END,
+                error_code = CASE
+                    WHEN requested_at > started_at THEN NULL
+                    ELSE 'ERR_REFRESH_LEASE_EXPIRED'
+                END,
+                lease_owner = NULL,
+                lease_expires_at = NULL, updated_at = clock_timestamp()
+            WHERE adapter = 'mrerp' AND status = 'leased'
+              AND (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp())
+              AND (%s::uuid IS NULL OR id = %s::uuid)
+            """,
+            (request_id, request_id),
+        )
+        cur.execute(
+            """
             SELECT r.id, r.tenant_id, r.endpoint_id, r.account_set_key,
                    ep.user_id, ep.name, ep.adapter, ep.config, ep.enabled
             FROM erp_target_refresh_requests r
             JOIN erp_endpoints ep ON ep.id = r.endpoint_id
             WHERE r.adapter = 'mrerp' AND ep.enabled = TRUE
-              AND (r.status = 'requested'
-                   OR (r.status = 'leased' AND r.lease_expires_at <= clock_timestamp()))
+              AND r.status = 'requested'
               AND (%s::uuid IS NULL OR r.id = %s::uuid)
             ORDER BY r.requested_at
             LIMIT 1
@@ -162,7 +212,7 @@ def _claim_mrerp(request_id: str | None = None) -> dict[str, Any] | None:
         cur.execute(
             """
             UPDATE erp_target_refresh_requests
-            SET status = 'leased', started_at = COALESCE(started_at, clock_timestamp()),
+            SET status = 'leased', started_at = clock_timestamp(),
                 lease_owner = %s,
                 lease_expires_at = clock_timestamp() + (%s * interval '1 second'),
                 updated_at = clock_timestamp()
@@ -173,78 +223,41 @@ def _claim_mrerp(request_id: str | None = None) -> dict[str, Any] | None:
     return {**dict(row), "lease_owner": owner}
 
 
-def _finish_mrerp(
-    request_id: str,
-    owner: str,
-    *,
-    success: bool,
-    error_code: str | None = None,
-    revision: int | None = None,
-) -> None:
-    with db.get_cursor(commit=True) as cur:
-        cur.execute(
-            """
-            UPDATE erp_target_refresh_requests
-            SET status = %s, completed_at = clock_timestamp(), error_code = %s,
-                result_revision = %s, lease_owner = NULL, lease_expires_at = NULL,
-                updated_at = clock_timestamp()
-            WHERE id = %s AND status = 'leased' AND lease_owner = %s
-            """,
-            (
-                "succeeded" if success else "failed",
-                None if success else str(error_code or "ERR_UNEXPECTED")[:200],
-                revision,
-                request_id,
-                owner,
-            ),
-        )
-
-
 def process_mrerp_request(request_id: str | None = None) -> bool:
     """Claim and run one cloud collector request; callers never hold the LINE response."""
-    request = _claim_mrerp(request_id)
-    if not request:
-        return False
-    request_id = str(request["id"])
-    owner = str(request["lease_owner"])
-    try:
-        from services.erp.mrerp_target_projection import (
-            refresh_mrerp_account_catalog,
-            refresh_mrerp_projection,
-        )
+    from services.erp import mrerp_refresh_worker
 
-        refresh = (
-            refresh_mrerp_account_catalog
-            if str(request["account_set_key"]) == ENDPOINT_SCOPE_KEY
-            else refresh_mrerp_projection
-        )
-        kwargs = {
-            "tenant_id": str(request["tenant_id"]),
-            "user_id": str(request["user_id"]),
-            "endpoint": {
-                "id": str(request["endpoint_id"]),
-                "name": request.get("name"),
-                "adapter": "mrerp",
-                "config": request.get("config") or {},
-            },
-        }
-        if refresh is refresh_mrerp_projection:
-            kwargs["account_set_key"] = str(request["account_set_key"])
-        result = refresh(**kwargs)
-        success = bool(result.get("ok"))
-        publication = result.get("projection") or result.get("catalog")
-        projection = publication if isinstance(publication, dict) else {}
-        _finish_mrerp(
-            request_id,
-            owner,
-            success=success,
-            error_code=result.get("error_code"),
-            revision=int(projection.get("revision") or 0) or None,
-        )
-    except Exception:
-        logger.exception("MR.ERP target refresh failed: %s", request_id[:8])
-        _finish_mrerp(request_id, owner, success=False, error_code="ERR_UNEXPECTED")
-    return True
+    processed = False
+    for _ in range(3):
+        request = _claim_mrerp(request_id)
+        if not request:
+            return processed
+        processed = True
+        try:
+            result = mrerp_refresh_worker.collect(request, endpoint_scope_key=ENDPOINT_SCOPE_KEY)
+        except Exception:
+            logger.exception("MR.ERP target refresh failed: %s", str(request["id"])[:8])
+            result = {
+                "ok": False,
+                "error_code": "ERR_UNEXPECTED",
+                "failure_scope": (
+                    None
+                    if str(request["account_set_key"]) == ENDPOINT_SCOPE_KEY
+                    else str(request["account_set_key"])
+                ),
+                "observed_at": datetime.now(timezone.utc),
+                "observations": [],
+            }
+        try:
+            completed = mrerp_refresh_worker.commit(request, result)
+        except ValueError as exc:
+            if str(exc) != "erp.target_refresh_stale_completion":
+                raise
+            logger.info("Discarded stale MR.ERP target refresh: %s", str(request["id"])[:8])
+            return True
+        if completed is not False:
+            return True
+    return processed
 
 
 def process_due_mrerp_requests(limit: int = 2) -> int:
@@ -277,8 +290,20 @@ def lease_express_refresh_with_cursor(
     cur.execute(
         """
         UPDATE erp_target_refresh_requests
-        SET status = 'failed', completed_at = clock_timestamp(),
-            error_code = 'ERR_REFRESH_LEASE_EXPIRED', lease_owner = NULL,
+        SET status = CASE
+                WHEN requested_at > started_at THEN 'requested'
+                ELSE 'failed'
+            END,
+            started_at = CASE WHEN requested_at > started_at THEN NULL ELSE started_at END,
+            completed_at = CASE
+                WHEN requested_at > started_at THEN NULL
+                ELSE clock_timestamp()
+            END,
+            error_code = CASE
+                WHEN requested_at > started_at THEN NULL
+                ELSE 'ERR_REFRESH_LEASE_EXPIRED'
+            END,
+            lease_owner = NULL,
             lease_expires_at = NULL, updated_at = clock_timestamp()
         WHERE endpoint_id = %s AND adapter = 'express' AND status = 'leased'
           AND (lease_expires_at IS NULL OR lease_expires_at <= clock_timestamp())
@@ -329,7 +354,7 @@ def lease_express_refresh_with_cursor(
     cur.execute(
         """
         UPDATE erp_target_refresh_requests
-        SET status = 'leased', started_at = COALESCE(started_at, clock_timestamp()),
+        SET status = 'leased', started_at = clock_timestamp(),
             lease_owner = %s,
             lease_expires_at = clock_timestamp() + (%s * interval '1 second'),
             updated_at = clock_timestamp()
@@ -377,8 +402,12 @@ def complete_express_refresh_with_cursor(
     cur.execute(
         """
         UPDATE erp_target_refresh_requests
-        SET status = %s, completed_at = clock_timestamp(), error_code = %s,
-            result_revision = %s, lease_owner = NULL, lease_expires_at = NULL,
+        SET status = CASE WHEN requested_at > started_at THEN 'requested' ELSE %s END,
+            started_at = CASE WHEN requested_at > started_at THEN NULL ELSE started_at END,
+            completed_at = CASE WHEN requested_at > started_at THEN NULL ELSE clock_timestamp() END,
+            error_code = CASE WHEN requested_at > started_at THEN NULL ELSE %s END,
+            result_revision = CASE WHEN requested_at > started_at THEN NULL ELSE %s END,
+            lease_owner = NULL, lease_expires_at = NULL,
             updated_at = clock_timestamp()
         WHERE id = %s AND endpoint_id = %s AND adapter = 'express'
           AND account_set_key = %s AND status = 'leased'

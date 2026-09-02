@@ -73,7 +73,7 @@ class TargetProjectionPgSmokeTests(unittest.TestCase):
             "CREATE TABLE users (id uuid PRIMARY KEY, tenant_id uuid NOT NULL REFERENCES tenants(id));"
             "CREATE TABLE erp_endpoints ("
             "id uuid PRIMARY KEY, tenant_id uuid REFERENCES tenants(id) ON DELETE CASCADE,"
-            "user_id uuid REFERENCES users(id), adapter text NOT NULL, "
+            "user_id uuid REFERENCES users(id), adapter text NOT NULL, config jsonb NOT NULL DEFAULT '{}', "
             "enabled boolean NOT NULL DEFAULT TRUE);"
         )
         ensure_rls_app_role(cls.cur)

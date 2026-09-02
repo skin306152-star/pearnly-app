@@ -6,7 +6,7 @@ import asyncio
 from typing import Any
 
 from core.feature_flags import erp_target_projection_enabled_for
-from services.erp import target_refresh
+from services.erp import target_catalog_evidence, target_refresh
 from services.line_erp import target_preflight
 
 
@@ -72,7 +72,7 @@ async def status(
     workspace_client_id: int | None,
     request_id: str,
 ) -> dict[str, Any]:
-    await asyncio.to_thread(_target, binding, endpoint_id, workspace_client_id)
+    compact_target = await asyncio.to_thread(_target, binding, endpoint_id, workspace_client_id)
     refresh = await asyncio.to_thread(
         target_refresh.refresh_status,
         request_id,
@@ -98,7 +98,20 @@ async def status(
         except target_preflight.TargetNotReady as exc:
             code = str(exc.result.get("block_reason") or "erp_target_not_ready")
             raise CatalogRefreshError(code) from None
-        result["target"] = readiness["target"]
+        target = readiness["target"]
+        receipt = await asyncio.to_thread(
+            target_catalog_evidence.validate_refresh_receipt,
+            tenant_id=str(binding["tenant_id"]),
+            user_id=str(binding["user_id"]),
+            endpoint_id=endpoint_id,
+            adapter=str(compact_target.get("adapter") or ""),
+            request_id=request_id,
+            request_revision=refresh.get("result_revision"),
+            catalog_revision=target.get("projection_revision"),
+        )
+        if not receipt["ok"]:
+            raise CatalogRefreshError("target_refresh_superseded")
+        result["target"] = target
     return result
 
 

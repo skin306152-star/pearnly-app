@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from core.auth import JWT_ALGORITHM, _jwt_secret
 from core.feature_flags import erp_target_projection_enabled_for
-from services.erp import target_refresh
+from services.erp import target_catalog_evidence, target_refresh
 from services.cowork_line import identity_store, intake, session_store
 from services.line_platform.liff import verify_id_token
 
@@ -207,7 +207,7 @@ async def cowork_intake_target_refresh_status(
 ):
     identity = _draft_identity(request, draft_id)
     try:
-        await asyncio.to_thread(
+        compact_target = await asyncio.to_thread(
             intake.get_target,
             identity,
             endpoint_id,
@@ -232,7 +232,7 @@ async def cowork_intake_target_refresh_status(
     data = {"refresh": refresh}
     if str(refresh.get("status") or "") == "succeeded":
         try:
-            data["target"] = await asyncio.to_thread(
+            target = await asyncio.to_thread(
                 intake.get_target,
                 identity,
                 endpoint_id,
@@ -241,6 +241,19 @@ async def cowork_intake_target_refresh_status(
             )
         except intake.CoworkLineIntakeError as exc:
             raise _error(exc) from exc
+        receipt = await asyncio.to_thread(
+            target_catalog_evidence.validate_refresh_receipt,
+            tenant_id=str(identity["tenant_id"]),
+            user_id=str(identity["user_id"]),
+            endpoint_id=endpoint_id,
+            adapter=str(compact_target.get("adapter") or ""),
+            request_id=request_id,
+            request_revision=refresh.get("result_revision"),
+            catalog_revision=target.get("projection_revision"),
+        )
+        if not receipt["ok"]:
+            raise HTTPException(409, detail="cowork_line_intake.target_refresh_superseded")
+        data["target"] = target
     response.headers["Cache-Control"] = "no-store"
     return {"ok": True, "data": data}
 

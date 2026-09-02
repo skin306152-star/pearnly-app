@@ -436,11 +436,16 @@ class IntakeRouteTest(unittest.TestCase):
         refresh_status.assert_not_called()
 
     def test_successful_catalog_refresh_returns_exact_cowork_target(self):
-        compact = {"endpoint_id": "endpoint-1", "workspace_client_id": 69}
+        compact = {
+            "endpoint_id": "endpoint-1",
+            "workspace_client_id": 69,
+            "adapter": "express",
+        }
         full = {
             **compact,
             "account_catalog_loaded": True,
             "account_choices": [{"key": "69EXP", "label": "69EXP"}],
+            "projection_revision": 7,
         }
         response = routes.Response()
         with (
@@ -458,8 +463,14 @@ class IntakeRouteTest(unittest.TestCase):
                     "request_id": "refresh-1",
                     "status": "succeeded",
                     "account_set_key": routes.target_refresh.ENDPOINT_SCOPE_KEY,
+                    "result_revision": 7,
                 },
             ),
+            mock.patch.object(
+                routes.target_catalog_evidence,
+                "validate_refresh_receipt",
+                return_value={"ok": True},
+            ) as validate_receipt,
         ):
             result = asyncio.run(
                 routes.cowork_intake_target_refresh_status(
@@ -476,7 +487,61 @@ class IntakeRouteTest(unittest.TestCase):
         self.assertEqual(get_target.call_count, 2)
         self.assertFalse(get_target.call_args_list[0].kwargs["include_account_catalog"])
         self.assertTrue(get_target.call_args_list[1].kwargs["include_account_catalog"])
+        validate_receipt.assert_called_once_with(
+            tenant_id="tenant-1",
+            user_id="user-1",
+            endpoint_id="endpoint-1",
+            adapter="express",
+            request_id="refresh-1",
+            request_revision=7,
+            catalog_revision=7,
+        )
         self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_catalog_refresh_rejects_a_superseded_cowork_snapshot(self):
+        compact = {
+            "endpoint_id": "endpoint-1",
+            "workspace_client_id": 69,
+            "adapter": "express",
+        }
+        full = {**compact, "projection_revision": 8, "account_catalog_loaded": True}
+        response = routes.Response()
+        with (
+            mock.patch.object(routes, "_draft_identity", return_value=IDENTITY),
+            mock.patch.object(routes.intake, "get_target", side_effect=[compact, full]),
+            mock.patch.object(routes, "erp_target_projection_enabled_for", return_value=True),
+            mock.patch.object(
+                routes.target_refresh,
+                "refresh_status",
+                return_value={
+                    "status": "succeeded",
+                    "account_set_key": routes.target_refresh.ENDPOINT_SCOPE_KEY,
+                    "result_revision": 7,
+                },
+            ),
+            mock.patch.object(
+                routes.target_catalog_evidence,
+                "validate_refresh_receipt",
+                return_value={"ok": False, "reason": "snapshot_superseded"},
+            ),
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                asyncio.run(
+                    routes.cowork_intake_target_refresh_status(
+                        None,
+                        "history-1",
+                        "endpoint-1",
+                        "refresh-1",
+                        response,
+                        workspace_client_id=69,
+                    )
+                )
+
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(
+            caught.exception.detail,
+            "cowork_line_intake.target_refresh_superseded",
+        )
 
 
 if __name__ == "__main__":

@@ -27,11 +27,11 @@ class MRErpProjectionError(RuntimeError):
         super().__init__(code)
 
 
-def claim_endpoint_tenant_with_cursor(cur, *, tenant_id: str, endpoint_id: str) -> None:
+def claim_endpoint_tenant_with_cursor(cur, *, tenant_id: str, endpoint_id: str) -> dict[str, Any]:
     """Attach a legacy endpoint only to its owner's existing tenant."""
     cur.execute(
         """
-        SELECT ep.id, ep.tenant_id
+        SELECT ep.id, ep.tenant_id, ep.config
         FROM erp_endpoints ep
         JOIN users owner_user ON owner_user.id = ep.user_id
         WHERE ep.id = %s AND ep.enabled = TRUE AND lower(ep.adapter) = 'mrerp'
@@ -49,6 +49,7 @@ def claim_endpoint_tenant_with_cursor(cur, *, tenant_id: str, endpoint_id: str) 
             "UPDATE erp_endpoints SET tenant_id = %s WHERE id = %s AND tenant_id IS NULL",
             (tenant_id, endpoint_id),
         )
+    return dict(endpoint)
 
 
 def _claim_endpoint_tenant(*, tenant_id: str, endpoint_id: str) -> None:

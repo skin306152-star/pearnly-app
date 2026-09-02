@@ -10,9 +10,10 @@
 - **✅ 生产 MR.ERP**:endpoint/account 后台分别 1.135s/19.382s；刷新期间 LINE polling 109/91ms、83/78ms，快照 300 商品、111 客户。
 - **✅ Windows Express**:生产安装包 62,900,788 bytes，SHA-256=`a0bb4a23e3858e61befbb73cf5b2092148dfa647c44c54b57e89450e9fae645c`；真实电脑两 endpoint 均回报 1.1.76、session 1 在线。
 - **✅ Express 性能**:endpoint/account refresh 分别 9.967s/9.986s；期间 LINE polling 69–87ms；结果 3 套账、276 商品、552 客户、225 科目，freshness 来源为 1.1.76。
+- **✅ 应用生产发布**:code-bearing SHA=`1445fe4c04cef723360d516d58ced957b0943f3b`，Manual CD=`33614767574`；deploy log `health check OK after 20s`，service/health/ready 全绿。
 - **✅ 本地证据**:应用相关 129 tests + 10 subtests、完整 pre-push 1119 modules/6 shards 全绿；Companion focused 52 passed，全套 487 passed/35 skipped，另 5 项与原仓相同的 macOS/Windows-only 基线失败。
 - **🚧 明确未做**:MR.ERP suppliers/units/branches/accounts、通用动态字段/按钮 collector 仍缺；LINE 编辑器尚无泛型主档下拉 schema；draft `master_revision` 全程 CAS 尚待 P4。
-- **⏭ 下一步**:提交状态证据 → 发布应用最终精确 SHA → 回读 production HEAD/service/ready → 保持生产 `/erp` 打开等待真机验收。
+- **⏭ 下一步**:保持生产 `/erp#/integrations` 打开，等待用户真机验收；后续批次进入 P3b2/P4，不与本轮已验证范围混称完成。
 
 ---
 

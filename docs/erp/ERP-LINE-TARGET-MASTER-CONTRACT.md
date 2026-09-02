@@ -197,6 +197,9 @@ P1 获得真机 `USER_ACCEPTED` 后才进入 P2。
   account-set refresh 限定为商品/客户/科目，避免 60 秒 heartbeat 等待和无关 posting 扫描。
 - **MR.ERP 生产证据**：endpoint/account 后台刷新分别 1.135s/19.382s；刷新期间 LINE polling
   109/91ms、83/78ms，最终快照 300 商品、111 客户。普通菜单、draft 和状态 poll 未访问第三方 ERP。
+- **应用生产证据**：code-bearing SHA `1445fe4c04cef723360d516d58ced957b0943f3b`，Manual CD
+  `33614767574`；部署日志 `health check OK after 20s`，production HEAD、systemd service、`/api/health`
+  和 `/api/ready` 均回读通过。精确生产 SHA 上协议闸拒绝 1.1.75、接受 1.1.76，功能 flag 仍为 all。
 - **Express 真机证据**：Companion commit `4243ee6f`，release run `33613228324`；生产安装包
   62,900,788 bytes，SHA-256=`a0bb4a23e3858e61befbb73cf5b2092148dfa647c44c54b57e89450e9fae645c`。
   Windows 登录用户 session 1 的两个 endpoint 均回报 1.1.76。LINE 绑定 endpoint 的 endpoint/account

@@ -107,12 +107,14 @@ def _selected_account_set(
 
 def _master_rows(rows: Any, *, kind: str) -> list[dict[str, Any]]:
     projected: list[dict[str, Any]] = []
+    seen_source_ids: set[str] = set()
     for row in rows if isinstance(rows, list) else []:
         if not isinstance(row, Mapping):
             continue
         source_id = str(row.get("code") or "").strip()
-        if not source_id:
+        if not source_id or source_id in seen_source_ids:
             continue
+        seen_source_ids.add(source_id)
         label = str(row.get("name") or source_id).strip() or source_id
         if kind == "products":
             attributes = {

@@ -97,6 +97,19 @@ class MRErpTargetProjectionTests(unittest.TestCase):
         self.assertEqual(fields["product_id"]["options_source"], "products")
         self.assertEqual(fields["supplier_id"]["type"], "unsupported")
 
+    def test_master_rows_keep_first_value_for_duplicate_erp_code(self):
+        rows = [
+            {"code": "P-01", "name": "First", "category_code": "A"},
+            {"code": "P-01", "name": "Duplicate", "category_code": "B"},
+            {"code": "P-02", "name": "Second", "category_code": "A"},
+        ]
+
+        projected = projection._master_rows(rows, kind="products")
+
+        self.assertEqual([row["source_id"] for row in projected], ["P-01", "P-02"])
+        self.assertEqual(projected[0]["label"], "First")
+        self.assertEqual(projected[0]["attributes"]["category_code"], "A")
+
     def test_transient_product_failure_retries_once_then_keeps_stale_snapshot(self):
         stale = {"snapshot": {"revision": 3}, "freshness": {"status": "offline"}}
         with (

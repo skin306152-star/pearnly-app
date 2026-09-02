@@ -1,7 +1,8 @@
 # ERP LINE 目标、套账与主档一致性合同
 
-> 状态：`P3A_DEPLOYED / FEATURE_FLAG_OFF / ADAPTER_AND_LINE_INTEGRATION_PENDING`
-> P3a 实现：`fc9e48b9`；运行时发布：`e574e9b0`，Manual CD `33588085006`。
+> 状态：`P3B1_PROD_VERIFIED / FEATURE_FLAG_ALL / P3C_EXPRESS_PENDING`
+> P3a 底座：`fc9e48b9`；MR.ERP live + LINE/Web：`2521ee8f`；生产重复码修复：
+> `1011d8ea7f1db1f3801aa6d1ff6e85fef654405f`，Manual CD `33590988040`。
 > 本文只定义连接、套账、主档与 LINE 选择的一致性边界；第三方 ERP 推送状态继续唯一来自
 > `erp_push_logs`，不在这里建立第二套推送状态。
 
@@ -178,11 +179,17 @@ P1 获得真机 `USER_ACCEPTED` 后才进入 P2。
 ### P3 统一 master snapshot 协议
 
 - **P3a 已实现**：immutable snapshot、current head、normalized items、原子发布、稳定 hash、component
-  revision、freshness、租户 RLS 与只读 API；功能闸默认关闭，现有网页和 LINE 不切流。
-- **P3b 待实现**：接 MR.ERP live fetch，并把套账、六类主档、表单字段与动作能力发布到统一投影。
+  revision、freshness、租户 RLS 与只读 API。
+- **P3b1 已实现并全量打开**：MR.ERP live fetch 已接套账、商品、客户；LINE/Cowork 新草稿及确认
+  前强制刷新，网页 endpoint 商品/客户列表绕过旧 600 秒缓存并读同一投影。生产真实快照为 2 套账、
+  300 商品、111 客户；LINE 真实 active identity 回读 online/selectable 且两套账可选，网页两类列表
+  均 `cached=false`、`stale=false`、`master_revision=1`。
+- **P3b2 待实现**：MR.ERP 供应商、单位、分支、科目及第三方动态字段/按钮尚无已验证 live collector；
+  当前 form schema 对这四类明确标 `collector_not_connected`，不得宣称六类已全量同步。
 - **P3c 待实现**：接 legacy/managed Express ingestion 与 Companion refresh request，共用同一 catalog。
-- P3a 已覆盖新增套账、主档改名、字段必填变化、按钮可用性变化、离线保留、RLS 与并发发布；
-  这些测试证明底座语义，不代表第三方采集或 LINE 下拉已经完成。
+- **生产证据**：目标 SHA `1011d8ea7f1db1f3801aa6d1ff6e85fef654405f`，Manual CD
+  `33590988040`，deploy log `health check OK after 21s`，service/health/ready 全绿。生产首刷暴露的
+  MR.ERP 重复 code 已在 adapter 边界稳定去重，旧 snapshot 未被错误覆盖。
 
 ### P4 LINE 选择、编辑器和确认 CAS
 

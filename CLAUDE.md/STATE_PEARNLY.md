@@ -1,16 +1,17 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 09-02 ERP 最新主档 P3a READY_FOR_BACKEND_ACCEPTANCE
+## 当前状态卡 · 09-02 ERP 最新主档 P3b1 PROD_VERIFIED → P3c DISCOVERY
 
-- **▶ 当前 task**:第三方 ERP 套账、主档、字段与按钮统一投影 P3a；运行时实现=`fc9e48b9`，测试闸修正=`511d9069`。
-- **✅ 本批交付**:immutable snapshot + current head + normalized items；endpoint/account-set 双 scope；稳定 hash、单调 revision、四类 component revision 与刷新 freshness 单源。
-- **📚 投影范围**:account sets；products/customers/suppliers/units/branches/accounts；表单字段/必填/选项来源；动作与按钮能力。
-- **🛡 一致性**:同内容不上假版本；失败保留最后成功 snapshot；attempted/observed 时间分离；租户 RLS；并发发布串行化；`erp_push_logs` 仍是推送状态唯一源。
-- **🚧 明确未做**:MR.ERP live fetch、Express Companion refresh/ingestion、网页与 LINE 消费、确认前 revision CAS 均未接；当前 LINE 下拉不会因 P3a 自动出现第三方新增内容。
-- **🚦 开关**:`erp_target_projection` 默认关闭；关闭时新增只读 API 返回 404，现有 `/cowork`、`/erp` 网页与 LINE 行为不切流。
-- **✅ 本地证据**:完整 pre-push 全绿（unittest 1114 模块/6 片）；P3a 11 个 contract/schema/route tests + 5 个真实 PostgreSQL smoke；RLS、权限覆盖、Alembic head 与 app import 通过。
-- **✅ 生产证据**:运行时发布=`e574e9b0`，Manual CD `33588085006`；production HEAD/service/health/ready 回读通过，`/erp`、`/cowork` 均 200；三张新表 RLS policy 就绪且 0 行，功能闸无记录/无名单。
-- **⏭ 批次门**:等待用户确认 P3a；确认后才进入 P3b MR.ERP live projection，不提前接 LINE。
+- **▶ 当前 task**:第三方 ERP 最新主档统一投影；P3a 底座=`fc9e48b9`，MR.ERP live + LINE/Web=`2521ee8f`，生产重复码修复=`1011d8ea`。
+- **✅ 已打开**:`erp_target_projection` 为全量 rollout；不关闭、不等待本轮真机，继续 P3c Express refresh/ingestion。
+- **✅ MR.ERP 已接**:每张新 LINE/Cowork 草稿及确认前跳过旧 probe/listing cache，live 拉套账、商品、客户并原子发布同一 snapshot；网页 endpoint 商品/客户列表读同一投影。
+- **✅ 一致性**:同内容不造假版本；失败保留最后成功 snapshot 但新单 fail closed；attempted/observed 分离；租户 RLS；`erp_push_logs` 仍是推送状态唯一源。
+- **✅ 生产实测**:目标 SHA=`1011d8ea7f1db1f3801aa6d1ff6e85fef654405f`，Manual CD=`33590988040`，deploy log `health check OK after 21s`，service/health/ready 全绿。
+- **✅ 真源快照**:已绑定 MR.ERP endpoint live refresh 成功；scope=`6:1`，fresh，revision/master_revision=`1`，2 套账、300 商品、111 客户。
+- **✅ LINE/Web 回读**:真实 active LINE identity 读到 2 套账、online/selectable、missing=[]；网页 products/customers 均 `cached=false`、`stale=false`，300/111 条且 master_revision 同为 1。
+- **✅ 本地证据**:完整 pre-push 两次全绿（unittest 1117 模块/6 片）；真实 PostgreSQL projection smoke 全绿；生产暴露的重复 ERP code 已按 source id 稳定去重并补回归。
+- **🚧 明确未做**:MR.ERP suppliers/units/branches/accounts 与动态字段/按钮采集器尚无可信源；Express 仍是 30 分钟 catalog 上报且 managed heartbeat 丢 catalog；draft/confirm revision CAS 尚未接。
+- **⏭ 下一批**:P3c 先把 legacy/managed Express heartbeat 归一发布到同一 snapshot，再做云端 refresh request ↔ Companion 有界回传；随后 P4 revision CAS。
 
 ---
 

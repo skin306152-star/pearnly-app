@@ -5,6 +5,7 @@ from copy import deepcopy
 
 from services.erp.target_projection_contract import (
     ENTITY_TYPES,
+    MAX_ACCOUNT_SETS,
     ProjectionContractError,
     normalize_projection,
 )
@@ -103,6 +104,24 @@ class TargetProjectionContractTests(unittest.TestCase):
                     raw["masters"]["products"][0]["attributes"] = {"api_token": "secret"}
                 with self.assertRaises(ProjectionContractError):
                     normalize_projection(raw)
+
+    def test_large_multi_year_express_catalogue_is_preserved(self):
+        raw = observation()
+        raw["account_sets"] = [
+            {"source_id": f"account-{index:04d}", "label": f"Account {index}"}
+            for index in range(1_248)
+        ]
+        normalized = normalize_projection(raw)
+        self.assertEqual(len(normalized.account_sets), 1_248)
+
+    def test_account_set_safety_limit_still_rejects_unbounded_payloads(self):
+        raw = observation()
+        raw["account_sets"] = [
+            {"source_id": f"account-{index:04d}", "label": f"Account {index}"}
+            for index in range(MAX_ACCOUNT_SETS + 1)
+        ]
+        with self.assertRaisesRegex(ProjectionContractError, "erp.target_projection_too_large"):
+            normalize_projection(raw)
 
 
 if __name__ == "__main__":

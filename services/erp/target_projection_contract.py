@@ -31,7 +31,7 @@ FIELD_TYPES = {
 }
 FRESH_STATUS = "fresh"
 REFRESH_STATUSES = {FRESH_STATUS, "refreshing", "stale", "offline", "error", "unsupported"}
-MAX_ACCOUNT_SETS = 1_000
+MAX_ACCOUNT_SETS = 5_000
 MAX_MASTER_ITEMS = 100_000
 MAX_FIELDS = 500
 MAX_ACTIONS = 200

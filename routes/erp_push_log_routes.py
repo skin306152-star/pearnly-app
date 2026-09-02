@@ -25,6 +25,9 @@ router = APIRouter()
 class ErpPushRequest(BaseModel):
     history_id: str
     endpoint_id: Optional[str] = Field(None, description="不传则用默认端点")
+    workspace_client_id: Optional[int] = Field(
+        None, gt=0, description="前端识别到的票面单据套账；后端仍以 history 归属为准"
+    )
     posting_kind: Optional[str] = Field(None, description="stock | service · Express 库存过账开关")
     account_set_key: Optional[str] = Field(
         None, max_length=500, description="最终选择的年度/账套键"
@@ -48,6 +51,7 @@ async def erp_push(req: ErpPushRequest, request: Request):
         request=request,
         history_id=req.history_id,
         endpoint_id=req.endpoint_id,
+        workspace_client_id=req.workspace_client_id,
         posting_kind=req.posting_kind,
         account_set_key=req.account_set_key,
         target_refresh_request_id=req.target_refresh_request_id,

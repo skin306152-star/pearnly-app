@@ -215,6 +215,7 @@ async def choose_target(
         "mode": mode,
         "direction": mode,
         "endpoint_id": str(target["endpoint_id"]),
+        "connection_workspace_client_id": target.get("workspace_client_id"),
         "workspace_client_id": target.get("workspace_client_id"),
         "adapter": target_adapter,
         "target_label": str(selected_target.get("label") or "")[:200],

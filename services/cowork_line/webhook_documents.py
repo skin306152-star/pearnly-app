@@ -86,7 +86,6 @@ async def recognize_document(message: dict, identity: dict, lang: str) -> None:
     filename = str(message.get("fileName") or "")
     if not filename:
         filename = f"line_{message.get('id')}.jpg"
-    auto_workspace = target.get("workspace_client_id") is None
     result = await asyncio.to_thread(
         webhook.run_recognition_core,
         user,
@@ -119,7 +118,7 @@ async def recognize_document(message: dict, identity: dict, lang: str) -> None:
             target,
             history_ids,
             payload["direction"],
-            provisional_history_assignment=auto_workspace,
+            provisional_history_assignment=True,
         )
         nonce = webhook.secrets.token_urlsafe(24)
         payload.update(
@@ -127,6 +126,7 @@ async def recognize_document(message: dict, identity: dict, lang: str) -> None:
                 "history_ids": history_ids,
                 "nonce": nonce,
                 "endpoint_id": target["endpoint_id"],
+                "connection_workspace_client_id": target.get("connection_workspace_client_id"),
                 "workspace_client_id": target.get("workspace_client_id"),
                 "target_label": target.get("label"),
             }
@@ -199,6 +199,7 @@ async def show_preview(
     )
     target = {
         "endpoint_id": payload.get("endpoint_id"),
+        "connection_workspace_client_id": payload.get("connection_workspace_client_id"),
         "workspace_client_id": payload.get("workspace_client_id"),
         "adapter": payload.get("adapter"),
         "label": payload.get("target_label"),

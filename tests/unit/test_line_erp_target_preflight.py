@@ -122,6 +122,42 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(selected["account_set"], "15:1")
         self.assertEqual(selected["account_config"], {"comidyear": "15", "seldb": "1"})
 
+    def test_selection_revalidates_connection_workspace_and_keeps_document_workspace(self):
+        target = {
+            "endpoint_id": "mr",
+            "workspace_client_id": 7,
+            "adapter": "mrerp",
+            "label": "MR.ERP",
+            "selected_account_key": "15:1",
+            "account_choices": [{"key": "15:1", "label": "TEST2020"}],
+        }
+        with mock.patch.object(
+            target_selection.target_preflight,
+            "require_ready",
+            return_value={"target": target},
+        ) as require:
+            _, selected = target_selection.normalize(
+                {"user_id": "u1", "tenant_id": "t1"},
+                {
+                    "endpoint_id": "mr",
+                    "connection_workspace_client_id": 7,
+                    "workspace_client_id": 9,
+                    "direction": "sales",
+                    "payment": "cash",
+                    "account_set": "15:1",
+                },
+            )
+
+        require.assert_called_once_with(
+            {"user_id": "u1", "tenant_id": "t1"},
+            endpoint_id="mr",
+            workspace_client_id=7,
+            refresh=False,
+            include_account_catalog=False,
+        )
+        self.assertEqual(selected["connection_workspace_client_id"], 7)
+        self.assertEqual(selected["workspace_client_id"], 9)
+
     def test_mrerp_year_uses_the_returned_account_mapping_not_the_label(self):
         target = {
             "endpoint_id": "mr",

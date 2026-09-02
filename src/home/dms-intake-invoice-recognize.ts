@@ -166,6 +166,22 @@ function ingestResult(d: Dict): IvResult {
             (w0) => w0.invoice_index
         )
     );
+    const attribution = d.workspace_attribution as
+        | {
+              assignments?: Array<{
+                  history_id?: string;
+                  workspace_id?: number | null;
+                  action?: string;
+                  workspace_name?: string;
+                  subject?: { tax_id?: string; name?: string };
+              }>;
+          }
+        | undefined;
+    const assignments = new Map(
+        (attribution?.assignments || [])
+            .filter((row) => row.history_id)
+            .map((row) => [String(row.history_id), row] as const)
+    );
     const invoices: IvInvoice[] = raw.length
         ? raw.map((x, i) => ({
               fields: (x.fields as Dict) || {},
@@ -192,6 +208,14 @@ function ingestResult(d: Dict): IvResult {
             ];
         });
     }
+    invoices.forEach((invoice) => {
+        const assignment = invoice.history_id ? assignments.get(invoice.history_id) : undefined;
+        if (!assignment) return;
+        invoice.workspace_id = assignment.workspace_id;
+        invoice.workspace_action = assignment.action;
+        invoice.workspace_name = assignment.workspace_name;
+        invoice.workspace_subject = assignment.subject;
+    });
     return {
         filename: (d.filename as string) || '',
         invoices,

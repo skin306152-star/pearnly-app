@@ -93,6 +93,14 @@ class SharedEditorSourceTests(unittest.TestCase):
             self.assertIn(".item-field--name", css)
             self.assertIn("overflow-wrap: anywhere", css)
         self.assertIn("result.push_ok !== true", erp_app)
+        self.assertIn("row.error_msg === 'erp.workspace_endpoint_required'", erp_app)
+        manual_branch = erp_app.index("row.error_msg === 'erp.workspace_endpoint_required'")
+        self.assertLess(manual_branch, erp_app.index("show('saved');", manual_branch))
+        self.assertLess(
+            erp_app.index("show('saved');", manual_branch),
+            erp_app.index("show('pushFailed', 'error');", manual_branch),
+        )
+        self.assertNotIn("result.push_ok = true", erp_app)
         self.assertIn("waiting ? 'waiting' : 'confirmed'", erp_app)
 
     def test_both_products_use_the_same_batch_runtime_and_old_runtime_is_removed(self):

@@ -186,9 +186,9 @@ def commit_staged_ocr_history(
                     (ids, user_id),
                 )
             return cur.rowcount
-    except Exception as e:
-        logger.error(f"commit_staged_ocr_history 失败 (user_id={user_id}): {e}")
-        return 0
+    except Exception:
+        logger.exception("commit_staged_ocr_history 失败 (user_id=%s)", user_id)
+        raise
 
 
 def update_history_official_name(

@@ -180,10 +180,14 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
         m = disp.start()
         self.addCleanup(disp.stop)
         await auto_push._auto_push_batch_for_endpoint(
-            "u1", self._ep(), [{"id": "1", "invoice_no": "INV1"}], None
+            "u1",
+            self._ep(),
+            [{"id": "1", "invoice_no": "INV1", "workspace_client_id": 22}],
+            None,
         )
         m.assert_not_called()
         self.assertEqual(self.logs[0]["status"], "skipped_dup")
+        self.assertEqual(self.logs[0]["workspace_client_id"], 22)
 
     async def test_results_persisted_and_failure_schedules_retry(self):
         mock.patch.object(

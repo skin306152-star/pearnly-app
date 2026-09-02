@@ -193,6 +193,7 @@ async def dispatch_confirmed_history(
             request=request,
             history_id=history_id,
             endpoint_id=effective_endpoint_id,
+            document_workspace_id=workspace_client_id,
             posting_kind=posting_kind,
             account_set_key=account_set_key,
             account_config=account_config,
@@ -221,6 +222,13 @@ async def dispatch_confirmed_history(
     )
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
+    try:
+        history_workspace_id = int(history.get("workspace_client_id") or 0) or None
+    except (TypeError, ValueError):
+        history_workspace_id = None
+    if workspace_client_id is not None and workspace_client_id != history_workspace_id:
+        raise HTTPException(409, detail="erp.history_workspace_changed")
+    workspace_client_id = history_workspace_id
     if user.get("entry") == "erp" and not convert_svc.history_is_converted(
         tenant_id=_tid(user), history_id=history_id
     ):
@@ -313,6 +321,7 @@ async def dispatch_confirmed_history(
             "attempt": 1,
             "elapsed_ms": 0,
             "trigger": "manual",
+            "workspace_client_id": history.get("workspace_client_id"),
         }
         log_id = (
             team_access.insert_assigned_push_log(user=user, **log_args)
@@ -362,6 +371,7 @@ async def dispatch_confirmed_history(
         "error_msg": result.get("error_msg"),
         "attempt": 1,
         "elapsed_ms": result.get("elapsed_ms", 0),
+        "workspace_client_id": history.get("workspace_client_id"),
     }
     log_id = (
         team_access.insert_assigned_push_log(user=user, **log_args)

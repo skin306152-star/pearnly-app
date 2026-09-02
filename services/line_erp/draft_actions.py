@@ -20,6 +20,19 @@ class BatchIncomplete(Exception):
         self.result = result
 
 
+def _saved_without_profile(result: dict[str, Any]) -> bool:
+    rows = list(result.get("push_results") or [])
+    return (
+        str(result.get("status") or "") == "manual"
+        and bool(rows)
+        and all(
+            row.get("status") == "manual"
+            and row.get("error_msg") == "erp.workspace_endpoint_required"
+            for row in rows
+        )
+    )
+
+
 async def act_draft(
     binding: dict,
     line_user_id: str,
@@ -82,11 +95,12 @@ async def act_draft(
         )
         if not result["ok"]:
             return result
-        text = (
-            "บันทึกเอกสารและส่งคำสั่งไป ERP แล้ว"
-            if result.get("push_ok")
-            else "บันทึกเอกสารแล้ว แต่ส่ง ERP ไม่สำเร็จ กรุณาตรวจสอบประวัติการส่ง"
-        )
+        if result.get("push_ok"):
+            text = "บันทึกเอกสารและส่งคำสั่งไป ERP แล้ว"
+        elif _saved_without_profile(result):
+            text = "บันทึกเอกสารเรียบร้อยแล้ว"
+        else:
+            text = "บันทึกเอกสารแล้ว แต่ส่ง ERP ไม่สำเร็จ กรุณาตรวจสอบประวัติการส่ง"
     store.clear_session(binding["tenant_id"], line_user_id)
     if reply_token:
         line_client.reply_text(reply_token, text, channel=CHANNEL)

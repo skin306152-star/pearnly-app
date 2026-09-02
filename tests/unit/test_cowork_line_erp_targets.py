@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 from services.cowork_line import document_preflight
 from services.erp import line_target_projection as erp_target_projection
@@ -361,6 +361,7 @@ class WorkspaceAssignmentTests(unittest.TestCase):
                 "_workspace_permission",
                 return_value={"id": "u1", "tenant_id": "t1"},
             ),
+            patch.object(erp_targets, "_workspace_access") as workspace_access,
             patch.object(erp_targets.db, "create_workspace_client", return_value=22),
             patch.object(
                 erp_targets.db, "update_history_workspace_client_id", return_value=True
@@ -368,7 +369,7 @@ class WorkspaceAssignmentTests(unittest.TestCase):
             patch.object(
                 erp_targets,
                 "require_target",
-                return_value={**fresh, "workspace_client_id": 22},
+                return_value=fresh,
             ),
         ):
             result = erp_targets.resolve_history_workspace(
@@ -380,6 +381,8 @@ class WorkspaceAssignmentTests(unittest.TestCase):
             )
 
         update.assert_called_once_with("h1", 22, "u1", "t1")
+        workspace_access.assert_called_once_with({"user_id": "u1", "tenant_id": "t1"}, 22)
+        self.assertIsNone(result["connection_workspace_client_id"])
         self.assertEqual(result["workspace_client_id"], 22)
 
     def test_existing_history_workspace_is_preserved(self):
@@ -393,6 +396,7 @@ class WorkspaceAssignmentTests(unittest.TestCase):
         with (
             patch.object(erp_targets, "_selected_target", return_value=fresh),
             patch.object(erp_targets.db, "get_ocr_history_details_bulk", return_value=histories),
+            patch.object(erp_targets, "_workspace_access") as workspace_access,
             patch.object(erp_targets, "require_target", return_value=fresh),
             patch.object(erp_targets.db, "update_history_workspace_client_id") as update,
         ):
@@ -400,7 +404,9 @@ class WorkspaceAssignmentTests(unittest.TestCase):
                 {"user_id": "u1", "tenant_id": "t1"}, fresh, ["h1"], "sales"
             )
 
-        self.assertEqual(result, fresh)
+        self.assertEqual(result["workspace_client_id"], 11)
+        self.assertEqual(result["connection_workspace_client_id"], 11)
+        workspace_access.assert_called_once_with({"user_id": "u1", "tenant_id": "t1"}, 11)
         update.assert_not_called()
 
     def test_editor_can_reassign_staged_history_to_selected_account_set(self):
@@ -414,6 +420,13 @@ class WorkspaceAssignmentTests(unittest.TestCase):
         with (
             patch.object(erp_targets, "_selected_target", return_value=fresh),
             patch.object(erp_targets.db, "get_ocr_history_details_bulk", return_value=histories),
+            patch.object(erp_targets, "_history_party", return_value=("01055", "ACME")),
+            patch.object(
+                erp_targets,
+                "_route_workspace",
+                return_value={"action": "assigned", "workspace_client_id": 22},
+            ),
+            patch.object(erp_targets, "_workspace_access") as workspace_access,
             patch.object(
                 erp_targets.db, "update_history_workspace_client_id", return_value=True
             ) as update,
@@ -428,7 +441,9 @@ class WorkspaceAssignmentTests(unittest.TestCase):
             )
 
         update.assert_called_once_with("h1", 22, "u1", "t1")
-        self.assertEqual(result, fresh)
+        workspace_access.assert_called_once_with({"user_id": "u1", "tenant_id": "t1"}, 22)
+        self.assertEqual(result["connection_workspace_client_id"], 22)
+        self.assertEqual(result["workspace_client_id"], 22)
 
     def test_unassigned_batch_uses_public_create_and_update_services(self):
         fresh = {
@@ -450,6 +465,7 @@ class WorkspaceAssignmentTests(unittest.TestCase):
             patch.object(
                 erp_targets, "_workspace_permission", return_value={"id": "u1", "tenant_id": "t1"}
             ),
+            patch.object(erp_targets, "_workspace_access") as workspace_access,
             patch.object(erp_targets.db, "create_workspace_client", return_value=22) as create,
             patch.object(
                 erp_targets.db, "update_history_workspace_client_id", return_value=True
@@ -457,18 +473,96 @@ class WorkspaceAssignmentTests(unittest.TestCase):
             patch.object(
                 erp_targets,
                 "require_target",
-                return_value={**fresh, "workspace_client_id": 22},
+                return_value=fresh,
             ),
         ):
             result = erp_targets.resolve_history_workspace(
                 {"user_id": "u1", "tenant_id": "t1"}, fresh, ["h1"], "sales"
             )
 
+        create.assert_called_once_with("u1", "t1", "ACME", tax_id="01055", erp_endpoint_id=None)
+        update.assert_called_once_with("h1", 22, "u1", "t1")
+        workspace_access.assert_called_once_with({"user_id": "u1", "tenant_id": "t1"}, 22)
+        self.assertEqual(result["workspace_client_id"], 22)
+
+    def test_bound_connection_workspace_does_not_override_document_subject(self):
+        target = {
+            "endpoint_id": "mrerp-1",
+            "workspace_client_id": 11,
+            "selectable": True,
+            "missing": [],
+        }
+        histories = {"h1": {"workspace_client_id": 11}}
+        with (
+            patch.object(erp_targets.db, "get_ocr_history_details_bulk", return_value=histories),
+            patch.object(erp_targets, "_history_party", return_value=("02066", "Company B")),
+            patch.object(
+                erp_targets,
+                "_route_workspace",
+                return_value={"action": "none", "reason": "no_match"},
+            ),
+            patch.object(
+                erp_targets,
+                "_workspace_permission",
+                return_value={"id": "u1", "tenant_id": "t1"},
+            ),
+            patch.object(erp_targets, "_workspace_access") as workspace_access,
+            patch.object(erp_targets.db, "create_workspace_client", return_value=22) as create,
+            patch.object(
+                erp_targets.db, "update_history_workspace_client_id", return_value=True
+            ) as update,
+            patch.object(erp_targets, "require_target", return_value=target) as require,
+        ):
+            result = erp_targets.resolve_history_workspace(
+                {"user_id": "u1", "tenant_id": "t1"},
+                target,
+                ["h1"],
+                "sales",
+                provisional_history_assignment=True,
+            )
+
         create.assert_called_once_with(
-            "u1", "t1", "ACME", tax_id="01055", erp_endpoint_id="mrerp-1"
+            "u1", "t1", "Company B", tax_id="02066", erp_endpoint_id=None
         )
         update.assert_called_once_with("h1", 22, "u1", "t1")
+        workspace_access.assert_called_once_with({"user_id": "u1", "tenant_id": "t1"}, 22)
+        self.assertEqual(
+            require.call_args_list,
+            [
+                call({"user_id": "u1", "tenant_id": "t1"}, "mrerp-1", 11),
+                call({"user_id": "u1", "tenant_id": "t1"}, "mrerp-1", 11),
+            ],
+        )
+        self.assertEqual(result["connection_workspace_client_id"], 11)
         self.assertEqual(result["workspace_client_id"], 22)
+
+    def test_document_workspace_requires_actor_access_before_history_assignment(self):
+        target = {
+            "endpoint_id": "mrerp-1",
+            "workspace_client_id": 11,
+            "selectable": True,
+            "missing": [],
+        }
+        identity = {"user_id": "u1", "tenant_id": "t1"}
+        histories = {"h1": {"workspace_client_id": 22}}
+        with (
+            patch.object(erp_targets, "_selected_target", return_value=target),
+            patch.object(erp_targets.db, "get_ocr_history_details_bulk", return_value=histories),
+            patch.object(
+                erp_targets,
+                "_workspace_access",
+                side_effect=erp_targets.CoworkLineErpTargetError("workspace_scope_forbidden"),
+            ) as workspace_access,
+            patch.object(erp_targets.db, "update_history_workspace_client_id") as update,
+            patch.object(erp_targets, "require_target") as require,
+        ):
+            with self.assertRaises(erp_targets.CoworkLineErpTargetError) as raised:
+                erp_targets.resolve_history_workspace(identity, target, ["h1"], "sales")
+
+        self.assertEqual(raised.exception.code, "workspace_scope_forbidden")
+        workspace_access.assert_called_once_with(identity, 22)
+        update.assert_not_called()
+        require.assert_not_called()
 
     def test_multiple_subjects_are_blocked_before_creation(self):
         fresh = {
@@ -683,6 +777,31 @@ class DocumentPreflightTests(unittest.TestCase):
         self.assertIsNone(result["ready_checks"]["live_connection"])
         self.assertTrue(result["ready_checks"]["erp_connection_configured"])
 
+    def test_preflight_revalidates_connection_a_and_checks_document_workspace_b(self):
+        target = {
+            "endpoint_id": "mrerp-1",
+            "connection_workspace_client_id": 7,
+            "workspace_client_id": 8,
+            "adapter": "mrerp",
+            "configured": True,
+            "selectable": True,
+            "missing": [],
+        }
+        fresh_connection = {**target, "workspace_client_id": 7}
+        history = {**self.history, "workspace_client_id": 8}
+        with (
+            patch.object(erp_targets, "require_target", return_value=fresh_connection) as require,
+            patch.object(document_preflight.db, "get_ocr_history_detail", return_value=history),
+            patch.object(document_preflight, "subject_matches", return_value=(True, None)) as match,
+        ):
+            result = erp_targets.preflight_document(
+                self.identity, target, "h1", "sales", payment="cash"
+            )
+
+        self.assertTrue(result["ok"])
+        require.assert_called_once_with(self.identity, "mrerp-1", 7)
+        match.assert_called_once_with(self.identity, history, "sales", 8)
+
     def test_mrerp_cash_purchase_is_blocked_until_import_is_verified(self):
         target = {
             "endpoint_id": "mrerp-1",
@@ -743,6 +862,32 @@ class DocumentPreflightTests(unittest.TestCase):
         self.assertNotIn("request_body", result)
         self.assertNotIn("payload", result)
         self.assertNotIn("secret", repr(result))
+
+    def test_managed_express_never_reads_connection_a_profile_for_document_b(self):
+        target = {
+            "endpoint_id": "express-1",
+            "connection_workspace_client_id": 7,
+            "workspace_client_id": 8,
+            "adapter": "express",
+            "managed": True,
+        }
+        cursor = Mock()
+        context = MagicMock()
+        context.__enter__.return_value = cursor
+        with (
+            patch.object(document_preflight.db, "get_cursor_rls", return_value=context),
+            patch.object(document_preflight, "enable_shared_express_select", return_value=True),
+            patch.object(
+                document_preflight, "fetch_visible_endpoint_rows", return_value=[]
+            ) as fetch,
+        ):
+            endpoint = document_preflight._express_endpoint(self.identity, target)
+
+        self.assertIsNone(endpoint)
+        cursor.execute.assert_called_once_with(
+            "SELECT set_config('app.current_workspace_id', %s, true)", ("8",)
+        )
+        self.assertEqual(fetch.call_args.kwargs["workspace_client_id"], 8)
 
     def test_legacy_express_uses_owner_endpoint_for_document_preflight(self):
         target = {

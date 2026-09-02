@@ -18,7 +18,6 @@ import { revCore, revMore, isAnonBuyerDoc, warnFields } from './dms-intake-revie
 import {
     guardBannerHtml,
     onGuardClick,
-    blockedIdxs,
     initGuard,
     ensureGuardData,
 } from './dms-intake-workspace-guard.js';
@@ -37,7 +36,7 @@ import {
 } from './dms-intake-review-posting.js';
 import type { PostingKind } from './dms-intake-review-posting.js';
 
-// 套账不符横幅需要重渲复核屏(归入/保持后横幅状态变化)→ 把 renderReview 交给 guard 模块。
+// 保留 guard 初始化接口；归属已由后端完成，横幅只展示结果。
 initGuard(renderReview);
 
 function fileWarns(r: IvResult): number {
@@ -68,7 +67,7 @@ export function renderReview() {
     showStepInv(3, 'dx-s-inv-review');
     bindPostingDefault();
     bindOpenViewer();
-    void ensureGuardData(); // 首次进入复核:拉账套列表 → 有错配时补渲出横幅
+    void ensureGuardData();
 }
 
 function barHtml(): string {
@@ -353,18 +352,11 @@ export function onReviewClick(tg: HTMLElement): boolean {
         return true;
     }
     if (tg.closest('#dx-inv-confirm-all')) {
-        // 套账不符且未处理的文件不进「确认全部」—— 确认=落进当前账本,错账本里多落一张
-        // 就多污染一张报表。单文件「确认并继续」不拦(用户逐张看过了,是显式决定)。
-        const blocked = blockedIdxs();
         const idxs = IV.results.reduce<number[]>((acc, r, i) => {
-            if (passable(r) && !blocked.has(i) && (!isErpEntry() || !missingPostingKind(r)))
-                acc.push(i);
+            if (passable(r) && (!isErpEntry() || !missingPostingKind(r))) acc.push(i);
             return acc;
         }, []);
-        if (
-            isErpEntry() &&
-            idxs.length < IV.results.filter((r, i) => passable(r) && !blocked.has(i)).length
-        ) {
+        if (isErpEntry() && idxs.length < IV.results.filter((r) => passable(r)).length) {
             showToast(t('dxi-item-type-required'), 'error');
             return true;
         }

@@ -64,6 +64,15 @@ def get_target(
         raise _error(exc) from exc
 
 
+def _connection_workspace(target: dict) -> int | None:
+    raw = (
+        target.get("connection_workspace_client_id")
+        if "connection_workspace_client_id" in target
+        else target.get("workspace_client_id")
+    )
+    return int(raw) if raw is not None else None
+
+
 def normalize_selection(target: dict, selection: dict) -> dict:
     adapter = str(target.get("adapter") or "").lower()
     direction = str(selection.get("direction") or "").lower()
@@ -84,9 +93,16 @@ def normalize_selection(target: dict, selection: dict) -> dict:
     requested_root = str(selection.get("account_root") or "").strip() or None
     if requested_root and requested_root != account_root:
         raise CoworkLineIntakeError("account_set_required", 422)
-    workspace_client_id = target.get("workspace_client_id")
+    connection_workspace_id = _connection_workspace(target)
+    if "connection_workspace_client_id" in target:
+        workspace_client_id = target.get("workspace_client_id")
+    elif "connection_workspace_client_id" in selection:
+        workspace_client_id = selection.get("workspace_client_id")
+    else:
+        workspace_client_id = target.get("workspace_client_id")
     normalized = {
         "endpoint_id": str(target["endpoint_id"]),
+        "connection_workspace_client_id": connection_workspace_id,
         "workspace_client_id": (
             int(workspace_client_id) if workspace_client_id is not None else None
         ),
@@ -129,7 +145,11 @@ def validated_selection(
     compact_target = get_target(
         identity,
         endpoint_id,
-        selection.get("workspace_client_id"),
+        (
+            selection.get("connection_workspace_client_id")
+            if "connection_workspace_client_id" in selection
+            else selection.get("workspace_client_id")
+        ),
         include_account_catalog=False,
         refresh_probe=False,
     )
@@ -162,7 +182,11 @@ def validated_selection(
         target = get_target(
             identity,
             endpoint_id,
-            selection.get("workspace_client_id"),
+            (
+                selection.get("connection_workspace_client_id")
+                if "connection_workspace_client_id" in selection
+                else selection.get("workspace_client_id")
+            ),
             include_account_catalog=True,
             refresh_probe=False,
         )
@@ -177,7 +201,13 @@ def validated_selection(
             for key, value in selection.items()
             if key not in {"catalog_refresh_request_id", "catalog_refresh_revision"}
         }
-    return target, normalize_selection(target, selection)
+    normalized = normalize_selection(target, selection)
+    projected = {
+        **target,
+        "connection_workspace_client_id": normalized["connection_workspace_client_id"],
+        "workspace_client_id": normalized["workspace_client_id"],
+    }
+    return projected, normalized
 
 
 def resolve_history_workspace(
@@ -237,7 +267,7 @@ def replace_target(targets: list[dict], selected: dict) -> list[dict]:
             selected
             if (
                 str(target.get("endpoint_id")) == str(selected.get("endpoint_id"))
-                and target.get("workspace_client_id") == selected.get("workspace_client_id")
+                and _connection_workspace(target) == _connection_workspace(selected)
             )
             else target
         )

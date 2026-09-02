@@ -40,8 +40,12 @@
             '/target/' +
             encodeURIComponent(target.endpoint_id || target.id || '') +
             '/refresh';
-        if (target.workspace_client_id != null) {
-            path += '?workspace_client_id=' + encodeURIComponent(target.workspace_client_id);
+        var connectionWorkspace =
+            target.connection_workspace_client_id == null
+                ? target.workspace_client_id
+                : target.connection_workspace_client_id;
+        if (connectionWorkspace != null) {
+            path += '?workspace_client_id=' + encodeURIComponent(connectionWorkspace);
         }
         return T.refreshTarget(api, path);
     }
@@ -102,6 +106,7 @@
         var selection = targetSelect.selection();
         return {
             records: records(),
+            connection_workspace_client_id: selection.connection_workspace_client_id,
             workspace_client_id: selection.workspace_client_id,
             endpoint_id: selection.endpoint_id,
             direction: selection.direction,
@@ -168,6 +173,19 @@
                 }
                 form.hidden = true;
                 if (result.push_ok !== true) {
+                    var savedWithoutProfile =
+                        result.status === 'manual' &&
+                        (result.results || []).length > 0 &&
+                        (result.results || []).every(function (row) {
+                            return (
+                                row.status === 'manual' &&
+                                row.error_msg === 'erp.workspace_endpoint_required'
+                            );
+                        });
+                    if (savedWithoutProfile) {
+                        show('saved');
+                        return;
+                    }
                     show('pushFailed', 'error');
                     return;
                 }

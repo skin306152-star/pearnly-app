@@ -104,11 +104,20 @@
             return String((target || {}).adapter || '').toLowerCase();
         }
 
+        function connectionWorkspaceId(target) {
+            if (!target) return null;
+            return Object.prototype.hasOwnProperty.call(target, 'connection_workspace_client_id')
+                ? target.connection_workspace_client_id
+                : target.workspace_client_id;
+        }
+
         function key(target) {
             return (
                 endpointId(target) +
                 ':' +
-                String(target.workspace_client_id == null ? 'none' : target.workspace_client_id)
+                String(
+                    connectionWorkspaceId(target) == null ? 'none' : connectionWorkspaceId(target)
+                )
             );
         }
 
@@ -217,11 +226,13 @@
             return targets().find(function (target) {
                 return (
                     endpointId(target) === String(selection().endpoint_id || '') &&
-                    String(target.workspace_client_id == null ? '' : target.workspace_client_id) ===
+                    String(
+                        connectionWorkspaceId(target) == null ? '' : connectionWorkspaceId(target)
+                    ) ===
                         String(
-                            selection().workspace_client_id == null
+                            connectionWorkspaceId(selection()) == null
                                 ? ''
-                                : selection().workspace_client_id
+                                : connectionWorkspaceId(selection())
                         )
                 );
             });
@@ -552,9 +563,18 @@
         function applyAccount(row) {
             var target = row.target;
             var choice = row.choice;
+            var currentSelection = selection();
+            var sameConnection =
+                endpointId(target) === String(currentSelection.endpoint_id || '') &&
+                String(connectionWorkspaceId(target)) ===
+                    String(connectionWorkspaceId(currentSelection));
             Object.assign(selection(), {
                 endpoint_id: target.endpoint_id || target.id,
-                workspace_client_id: target.workspace_client_id,
+                connection_workspace_client_id: connectionWorkspaceId(target),
+                workspace_client_id:
+                    sameConnection && currentSelection.workspace_client_id != null
+                        ? currentSelection.workspace_client_id
+                        : target.workspace_client_id,
                 adapter: target.adapter,
                 target_label: selectedTargetLabel(target, choice),
                 account_root: choice.root_key || null,
@@ -570,6 +590,7 @@
             clearCatalogProof();
             Object.assign(selection(), {
                 endpoint_id: target.endpoint_id || target.id,
+                connection_workspace_client_id: connectionWorkspaceId(target),
                 workspace_client_id: target.workspace_client_id,
                 adapter: target.adapter,
                 target_label: target.label || targetOptionLabel(target),

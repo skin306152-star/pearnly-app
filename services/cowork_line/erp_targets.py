@@ -153,8 +153,21 @@ def require_target(
 
 def _selected_target(identity: dict[str, Any], target: dict[str, Any]) -> dict[str, Any]:
     endpoint_id = str(target.get("endpoint_id") or "").strip()
-    workspace_id = target.get("workspace_client_id")
+    workspace_id = (
+        target.get("connection_workspace_client_id")
+        if "connection_workspace_client_id" in target
+        else target.get("workspace_client_id")
+    )
     return require_target(identity, endpoint_id, workspace_id)
+
+
+def _finalized_target(identity: dict[str, Any], target: dict[str, Any]) -> dict[str, Any]:
+    fresh = _selected_target(identity, target)
+    return {
+        **fresh,
+        "connection_workspace_client_id": fresh.get("workspace_client_id"),
+        "workspace_client_id": target.get("workspace_client_id"),
+    }
 
 
 _history_party = line_history_workspace._history_party
@@ -169,6 +182,15 @@ def _workspace_permission(identity: dict[str, Any]):
     if not authz.has("settings.workspace.manage") or authz.scope_mode == "assigned":
         raise CoworkLineErpTargetError("workspace_manage_forbidden")
     return user
+
+
+def _workspace_access(identity: dict[str, Any], workspace_client_id: int) -> None:
+    tenant_id = str(identity.get("tenant_id") or "").strip()
+    user_id = str(identity.get("user_id") or "").strip()
+    with db.get_cursor_rls(tenant_id=tenant_id or None, user_id=user_id or None) as cur:
+        _user, authz = _active_actor(cur, identity)
+    if not authz.allows_workspace(workspace_client_id):
+        raise CoworkLineErpTargetError("workspace_scope_forbidden")
 
 
 def resolve_history_workspace(
@@ -188,13 +210,10 @@ def resolve_history_workspace(
         select_target=_selected_target,
         require_workspace_actor=_workspace_permission,
         error_type=CoworkLineErpTargetError,
+        authorize_workspace=_workspace_access,
         history_party=_history_party,
         route_workspace=_route_workspace,
-        finalize_target=lambda current, selected: require_target(
-            current,
-            selected["endpoint_id"],
-            selected["workspace_client_id"],
-        ),
+        finalize_target=_finalized_target,
         provisional_history_assignment=provisional_history_assignment,
     )
 

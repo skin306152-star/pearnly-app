@@ -120,6 +120,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             {
                 "history_id",
                 "endpoint_id",
+                "workspace_client_id",
                 "posting_kind",
                 "account_set_key",
                 "target_refresh_request_id",
@@ -127,6 +128,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             },
         )
         self.assertEqual(ErpPushRequest(history_id="h1").endpoint_id, None)
+        self.assertEqual(ErpPushRequest(history_id="h1").workspace_client_id, None)
         # posting_kind 每批过账开关(Express 库存/服务)· 缺省 None → 后端默认服务·销售(不回归)。
         self.assertEqual(ErpPushRequest(history_id="h1").posting_kind, None)
         self.assertEqual(ErpPushRequest(history_id="h1").account_set_key, None)

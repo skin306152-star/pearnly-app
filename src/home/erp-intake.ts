@@ -6,6 +6,15 @@ export function isErpEntry(): boolean {
     return window._entry === 'erp' || localStorage.getItem('pearnly_entry') === 'erp';
 }
 
+export function isCoworkEntry(): boolean {
+    return (
+        window._entry === 'cowork' ||
+        window._entry === 'main' ||
+        localStorage.getItem('pearnly_entry') === 'cowork' ||
+        localStorage.getItem('pearnly_entry') === 'main'
+    );
+}
+
 export function setErpIntakeDirection(direction: ErpDirection): void {
     sessionStorage.setItem(DIRECTION_KEY, direction);
     window.routeTo?.('dms-intake');

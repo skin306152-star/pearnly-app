@@ -140,7 +140,7 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
             ),
             mock.patch.object(push_reservation, "lock_endpoint_binding"),
             mock.patch.object(push_reservation, "lock_legacy_endpoint", return_value=True),
-            mock.patch.object(push_reservation, "_active_actor"),
+            mock.patch.object(push_reservation, "_active_actor") as active_actor,
             mock.patch.object(
                 push_reservation, "require_catalog_evidence", side_effect=denied
             ) as evidence,
@@ -152,6 +152,7 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
                     ["44444444-4444-4444-8444-444444444444"],
                     {
                         "endpoint_id": "33333333-3333-4333-8333-333333333333",
+                        "connection_workspace_client_id": 11,
                         "workspace_client_id": 17,
                         "adapter": "mrerp",
                     },
@@ -166,8 +167,120 @@ class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
         self.assertIs(evidence.call_args.kwargs["cur"], cursor)
         self.assertEqual(evidence.call_args.kwargs["account_set_key"], "15:2")
         staged_history.assert_not_called()
+        binding_check = next(
+            call
+            for call in cursor.execute.call_args_list
+            if "FROM workspace_clients" in call.args[0]
+        )
+        self.assertEqual(binding_check.args[1][0], 11)
+        active_actor.assert_called_once_with(cursor, IDENTITY, 17)
         statements = [call.args[0] for call in cursor.execute.call_args_list]
         self.assertFalse(any("INSERT INTO erp_push_logs" in sql for sql in statements))
+
+    def test_legacy_reservation_uses_connection_a_and_logs_document_workspace_b(self):
+        endpoint_id = "33333333-3333-4333-8333-333333333333"
+        history_id = "44444444-4444-4444-8444-444444444444"
+        cursor = mock.MagicMock()
+        cursor.rowcount = 1
+        cursor.fetchone.side_effect = [
+            {"id": endpoint_id, "adapter": "mrerp", "config": {}, "enabled": True},
+            {"id": 11},
+            {"id": "log-1"},
+        ]
+        with (
+            mock.patch.object(
+                push_reservation.db,
+                "get_cursor_rls",
+                return_value=_CursorContext(cursor),
+            ),
+            mock.patch.object(push_reservation, "lock_endpoint_binding"),
+            mock.patch.object(push_reservation, "lock_legacy_endpoint", return_value=True),
+            mock.patch.object(push_reservation, "_active_actor") as active_actor,
+            mock.patch.object(push_reservation, "require_catalog_evidence"),
+            mock.patch.object(
+                push_reservation, "_staged_history", return_value={**HISTORY, "id": history_id}
+            ),
+            mock.patch.object(push_reservation, "_prior_success", return_value=None),
+        ):
+            _, intents = push_reservation.reserve_legacy_batch(
+                IDENTITY,
+                [history_id],
+                {
+                    "endpoint_id": endpoint_id,
+                    "connection_workspace_client_id": 11,
+                    "workspace_client_id": 17,
+                    "adapter": "mrerp",
+                },
+                {"account_set": "6:1"},
+            )
+
+        binding_check = next(
+            call
+            for call in cursor.execute.call_args_list
+            if "FROM workspace_clients" in call.args[0]
+        )
+        log_insert = next(
+            call
+            for call in cursor.execute.call_args_list
+            if "INSERT INTO erp_push_logs" in call.args[0]
+        )
+        self.assertEqual(binding_check.args[1][0], 11)
+        active_actor.assert_called_once_with(cursor, IDENTITY, 17)
+        self.assertEqual(log_insert.args[1][12], 17)
+        self.assertEqual(intents[0]["log_id"], "log-1")
+
+    def test_legacy_unbound_endpoint_reserves_against_document_workspace(self):
+        endpoint_id = "33333333-3333-4333-8333-333333333333"
+        history_id = "44444444-4444-4444-8444-444444444444"
+        cursor = mock.MagicMock()
+        cursor.rowcount = 1
+        cursor.fetchone.side_effect = [
+            {"id": endpoint_id, "adapter": "mrerp", "config": {}, "enabled": True},
+            None,
+            {"id": "log-1"},
+        ]
+        with (
+            mock.patch.object(
+                push_reservation.db,
+                "get_cursor_rls",
+                return_value=_CursorContext(cursor),
+            ),
+            mock.patch.object(push_reservation, "lock_endpoint_binding"),
+            mock.patch.object(push_reservation, "lock_legacy_endpoint", return_value=True),
+            mock.patch.object(push_reservation, "_active_actor") as active_actor,
+            mock.patch.object(push_reservation, "require_catalog_evidence"),
+            mock.patch.object(
+                push_reservation, "_staged_history", return_value={**HISTORY, "id": history_id}
+            ),
+            mock.patch.object(push_reservation, "_prior_success", return_value=None),
+        ):
+            _, intents = push_reservation.reserve_legacy_batch(
+                IDENTITY,
+                [history_id],
+                {
+                    "endpoint_id": endpoint_id,
+                    "connection_workspace_client_id": None,
+                    "workspace_client_id": 17,
+                    "adapter": "mrerp",
+                },
+                {"account_set": "6:1"},
+            )
+
+        unbound_check = next(
+            call
+            for call in cursor.execute.call_args_list
+            if "FROM workspace_clients" in call.args[0]
+        )
+        log_insert = next(
+            call
+            for call in cursor.execute.call_args_list
+            if "INSERT INTO erp_push_logs" in call.args[0]
+        )
+        self.assertIn("LIMIT 1 FOR SHARE", unbound_check.args[0])
+        self.assertEqual(unbound_check.args[1], (IDENTITY["tenant_id"], endpoint_id))
+        active_actor.assert_called_once_with(cursor, IDENTITY, 17)
+        self.assertEqual(log_insert.args[1][12], 17)
+        self.assertEqual(intents[0]["log_id"], "log-1")
 
     def test_retryable_mrerp_failure_is_presented_as_waiting(self):
         cursor = _Cursor(rowcount=1)

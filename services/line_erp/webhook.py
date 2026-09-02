@@ -341,7 +341,6 @@ async def _handle_document(
         )
         await asyncio.to_thread(line_client.start_loading, line_user_id, 30, channel=CHANNEL)
     user["entry"] = "erp"
-    provisional_workspace = selection.get("workspace_client_id") is None
     try:
         result = await asyncio.to_thread(
             run_recognition_core,
@@ -378,7 +377,7 @@ async def _handle_document(
             readiness["target"],
             history_ids,
             mode,
-            provisional_history_assignment=provisional_workspace,
+            provisional_history_assignment=True,
         )
     except (workspace_resolution.WorkspaceResolutionError, target_preflight.TargetNotReady):
         await draft_actions.discard(binding, history_ids)
@@ -389,6 +388,7 @@ async def _handle_document(
             "ไม่สามารถจับคู่บริษัทในเอกสารกับบัญชี Pearnly ได้ กรุณาตรวจสอบข้อมูลบริษัท",
         )
         return
+    selection["connection_workspace_client_id"] = target.get("connection_workspace_client_id")
     selection["workspace_client_id"] = int(target["workspace_client_id"])
     nonce = secrets.token_urlsafe(24)
     store.set_session(

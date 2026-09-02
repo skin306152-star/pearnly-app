@@ -367,12 +367,17 @@ async def _require_target(
     *,
     refresh_probe: bool = False,
 ) -> dict | None:
+    connection_workspace = (
+        selection.get("connection_workspace_client_id")
+        if "connection_workspace_client_id" in selection
+        else selection.get("workspace") or selection.get("workspace_client_id")
+    )
     try:
         return await asyncio.to_thread(
             erp_targets.require_target,
             identity,
             str(selection.get("endpoint") or selection.get("endpoint_id") or ""),
-            selection.get("workspace") or selection.get("workspace_client_id"),
+            connection_workspace,
             refresh_probe=refresh_probe,
             include_account_catalog=False,
         )
@@ -391,6 +396,7 @@ async def _default_target_selection(identity: dict, params: dict, lang: str) -> 
     selected = {
         "lang": lang,
         "endpoint_id": target["endpoint_id"],
+        "connection_workspace_client_id": target.get("workspace_client_id"),
         "workspace_client_id": target.get("workspace_client_id"),
         "adapter": target["adapter"],
         "target_label": (

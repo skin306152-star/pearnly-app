@@ -1,4 +1,3 @@
-// 录入工作台发票/收据任务：上传、识别和多发票拆分；复核与提交分模块实现。
 /* global t, showToast */
 import { S, esc, $ } from './dms-intake-core.js';
 import { saveStep } from './step-resume.js';
@@ -36,6 +35,10 @@ export interface IvInvoice {
     total: number; // 本文件共几张
     fmtWarn?: boolean; // 后端判该张发票号格式偏离同卖家多数派(疑读错)→ 标黄核对
     pageIndices?: number[]; // 该张发票在原 PDF 的物理页号(1-based)· 供原图跳到正确页
+    workspace_id?: number | null;
+    workspace_action?: string;
+    workspace_name?: string;
+    workspace_subject?: { tax_id?: string; name?: string };
 }
 export interface IvResult {
     filename: string;
@@ -469,7 +472,6 @@ export function onInvoiceChange(tg: HTMLElement): boolean {
         return true;
     }
     if (changeErpCatalogSelection(tg, IV.endpoints, renderSubmit)) return true;
-    // 复核字段编辑:data-iv-field="fileIdx:invIdx:key"
     const fk = tg.getAttribute('data-iv-field');
     if (fk) {
         const [fi, ii, key] = fk.split(':');
@@ -477,8 +479,6 @@ export function onInvoiceChange(tg: HTMLElement): boolean {
         if (inv) inv.fields[key] = (tg as HTMLInputElement).value;
         return true;
     }
-    // 明细行编辑:data-iv-item="fileIdx:invIdx:itemIdx:key" · 单开一个属性,
-    // 免得给 data-iv-field 的三段式加第四段(key 里带冒号会串位)。
     const ik = tg.getAttribute('data-iv-item');
     if (ik) {
         const [fi, ii, ti, key] = ik.split(':');

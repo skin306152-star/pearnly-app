@@ -376,6 +376,29 @@ class InsertPushLogTests(unittest.TestCase):
         # request_body json 序列化进 params(第 9 个值,index 8)
         self.assertIn('"k": "v"', cur.last_params[8])
 
+    def test_workspace_is_written_with_the_push_log(self):
+        cur = FakeCursor(fetchone={"id": "log-1"})
+        with patch_cursor(cur):
+            store.insert_push_log(
+                "u1",
+                "e1",
+                "h1",
+                "INV1",
+                "seller",
+                100.0,
+                "success",
+                200,
+                None,
+                "resp",
+                None,
+                1,
+                50,
+                workspace_client_id=22,
+            )
+
+        self.assertIn("workspace_client_id", cur.last_sql)
+        self.assertEqual(cur.last_params[15], 22)
+
     def test_none_request_body_passes_none(self):
         cur = FakeCursor(fetchone={"id": "log-1"})
         with patch_cursor(cur):

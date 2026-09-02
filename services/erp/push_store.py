@@ -307,6 +307,7 @@ def insert_push_log(
     work_order_id: Optional[str] = None,
     lease_owner: Optional[str] = None,
     lease_seconds: int = 0,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[str]:
     """work_order_id(MC2-C · 尾参默认 None):只有工单发起的推送才带,主站直推(集成页/
     LINE agent/自动推/邮件收料)一律不传、如实留 NULL——现存写入点全集勘察实锤(派单书
@@ -330,10 +331,10 @@ def insert_push_log(
                 INSERT INTO erp_push_logs (
                     user_id, endpoint_id, history_id, invoice_no, seller_name,
                     total_amount, status, http_status, request_body, response_body,
-                    error_msg, attempt, elapsed_ms, trigger, work_order_id,
+                    error_msg, attempt, elapsed_ms, trigger, work_order_id, workspace_client_id,
                     lease_owner, lease_expires_at
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s,
-                          %s, CASE WHEN %s > 0 THEN NOW() + (%s * INTERVAL '1 second') END)
+                          %s, %s, CASE WHEN %s > 0 THEN NOW() + (%s * INTERVAL '1 second') END)
                 RETURNING id
             """,
                 (
@@ -352,6 +353,7 @@ def insert_push_log(
                     elapsed_ms,
                     trigger,
                     work_order_id,
+                    workspace_client_id,
                     lease_owner,
                     int(lease_seconds or 0),
                     int(lease_seconds or 0),

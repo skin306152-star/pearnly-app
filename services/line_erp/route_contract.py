@@ -19,6 +19,7 @@ class DraftUpdateIn(BaseModel):
     pages: list[dict] = Field(default_factory=list)
     fields: dict = Field(default_factory=dict)
     endpoint_id: str = ""
+    connection_workspace_client_id: int | None = None
     workspace_client_id: int | None = None
     direction: str = ""
     adapter: str = ""

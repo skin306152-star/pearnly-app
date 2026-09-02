@@ -22,9 +22,10 @@ class ConfirmationStatusRequest(BaseModel):
 
 @router.post("/api/ocr/convert-documents/status")
 async def confirmation_status(req: ConfirmationStatusRequest, request: Request):
-    """Verify formal records without persisting pages or replaying conversion."""
+    """Verify formal records; shared confirmation derives scope from each stored history."""
     user = get_current_user_from_request(request)
     _check_history_access(user)
+    erp_confirmation_access.require_formal_conversion_entry(user)
     tenant_id = _tid(user)
     team_access.assert_owned_histories(request, user, req.history_ids)
     with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user["id"])) as cur:

@@ -58,6 +58,11 @@ class CommitStagedTests(unittest.TestCase):
         self.assertIn("tenant_id = %s::uuid", sql)
         self.assertEqual(params, (["a"], "t1"))
 
+    def test_database_failure_is_not_reported_as_zero_commits(self):
+        with mock.patch.object(cdb, "get_cursor_rls", side_effect=RuntimeError("db down")):
+            with self.assertRaisesRegex(RuntimeError, "db down"):
+                commit_staged_ocr_history("u1", ["a"], tenant_id="t1")
+
 
 if __name__ == "__main__":
     unittest.main()

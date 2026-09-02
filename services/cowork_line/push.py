@@ -132,6 +132,7 @@ def _failure_log(
             attempt=1,
             elapsed_ms=0,
             trigger="manual",
+            workspace_client_id=target.get("workspace_client_id"),
         )
     if not log_id:
         raise CoworkLinePushError("push_log_failed")

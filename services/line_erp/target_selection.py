@@ -24,10 +24,20 @@ class SelectionError(Exception):
         super().__init__(code)
 
 
+def connection_workspace_id(
+    values: dict[str, Any], fallback: Any = None, explicit: Any = None
+) -> Any:
+    if explicit is not None:
+        return explicit
+    if "connection_workspace_client_id" in values:
+        return values.get("connection_workspace_client_id")
+    return values.get("workspace_client_id") if fallback is None else fallback
+
+
 def from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     adapter = str(payload.get("adapter") or "").lower()
     posting_mode = payload.get("posting_mode")
-    return {
+    selection = {
         "endpoint_id": payload.get("endpoint_id"),
         "workspace_client_id": payload.get("workspace_client_id"),
         "adapter": adapter or None,
@@ -42,6 +52,9 @@ def from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "payment": payload.get("payment") or (posting_mode if adapter == "mrerp" else None),
         "master_refresh_request_id": payload.get("master_refresh_request_id"),
     }
+    if "connection_workspace_client_id" in payload:
+        selection["connection_workspace_client_id"] = payload.get("connection_workspace_client_id")
+    return selection
 
 
 def normalize(
@@ -51,7 +64,11 @@ def normalize(
     if direction not in {"purchase", "sales"}:
         raise SelectionError("line_erp.direction_required", 422)
     endpoint_id = str(values.get("endpoint_id") or "").strip()
-    workspace_id = values.get("workspace_client_id")
+    connection_workspace_id = (
+        values.get("connection_workspace_client_id")
+        if "connection_workspace_client_id" in values
+        else values.get("workspace_client_id")
+    )
     if not endpoint_id:
         raise SelectionError("line_erp.target_required", 422)
     if not str(values.get("account_set") or "").strip():
@@ -60,7 +77,9 @@ def normalize(
         compact_readiness = target_preflight.require_ready(
             binding,
             endpoint_id=endpoint_id,
-            workspace_client_id=(int(workspace_id) if workspace_id is not None else None),
+            workspace_client_id=(
+                int(connection_workspace_id) if connection_workspace_id is not None else None
+            ),
             refresh=False,
             include_account_catalog=False,
         )
@@ -102,7 +121,9 @@ def normalize(
             readiness = target_preflight.require_ready(
                 binding,
                 endpoint_id=endpoint_id,
-                workspace_client_id=(int(workspace_id) if workspace_id is not None else None),
+                workspace_client_id=(
+                    int(connection_workspace_id) if connection_workspace_id is not None else None
+                ),
                 refresh=False,
                 include_account_catalog=True,
             )
@@ -135,13 +156,23 @@ def normalize(
     requested_root = str(values.get("account_root") or "").strip() or None
     if requested_root and requested_root != account_root:
         raise SelectionError("line_erp.account_set_required", 422)
+    if "connection_workspace_client_id" in values:
+        document_workspace_id = values.get("workspace_client_id")
+    else:
+        document_workspace_id = target.get("workspace_client_id")
+    try:
+        document_workspace_id = (
+            int(document_workspace_id) if document_workspace_id is not None else None
+        )
+    except (TypeError, ValueError):
+        raise SelectionError("line_erp.target_required", 422) from None
+    target_workspace_id = target.get("workspace_client_id")
     normalized = {
         "endpoint_id": str(target["endpoint_id"]),
-        "workspace_client_id": (
-            int(target["workspace_client_id"])
-            if target.get("workspace_client_id") is not None
-            else None
+        "connection_workspace_client_id": (
+            int(target_workspace_id) if target_workspace_id is not None else None
         ),
+        "workspace_client_id": document_workspace_id,
         "adapter": adapter,
         "target_label": target_label_for_account(target, account),
         "account_root": account_root,

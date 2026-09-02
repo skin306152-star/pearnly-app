@@ -280,7 +280,8 @@ export async function pushHistory(
     target: string,
     postingKind?: string,
     accountSetKey?: string,
-    catalogEvidence?: { requestId: string; revision: number }
+    catalogEvidence?: { requestId: string; revision: number },
+    workspaceClientId?: number
 ): Promise<PushOutcome> {
     try {
         const body: Record<string, unknown> = {
@@ -288,6 +289,7 @@ export async function pushHistory(
             operation_id: operationId(),
         };
         if (target) body.endpoint_id = target;
+        if (workspaceClientId != null) body.workspace_client_id = workspaceClientId;
         if (postingKind) body.posting_kind = postingKind;
         if (accountSetKey) body.account_set_key = accountSetKey;
         if (catalogEvidence) {

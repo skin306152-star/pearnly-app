@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from core import db
+from services.cowork_line.managed_unavailable import confirm_without_endpoint
 from services.cowork_line.push_recovery import (
     LEGACY_RESERVATION_LEASE,
     settle_stale_legacy,
@@ -20,6 +21,7 @@ from services.cowork_line.push_reservation_access import (
 from services.cowork_line.push_dedup import prior_success as _prior_success
 from services.cowork_line.push_history import staged_history as _staged_history
 from services.erp.express_push.enqueue import QUEUED_SENTINEL, enqueue_express
+from services.erp.document_managed_target import resolve_document_endpoint
 from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 from services.erp.shared_express_push import (
@@ -115,16 +117,23 @@ def reserve_managed_batch(
         cur.execute("SET LOCAL app.current_workspace_id = %s", (str(workspace_id),))
         if not enable_shared_express_select(cur, tenant_id, workspace_id):
             raise HTTPException(503, detail="erp.shared_endpoint_unavailable")
-        managed_id = _managed_endpoint_id(
+        managed_id, use_bound_default = resolve_document_endpoint(
             cur,
             endpoint_id=endpoint_id,
             tenant_id=tenant_id,
             workspace_client_id=workspace_id,
+            lookup=_managed_endpoint_id,
         )
-        if managed_id is None:
-            raise HTTPException(409, detail="erp.endpoint_changed")
-        lock_endpoint_binding(cur, managed_id)
         _active_actor(cur, identity, workspace_id)
+        if managed_id is None:
+            return confirm_without_endpoint(
+                cur,
+                tenant_id=tenant_id,
+                actor_id=actor_id,
+                workspace_client_id=workspace_id,
+                history_ids=ids,
+            )
+        lock_endpoint_binding(cur, managed_id)
         _lock_actor_and_workspace(
             cur,
             actor_id=actor_id,
@@ -138,6 +147,11 @@ def reserve_managed_batch(
             tenant_id=tenant_id,
             workspace_client_id=workspace_id,
         )
+        if use_bound_default:
+            account_set_key = None
+            account_config = None
+            catalog_refresh_request_id = None
+            catalog_refresh_revision = None
         require_catalog_evidence(
             endpoint,
             tenant_id=tenant_id,
@@ -262,6 +276,14 @@ def reserve_legacy_batch(
     tenant_id, actor_id = _identity(identity)
     endpoint_id = _uuid(target.get("endpoint_id"), "erp.endpoint_not_found")
     workspace_id = int(target.get("workspace_client_id") or 0)
+    connection_workspace_value = (
+        target.get("connection_workspace_client_id")
+        if "connection_workspace_client_id" in target
+        else target.get("workspace_client_id")
+    )
+    connection_workspace_id = (
+        int(connection_workspace_value) if connection_workspace_value else None
+    )
     ids = [_uuid(value, "erp.history_not_found") for value in history_ids]
     if not workspace_id or not ids:
         raise HTTPException(409, detail="workspace.required")
@@ -282,13 +304,22 @@ def reserve_legacy_batch(
         adapter = str((endpoint or {}).get("adapter") or "").lower()
         if not endpoint or adapter not in {"mrerp", "express"}:
             raise HTTPException(409, detail="erp.endpoint_not_ready")
-        cur.execute(
-            "SELECT id FROM workspace_clients WHERE id = %s AND tenant_id = %s "
-            "AND erp_endpoint_id = %s AND is_active = TRUE FOR SHARE",
-            (workspace_id, tenant_id, endpoint_id),
-        )
-        if not cur.fetchone():
-            raise HTTPException(409, detail="erp.workspace_binding_changed")
+        if connection_workspace_id is not None:
+            cur.execute(
+                "SELECT id FROM workspace_clients WHERE id = %s AND tenant_id = %s "
+                "AND erp_endpoint_id = %s AND is_active = TRUE FOR SHARE",
+                (connection_workspace_id, tenant_id, endpoint_id),
+            )
+            if not cur.fetchone():
+                raise HTTPException(409, detail="erp.workspace_binding_changed")
+        else:
+            cur.execute(
+                "SELECT id FROM workspace_clients WHERE tenant_id = %s "
+                "AND erp_endpoint_id = %s AND is_active = TRUE LIMIT 1 FOR SHARE",
+                (tenant_id, endpoint_id),
+            )
+            if cur.fetchone():
+                raise HTTPException(409, detail="erp.workspace_binding_changed")
         require_catalog_evidence(
             endpoint,
             tenant_id=tenant_id,

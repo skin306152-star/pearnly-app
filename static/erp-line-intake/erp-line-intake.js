@@ -78,8 +78,12 @@
             '/target/' +
             encodeURIComponent(target.endpoint_id || target.id || '') +
             '/refresh';
-        if (target.workspace_client_id != null) {
-            path += '?workspace_client_id=' + encodeURIComponent(target.workspace_client_id);
+        var connectionWorkspace =
+            target.connection_workspace_client_id == null
+                ? target.workspace_client_id
+                : target.connection_workspace_client_id;
+        if (connectionWorkspace != null) {
+            path += '?workspace_client_id=' + encodeURIComponent(connectionWorkspace);
         }
         return T.refreshTarget(api, path);
     }
@@ -284,6 +288,7 @@
             body: JSON.stringify({
                 records: rows(),
                 endpoint_id: selection.endpoint_id,
+                connection_workspace_client_id: selection.connection_workspace_client_id,
                 workspace_client_id: selection.workspace_client_id,
                 direction: selection.direction,
                 adapter: selection.adapter,
@@ -332,6 +337,19 @@
                 }
                 form.hidden = true;
                 if (result.push_ok !== true) {
+                    var savedWithoutProfile =
+                        result.status === 'manual' &&
+                        (result.push_results || []).length > 0 &&
+                        (result.push_results || []).every(function (row) {
+                            return (
+                                row.status === 'manual' &&
+                                row.error_msg === 'erp.workspace_endpoint_required'
+                            );
+                        });
+                    if (savedWithoutProfile) {
+                        show('saved');
+                        return;
+                    }
                     show('pushFailed', 'error');
                     return;
                 }

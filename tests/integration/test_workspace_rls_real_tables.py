@@ -38,9 +38,10 @@ class WorkspaceRlsTests(unittest.TestCase):
         os.environ["RLS_ROLE"] = "pearnly_app"
 
         from core import db, rls
-        from services.workspace import store, seller_routing
+        from services.workspace import document_assignment, seller_routing, store
 
         cls.db, cls.s, cls.r = db, store, seller_routing
+        cls.assignment = document_assignment
         with db.get_cursor_rls(bypass=True, commit=True) as cur:
             rls.ensure_rls_app_role(cur)
             cur.execute(
@@ -103,7 +104,7 @@ class WorkspaceRlsTests(unittest.TestCase):
         self.assertFalse(self.s.update_workspace_client(wa, UB, tenant_id=B, name="hack"))
         self.assertTrue(self.s.update_workspace_client(wa, UA, tenant_id=A, name="ok"))
         self.assertFalse(self.s.bind_workspace_endpoint(wa, "ep", UB, tenant_id=B))
-        self.assertTrue(self.s.bind_workspace_endpoint(wa, "ep", UA, tenant_id=A))
+        self.assertTrue(self.s.bind_workspace_endpoint(wa, None, UA, tenant_id=A))
         self.assertFalse(self.s.archive_workspace_client(wa, UB, tenant_id=B))
         self.assertTrue(self.s.archive_workspace_client(wa, UA, tenant_id=A))
 
@@ -112,6 +113,20 @@ class WorkspaceRlsTests(unittest.TestCase):
         self.assertTrue(self.s.tax_id_in_use(UA, A, "111"))
         # B 看不到 A 的主体 → A 的税号对 B 不算占用
         self.assertFalse(self.s.tax_id_in_use(UB, B, "111"))
+
+    def test_document_assignment_creates_unbound_workspace_and_reuses_it(self):
+        fields = {"seller_name": "DOCUMENT COMPANY B", "seller_tax": "3333333333333"}
+
+        created = self.assignment.resolve_or_create(fields, "sales", UA, A)
+        reused = self.assignment.resolve_or_create(fields, "sales", UA, A)
+
+        self.assertEqual(created["action"], "created")
+        self.assertEqual(reused["action"], "matched")
+        self.assertEqual(reused["workspace_client_id"], created["workspace_client_id"])
+        workspace = self.s.get_workspace_client(created["workspace_client_id"], UA, A)
+        self.assertEqual(workspace["name"], "DOCUMENT COMPANY B")
+        self.assertEqual(workspace["tax_id"], "3333333333333")
+        self.assertIsNone(workspace["erp_endpoint_id"])
 
     def test_seller_routing_cross_tenant_blocked(self):
         wa, _ = self._seed()

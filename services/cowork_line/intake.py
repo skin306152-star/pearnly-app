@@ -122,6 +122,13 @@ def _update_scope(identity: dict, history_ids: list[str], selection: dict) -> No
 
 def save_draft(identity: dict, draft_id: str, records: list[dict], selection: dict) -> dict:
     _, payload = require_draft(identity, draft_id)
+    selection = dict(selection)
+    if selection.get("connection_workspace_client_id") is None:
+        selection["connection_workspace_client_id"] = (
+            payload.get("connection_workspace_client_id")
+            if "connection_workspace_client_id" in payload
+            else selection.get("workspace_client_id")
+        )
     history_ids = _ids(payload)
     submitted_ids = [str(row.get("id") or row.get("history_id") or "") for row in records]
     if submitted_ids != history_ids:

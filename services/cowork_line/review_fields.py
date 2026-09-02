@@ -6,7 +6,7 @@ from __future__ import annotations
 def selection_from_payload(payload: dict) -> dict:
     adapter = str(payload.get("adapter") or "").lower()
     posting_mode = payload.get("posting_mode")
-    return {
+    selection = {
         "endpoint_id": payload.get("endpoint_id"),
         "workspace_client_id": payload.get("workspace_client_id"),
         "adapter": payload.get("adapter"),
@@ -21,6 +21,9 @@ def selection_from_payload(payload: dict) -> dict:
         "payment": payload.get("payment") or (posting_mode if adapter == "mrerp" else None),
         "master_refresh_request_id": payload.get("master_refresh_request_id"),
     }
+    if "connection_workspace_client_id" in payload:
+        selection["connection_workspace_client_id"] = payload.get("connection_workspace_client_id")
+    return selection
 
 
 def pages_with_direction(pages: list, direction: str) -> list:

@@ -101,6 +101,17 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
         self.assertIn('data-review-action="confirm"', self.review)
         self.assertIn("confirm.disabled = busy || !report.canConfirm", self.review)
 
+    def test_missing_workspace_profile_is_saved_without_a_push_failure_banner(self):
+        code = "row.error_msg === 'erp.workspace_endpoint_required'"
+        self.assertIn(code, self.app)
+        branch = self.app.index(code)
+        self.assertLess(branch, self.app.index("show('saved');", branch))
+        self.assertLess(
+            self.app.index("show('saved');", branch),
+            self.app.index("show('pushFailed', 'error');", branch),
+        )
+        self.assertNotIn("result.push_ok = true", self.app)
+
     def test_mrerp_purchase_only_offers_credit(self):
         self.assertIn("purchase ? ''", self.target_select_compact)
         self.assertIn("selection().payment === 'credit'", self.target_select)

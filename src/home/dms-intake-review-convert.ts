@@ -2,7 +2,7 @@
 import { esc, authHeaders } from './dms-intake-core.js';
 import { IV } from './dms-intake-invoice.js';
 import type { IvInvoice, IvResult } from './dms-intake-invoice.js';
-import { isErpEntry } from './erp-intake.js';
+import { isCoworkEntry, isErpEntry } from './erp-intake.js';
 
 interface ConvertResult {
     status: 'converted' | 'skipped';
@@ -243,7 +243,7 @@ export async function confirmIndices(indices: number[]): Promise<boolean> {
             if (!confirmationErrorCode) confirmationErrorCode = 'formal_document_required';
             return false;
         }
-    } else {
+    } else if (!isCoworkEntry()) {
         await convertHistoryIds(ids);
     }
     let ok = true;

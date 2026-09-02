@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from fastapi import HTTPException
 
 from services.erp import shared_express_push as service
 from services.cowork_line import push_reservation as cowork_reservation
@@ -241,7 +242,14 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
             "adapter": "express",
         }
 
-    def _call(self, actor=ACTOR_A, tenant=TENANT, account_set_key=None):
+    def _call(
+        self,
+        actor=ACTOR_A,
+        tenant=TENANT,
+        account_set_key=None,
+        requested_workspace_id=WORKSPACE,
+        entry="cowork",
+    ):
         with (
             patch.object(service.db, "get_cursor_rls", self._service_cursor),
             patch.object(service, "erp_shared_express_endpoint_enabled_for", return_value=True),
@@ -250,10 +258,10 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
             patch.object(service, "enqueue_express", side_effect=self._enqueue),
         ):
             return service.reserve_managed_manual_push(
-                user={"id": actor, "tenant_id": tenant, "entry": "cowork"},
+                user={"id": actor, "tenant_id": tenant, "entry": entry},
                 history_id=HISTORY,
                 endpoint_id=ENDPOINT,
-                requested_workspace_id=WORKSPACE,
+                requested_workspace_id=requested_workspace_id,
                 posting_kind="service",
                 account_set_key=account_set_key,
             )
@@ -296,6 +304,70 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
                 catalog_refresh_request_id=REFRESH if account_set_key else None,
                 catalog_refresh_revision=1 if account_set_key else None,
             )
+
+    def test_history_workspace_wins_when_no_web_workspace_hint_is_sent(self):
+        self.cur.execute(
+            "INSERT INTO workspace_clients "
+            "(id,tenant_id,is_active,erp_endpoint_id,tax_id,created_at) "
+            "VALUES (99,%s,TRUE,NULL,'0999999999999',clock_timestamp() - interval '1 day')",
+            (TENANT,),
+        )
+        self.admin.commit()
+
+        result = self._call(requested_workspace_id=None)
+
+        self.assertTrue(result["queued"])
+        self.cur.execute(
+            "SELECT workspace_client_id FROM erp_push_logs WHERE id = %s",
+            (result["log_id"],),
+        )
+        self.assertEqual(self.cur.fetchone()["workspace_client_id"], WORKSPACE)
+
+    def test_workspace_without_managed_endpoint_confirms_and_logs_manual_in_b(self):
+        self.cur.execute(
+            "INSERT INTO workspace_clients (id,tenant_id,is_active,erp_endpoint_id,tax_id) "
+            "VALUES (99,%s,TRUE,%s,'0999999999999')",
+            (TENANT, ENDPOINT),
+        )
+        self.cur.execute(
+            "UPDATE workspace_clients SET erp_endpoint_id=NULL WHERE id=%s", (WORKSPACE,)
+        )
+        self.cur.execute("UPDATE erp_endpoints SET workspace_client_id=99 WHERE id=%s", (ENDPOINT,))
+        self.admin.commit()
+
+        web = self._call(entry="main")
+        self.assertEqual(web["status"], "manual")
+        self.assertIsNone(web["endpoint_id"])
+        self.cur.execute(
+            "SELECT endpoint_id,workspace_client_id,status,error_msg FROM erp_push_logs "
+            "WHERE id=%s",
+            (web["log_id"],),
+        )
+        log = self.cur.fetchone()
+        self.assertIsNone(log["endpoint_id"])
+        self.assertEqual(log["workspace_client_id"], WORKSPACE)
+        self.assertEqual(log["status"], "manual")
+        self.assertEqual(log["error_msg"], "erp.workspace_endpoint_required")
+
+        self.cur.execute("DELETE FROM erp_push_logs")
+        self.cur.execute(
+            "UPDATE ocr_history SET staged=TRUE,last_push_status=NULL WHERE id=%s", (HISTORY,)
+        )
+        self.admin.commit()
+        line = self._call_cowork_batch()
+        self.assertEqual(line[0]["status"], "manual")
+        self.cur.execute("SELECT staged,last_push_status FROM ocr_history WHERE id=%s", (HISTORY,))
+        history = self.cur.fetchone()
+        self.assertFalse(history["staged"])
+        self.assertEqual(history["last_push_status"], "manual")
+        self.cur.execute(
+            "SELECT endpoint_id,workspace_client_id,status FROM erp_push_logs WHERE history_id=%s",
+            (HISTORY,),
+        )
+        line_log = self.cur.fetchone()
+        self.assertIsNone(line_log["endpoint_id"])
+        self.assertEqual(line_log["workspace_client_id"], WORKSPACE)
+        self.assertEqual(line_log["status"], "manual")
 
     def test_cross_actor_reuse_rollback_and_cross_tenant_are_atomic(self):
         first = self._call(ACTOR_A)
@@ -346,7 +418,10 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
         self.cur.execute("DROP FUNCTION fail_shared_push_insert()")
         self.admin.commit()
 
-        self.assertIsNone(self._call(FOREIGN_ACTOR, OTHER_TENANT))
+        with self.assertRaises(HTTPException) as foreign:
+            self._call(FOREIGN_ACTOR, OTHER_TENANT)
+        self.assertEqual(foreign.exception.status_code, 404)
+        self.assertEqual(foreign.exception.detail, "erp.history_not_found")
         self.cur.execute("SELECT count(*) AS n FROM erp_push_logs")
         self.assertEqual(self.cur.fetchone()["n"], 0)
 
@@ -465,6 +540,45 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
         self.assertIsNone(final_log["lease_owner"])
         self.cur.execute("SELECT success_count FROM erp_endpoints WHERE id=%s", (ENDPOINT,))
         self.assertEqual(self.cur.fetchone()["success_count"], 1)
+
+    def test_cowork_unbound_legacy_endpoint_uses_document_workspace(self):
+        self.cur.execute(
+            "UPDATE erp_endpoints SET adapter='mrerp',shared_scope=FALSE,binding_generation=0,"
+            'config=\'{"username":"u","password":"p"}\'::jsonb WHERE id=%s',
+            (ENDPOINT,),
+        )
+        self.cur.execute(
+            "UPDATE workspace_clients SET erp_endpoint_id=NULL WHERE id=%s", (WORKSPACE,)
+        )
+        self.cur.execute("UPDATE ocr_history SET staged=TRUE WHERE id=%s", (HISTORY,))
+        self.admin.commit()
+        identity = {
+            "user_id": ACTOR_A,
+            "tenant_id": TENANT,
+            "membership_id": "membership",
+        }
+        target = {
+            "endpoint_id": ENDPOINT,
+            "connection_workspace_client_id": None,
+            "workspace_client_id": WORKSPACE,
+            "adapter": "mrerp",
+        }
+        with (
+            patch.object(cowork_reservation.db, "get_cursor_rls", self._service_cursor),
+            patch.object(cowork_reservation, "_active_actor", return_value=self._authz()),
+        ):
+            _endpoint, intents = cowork_reservation.reserve_legacy_batch(
+                identity, [HISTORY], target
+            )
+
+        self.assertEqual(intents[0]["status"], "retrying")
+        self.cur.execute(
+            "SELECT workspace_client_id,status FROM erp_push_logs WHERE history_id=%s",
+            (HISTORY,),
+        )
+        log = self.cur.fetchone()
+        self.assertEqual(log["workspace_client_id"], WORKSPACE)
+        self.assertEqual(log["status"], "retrying")
 
 
 if __name__ == "__main__":

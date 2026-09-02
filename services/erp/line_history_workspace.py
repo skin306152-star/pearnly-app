@@ -36,6 +36,7 @@ def resolve(
     select_target: Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]],
     require_workspace_actor: Callable[[dict[str, Any]], dict[str, Any]],
     error_type: type[Exception],
+    authorize_workspace: Callable[[dict[str, Any], int], Any] | None = None,
     history_party: Callable[[dict[str, Any], str], tuple[str, str]] = _history_party,
     route_workspace: Callable[..., dict[str, Any]] = _route_workspace,
     finalize_target: Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]] | None = None,
@@ -50,6 +51,12 @@ def resolve(
     if not ids:
         raise error_type("history_required")
     fresh_target = select_target(identity, target)
+    connection_workspace = fresh_target.get("workspace_client_id")
+    connection_workspace = int(connection_workspace) if connection_workspace is not None else None
+    fresh_target = {
+        **fresh_target,
+        "connection_workspace_client_id": connection_workspace,
+    }
     user_id = str(identity.get("user_id") or "")
     tenant_id = str(identity.get("tenant_id") or "")
     histories = db.get_ocr_history_details_bulk(user_id, ids, tenant_id=tenant_id)
@@ -64,16 +71,10 @@ def resolve(
     }
     if len(existing_ids) > 1:
         raise error_type("history_workspace_mismatch")
-    target_workspace = fresh_target.get("workspace_client_id")
-    if existing_ids and target_workspace is not None and int(target_workspace) not in existing_ids:
-        raise error_type("history_workspace_mismatch")
-
     subjects: set[tuple[str, str]] = set()
     routed_ids: set[int] = set()
     for history_id in ids:
         history = histories[history_id]
-        if may_reassign and target_workspace is not None:
-            continue
         if history.get("workspace_client_id") is not None and not may_reassign:
             continue
         tax_id, name = history_party(history, direction)
@@ -102,15 +103,7 @@ def resolve(
         raise error_type("workspace_ambiguous")
 
     chosen = next(iter(existing_ids or routed_ids), None)
-    if target_workspace is not None:
-        if chosen is not None and chosen != int(target_workspace):
-            raise error_type("history_workspace_mismatch")
-        chosen = int(target_workspace)
-    elif chosen is not None:
-        require_workspace_actor(identity)
-        if not db.bind_workspace_endpoint(chosen, fresh_target["endpoint_id"], user_id, tenant_id):
-            raise error_type("workspace_binding_failed")
-    else:
+    if chosen is None:
         user = require_workspace_actor(identity)
         tax_id, name = history_party(histories[ids[0]], direction)
         if not name:
@@ -120,10 +113,13 @@ def resolve(
             user["tenant_id"],
             name,
             tax_id=tax_id or None,
-            erp_endpoint_id=fresh_target["endpoint_id"],
+            erp_endpoint_id=None,
         )
         if chosen is None:
             raise error_type("workspace_create_failed")
+
+    if authorize_workspace is not None:
+        authorize_workspace(identity, int(chosen))
 
     for history_id in ids:
         history = histories[history_id]
@@ -131,8 +127,8 @@ def resolve(
             continue
         if not db.update_history_workspace_client_id(history_id, chosen, user_id, tenant_id):
             raise error_type("history_workspace_update_failed")
-    resolver = finalize_target or select_target
-    return resolver(identity, {**fresh_target, "workspace_client_id": int(chosen)})
+    resolved = {**fresh_target, "workspace_client_id": int(chosen)}
+    return finalize_target(identity, resolved) if finalize_target else resolved
 
 
 __all__ = ["resolve"]

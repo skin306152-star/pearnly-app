@@ -13,6 +13,14 @@ def test_erp_entry_reuses_dms_and_locks_direction():
     assert "isErpEntry" in read("src/home/dms-intake.ts")
 
 
+def test_legacy_main_entry_keeps_cowork_recognition_only_semantics():
+    adapter = read("src/home/erp-intake.ts")
+    conversion = read("src/home/dms-intake-review-convert.ts")
+    assert "window._entry === 'main'" in adapter
+    assert "localStorage.getItem('pearnly_entry') === 'main'" in adapter
+    assert "else if (!isCoworkEntry())" in conversion
+
+
 def test_dedicated_erp_line_uses_the_shared_scoped_catalog_refresh():
     app = read("static/erp-line-intake/erp-line-intake.js")
     i18n = read("static/erp-line-intake/i18n.js")

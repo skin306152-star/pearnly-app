@@ -37,6 +37,7 @@ class SharedExpressPushRouteTests(unittest.IsolatedAsyncioTestCase):
         req = routes.ErpPushRequest(
             history_id="history-1",
             endpoint_id="endpoint-1",
+            workspace_client_id=202,
             account_set_key=r"S:\\68EXP\\BRANCH",
             target_refresh_request_id="11111111-1111-4111-8111-111111111111",
             target_projection_revision=7,
@@ -56,6 +57,7 @@ class SharedExpressPushRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, queued)
         reserve.assert_awaited_once()
         self.assertEqual(reserve.call_args.kwargs["account_set_key"], r"S:\\68EXP\\BRANCH")
+        self.assertEqual(reserve.call_args.kwargs["document_workspace_id"], 202)
         self.assertEqual(
             reserve.call_args.kwargs["target_refresh_request_id"],
             "11111111-1111-4111-8111-111111111111",
@@ -101,7 +103,38 @@ class SharedExpressPushRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["ok"])
 
 
-class SharedExpressCatalogEvidenceTests(unittest.TestCase):
+class SharedExpressCatalogEvidenceTests(unittest.IsolatedAsyncioTestCase):
+    def test_main_and_cowork_take_direction_from_ocr_without_formal_document(self):
+        for entry in ("main", "cowork"):
+            with self.subTest(entry=entry):
+                cursor = MagicMock()
+                direction = service._confirmed_direction(
+                    cursor,
+                    history_id="44444444-4444-4444-8444-444444444444",
+                    tenant_id="tenant",
+                    workspace_client_id=101,
+                    history={"fields": {"direction": "purchase"}},
+                    entry=entry,
+                )
+                self.assertEqual(direction, "purchase")
+                cursor.execute.assert_not_called()
+
+    async def test_web_hint_uses_document_workspace_not_active_header(self):
+        with patch.object(
+            service, "reserve_managed_manual_push", return_value={"ok": True}
+        ) as reserve:
+            result = await service.maybe_reserve_manual_push(
+                user={"id": "actor", "tenant_id": "tenant", "entry": "cowork"},
+                request=_request("101"),
+                history_id="44444444-4444-4444-8444-444444444444",
+                endpoint_id="33333333-3333-4333-8333-333333333333",
+                document_workspace_id=202,
+                posting_kind="service",
+            )
+
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(reserve.call_args.kwargs["requested_workspace_id"], 202)
+
     def test_managed_reservation_holds_endpoint_row_against_new_refresh(self):
         cursor = MagicMock()
         cursor.fetchone.return_value = {
@@ -152,14 +185,20 @@ class SharedExpressCatalogEvidenceTests(unittest.TestCase):
             patch.object(service.db, "get_cursor_rls", return_value=cursor_context),
             patch.object(service, "erp_shared_express_endpoint_enabled_for", return_value=True),
             patch.object(service, "_legacy_selected", return_value=False),
+            patch.object(service, "_history_workspace", return_value=101),
             patch.object(service, "enable_shared_express_select", return_value=True),
             patch.object(
                 service,
                 "_managed_endpoint_id",
                 return_value="33333333-3333-4333-8333-333333333333",
-            ),
+            ) as managed_endpoint,
             patch.object(service, "lock_endpoint_binding"),
             patch.object(service, "resolve", return_value=authz),
+            patch.object(
+                service,
+                "_locked_history",
+                return_value={"fields": {"direction": "purchase"}},
+            ),
             patch.object(service, "_lock_actor_and_workspace"),
             patch.object(service, "_endpoint_after_lock", return_value=endpoint),
             patch.object(service, "require_catalog_evidence", side_effect=denied) as evidence,
@@ -188,7 +227,32 @@ class SharedExpressCatalogEvidenceTests(unittest.TestCase):
             evidence.call_args.kwargs["request_id"], "55555555-5555-4555-8555-555555555555"
         )
         self.assertEqual(evidence.call_args.kwargs["revision"], 8)
+        self.assertEqual(managed_endpoint.call_args.kwargs["workspace_client_id"], 101)
         account_choice.assert_not_called()
+
+    def test_stale_workspace_hint_cannot_override_persisted_history_workspace(self):
+        cursor = MagicMock()
+        cursor_context = MagicMock()
+        cursor_context.__enter__.return_value = cursor
+        with (
+            patch.object(service.db, "get_cursor_rls", return_value=cursor_context),
+            patch.object(service, "erp_shared_express_endpoint_enabled_for", return_value=True),
+            patch.object(service, "_legacy_selected", return_value=False),
+            patch.object(service, "_history_workspace", return_value=202),
+            patch.object(service, "_managed_endpoint_id") as managed_endpoint,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                service.reserve_managed_manual_push(
+                    user={"id": "actor", "tenant_id": "tenant", "entry": "cowork"},
+                    history_id="44444444-4444-4444-8444-444444444444",
+                    endpoint_id="33333333-3333-4333-8333-333333333333",
+                    requested_workspace_id=101,
+                    posting_kind="service",
+                )
+
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(caught.exception.detail, "erp.history_workspace_changed")
+        managed_endpoint.assert_not_called()
 
 
 if __name__ == "__main__":

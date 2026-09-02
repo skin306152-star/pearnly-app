@@ -185,13 +185,13 @@ export async function doFinish() {
     // 普通工作台在终态写入编辑值并提交草稿。ERP 入口已在步骤 3 一次性完成
     // PUT→正式单转换；步骤 4 只能回读状态和推送，不能重放已锁定记录的写操作。
     const saved = isErpEntry() ? true : await persistAllEdits();
-    if (isErpEntry() && !saved) {
+    if (!saved) {
         IV.busy = false;
         renderReview();
         return;
     }
     const committed = isErpEntry() ? true : await commitStaged();
-    if (isErpEntry() && !committed) {
+    if (!committed) {
         showToast(t('dxi-rev-save-fail'), 'error');
         IV.busy = false;
         renderReview();
@@ -202,7 +202,7 @@ export async function doFinish() {
     let erpFail = 0;
     let erpPending = 0;
     if (IV.output.excel) excelOk = await doExport();
-    if (IV.output.erp && (!isErpEntry() || (saved && committed))) {
+    if (IV.output.erp) {
         const ids = allHistoryIds();
         const pushIds = isErpEntry() ? convertedHistoryIds(ids) : ids;
         erpFail += ids.length - pushIds.length;
@@ -212,8 +212,6 @@ export async function doFinish() {
             else if (outcome === 'waiting') erpPending++;
             else erpFail++;
         }
-    } else if (IV.output.erp) {
-        erpFail = allHistoryIds().length;
     }
     IV.busy = false;
     renderResult(excelOk, erpOk, erpFail, erpPending);
@@ -327,12 +325,16 @@ async function doExport(): Promise<boolean> {
     }
 }
 async function pushOne(historyId: string): Promise<import('./dms-intake-erp-push.js').PushOutcome> {
+    const invoice = IV.results
+        .flatMap((result) => result.invoices)
+        .find((candidate) => candidate.history_id === historyId);
     return pushHistory(
         historyId,
         IV.target,
         IV.postingKind,
         selectedAccountKey(IV.endpoints, IV.target),
-        selectedCatalogEvidence(IV.endpoints, IV.target)
+        selectedCatalogEvidence(IV.endpoints, IV.target),
+        invoice?.workspace_id ?? undefined
     );
 }
 function downloadBlob(blob: Blob, name: string) {

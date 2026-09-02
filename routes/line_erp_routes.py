@@ -15,9 +15,8 @@ from core import db
 from core.auth import JWT_ALGORITHM, get_current_user_from_request
 from core.feature_flags import erp_line_enabled_for
 from core.workspace_context import WS_HEADER
-from services.erp import selected_account_refresh, target_refresh
+from services.erp import selected_account_refresh, target_refresh, team_access
 from services.auth.entrance import require_erp_portal
-from services.erp import team_access
 from services.line_erp import (
     catalog_refresh,
     route_contract,
@@ -35,7 +34,6 @@ router = APIRouter(tags=["line-erp"])
 CHANNEL = "erp"
 _ROOT = Path(__file__).resolve().parent.parent
 logger = logging.getLogger(__name__)
-
 LiffAuthIn = route_contract.LiffAuthIn
 DraftUpdateIn = route_contract.DraftUpdateIn
 
@@ -230,7 +228,6 @@ async def erp_draft_page(request: Request, draft_id: str, history_id: str, page:
     if not info:
         raise HTTPException(404, detail="line_erp.pdf_not_found")
     data = pdf_storage.read_bytes(info["pdf_storage_path"])
-    # URL 使用 0-based 页码，渲染器使用 1-based；边界只在这里转换一次。
     rendered = render_page_png_bytes(data, page=page + 1) if data else None
     if rendered is None:
         raise HTTPException(422, detail="line_erp.render_failed")
@@ -251,7 +248,7 @@ async def erp_draft_get(request: Request, draft_id: str):
         target_preflight.inspect_targets,
         binding,
         endpoint_id=str(payload.get("endpoint_id") or "") or None,
-        workspace_client_id=payload.get("workspace_client_id"),
+        workspace_client_id=target_selection.connection_workspace_id(payload),
         refresh=False,
         include_account_catalog=False,
     )
@@ -337,6 +334,9 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
     payload = session.get("payload") or {}
     requested = {
         "endpoint_id": req.endpoint_id,
+        "connection_workspace_client_id": target_selection.connection_workspace_id(
+            payload, req.workspace_client_id, req.connection_workspace_client_id
+        ),
         "workspace_client_id": req.workspace_client_id,
         "direction": req.direction,
         "adapter": req.adapter,
@@ -437,7 +437,7 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
     target_result = target_preflight.inspect_targets(
         binding,
         endpoint_id=selection["endpoint_id"],
-        workspace_client_id=selection["workspace_client_id"],
+        workspace_client_id=target_selection.connection_workspace_id(selection),
     )
     return {
         "ok": True,

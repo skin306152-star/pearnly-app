@@ -11,6 +11,10 @@ from fastapi import HTTPException, Request
 
 from core import db
 from services.authz.resolver import resolve
+from services.erp.document_managed_target import (
+    reserve_confirmed_without_endpoint,
+    resolve_document_endpoint,
+)
 from services.erp.express_push.enqueue import QUEUED_SENTINEL, enqueue_express
 from services.erp.legacy_generation import lock_endpoint_binding
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
@@ -21,6 +25,7 @@ from services.erp.selected_account import require_catalog_evidence, resolve_acco
 from services.ocr_history.queries import _DETAIL_COLUMNS, _detail_row
 
 _WEB_ENTRIES = frozenset({"main", "cowork", "erp"})
+_COWORK_ENTRIES = frozenset({"main", "cowork"})
 _DIRECTION_PERMISSIONS = {
     "purchase": ("purchase.doc.create", "purchase.doc.approve"),
     "sales": ("sales.doc.create", "sales.doc.approve"),
@@ -34,29 +39,26 @@ def _uuid(value: object, detail: str) -> str:
         raise HTTPException(404, detail=detail) from exc
 
 
-def _workspace_id(raw: object) -> Optional[int]:
-    if raw is None:
-        return None
-    value = str(raw).strip()
-    if not value.isdigit() or int(value) <= 0:
-        raise HTTPException(400, detail="workspace.required")
-    return int(value)
-
-
 def _row_dict(row: Any) -> Dict[str, Any]:
     return dict(row) if row and hasattr(row, "keys") else {}
 
 
-def _default_workspace(cur, tenant_id: str) -> int:
+def _history_workspace(cur, *, history_id: str, tenant_id: str) -> int:
     cur.execute(
-        "SELECT id FROM workspace_clients WHERE tenant_id = %s AND is_active = TRUE "
-        "ORDER BY created_at, id LIMIT 1",
-        (tenant_id,),
+        "SELECT workspace_client_id FROM ocr_history "
+        "WHERE id = %s AND tenant_id = %s AND staged = FALSE",
+        (history_id, tenant_id),
     )
     row = cur.fetchone()
     if not row:
-        raise HTTPException(400, detail="workspace.required")
-    return int(row["id"])
+        raise HTTPException(404, detail="erp.history_not_found")
+    try:
+        workspace_client_id = int(row.get("workspace_client_id") or 0)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(409, detail="workspace.required") from exc
+    if workspace_client_id <= 0:
+        raise HTTPException(409, detail="workspace.required")
+    return workspace_client_id
 
 
 def _legacy_selected(cur, actor_id: str, endpoint_id: Optional[str]) -> bool:
@@ -177,7 +179,7 @@ def _confirmed_direction(
     keeps the confirmed document only in ``ocr_history``; its explicit direction was
     chosen before OCR and persisted with the draft, so no formal document is created.
     """
-    if entry == "cowork":
+    if entry in _COWORK_ENTRIES:
         fields = history.get("fields") if isinstance(history.get("fields"), dict) else {}
         pages = history.get("pages") if isinstance(history.get("pages"), list) else []
         if not fields and pages and isinstance(pages[0], dict):
@@ -278,20 +280,23 @@ def reserve_managed_manual_push(
     with db.get_cursor_rls(tenant_id=tenant_id, user_id=actor_id, commit=True) as cur:
         if _legacy_selected(cur, actor_id, endpoint_id):
             return None
-        workspace_client_id = requested_workspace_id or _default_workspace(cur, tenant_id)
+        workspace_client_id = _history_workspace(
+            cur,
+            history_id=history_id,
+            tenant_id=tenant_id,
+        )
+        if requested_workspace_id is not None and requested_workspace_id != workspace_client_id:
+            raise HTTPException(409, detail="erp.history_workspace_changed")
         cur.execute("SET LOCAL app.current_workspace_id = %s", (str(workspace_client_id),))
         if not enable_shared_express_select(cur, tenant_id, workspace_client_id):
             raise HTTPException(503, detail="erp.shared_endpoint_unavailable")
-        managed_endpoint_id = _managed_endpoint_id(
+        managed_endpoint_id, use_bound_default = resolve_document_endpoint(
             cur,
             endpoint_id=endpoint_id,
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
+            lookup=_managed_endpoint_id,
         )
-        if managed_endpoint_id is None:
-            return None
-
-        lock_endpoint_binding(cur, managed_endpoint_id)
         authz = resolve(user, cur=cur, lock=True)
         if (
             authz.membership_id is None
@@ -299,6 +304,39 @@ def reserve_managed_manual_push(
             or not authz.allows_workspace(workspace_client_id)
         ):
             raise HTTPException(403, detail="authz.forbidden")
+        history = _locked_history(
+            cur,
+            history_id=history_id,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+        )
+        direction = _confirmed_direction(
+            cur,
+            history_id=history_id,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            history=history,
+            entry=str(user.get("entry") or ""),
+        )
+        if user.get("entry") not in _COWORK_ENTRIES and any(
+            not authz.has(code) for code in _DIRECTION_PERMISSIONS[direction]
+        ):
+            raise HTTPException(403, detail="authz.forbidden")
+        if managed_endpoint_id is None:
+            return reserve_confirmed_without_endpoint(
+                cur,
+                actor_id=actor_id,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                history_id=history_id,
+                history=history,
+                source={
+                    "cowork": "cowork_line",
+                    "erp": "line_erp",
+                }.get(str(user.get("entry") or ""), "main"),
+            )
+
+        lock_endpoint_binding(cur, managed_endpoint_id)
         _lock_actor_and_workspace(
             cur,
             actor_id=actor_id,
@@ -312,6 +350,11 @@ def reserve_managed_manual_push(
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
         )
+        if use_bound_default:
+            account_set_key = None
+            account_config = None
+            target_refresh_request_id = None
+            target_projection_revision = None
         if catalog_evidence_required:
             require_catalog_evidence(
                 endpoint,
@@ -339,25 +382,6 @@ def reserve_managed_manual_push(
         ).strip()
         if not selected_account:
             raise HTTPException(409, detail="erp.account_set_unavailable")
-        history = _locked_history(
-            cur,
-            history_id=history_id,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-        )
-        direction = _confirmed_direction(
-            cur,
-            history_id=history_id,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            history=history,
-            entry=str(user.get("entry") or ""),
-        )
-        if user.get("entry") != "cowork" and any(
-            not authz.has(code) for code in _DIRECTION_PERMISSIONS[direction]
-        ):
-            raise HTTPException(403, detail="authz.forbidden")
-
         active, success = _existing_log(
             cur,
             tenant_id=tenant_id,
@@ -444,24 +468,19 @@ async def maybe_reserve_manual_push(
     request: Request,
     history_id: str,
     endpoint_id: Optional[str],
+    document_workspace_id: Optional[int],
     posting_kind: Optional[str],
     account_set_key: Optional[str] = None,
     account_config: Optional[dict[str, Any]] = None,
     target_refresh_request_id: Optional[str] = None,
     target_projection_revision: Optional[int] = None,
 ) -> Optional[dict]:
-    raw_workspace = request.headers.get("X-Workspace-Client-Id")
-
     def run() -> Optional[dict]:
-        requested_workspace_id = None
-        tenant_id = str(user.get("tenant_id") or "").strip()
-        if user.get("entry") in _WEB_ENTRIES and erp_shared_express_endpoint_enabled_for(tenant_id):
-            requested_workspace_id = _workspace_id(raw_workspace)
         return reserve_managed_manual_push(
             user=user,
             history_id=history_id,
             endpoint_id=endpoint_id,
-            requested_workspace_id=requested_workspace_id,
+            requested_workspace_id=document_workspace_id,
             posting_kind=posting_kind,
             account_set_key=account_set_key,
             account_config=account_config,

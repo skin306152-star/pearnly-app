@@ -92,13 +92,26 @@ snapshot；同一内容重复上报只更新 freshness，不生成假 revision�
 
 新 draft 必须保存：
 
-- actor、tenant、workspace；
+- actor、tenant、`connection_workspace_client_id` 与 `workspace_client_id`；
 - endpoint id、adapter、account set key；
 - 业务方向与记账模式；
 - `master_revision`；
 - 用户选中的商品/客户/科目 source id 及当时 label snapshot。
 
 历史单保留 label snapshot，不因主档后续改名而篡改历史。新单只使用 current snapshot。
+
+### 3.4 连接授权与单据归属不变量
+
+- `connection_workspace_client_id` 是所选连接的授权与确认前重验锚点 A，不代表票面主体。
+- owner 可见但尚未绑定套账的 legacy endpoint 没有 A；确认时必须在同一锁内重验它仍未绑定，
+  不能因 A 为空阻断单据归入 B。
+- `workspace_client_id` 是票面单据主体 B，统一作为 OCR 历史、采购/销售正式单、Stock Card 与
+  `erp_push_logs` 的归属；A 与 B 可以不同。
+- legacy 的 endpoint 与 account set 可以作为 B 的推送目标，但 endpoint 原有的 A 绑定不得迁移、
+  覆盖或复制到 B。
+- managed Express 必须使用 B 自己绑定的 endpoint/Profile，不得跨 workspace 复用 A 的 Profile。
+- Cowork 确认只结束 OCR 草稿并按 B 记录推送日志，不创建采购/销售正式单；`/erp` 确认才按方向
+  创建正式单，库存商品继续进入 B 的 Stock Card。
 
 ## 4. 刷新与确认协议
 

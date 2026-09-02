@@ -313,8 +313,11 @@ async function boot(page, convertResult, recogn, entry = 'firm') {
 }
 
 test.describe('OCR 确认 → 正式单据转换桥(前端接线 + UI 拍板)', () => {
-    test('确认全部 → 调转换桥 → 已入账 chip', async ({ page }) => {
+    test('Cowork 确认全部只确认识别记录，不建正式单', async ({ page }) => {
         await boot(page, CONVERT_OK);
+        await page.evaluate(() => {
+            window._entry = 'cowork';
+        });
         await page.setInputFiles('#dx-inv-file', {
             name: 'invoice.pdf',
             mimeType: 'application/pdf',
@@ -334,31 +337,27 @@ test.describe('OCR 确认 → 正式单据转换桥(前端接线 + UI 拍板)', 
             fullPage: true,
         });
 
-        // ① 确认全部 → 触发转换桥
-        const respPromise = page.waitForResponse((r) =>
-            r.url().includes('/api/ocr/convert-documents')
-        );
         await page.click('#dx-inv-confirm-all');
-        await respPromise;
-        await expect(page.locator('.dx-inv-head .dx-badge.green')).toBeVisible();
-        await expect(page.locator('.dx-inv-head .dx-badge.green')).toHaveText('已入账');
+        await expect(page.locator('.dx-pill.ok')).toHaveText('✓ 已确认');
+        await expect(page.locator('.dx-inv-head .dx-badge.green')).toHaveCount(0);
         await page.screenshot({
             path: path.join(OUT, '02-confirmed-booked-chip.png'),
             fullPage: true,
         });
 
-        expect(convertCalls.length, '确认全部应触发一次转换请求').toBe(1);
-        expect(convertCalls[0].history_ids).toEqual(['h1']);
-        expect(convertCalls[0].workspace_client_id).toBe(1);
+        expect(convertCalls.length, 'Cowork 确认不得触发正式单转换').toBe(0);
 
         // 再次确认(如已确认过)不该重复调用同一 history_id(convertHistoryIds 按 id 去重)。
         await page.click('#dx-inv-rev-next');
         await page.waitForSelector('#dx-s-inv-submit.active', { timeout: 8000 });
-        expect(convertCalls.length, 'enterSubmit 兜底调用应因已转换而不重复请求').toBe(1);
+        expect(convertCalls.length, '进入提交页也不得触发正式单转换').toBe(0);
     });
 
-    test('转换被跳过 → 琥珀色 chip 带跳过原因(四态诚实,不吞)', async ({ page }) => {
+    test('Cowork 不展示正式单转换跳过状态', async ({ page }) => {
         await boot(page, CONVERT_SKIPPED);
+        await page.evaluate(() => {
+            window._entry = 'cowork';
+        });
         await page.setInputFiles('#dx-inv-file', {
             name: 'invoice.pdf',
             mimeType: 'application/pdf',
@@ -366,14 +365,10 @@ test.describe('OCR 确认 → 正式单据转换桥(前端接线 + UI 拍板)', 
         });
         await page.click('#dx-inv-start');
         await page.waitForSelector('#dx-s-inv-review.active', { timeout: 8000 });
-        const respPromise = page.waitForResponse((r) =>
-            r.url().includes('/api/ocr/convert-documents')
-        );
         await page.click('#dx-inv-confirm-all');
-        await respPromise;
-        const chip = page.locator('.dx-inv-head .dx-badge.amber');
-        await expect(chip).toBeVisible();
-        await expect(chip).toContainText('未入账');
+        await expect(page.locator('.dx-pill.ok')).toHaveText('✓ 已确认');
+        await expect(page.locator('.dx-inv-head .dx-badge.amber')).toHaveCount(0);
+        expect(convertCalls).toHaveLength(0);
         await page.screenshot({
             path: path.join(OUT, '03-skipped-reason-chip.png'),
             fullPage: true,

@@ -139,27 +139,16 @@ class MutableHistoryLockTests(unittest.TestCase):
 
 
 class MutableHistoryWriteTests(unittest.TestCase):
-    def test_nonshared_or_disabled_context_never_opens_a_mutation_transaction(self):
-        cases = [(entry, True) for entry in ("pos", "ai", "dms", "daily", None, "unknown")]
-        cases.extend((entry, False) for entry in ("main", "cowork", "erp"))
-        for entry, enabled in cases:
-            with self.subTest(entry=entry, enabled=enabled):
+    def test_non_erp_context_never_opens_a_formal_mutation_transaction(self):
+        for entry in ("main", "cowork", "pos", "ai", "dms", "daily", None, "unknown"):
+            with self.subTest(entry=entry):
                 user = {"id": ACTOR, "tenant_id": TENANT, "entry": entry}
-                with (
-                    mock.patch.object(
-                        access.confirmation_access,
-                        "erp_shared_express_endpoint_enabled_for",
-                        return_value=enabled,
-                    ) as flag,
-                    mock.patch.object(access.db, "get_cursor_rls") as cursor,
-                ):
+                with mock.patch.object(access.db, "get_cursor_rls") as cursor:
                     result = access.update_history_pages(
                         mock.sentinel.request, user, TENANT, HISTORY, [{"fields": {}}]
                     )
                 self.assertIsNone(result)
                 cursor.assert_not_called()
-                if entry not in ("main", "cowork", "erp"):
-                    flag.assert_not_called()
 
     def test_pages_update_is_actor_and_workspace_bound_in_one_transaction(self):
         cur = mock.Mock(rowcount=1)

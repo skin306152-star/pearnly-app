@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-"""OCR history list, detail, confirmation, mutation, file, and deletion routes."""
 
 from __future__ import annotations
 
@@ -140,20 +139,25 @@ class OcrConvertRequest(BaseModel):
 
 @router.post("/api/ocr/convert-documents")
 async def ocr_convert_documents(req: OcrConvertRequest, request: Request):
-    """录入工作台确认:草稿 history 转正式单;flag-on 整批锁定并验权,flag-off 保留旧行为。
-    转换由 intake_bridge.convert 幂等处理。"""
+    """Convert histories; shared confirmation groups by persisted workspace."""
     user = get_current_user_from_request(request)
     _check_history_access(user)
+    erp_confirmation_access.require_formal_conversion_entry(user)
     tenant_id = _tid(user)
     team_access.assert_owned_histories(request, user, req.history_ids)
-    with db.get_cursor_rls(
-        tenant_id=tenant_id,
-        workspace_client_id=req.workspace_client_id,
-        user_id=str(user["id"]),
-        commit=True,
-    ) as cur:
+    shared_confirmation = erp_confirmation_access.is_shared_confirmation_context(user, tenant_id)
+    cursor_args = {"tenant_id": tenant_id, "user_id": str(user["id"]), "commit": True}
+    if not shared_confirmation:
+        cursor_args["workspace_client_id"] = req.workspace_client_id
+    with db.get_cursor_rls(**cursor_args) as cur:
         confirmation = erp_confirmation_access.guard_confirmation(
-            cur, request, user, tenant_id, req.workspace_client_id, req.history_ids
+            cur,
+            request,
+            user,
+            tenant_id,
+            req.workspace_client_id,
+            req.history_ids,
+            shared_context=shared_confirmation,
         )
         if user.get("entry") == "erp":
             invalid = convert_svc.validate_erp_histories(

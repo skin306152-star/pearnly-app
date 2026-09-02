@@ -66,7 +66,12 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_non_default_push_reserves_before_outbound_and_finalizes_same_log(self):
         user = {"id": "owner", "tenant_id": "tenant", "entry": "erp"}
-        history = {"id": "history", "invoice_no": "INV-1", "total_amount": 100}
+        history = {
+            "id": "history",
+            "invoice_no": "INV-1",
+            "total_amount": 100,
+            "workspace_client_id": 17,
+        }
         endpoint = {
             "id": "endpoint-1",
             "name": "MR.ERP",
@@ -263,6 +268,44 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(evidence.call_args.kwargs["account_set_key"], "15:2")
         outbound.assert_not_called()
 
+    async def test_web_workspace_hint_cannot_override_legacy_history_workspace(self):
+        user = {"id": "owner", "tenant_id": "tenant", "entry": "main"}
+        request = mock.Mock()
+        history = {"id": "history", "workspace_client_id": 202}
+        with (
+            mock.patch.object(
+                confirmed_push.team_access, "assigned_endpoint_for_request", return_value=None
+            ),
+            mock.patch.object(
+                confirmed_push.team_access, "record_creator_scope", return_value=None
+            ),
+            mock.patch.object(
+                confirmed_push.shared_express_push,
+                "maybe_reserve_manual_push",
+                new=mock.AsyncMock(return_value=None),
+            ),
+            mock.patch.object(confirmed_push.db, "get_ocr_history_detail", return_value=history),
+            mock.patch.object(confirmed_push.db, "get_erp_endpoint") as endpoint,
+            mock.patch.object(
+                confirmed_push.confirmed_push_reservation, "reserve_catalog_selected_push"
+            ) as reserve,
+            mock.patch.object(confirmed_push.erp_push, "push_to_endpoint") as outbound,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                await confirmed_push.dispatch_confirmed_history(
+                    user=user,
+                    request=request,
+                    history_id="history",
+                    endpoint_id="endpoint-1",
+                    workspace_client_id=101,
+                )
+
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(caught.exception.detail, "erp.history_workspace_changed")
+        endpoint.assert_not_called()
+        reserve.assert_not_called()
+        outbound.assert_not_called()
+
     async def test_retryable_first_failure_is_presented_as_waiting(self):
         user = {"id": "owner", "tenant_id": "tenant", "entry": "erp"}
         endpoint = {
@@ -277,6 +320,7 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
             "invoice_no": "INV-1",
             "seller_name": "Seller",
             "total_amount": 100,
+            "workspace_client_id": 7,
         }
         failure = {
             "success": False,
@@ -320,6 +364,7 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["status"], "retrying")
         self.assertEqual(log.call_args.kwargs["request_body"]["source"], "line_erp")
+        self.assertEqual(log.call_args.kwargs["workspace_client_id"], 7)
         retry.assert_called_once_with("log-1", 5)
 
     async def test_member_push_uses_only_owner_assigned_endpoint(self):
@@ -340,6 +385,7 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
             "invoice_no": "INV-1",
             "seller_name": "Seller",
             "total_amount": 100,
+            "workspace_client_id": 7,
         }
         push_result = {
             "success": True,

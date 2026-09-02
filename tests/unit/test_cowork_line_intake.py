@@ -37,6 +37,7 @@ PAYLOAD = {
     "nonce": "nonce-1",
     "adapter": "mrerp",
     "endpoint_id": "endpoint-1",
+    "connection_workspace_client_id": None,
     "workspace_client_id": None,
     "account_set": "6:1",
     "direction": "purchase",
@@ -89,7 +90,11 @@ class IntakeServiceTest(unittest.TestCase):
             "mode_options": ["cash", "credit"],
             **MRERP_ACCOUNT,
         }
-        ready = {**initial, "workspace_client_id": 17}
+        ready = {
+            **initial,
+            "connection_workspace_client_id": None,
+            "workspace_client_id": 17,
+        }
         targets = SimpleNamespace(
             require_target=mock.Mock(return_value=initial),
             resolve_history_workspace=mock.Mock(return_value=ready),
@@ -139,13 +144,13 @@ class IntakeServiceTest(unittest.TestCase):
             refresh_probe=False,
             include_account_catalog=False,
         )
-        targets.resolve_history_workspace.assert_called_once_with(
-            IDENTITY,
-            initial,
-            ["history-1"],
-            "purchase",
-            provisional_history_assignment=True,
-        )
+        resolve_args = targets.resolve_history_workspace.call_args
+        self.assertEqual(resolve_args.args[0], IDENTITY)
+        self.assertEqual(resolve_args.args[1]["endpoint_id"], "endpoint-1")
+        self.assertIsNone(resolve_args.args[1]["connection_workspace_client_id"])
+        self.assertIsNone(resolve_args.args[1]["workspace_client_id"])
+        self.assertEqual(resolve_args.args[2:], (["history-1"], "purchase"))
+        self.assertTrue(resolve_args.kwargs["provisional_history_assignment"])
         self.assertEqual(update_scope.call_args.args[2]["workspace_client_id"], 17)
         saved_payload = set_session.call_args.kwargs["payload"]
         self.assertEqual(saved_payload["workspace_client_id"], 17)

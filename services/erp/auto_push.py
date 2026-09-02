@@ -72,6 +72,7 @@ async def _auto_push_history(
                     attempt=1,
                     elapsed_ms=0,
                     trigger="auto",
+                    workspace_client_id=history.get("workspace_client_id"),
                 )
                 logger.info(
                     "[AutoPush-dedup] skipped · history=%s endpoint=%s " "(prior=%s)",
@@ -97,6 +98,7 @@ async def _auto_push_history(
                 attempt=1,
                 elapsed_ms=0,
                 trigger="auto",
+                workspace_client_id=history.get("workspace_client_id"),
             )
 
             # push_to_endpoint 是同步调用(requests) · 用 run_in_executor 挪到线程
@@ -137,6 +139,7 @@ async def _auto_push_history(
                     attempt=1,
                     elapsed_ms=result.get("elapsed_ms", 0),
                     trigger="auto",  # 标记自动触发
+                    workspace_client_id=history.get("workspace_client_id"),
                 )
 
             db.update_endpoint_stats(ep["id"], final_status != "failed")
@@ -231,6 +234,7 @@ def _persist_push_outcome(user_id, ep, history, result, trigger="auto", pending_
             attempt=1,
             elapsed_ms=result.get("elapsed_ms", 0),
             trigger=trigger,
+            workspace_client_id=history.get("workspace_client_id"),
         )
     db.update_endpoint_stats(ep["id"], final_status != "failed")
     db.update_history_push_status(history_id, final_status)
@@ -292,6 +296,7 @@ async def _auto_push_batch_for_endpoint(user_id, endpoint, histories, tenant_id=
                 attempt=1,
                 elapsed_ms=0,
                 trigger="auto",
+                workspace_client_id=h.get("workspace_client_id"),
             )
             continue
         to_push.append(h)
@@ -319,6 +324,7 @@ async def _auto_push_batch_for_endpoint(user_id, endpoint, histories, tenant_id=
                 attempt=1,
                 elapsed_ms=0,
                 trigger="auto",
+                workspace_client_id=h.get("workspace_client_id"),
             )
             if pid:
                 pending_ids[str(h["id"])] = pid

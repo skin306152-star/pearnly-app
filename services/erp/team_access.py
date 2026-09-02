@@ -426,6 +426,7 @@ def insert_assigned_push_log(
     attempt: int,
     elapsed_ms: int,
     trigger: str = "manual",
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[str]:
     """Write a member-owned log after rechecking the owner endpoint assignment."""
     with db.get_cursor(commit=True) as cur:
@@ -443,8 +444,8 @@ def insert_assigned_push_log(
             INSERT INTO erp_push_logs (
                 user_id, endpoint_id, history_id, invoice_no, seller_name,
                 total_amount, status, http_status, request_body, response_body,
-                error_msg, attempt, elapsed_ms, trigger
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
+                error_msg, attempt, elapsed_ms, trigger, workspace_client_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (
@@ -462,6 +463,7 @@ def insert_assigned_push_log(
                 int(attempt),
                 int(elapsed_ms or 0),
                 trigger,
+                workspace_client_id,
             ),
         )
         row = cur.fetchone()

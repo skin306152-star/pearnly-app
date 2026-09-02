@@ -161,6 +161,7 @@ async function boot(page, entry, state = {}) {
                 state.failSave || (state.failSaveAfterConfirm && state.historyPuts > 2) ? 500 : 200;
         } else if (pathname === '/api/ocr/commit' && req.method() === 'POST') {
             state.commits += 1;
+            status = state.failCommit ? 500 : 200;
             body = { ok: true, committed: (req.postDataJSON().ids || []).length };
         } else if (pathname === '/api/ocr/convert-documents/status') {
             const historyIds = req.postDataJSON().history_ids || [];
@@ -436,6 +437,62 @@ test('ERP purchase and sales record buttons open the shared intake with an expli
     expect(await page.evaluate(() => sessionStorage.getItem('pearnly_erp_intake_direction'))).toBe(
         'sales'
     );
+});
+
+test('Cowork confirmation commits recognition only and creates no formal document', async ({
+    page,
+}) => {
+    const state = {};
+    await boot(page, 'cowork', state);
+    await page.evaluate(() => {
+        window.loadDmsIntake();
+        document.querySelectorAll('.page').forEach((node) => node.classList.remove('active'));
+        document.getElementById('page-dms-intake')?.classList.add('active');
+    });
+    await page.setInputFiles('#dx-inv-file', {
+        name: 'cowork-invoice.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('invoice'),
+    });
+    await page.click('#dx-inv-start');
+    await page.waitForSelector('#dx-s-inv-review.active');
+    await page.click('.dx-confirm-one');
+    await page.click('#dx-inv-rev-next');
+    await page.waitForSelector('#dx-s-inv-submit.active');
+    await page.click('#dx-inv-finish');
+    await page.waitForSelector('#dx-s-success.active');
+
+    expect(state.historyPuts).toBe(1);
+    expect(state.commits).toBe(1);
+    expect(state.converts).toBe(0);
+});
+
+test('Cowork commit failure stays in review and never starts ERP push', async ({ page }) => {
+    const state = { failCommit: true };
+    await boot(page, 'cowork', state);
+    await page.evaluate(() => {
+        window.loadDmsIntake();
+        document.querySelectorAll('.page').forEach((node) => node.classList.remove('active'));
+        document.getElementById('page-dms-intake')?.classList.add('active');
+    });
+    await page.setInputFiles('#dx-inv-file', {
+        name: 'cowork-invoice.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('invoice'),
+    });
+    await page.click('#dx-inv-start');
+    await page.waitForSelector('#dx-s-inv-review.active');
+    await page.click('.dx-confirm-one');
+    await page.click('#dx-inv-rev-next');
+    await page.waitForSelector('#dx-s-inv-submit.active');
+    await page.click('#dx-inv-finish');
+
+    await expect(page.locator('#dx-s-inv-review.active')).toBeVisible();
+    await expect(page.locator('#dx-s-success.active')).toHaveCount(0);
+    expect(state.historyPuts).toBe(1);
+    expect(state.commits).toBe(1);
+    expect(state.converts).toBe(0);
+    expect(state.erpPushes).toBe(0);
 });
 
 test('ERP MR.ERP setup uses the isolated ERP session and refreshes its card immediately', async ({
@@ -789,6 +846,12 @@ test('ERP step four sends the final Express year and account selected by the use
     secondInvoice.page_indices = [2];
     secondInvoice.fields.invoice_number = 'ERP-002';
     recognized.invoices.push(secondInvoice);
+    recognized.workspace_attribution = {
+        assignments: [
+            { history_id: 'h1', workspace_id: 77, action: 'created' },
+            { history_id: 'h2', workspace_id: 77, action: 'matched' },
+        ],
+    };
     const endpoint = {
         id: 'express-1',
         name: 'Express',
@@ -986,6 +1049,7 @@ test('ERP step four sends the final Express year and account selected by the use
         'refresh-4',
     ]);
     expect(state.erpPushBodies.map((body) => body.target_projection_revision)).toEqual([1, 1]);
+    expect(state.erpPushBodies.map((body) => body.workspace_client_id)).toEqual([77, 77]);
     expect(state.erpEndpointReads - endpointReadsBeforePush).toBe(1);
     expect(state.erpProjectionReads - projectionReadsBeforePush).toBe(0);
     expect(state.erpProjectionRefreshes - projectionRefreshesBeforePush).toBe(0);

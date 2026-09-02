@@ -125,14 +125,24 @@ def preflight_document(
         return _result(["payment_invalid"], checks={"target_ready": False})
     endpoint_id = str(target.get("endpoint_id") or "")
     workspace_id = target.get("workspace_client_id")
+    connection_workspace_id = (
+        target.get("connection_workspace_client_id")
+        if "connection_workspace_client_id" in target
+        else workspace_id
+    )
     try:
-        fresh = require_target(identity, endpoint_id, workspace_id)
+        fresh = require_target(identity, endpoint_id, connection_workspace_id)
     except CoworkLineErpTargetError as exc:
         missing = list(exc.missing) or [exc.code]
         return _result(missing, checks={"target_ready": False})
-    if fresh.get("workspace_client_id") is None:
+    if workspace_id is None:
         return _result(["workspace_required"], checks={"target_ready": True})
-    workspace_id = int(fresh["workspace_client_id"])
+    workspace_id = int(workspace_id)
+    fresh = {
+        **fresh,
+        "connection_workspace_client_id": connection_workspace_id,
+        "workspace_client_id": workspace_id,
+    }
     history = db.get_ocr_history_detail(
         str(identity.get("user_id") or ""),
         str(history_id),

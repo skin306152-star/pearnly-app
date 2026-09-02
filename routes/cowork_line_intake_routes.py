@@ -30,6 +30,7 @@ class LiffAuthIn(BaseModel):
 
 class DraftUpdateIn(BaseModel):
     records: list[dict] = Field(default_factory=list)
+    connection_workspace_client_id: int | None = None
     workspace_client_id: int | None = None
     endpoint_id: str = ""
     direction: str = ""

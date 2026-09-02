@@ -9,6 +9,7 @@ def _express_selection(mode="purchase"):
         "mode": mode,
         "direction": mode,
         "endpoint_id": "ep-1",
+        "connection_workspace_client_id": 7,
         "workspace_client_id": 7,
         "adapter": "express",
         "target_label": "Express · Main",
@@ -56,6 +57,23 @@ class _Context:
 
 
 class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
+    def test_missing_document_workspace_profile_is_a_saved_non_push_result(self):
+        result = {
+            "status": "manual",
+            "push_results": [
+                {
+                    "status": "manual",
+                    "error_msg": "erp.workspace_endpoint_required",
+                }
+            ],
+        }
+        self.assertTrue(webhook.draft_actions._saved_without_profile(result))
+        self.assertFalse(
+            webhook.draft_actions._saved_without_profile(
+                {"status": "manual", "push_results": [{"status": "manual"}]}
+            )
+        )
+
     async def test_menu_does_not_probe_targets_before_rendering(self):
         with mock.patch.object(webhook.target_preflight, "inspect_targets") as inspect:
             card = await webhook._menu_card(
@@ -192,6 +210,11 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
     async def test_document_backfills_preview_before_opening_draft(self):
         binding = {"tenant_id": "t1", "user_id": "u1", "workspace_client_id": 7}
         selection = _express_selection()
+        resolved_target = {
+            **_ready(selection)["target"],
+            "connection_workspace_client_id": 7,
+            "workspace_client_id": 9,
+        }
         with (
             mock.patch.object(
                 webhook.store,
@@ -237,7 +260,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(
                 webhook.workspace_resolution,
                 "resolve_history_workspace",
-                return_value=_ready(selection)["target"],
+                return_value=resolved_target,
             ) as resolve_workspace,
             mock.patch.object(
                 webhook.cards,
@@ -256,12 +279,15 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         payload = set_session.call_args.args[3]
         self.assertEqual(set_session.call_args.args[:3], ("t1", "line-u1", "draft"))
         self.assertEqual(payload["history_ids"], ["h1"])
+        self.assertEqual(payload["connection_workspace_client_id"], 7)
+        self.assertEqual(payload["workspace_client_id"], 9)
         self.assertTrue(payload["nonce"])
+        self.assertTrue(resolve_workspace.call_args.kwargs["provisional_history_assignment"])
         preview_card.assert_called_once_with(
             "h1",
             "purchase",
             {"invoice_number": "P-1", "items": [{"name": "Widget"}]},
-            target=_ready(selection)["target"],
+            target=resolved_target,
             posting_mode="stock",
             record_count=1,
             item_count=1,
@@ -269,7 +295,11 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_unbound_cowork_target_resolves_workspace_after_ocr(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}
-        selection = {**_express_selection(), "workspace_client_id": None}
+        selection = {
+            **_express_selection(),
+            "connection_workspace_client_id": None,
+            "workspace_client_id": None,
+        }
         ready = _ready(selection)
         with (
             mock.patch.object(
@@ -412,7 +442,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             any("UPDATE ocr_history SET staged = FALSE" in sql for sql, _ in cursor.sql)
         )
 
-    async def test_complete_confirm_pushes_each_history_through_assigned_erp(self):
+    async def test_complete_confirm_books_and_pushes_document_workspace_b(self):
         binding = {
             "tenant_id": "t1",
             "user_id": "u1",
@@ -420,6 +450,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         }
         cursor = _Cursor(count=2)
         selection = _express_selection()
+        selection["workspace_client_id"] = 9
         selection.update(
             {
                 "account_set": r"S:\\70EXP\\TEST2020",
@@ -480,7 +511,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 webhook.draft_actions.line_document_subject,
                 "matches",
                 return_value=(True, None),
-            ),
+            ) as subject_matches,
             mock.patch.object(
                 webhook.convert_svc,
                 "convert_histories",
@@ -501,13 +532,15 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             user={"id": "u1", "tenant_id": "t1", "is_active": True, "entry": "erp"},
             history_ids=["h1", "h2"],
             endpoint_id="ep-1",
-            workspace_client_id=7,
+            workspace_client_id=9,
             posting_kind="stock",
             account_set_key=r"S:\\70EXP\\TEST2020",
             account_config=None,
             catalog_refresh_request_id="11111111-1111-4111-8111-111111111111",
             catalog_refresh_revision=8,
         )
+        for subject_call in subject_matches.call_args_list:
+            self.assertEqual(subject_call.args[3], 9)
         clear_session.assert_called_once_with("t1", "line-u1")
 
 

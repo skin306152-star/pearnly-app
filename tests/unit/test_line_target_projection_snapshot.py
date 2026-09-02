@@ -43,7 +43,7 @@ class LineTargetProjectionSnapshotTests(unittest.TestCase):
             ),
             mock.patch.object(
                 line_target_catalog,
-                "refresh_mrerp_projection",
+                "refresh_mrerp_account_catalog",
                 return_value={"ok": True, "error_code": None},
             ) as refresh,
             mock.patch.object(line_target_catalog, "load_state", return_value=self.state),
@@ -72,7 +72,7 @@ class LineTargetProjectionSnapshotTests(unittest.TestCase):
             ),
             mock.patch.object(
                 line_target_catalog,
-                "refresh_mrerp_projection",
+                "refresh_mrerp_account_catalog",
                 return_value={"ok": False, "error_code": "ERR_TECHNICAL"},
             ),
             mock.patch.object(line_target_catalog, "load_state", return_value=self.state),

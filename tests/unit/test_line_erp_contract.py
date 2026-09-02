@@ -73,6 +73,41 @@ class ErpChannelTests(unittest.TestCase):
         self.assertEqual(data["bot_basic_id"], "@erp-test")
         self.assertEqual(data["bot_friend_url"], "https://line.me/R/ti/p/@erp-test")
 
+    @mock.patch.object(routes.webhook, "draft_records", return_value=[])
+    @mock.patch.object(
+        routes.target_preflight,
+        "inspect_targets",
+        return_value={"targets": []},
+    )
+    @mock.patch.object(
+        routes,
+        "_draft_token",
+        return_value=(
+            {"user_id": "u1"},
+            {"tenant_id": "t1", "user_id": "u1"},
+            {
+                "payload": {
+                    "history_ids": [],
+                    "endpoint_id": "ep-1",
+                    "workspace_client_id": 7,
+                }
+            },
+        ),
+    )
+    def test_draft_poll_never_reloads_third_party_master_data(self, _token, inspect, _records):
+        app = FastAPI()
+        app.include_router(routes.router)
+
+        response = TestClient(app).get("/api/line/erp/draft/d1")
+
+        self.assertEqual(response.status_code, 200)
+        inspect.assert_called_once_with(
+            {"tenant_id": "t1", "user_id": "u1"},
+            endpoint_id="ep-1",
+            workspace_client_id=7,
+            refresh=False,
+        )
+
 
 class ErpFlowTests(unittest.TestCase):
     def test_mode_must_be_selected_before_media(self):

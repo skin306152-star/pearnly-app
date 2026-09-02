@@ -31,10 +31,14 @@ def _locked(session: dict[str, Any]) -> bool:
 
 
 async def _inspect_targets(
-    binding: dict[str, Any], line_user_id: str, reply_token: str | None
+    binding: dict[str, Any],
+    line_user_id: str,
+    reply_token: str | None,
+    *,
+    refresh: bool = True,
 ) -> dict[str, Any] | None:
     try:
-        return await asyncio.to_thread(target_preflight.inspect_targets, binding, refresh=True)
+        return await asyncio.to_thread(target_preflight.inspect_targets, binding, refresh=refresh)
     except target_preflight.TargetNotReady as exc:
         _notify(line_user_id, reply_token, target_preflight.status_text(exc.result))
     except Exception:
@@ -56,7 +60,7 @@ async def show_target_picker(
     if session.get("state") == "ocr_processing" or _locked(session):
         _notify(line_user_id, reply_token, "รายการปัจจุบันยังไม่เสร็จ กรุณาดำเนินการให้เรียบร้อย")
         return
-    result = await _inspect_targets(binding, line_user_id, reply_token)
+    result = await _inspect_targets(binding, line_user_id, reply_token, refresh=True)
     if result is None:
         return
     store.set_session(binding["tenant_id"], line_user_id, "target", {"mode": mode})
@@ -88,7 +92,7 @@ async def show_account_picker(
     ):
         _notify(line_user_id, reply_token, "รายการหมดอายุ กรุณาเลือกประเภทเอกสารใหม่")
         return
-    result = await _inspect_targets(binding, line_user_id, reply_token)
+    result = await _inspect_targets(binding, line_user_id, reply_token, refresh=False)
     if result is None:
         return
     targets = result.get("targets") or []
@@ -164,7 +168,7 @@ async def choose_target(
             binding,
             endpoint_id=endpoint_id,
             workspace_client_id=workspace_id,
-            refresh=True,
+            refresh=False,
         )
     except target_preflight.TargetNotReady as exc:
         _notify(line_user_id, reply_token, target_preflight.status_text(exc.result))
@@ -208,7 +212,7 @@ async def choose_posting_mode(
             target_selection.normalize,
             binding,
             requested,
-            refresh=True,
+            refresh=False,
         )
     except target_selection.SelectionError as exc:
         text = (

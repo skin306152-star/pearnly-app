@@ -257,39 +257,20 @@ def refresh_mrerp_projection(
     observed_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Refresh live account sets, customers and products without wizard caches."""
-    endpoint_id = str(endpoint.get("id") or "")
-    if str(endpoint.get("adapter") or "").strip().lower() != "mrerp":
-        raise MRErpProjectionError("erp.target_projection_adapter_mismatch")
+    timestamp = observed_at or datetime.now(timezone.utc)
+    account_refresh = refresh_mrerp_account_catalog(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        endpoint=endpoint,
+        observed_at=timestamp,
+    )
+    if not account_refresh.get("ok"):
+        return account_refresh
+    account_sets = account_refresh["account_sets"]
+    catalog = account_refresh["catalog"]
     config = endpoint.get("config") if isinstance(endpoint.get("config"), Mapping) else {}
     config = deepcopy(dict(config))
-    timestamp = observed_at or datetime.now(timezone.utc)
-    _claim_endpoint_tenant(tenant_id=tenant_id, endpoint_id=endpoint_id)
-
-    account_result = _run_live(test_mrerp_endpoint, config)
-    if not account_result.get("ok"):
-        return _failed(
-            tenant_id=tenant_id,
-            user_id=user_id,
-            endpoint_id=endpoint_id,
-            account_set_key=None,
-            observed_at=timestamp,
-            error_code=str(account_result.get("error_code") or "ERR_UNEXPECTED"),
-        )
-    account_sets = _account_sets(account_result.get("companies"))
-    if not account_sets:
-        return _failed(
-            tenant_id=tenant_id,
-            user_id=user_id,
-            endpoint_id=endpoint_id,
-            account_set_key=None,
-            observed_at=timestamp,
-            error_code="ERR_ACCOUNT_SET_EMPTY",
-        )
-    catalog = publish_projection(
-        tenant_id=tenant_id,
-        endpoint_id=endpoint_id,
-        observation=_observation(observed_at=timestamp, account_sets=account_sets),
-    )
+    endpoint_id = str(endpoint.get("id") or "")
 
     selected = _selected_account_set(account_sets, config, account_set_key)
     if selected is None:
@@ -362,8 +343,64 @@ def refresh_mrerp_projection(
     }
 
 
+def refresh_mrerp_account_catalog(
+    *,
+    tenant_id: str,
+    user_id: str,
+    endpoint: Mapping[str, Any],
+    observed_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Refresh only the lightweight account-set catalog used by LINE target pickers."""
+    endpoint_id = str(endpoint.get("id") or "")
+    if str(endpoint.get("adapter") or "").strip().lower() != "mrerp":
+        raise MRErpProjectionError("erp.target_projection_adapter_mismatch")
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), Mapping) else {}
+    config = deepcopy(dict(config))
+    timestamp = observed_at or datetime.now(timezone.utc)
+    _claim_endpoint_tenant(tenant_id=tenant_id, endpoint_id=endpoint_id)
+
+    account_result = _run_live(test_mrerp_endpoint, config)
+    if not account_result.get("ok"):
+        return _failed(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            endpoint_id=endpoint_id,
+            account_set_key=None,
+            observed_at=timestamp,
+            error_code=str(account_result.get("error_code") or "ERR_UNEXPECTED"),
+        )
+    account_sets = _account_sets(account_result.get("companies"))
+    if not account_sets:
+        return _failed(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            endpoint_id=endpoint_id,
+            account_set_key=None,
+            observed_at=timestamp,
+            error_code="ERR_ACCOUNT_SET_EMPTY",
+        )
+    catalog = publish_projection(
+        tenant_id=tenant_id,
+        endpoint_id=endpoint_id,
+        observation=_observation(observed_at=timestamp, account_sets=account_sets),
+    )
+    return {
+        "ok": True,
+        "error_code": None,
+        "catalog": catalog,
+        "account_sets": account_sets,
+        "data": _state(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            endpoint_id=endpoint_id,
+            account_set_key=None,
+        ),
+    }
+
+
 __all__ = [
     "MRErpProjectionError",
     "claim_endpoint_tenant_with_cursor",
+    "refresh_mrerp_account_catalog",
     "refresh_mrerp_projection",
 ]

@@ -110,6 +110,29 @@ class MRErpTargetProjectionTests(unittest.TestCase):
         self.assertEqual(projected[0]["label"], "First")
         self.assertEqual(projected[0]["attributes"]["category_code"], "A")
 
+    def test_account_catalog_refresh_never_fetches_heavy_master_lists(self):
+        claim, accounts, products, customers, publish, load = self._patches()
+        with (
+            claim,
+            accounts,
+            products as product_mock,
+            customers as customer_mock,
+            publish as publish_mock,
+            load,
+        ):
+            result = projection.refresh_mrerp_account_catalog(
+                tenant_id="tenant-a",
+                user_id="user-a",
+                endpoint=self.endpoint,
+                observed_at=self.observed_at,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(result["account_sets"]), 2)
+        product_mock.assert_not_called()
+        customer_mock.assert_not_called()
+        publish_mock.assert_called_once()
+
     def test_transient_product_failure_retries_once_then_keeps_stale_snapshot(self):
         stale = {"snapshot": {"revision": 3}, "freshness": {"status": "offline"}}
         with (

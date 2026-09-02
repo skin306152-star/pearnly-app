@@ -7,7 +7,7 @@ from typing import Any
 
 from core.feature_flags import erp_target_projection_enabled_for
 from services.erp import line_target_projection, target_readiness
-from services.erp.mrerp_target_projection import refresh_mrerp_projection
+from services.erp.mrerp_target_projection import refresh_mrerp_account_catalog
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 from services.erp.shared_express_schema import enable_shared_express_select
 from services.erp.target_projection_store import load_state
@@ -242,7 +242,7 @@ def _projection_probe(
 
     refresh_result = None
     if refresh:
-        refresh_result = refresh_mrerp_projection(
+        refresh_result = refresh_mrerp_account_catalog(
             tenant_id=str(tenant_id),
             user_id=str(user_id),
             endpoint=endpoint,

@@ -91,7 +91,7 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
                 "express",
             )
 
-        inspect.assert_called_once_with(self.binding, refresh=True)
+        inspect.assert_called_once_with(self.binding, refresh=False)
         save.assert_called_once_with(
             "t1",
             "line-u1",
@@ -165,7 +165,7 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
             self.binding,
             endpoint_id="express-1",
             workspace_client_id=7,
-            refresh=True,
+            refresh=False,
         )
         payload = save.call_args.args[3]
         self.assertEqual(save.call_args.args[:3], ("t1", "line-u1", "posting"))
@@ -217,7 +217,7 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
             self.binding,
             endpoint_id="express-1",
             workspace_client_id=None,
-            refresh=True,
+            refresh=False,
         )
         self.assertIsNone(save.call_args.args[3]["workspace_client_id"])
 
@@ -247,7 +247,7 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
             await target_flow.choose_posting_mode("stock", self.binding, "line-u1", "reply-token")
 
         self.assertEqual(normalize.call_args.args[1]["posting_kind"], "stock")
-        self.assertTrue(normalize.call_args.kwargs["refresh"])
+        self.assertFalse(normalize.call_args.kwargs["refresh"])
         save.assert_called_once_with("t1", "line-u1", "receiving", selected)
 
     def test_blocked_target_is_status_text_not_a_quick_reply(self):

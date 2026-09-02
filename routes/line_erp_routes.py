@@ -271,7 +271,7 @@ async def erp_draft_get(request: Request, draft_id: str):
         binding,
         endpoint_id=str(payload.get("endpoint_id") or "") or None,
         workspace_client_id=payload.get("workspace_client_id"),
-        refresh=True,
+        refresh=False,
     )
     return {
         "ok": True,
@@ -314,7 +314,7 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
             target_selection.normalize,
             binding,
             requested,
-            refresh=True,
+            refresh=False,
         )
     except target_selection.SelectionError as exc:
         raise HTTPException(exc.status_code, detail=exc.code) from None

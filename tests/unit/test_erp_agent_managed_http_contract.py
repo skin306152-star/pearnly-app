@@ -277,6 +277,7 @@ class ManagedHeartbeatHttpTests(unittest.TestCase):
                     "pearnly_account": "owner@example.com",
                 },
             ),
+            mock.patch.object(erp_agent, "_ingest_target_projection") as ingest,
             mock.patch.object(erp_agent, "_managed_heartbeat") as managed_heartbeat,
         ):
             response = TestClient(app).post(
@@ -306,6 +307,7 @@ class ManagedHeartbeatHttpTests(unittest.TestCase):
         authenticate.assert_called_once_with(token)
         touch_heartbeat.assert_called_once_with(endpoint["id"], device="")
         account_sets_store.assert_called_once_with(endpoint["id"], [{"code": "TEST"}])
+        ingest.assert_called_once_with(endpoint["id"], {"account_sets": [{"code": "TEST"}]})
         managed_heartbeat.assert_not_called()
 
     def test_legacy_agent_token_route_keeps_existing_http_contract(self):

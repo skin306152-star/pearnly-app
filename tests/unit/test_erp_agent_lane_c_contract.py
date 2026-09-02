@@ -53,6 +53,10 @@ class AgentLaneCTests(unittest.TestCase):
             mock.patch.object(erp_agent.agent_store, "authenticate", return_value=endpoint),
             mock.patch.object(erp_agent.agent_store, "touch_heartbeat"),
             mock.patch.object(erp_agent.agent_store, "store_account_sets", return_value=2),
+            mock.patch.object(erp_agent, "_ingest_target_projection") as ingest,
+            mock.patch.object(
+                erp_agent, "_offer_master_refresh", side_effect=lambda result, _body: result
+            ),
             mock.patch.object(erp_agent, "_managed_heartbeat") as managed,
         ):
             result = asyncio.run(
@@ -63,6 +67,9 @@ class AgentLaneCTests(unittest.TestCase):
         self.assertEqual(result["connected"], True)
         self.assertEqual(result["account_set"], "TEST")
         self.assertEqual(result["account_sets_received"], 2)
+        ingest.assert_called_once_with(
+            "ep-1", {"account_sets": [{"code": "TEST"}], "account_set": "TEST"}
+        )
         managed.assert_not_called()
 
     def test_unknown_token_uses_heartbeat_only_managed_seam(self):

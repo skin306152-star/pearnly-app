@@ -20,8 +20,12 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
             "workspace_client_id": 7,
             "workspace_name": "Sister Makeup",
             "label": "Express · MAIN",
+            "connection_label": "Express",
             "adapter": "express",
             "selectable": True,
+            "supports_master_refresh": True,
+            "selected_account_key": "MAIN",
+            "account_choices": [{"key": "MAIN", "label": "MAIN", "writable": True}],
         }
 
     async def test_direction_refreshes_targets_and_shows_erp_quick_replies(self):
@@ -42,7 +46,7 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
         ):
             await target_flow.show_target_picker(self.binding, "line-u1", "reply-token", "purchase")
 
-        inspect.assert_called_once_with(self.binding, refresh=True)
+        inspect.assert_called_once_with(self.binding, refresh=False)
         save.assert_called_once_with("t1", "line-u1", "target", {"mode": "purchase"})
         message = reply.call_args.args[1][0]
         self.assertEqual(message["type"], "text")
@@ -99,11 +103,108 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
             {"mode": "purchase", "adapter": "express"},
         )
         message = reply.call_args.args[1][0]
-        self.assertEqual([action["label"] for action in _actions(message)], ["Express · MAIN"])
+        self.assertEqual(
+            [action["label"] for action in _actions(message)], ["Sister Makeup · MAIN"]
+        )
+        self.assertIn("account", parse_qs(_actions(message)[0]["data"]))
         rendered = json.dumps(message, ensure_ascii=False)
         self.assertIn("Express · OFFLINE", rendered)
         self.assertIn("โปรแกรมผู้ช่วย Express ออฟไลน์", rendered)
         self.assertNotIn("MR.ERP · MAIN", rendered)
+
+    async def test_account_picker_requests_endpoint_refresh_without_blocking_line(self):
+        with (
+            mock.patch.object(
+                target_flow.store,
+                "get_session",
+                return_value={"state": "target", "payload": {"mode": "purchase"}},
+            ),
+            mock.patch.object(
+                target_flow.team_access,
+                "binding_line_modes",
+                return_value=("purchase",),
+            ),
+            mock.patch.object(
+                target_flow.target_preflight,
+                "inspect_targets",
+                return_value={"targets": [self.target]},
+            ),
+            mock.patch.object(target_flow, "erp_target_projection_enabled_for", return_value=True),
+            mock.patch.object(
+                target_flow.target_refresh,
+                "request_refresh",
+                return_value={"request_id": "refresh-endpoint", "status": "requested"},
+            ) as request_refresh,
+            mock.patch.object(target_flow.store, "set_session") as save,
+            mock.patch.object(target_flow.line_client, "reply_messages") as reply,
+        ):
+            await target_flow.show_account_picker(
+                self.binding, "line-u1", "reply-token", "purchase", "express"
+            )
+
+        request_refresh.assert_called_once_with(
+            tenant_id="t1",
+            user_id="u1",
+            endpoint_id="express-1",
+            account_set_key="@endpoint",
+            adapter="express",
+        )
+        refreshes = save.call_args.args[3]["account_catalog_refreshes"]
+        self.assertEqual(refreshes[0]["request_id"], "refresh-endpoint")
+        message = reply.call_args.args[1][0]
+        self.assertIn("ล่าสุด", message["text"])
+        self.assertEqual([action["label"] for action in _actions(message)], ["ตรวจสอบอีกครั้ง"])
+
+    async def test_account_picker_reads_new_snapshot_after_endpoint_refresh(self):
+        refreshes = [
+            {
+                "request_id": "refresh-endpoint",
+                "endpoint_id": "express-1",
+                "adapter": "express",
+            }
+        ]
+        with (
+            mock.patch.object(
+                target_flow.store,
+                "get_session",
+                return_value={
+                    "state": "target",
+                    "payload": {
+                        "mode": "purchase",
+                        "adapter": "express",
+                        "account_catalog_refreshes": refreshes,
+                    },
+                },
+            ),
+            mock.patch.object(
+                target_flow.team_access,
+                "binding_line_modes",
+                return_value=("purchase",),
+            ),
+            mock.patch.object(
+                target_flow.target_preflight,
+                "inspect_targets",
+                return_value={"targets": [self.target]},
+            ),
+            mock.patch.object(target_flow, "erp_target_projection_enabled_for", return_value=True),
+            mock.patch.object(
+                target_flow.target_refresh,
+                "refresh_status",
+                return_value={"status": "succeeded"},
+            ),
+            mock.patch.object(target_flow.target_refresh, "request_refresh") as request_refresh,
+            mock.patch.object(target_flow.store, "set_session"),
+            mock.patch.object(target_flow.line_client, "reply_messages") as reply,
+        ):
+            await target_flow.show_account_picker(
+                self.binding, "line-u1", "reply-token", "purchase", "express"
+            )
+
+        request_refresh.assert_not_called()
+        self.assertEqual(
+            [action["label"] for action in _actions(reply.call_args.args[1][0])],
+            ["Sister Makeup · MAIN"],
+        )
 
     async def test_erp_choice_rechecks_employee_permission_before_preflight(self):
         with (
@@ -151,6 +252,12 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(
                 target_flow.target_preflight, "require_ready", return_value=ready
             ) as require,
+            mock.patch.object(target_flow, "erp_target_projection_enabled_for", return_value=True),
+            mock.patch.object(
+                target_flow.target_refresh,
+                "request_refresh",
+                return_value={"request_id": "refresh-1", "status": "requested"},
+            ) as request_refresh,
             mock.patch.object(target_flow.store, "set_session") as save,
             mock.patch.object(target_flow.line_client, "reply_messages") as reply,
         ):
@@ -171,6 +278,14 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(save.call_args.args[:3], ("t1", "line-u1", "posting"))
         self.assertEqual(payload["endpoint_id"], "express-1")
         self.assertEqual(payload["workspace_client_id"], 7)
+        self.assertEqual(payload["master_refresh_request_id"], "refresh-1")
+        request_refresh.assert_called_once_with(
+            tenant_id="t1",
+            user_id="u1",
+            endpoint_id="express-1",
+            account_set_key="MAIN",
+            adapter="express",
+        )
         message = reply.call_args.args[1][0]
         self.assertEqual(message["type"], "text")
         self.assertEqual(
@@ -203,6 +318,12 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
                 "require_ready",
                 return_value={"target": target},
             ) as require,
+            mock.patch.object(target_flow, "erp_target_projection_enabled_for", return_value=True),
+            mock.patch.object(
+                target_flow.target_refresh,
+                "request_refresh",
+                return_value={"request_id": "refresh-2", "status": "requested"},
+            ),
             mock.patch.object(target_flow.store, "set_session") as save,
             mock.patch.object(target_flow.line_client, "reply_messages"),
         ):
@@ -220,6 +341,42 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
             refresh=False,
         )
         self.assertIsNone(save.call_args.args[3]["workspace_client_id"])
+
+    async def test_old_express_companion_keeps_existing_line_flow(self):
+        target = {**self.target, "supports_master_refresh": False}
+        with (
+            mock.patch.object(
+                target_flow.store,
+                "get_session",
+                return_value={
+                    "state": "target",
+                    "payload": {"mode": "sales", "adapter": "express"},
+                },
+            ),
+            mock.patch.object(
+                target_flow.team_access,
+                "binding_line_modes",
+                return_value=("sales",),
+            ),
+            mock.patch.object(
+                target_flow.target_preflight,
+                "require_ready",
+                return_value={"target": target},
+            ),
+            mock.patch.object(target_flow, "erp_target_projection_enabled_for", return_value=True),
+            mock.patch.object(target_flow.target_refresh, "request_refresh") as request_refresh,
+            mock.patch.object(target_flow.store, "set_session") as save,
+            mock.patch.object(target_flow.line_client, "reply_messages"),
+        ):
+            await target_flow.choose_target(
+                {"mode": ["sales"], "endpoint": ["express-1"], "workspace": ["7"]},
+                self.binding,
+                "line-u1",
+                "reply-token",
+            )
+
+        request_refresh.assert_not_called()
+        self.assertNotIn("master_refresh_request_id", save.call_args.args[3])
 
     async def test_posting_choice_locks_complete_target_snapshot_for_ocr(self):
         requested = {
@@ -274,11 +431,12 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
         targets = [
             {
                 **self.target,
-                "endpoint_id": f"express-{index}",
-                "workspace_client_id": index,
-                "label": f"Express {index}",
+                "workspace_name": "",
+                "account_choices": [
+                    {"key": f"account-{index}", "label": f"Express {index}", "writable": True}
+                    for index in range(13)
+                ],
             }
-            for index in range(13)
         ]
 
         first = selection_messages.account_picker_message(targets, "express", "purchase", page=0)

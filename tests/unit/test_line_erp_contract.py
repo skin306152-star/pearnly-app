@@ -309,6 +309,42 @@ class ErpWebhookTests(unittest.TestCase):
 
 
 class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_confirm_waits_for_background_master_refresh(self):
+        selection = {
+            "mode": "purchase",
+            "direction": "purchase",
+            "endpoint_id": "ep-1",
+            "workspace_client_id": 7,
+            "adapter": "mrerp",
+            "payment": "credit",
+            "master_refresh_request_id": "11111111-1111-4111-8111-111111111111",
+        }
+        with (
+            mock.patch.object(
+                webhook.draft_actions.target_refresh,
+                "refresh_status",
+                return_value={"status": "leased"},
+            ) as refresh_status,
+            mock.patch.object(webhook.target_selection, "normalize") as normalize,
+        ):
+            result = await webhook._confirm(
+                {"user_id": "u1", "tenant_id": "t1"},
+                {"id": "u1"},
+                "h1",
+                ["h1"],
+                None,
+                "purchase",
+                selection,
+            )
+
+        self.assertEqual(result["detail"], "line_erp.master_refresh_pending")
+        refresh_status.assert_called_once_with(
+            selection["master_refresh_request_id"],
+            tenant_id="t1",
+            endpoint_id="ep-1",
+        )
+        normalize.assert_not_called()
+
     async def test_confirm_stops_before_conversion_when_one_document_has_anomaly(self):
         records = [
             {

@@ -67,18 +67,47 @@ def _managed_heartbeat(token: str, body: Dict[str, Any]):
     from services.erp.shared_express_live import ManagedLiveError, record_managed_heartbeat
 
     try:
-        return record_managed_heartbeat(
+        result = record_managed_heartbeat(
             token,
             account_set=body.get("account_set"),
             account_dir=body.get("account_dir"),
             agent_version=body.get("companion_version"),
             offline=bool(body.get("offline")),
         )
+        if result.get("ok") and not body.get("offline"):
+            _ingest_target_projection(str(result.get("endpoint_id") or ""), body)
+        return _offer_master_refresh(result, body)
     except ManagedLiveError as exc:
         raise HTTPException(
             status_code=int(getattr(exc, "status", getattr(exc, "status_code", 500))),
             detail=str(getattr(exc, "code", "erp.managed_live_error")),
         ) from exc
+
+
+def _ingest_target_projection(endpoint_id: str, body: Dict[str, Any]) -> None:
+    try:
+        from services.erp.express_target_projection import ingest_express_heartbeat
+
+        ingest_express_heartbeat(endpoint_id, body)
+    except Exception:
+        logger.exception("Express target projection ingestion failed: %s", endpoint_id[:8])
+
+
+def _offer_master_refresh(
+    result: Dict[str, Any], body: Dict[str, Any], *, endpoint_id: str | None = None
+) -> Dict[str, Any]:
+    endpoint_id = str(endpoint_id or result.get("endpoint_id") or "")
+    account_set = str(body.get("account_set") or body.get("account_dir") or "")
+    if not endpoint_id or body.get("offline"):
+        return result
+    try:
+        from services.erp.target_refresh import lease_express_refresh
+
+        request = lease_express_refresh(endpoint_id, account_set)
+    except Exception:
+        logger.exception("Express target refresh lease failed: %s", endpoint_id[:8])
+        return result
+    return {**result, "master_refresh": request} if request else result
 
 
 def _run_agent_heartbeat(token: str, body: Dict[str, Any]):
@@ -140,7 +169,8 @@ def _run_agent_heartbeat(token: str, body: Dict[str, Any]):
     # 小助手版本落端点:发版后「在用的真更新了没」得能查,不能只靠上机器看托盘。
     if cfg.get("companion_version") != body.get("companion_version"):
         agent_store.store_companion_version(str(ep["id"]), body.get("companion_version"))
-    return {
+    _ingest_target_projection(str(ep["id"]), body)
+    result = {
         "ok": True,
         "endpoint_id": str(ep["id"]),
         "connected": True,
@@ -150,6 +180,7 @@ def _run_agent_heartbeat(token: str, body: Dict[str, Any]):
         "accounts_received": accts_stored,
         "connection": _connection_identity(ep),
     }
+    return _offer_master_refresh(result, body)
 
 
 # ── token 生成(网页会话)────────────────────────────────────────────────
@@ -234,7 +265,12 @@ def _legacy_agent_lease(ep: Dict[str, Any], owner: str, max_n: int) -> Dict[str,
                 "payload": payload,
             }
         )
-    return {"ok": True, "lease_seconds": 120, "jobs": jobs}
+    result = {"ok": True, "lease_seconds": 120, "jobs": jobs}
+    return _offer_master_refresh(
+        result,
+        {"account_set": cfg.get("account_set") or cfg.get("account_dir")},
+        endpoint_id=str(ep["id"]),
+    )
 
 
 def _run_agent_lease(token: str, agent_id: object, max_n: int) -> Dict[str, Any]:

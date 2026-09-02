@@ -71,9 +71,13 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/endpoints/{endpoint_id}/shared/profile/confirm"),
             ("GET", "/api/erp/endpoints/{endpoint_id}/target-projection"),
             ("POST", "/api/erp/endpoints/{endpoint_id}/target-projection/refresh"),
+            (
+                "GET",
+                "/api/erp/endpoints/{endpoint_id}/target-projection/refresh/{request_id}",
+            ),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 37)
+        self.assertEqual(len(router.routes), 38)
 
     def test_app_includes_erp_router(self):
         """防 include_router 漏挂 · app 必须能路由到 erp 推送"""

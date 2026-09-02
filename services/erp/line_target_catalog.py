@@ -10,7 +10,7 @@ from services.erp import line_target_projection, target_readiness
 from services.erp.mrerp_target_projection import refresh_mrerp_account_catalog
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 from services.erp.shared_express_schema import enable_shared_express_select
-from services.erp.target_projection_store import load_state
+from services.erp.target_projection_store import load_state, load_state_with_cursor
 
 LegacySpec = tuple[dict[str, Any], dict[str, Any] | None, int, bool]
 
@@ -111,6 +111,11 @@ def managed_targets(
             cloud_in_flight, waiting_lock = line_target_projection.active_push_state(
                 cur, str(row["id"])
             )
+            projection_state = load_state_with_cursor(
+                cur,
+                tenant_id=tenant_id,
+                endpoint_id=str(row["id"]),
+            )
             targets.append(
                 line_target_projection.managed_target(
                     row,
@@ -118,6 +123,9 @@ def managed_targets(
                     duplicate=duplicate,
                     cloud_in_flight=cloud_in_flight,
                     waiting_lock=waiting_lock,
+                    account_sets=((projection_state or {}).get("snapshot") or {}).get(
+                        "account_sets"
+                    ),
                 )
             )
     return targets
@@ -237,6 +245,22 @@ def _projection_probe(
 ) -> dict[str, Any]:
     adapter = str(endpoint.get("adapter") or "").strip().lower()
     enabled = bool(tenant_id and user_id and erp_target_projection_enabled_for(tenant_id, user_id))
+    if adapter == "express" and enabled:
+        probe = target_readiness.probe_endpoint(endpoint, refresh=False)
+        state = load_state(
+            tenant_id=str(tenant_id),
+            user_id=str(user_id),
+            endpoint_id=str(endpoint.get("id") or ""),
+        )
+        snapshot = (state or {}).get("snapshot") or {}
+        if snapshot:
+            probe = {
+                **probe,
+                "account_sets": snapshot.get("account_sets") or [],
+                "projection_revision": snapshot.get("revision"),
+                "account_sets_revision": snapshot.get("account_sets_revision"),
+            }
+        return probe
     if adapter != "mrerp" or not enabled:
         return target_readiness.probe_endpoint(endpoint, refresh=refresh)
 

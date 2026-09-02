@@ -239,6 +239,12 @@ class TargetProjectionPgSmokeTests(unittest.TestCase):
     def test_rls_hides_other_tenant_projection(self):
         self._publish(_observation(), TENANT_A, ENDPOINT_A)
         self._publish(_observation("Other"), TENANT_B, ENDPOINT_B)
+        self.cur.execute(
+            "INSERT INTO erp_target_refresh_requests "
+            "(tenant_id,endpoint_id,account_set_key,adapter,reason) VALUES "
+            "(%s,%s,'2026','express','test'),(%s,%s,'2026','express','test')",
+            (TENANT_A, ENDPOINT_A, TENANT_B, ENDPOINT_B),
+        )
         self.conn.commit()
         self.cur.execute(f"SET LOCAL ROLE {RLS_APP_ROLE}")
         self.cur.execute(f'SET LOCAL search_path TO "{self.schema}", public')

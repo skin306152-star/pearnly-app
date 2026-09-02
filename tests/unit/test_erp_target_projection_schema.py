@@ -17,6 +17,7 @@ class TargetProjectionSchemaTests(unittest.TestCase):
                 "erp_target_projection_snapshots",
                 "erp_target_projection_heads",
                 "erp_target_projection_items",
+                "erp_target_refresh_requests",
             ),
         )
         for token in (
@@ -29,6 +30,7 @@ class TargetProjectionSchemaTests(unittest.TestCase):
             "form_schema_revision",
             "capability_revision",
             "entity_type IN ('products', 'customers', 'suppliers', 'units', 'branches', 'accounts')",
+            "status IN ('requested', 'leased', 'succeeded', 'failed')",
         ):
             self.assertIn(token, ddl)
         schema = (ROOT / "services/erp/target_projection_schema.py").read_text()
@@ -41,6 +43,11 @@ class TargetProjectionSchemaTests(unittest.TestCase):
         self.assertIn('down_revision = "0118_dms_line_query_permission"', migration)
         self.assertIn("from services.erp.target_projection_schema import DDL, TABLES", migration)
         self.assertIn("ensure_target_projection_schema()", startup)
+        refresh_migration = (
+            ROOT / "alembic/versions/0120_erp_target_refresh_requests.py"
+        ).read_text()
+        self.assertIn('revision = "0120_erp_target_refresh_requests"', refresh_migration)
+        self.assertIn('down_revision = "0119_erp_target_projection"', refresh_migration)
 
     def test_new_read_api_is_feature_gated_and_registered(self):
         flags = (ROOT / "core/feature_flags.py").read_text()

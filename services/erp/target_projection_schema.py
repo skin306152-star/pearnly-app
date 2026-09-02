@@ -9,6 +9,7 @@ TABLES = (
     "erp_target_projection_snapshots",
     "erp_target_projection_heads",
     "erp_target_projection_items",
+    "erp_target_refresh_requests",
 )
 
 DDL = (
@@ -84,10 +85,39 @@ DDL = (
         PRIMARY KEY (snapshot_id, entity_type, source_id)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS erp_target_refresh_requests (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        endpoint_id uuid NOT NULL REFERENCES erp_endpoints(id) ON DELETE CASCADE,
+        account_set_key text NOT NULL,
+        adapter text NOT NULL CHECK (adapter IN ('mrerp', 'express')),
+        status text NOT NULL DEFAULT 'requested' CHECK (
+            status IN ('requested', 'leased', 'succeeded', 'failed')
+        ),
+        requested_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+        reason text NOT NULL,
+        requested_at timestamptz NOT NULL DEFAULT now(),
+        started_at timestamptz,
+        completed_at timestamptz,
+        lease_owner text,
+        lease_expires_at timestamptz,
+        error_code text,
+        result_revision bigint,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CHECK (account_set_key <> '')
+    )
+    """,
     "CREATE INDEX IF NOT EXISTS ix_erp_target_projection_snapshot_lookup "
     "ON erp_target_projection_snapshots (tenant_id, endpoint_id, scope_kind, scope_key, revision DESC)",
     "CREATE INDEX IF NOT EXISTS ix_erp_target_projection_items_lookup "
     "ON erp_target_projection_items (tenant_id, endpoint_id, entity_type, source_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_erp_target_refresh_active "
+    "ON erp_target_refresh_requests (tenant_id, endpoint_id, account_set_key) "
+    "WHERE status IN ('requested', 'leased')",
+    "CREATE INDEX IF NOT EXISTS ix_erp_target_refresh_due "
+    "ON erp_target_refresh_requests (adapter, status, requested_at)",
 )
 
 

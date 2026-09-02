@@ -7,8 +7,19 @@ import ntpath
 from typing import Any
 
 from services.erp import target_readiness
+from services.erp.express_target_projection import normalize_express_account_key
 from services.erp.push_log_meta import _derive_v3_meta
 from services.erp.shared_express_store import safe_endpoint_dto
+
+_MASTER_REFRESH_MIN_VERSION = (1, 1, 72)
+
+
+def supports_master_refresh(version: Any) -> bool:
+    try:
+        parsed = tuple(int(part) for part in str(version or "").strip().split("."))
+    except ValueError:
+        return False
+    return parsed >= _MASTER_REFRESH_MIN_VERSION
 
 
 def _setup_action(missing: list[str]) -> str | None:
@@ -70,7 +81,41 @@ def _mrerp_account_choices(probe: dict[str, Any] | None) -> list[dict[str, Any]]
     return choices
 
 
-def _express_account_choices(endpoint: dict[str, Any]) -> list[dict[str, Any]]:
+def _projection_express_choices(probe: dict[str, Any] | None) -> list[dict[str, Any]]:
+    choices = []
+    for row in (probe or {}).get("account_sets") or []:
+        if not isinstance(row, dict):
+            continue
+        attributes = row.get("attributes") if isinstance(row.get("attributes"), dict) else {}
+        key = normalize_express_account_key(row.get("source_id"))
+        if not key:
+            continue
+        choices.append(
+            {
+                "key": key,
+                "label": str(row.get("label") or key).strip(),
+                "root_key": str(attributes.get("root") or "").strip(),
+                "root_label": str(attributes.get("root_label") or "").strip()
+                or _root_label(str(attributes.get("root") or "")),
+                "account_set": key,
+                "account_dir": str(attributes.get("path") or key).strip(),
+                "account_company": str(attributes.get("company") or "").strip(),
+                "account_set_row": _int_value(attributes.get("row")),
+                "writable": bool(attributes.get("writable", True)),
+                "mapping": (
+                    attributes.get("mapping") if isinstance(attributes.get("mapping"), dict) else {}
+                ),
+            }
+        )
+    return choices
+
+
+def _express_account_choices(
+    endpoint: dict[str, Any], probe: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
+    projected = _projection_express_choices(probe)
+    if projected:
+        return projected
     config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
     reported = config.get("reported_account_sets")
     rows = reported if isinstance(reported, list) else []
@@ -130,7 +175,7 @@ def _legacy_account_choices(
     if adapter == "mrerp":
         return _mrerp_account_choices(probe)
     if adapter == "express":
-        return _express_account_choices(endpoint)
+        return _express_account_choices(endpoint, probe)
     return []
 
 
@@ -141,10 +186,14 @@ def _legacy_account_label(
     selected = (
         _choice_key(config.get("comidyear") or "6", config.get("seldb") or "1")
         if adapter == "mrerp"
-        else str(config.get("account_set") or config.get("account_dir") or "").strip()
+        else normalize_express_account_key(config.get("account_set") or config.get("account_dir"))
     )
     for choice in choices:
-        if str(choice.get("key") or "") == selected:
+        choice_key = str(choice.get("key") or "")
+        if choice_key == selected or (
+            adapter == "express"
+            and normalize_express_account_key(choice_key) == normalize_express_account_key(selected)
+        ):
             return str(choice.get("label") or "").strip()[:200]
     return selected
 
@@ -175,6 +224,7 @@ def managed_target(
     duplicate: bool = False,
     cloud_in_flight: bool = False,
     waiting_lock: bool = False,
+    account_sets: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     endpoint_id = str(row.get("id") or "")
     workspace_id = int(workspace["id"])
@@ -209,7 +259,7 @@ def managed_target(
         missing.append("companion_not_ready")
     profile_label = str(dto.get("account_set") or "").strip()
     endpoint_label = str(row.get("name") or "Express").strip()[:80]
-    account_choices = (
+    account_choices = _projection_express_choices({"account_sets": account_sets or []}) or (
         [
             {
                 "key": profile_label,
@@ -221,19 +271,32 @@ def managed_target(
         if profile_label
         else []
     )
+    profile_key = normalize_express_account_key(profile_label)
+    selected_choice = next(
+        (
+            choice
+            for choice in account_choices
+            if normalize_express_account_key(choice.get("key")) == profile_key
+        ),
+        None,
+    )
+    selected_account_key = str((selected_choice or {}).get("key") or profile_label).strip()
+    account_label = str((selected_choice or {}).get("label") or profile_label).strip()
     return {
         "endpoint_id": endpoint_id,
         "workspace_client_id": workspace_id,
         "workspace_name": str(workspace.get("name") or "")[:200] or None,
         "adapter": "express",
-        "label": f"{endpoint_label} · {profile_label}" if profile_label else endpoint_label,
-        "account_set_label": profile_label or None,
+        "connection_label": endpoint_label,
+        "label": f"{endpoint_label} · {account_label}" if account_label else endpoint_label,
+        "account_set_label": account_label or None,
         "account_choices": account_choices,
-        "selected_account_key": profile_label or None,
+        "selected_account_key": selected_account_key or None,
         "connection_state": state,
         "configured": configured,
         "selectable": not missing,
         "mode_options": ["stock", "service"],
+        "supports_master_refresh": supports_master_refresh(row.get("agent_version")),
         "managed": True,
         "ready_checks": {
             "permissions": True,
@@ -276,10 +339,23 @@ def legacy_target(
     account_choices = _legacy_account_choices(endpoint, adapter, probe)
     account_label = _legacy_account_label(endpoint, adapter, account_choices)
     config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
-    selected_account_key = (
+    configured_account_key = (
         _choice_key(config.get("comidyear") or "6", config.get("seldb") or "1")
         if adapter == "mrerp"
         else str(config.get("account_set") or config.get("account_dir") or "").strip()
+    )
+    selected_account_key = next(
+        (
+            str(choice.get("key") or "")
+            for choice in account_choices
+            if str(choice.get("key") or "") == configured_account_key
+            or (
+                adapter == "express"
+                and normalize_express_account_key(choice.get("key"))
+                == normalize_express_account_key(configured_account_key)
+            )
+        ),
+        configured_account_key,
     )
     endpoint_label = str(
         endpoint.get("name") or ("Express" if adapter == "express" else "MR.ERP")
@@ -289,6 +365,7 @@ def legacy_target(
         "workspace_client_id": int(workspace["id"]) if workspace else None,
         "workspace_name": str(workspace.get("name") or "")[:200] if workspace else None,
         "adapter": adapter,
+        "connection_label": endpoint_label,
         "label": f"{endpoint_label} · {account_label}" if account_label else endpoint_label,
         "account_set_label": account_label or None,
         "account_choices": account_choices,
@@ -297,6 +374,11 @@ def legacy_target(
         "configured": configured,
         "selectable": not missing,
         "mode_options": ["stock", "service"] if adapter == "express" else ["cash", "credit"],
+        "supports_master_refresh": (
+            supports_master_refresh(config.get("companion_version"))
+            if adapter == "express"
+            else True
+        ),
         "managed": False,
         "ready_checks": {
             "permissions": True,
@@ -339,4 +421,9 @@ def active_push_state(cur, endpoint_id: str) -> tuple[bool, bool]:
     return bool(activities), waiting_lock
 
 
-__all__ = ["active_push_state", "legacy_target", "managed_target"]
+__all__ = [
+    "active_push_state",
+    "legacy_target",
+    "managed_target",
+    "supports_master_refresh",
+]

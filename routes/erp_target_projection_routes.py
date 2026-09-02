@@ -10,13 +10,9 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from core.feature_flags import erp_target_projection_enabled_for
 from services.auth.entrance import require_erp_portal
 from services.authz.deps import require_perm
-from services.erp import team_access
+from services.erp import line_target_projection, target_refresh, team_access
 from services.erp.target_projection_contract import ProjectionContractError
 from services.erp.target_projection_store import load_state
-from services.erp.mrerp_target_projection import (
-    MRErpProjectionError,
-    refresh_mrerp_projection,
-)
 
 router = APIRouter()
 
@@ -69,16 +65,39 @@ def _refresh_projection(user: dict, endpoint_id: str, account_set_key: str | Non
     endpoint = _resolve_endpoint(user, endpoint_id)
     if endpoint is None:
         raise HTTPException(404, detail="erp.endpoint_not_found")
+    adapter = str(endpoint.get("adapter") or "").strip().lower()
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    version = endpoint.get("agent_version") or config.get("companion_version")
+    if adapter == "express" and not line_target_projection.supports_master_refresh(version):
+        raise HTTPException(409, detail="erp.companion_update_required")
     try:
-        return refresh_mrerp_projection(
+        refresh = target_refresh.request_refresh(
             tenant_id=str(user["tenant_id"]),
             user_id=str(user["id"]),
-            endpoint=endpoint,
-            account_set_key=account_set_key,
+            endpoint_id=endpoint_id,
+            account_set_key=account_set_key or target_refresh.ENDPOINT_SCOPE_KEY,
+            adapter=adapter,
+            reason="web_target_projection",
         )
-    except MRErpProjectionError as exc:
-        status = 404 if exc.code == "erp.endpoint_not_found" else 400
-        raise HTTPException(status, detail=exc.code) from exc
+    except ValueError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    return {"ok": True, "refresh": refresh, "adapter": adapter}
+
+
+def _refresh_status(user: dict, endpoint_id: str, request_id: str) -> dict:
+    require_erp_portal(user)
+    if not erp_target_projection_enabled_for(user.get("tenant_id"), user.get("id")):
+        raise HTTPException(404, detail="erp.target_projection_unavailable")
+    if not _endpoint_visible(user, endpoint_id):
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    status = target_refresh.refresh_status(
+        request_id,
+        tenant_id=str(user["tenant_id"]),
+        endpoint_id=endpoint_id,
+    )
+    if status is None:
+        raise HTTPException(404, detail="erp.target_refresh_missing")
+    return {"ok": True, "refresh": status}
 
 
 @router.get("/api/erp/endpoints/{endpoint_id}/target-projection")
@@ -101,7 +120,31 @@ async def refresh_erp_target_projection(
     account_set_key: str | None = Query(default=None, max_length=500),
 ):
     user = await asyncio.to_thread(lambda: require_perm(request, "erp.endpoint.view"))
-    return await asyncio.to_thread(_refresh_projection, user, endpoint_id, account_set_key)
+    result = await asyncio.to_thread(_refresh_projection, user, endpoint_id, account_set_key)
+    adapter = result.pop("adapter")
+    if adapter == "mrerp":
+        asyncio.create_task(
+            asyncio.to_thread(
+                target_refresh.process_mrerp_request,
+                result["refresh"]["request_id"],
+            )
+        )
+    return result
 
 
-__all__ = ["erp_target_projection", "refresh_erp_target_projection", "router"]
+@router.get("/api/erp/endpoints/{endpoint_id}/target-projection/refresh/{request_id}")
+async def erp_target_projection_refresh_status(
+    endpoint_id: str,
+    request_id: str,
+    request: Request,
+):
+    user = await asyncio.to_thread(lambda: require_perm(request, "erp.endpoint.view"))
+    return await asyncio.to_thread(_refresh_status, user, endpoint_id, request_id)
+
+
+__all__ = [
+    "erp_target_projection",
+    "erp_target_projection_refresh_status",
+    "refresh_erp_target_projection",
+    "router",
+]

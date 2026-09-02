@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 
 from services.line_erp import target_preflight
@@ -10,6 +11,10 @@ from services.line_platform.quick_replies import question, quick_reply_item
 QR_LIMIT = 13
 QR_PAGE_SIZE = 11
 _ADAPTERS = (("mrerp", "MR.ERP"), ("express", "Express"))
+
+
+def account_reference(account_key: object) -> str:
+    return hashlib.sha256(str(account_key or "").strip().encode("utf-8")).hexdigest()[:16]
 
 
 def _status(targets: list[dict]) -> str:
@@ -37,19 +42,35 @@ def account_picker_message(targets: list[dict], adapter: str, mode: str, *, page
     adapter_targets = [
         target for target in targets if str(target.get("adapter") or "").lower() == adapter
     ]
-    ready_targets = [target for target in adapter_targets if target.get("selectable")]
-    page_count = max(1, math.ceil(len(ready_targets) / QR_PAGE_SIZE))
+    account_options = [
+        (target, account)
+        for target in adapter_targets
+        if target.get("selectable")
+        for account in target.get("account_choices") or []
+        if isinstance(account, dict)
+        and str(account.get("key") or "").strip()
+        and account.get("writable") is not False
+    ]
+    page_count = max(1, math.ceil(len(account_options) / QR_PAGE_SIZE))
     page = max(0, min(int(page or 0), page_count - 1))
     start = page * QR_PAGE_SIZE
     items = [
         quick_reply_item(
-            str(target.get("label") or target.get("workspace_name") or adapter),
+            " · ".join(
+                value
+                for value in (
+                    str(target.get("workspace_name") or "").strip(),
+                    str(account.get("label") or account.get("key") or "").strip(),
+                )
+                if value
+            ),
             "target",
             mode=mode,
             endpoint=target.get("endpoint_id"),
             workspace=target.get("workspace_client_id"),
+            account=account_reference(account.get("key")),
         )
-        for target in ready_targets[start : start + QR_PAGE_SIZE]
+        for target, account in account_options[start : start + QR_PAGE_SIZE]
     ]
     if page > 0:
         items.insert(
@@ -79,6 +100,19 @@ def account_picker_message(targets: list[dict], adapter: str, mode: str, *, page
     )
 
 
+def account_refresh_message(adapter: str, mode: str, *, failed: bool = False) -> dict:
+    text = (
+        "อัปเดตรายการบัญชี ERP ไม่สำเร็จ กรุณาลองใหม่"
+        if failed
+        else "กำลังอ่านรายการบัญชีล่าสุดจาก ERP แล้วแตะตรวจสอบอีกครั้ง"
+    )
+    return question(
+        "อัปเดตข้อมูล ERP",
+        text,
+        [quick_reply_item("ตรวจสอบอีกครั้ง", "erp-type", erp=adapter, mode=mode)],
+    )
+
+
 def posting_mode_message(mode: str, target: dict) -> dict:
     if str(target.get("adapter") or "").lower() == "express":
         options = (("stock", "สินค้า / สต๊อก"), ("service", "บริการ / ไม่ลงสต๊อก"))
@@ -104,7 +138,9 @@ def posting_mode_message(mode: str, target: dict) -> dict:
 __all__ = [
     "QR_LIMIT",
     "QR_PAGE_SIZE",
+    "account_reference",
     "account_picker_message",
+    "account_refresh_message",
     "erp_picker_message",
     "posting_mode_message",
 ]

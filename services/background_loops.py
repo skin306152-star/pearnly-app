@@ -160,6 +160,10 @@ async def run_erp_retry_tick():
 async def run_recovery_tick():
     """Run non-ERP recovery queues on the existing background cadence."""
     try:
+        await run_erp_target_refresh_tick()
+    except Exception as e:
+        logger.warning(f"[erp_target_refresh] tick failed: {e}")
+    try:
         await run_accounting_posting_failure_tick()
     except Exception as e:
         logger.warning(f"[acct_recovery] tick failed: {e}")
@@ -187,6 +191,14 @@ async def run_recovery_tick():
 
     # run_tick 自吞异常(挂点安全在 reaper 内部保证),与 erp_retry_loop 开场的调用点一致裸调。
     await reaper.run_tick()
+
+
+async def run_erp_target_refresh_tick():
+    import asyncio as _asyncio
+
+    from services.erp import target_refresh
+
+    await _asyncio.to_thread(target_refresh.process_due_mrerp_requests, limit=2)
 
 
 async def run_accounting_posting_failure_tick():

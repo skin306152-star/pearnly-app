@@ -243,7 +243,13 @@ def lease_managed(token: str, agent_id: object, max_n: int) -> Dict[str, Any]:
                         "payload": payload,
                     }
                 )
-            return {"ok": True, "lease_seconds": _LEASE_SECONDS, "jobs": jobs}
+            result = {"ok": True, "lease_seconds": _LEASE_SECONDS, "jobs": jobs}
+            from services.erp.target_refresh import lease_express_refresh_with_cursor
+
+            refresh = lease_express_refresh_with_cursor(cur, endpoint_id, account_set)
+            if refresh:
+                result["master_refresh"] = refresh
+            return result
     except ManagedAgentQueueError:
         raise
     except Exception as exc:

@@ -60,6 +60,13 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
               attempt integer not null default 1, created_at timestamptz not null default now(),
               lease_owner text, lease_expires_at timestamptz
             );
+            CREATE TABLE erp_target_refresh_requests (
+              id uuid primary key default gen_random_uuid(), tenant_id uuid not null,
+              endpoint_id uuid not null, account_set_key text not null, adapter text not null,
+              status text not null default 'requested', requested_at timestamptz not null default now(),
+              started_at timestamptz, lease_owner text, lease_expires_at timestamptz,
+              updated_at timestamptz not null default now()
+            );
             """)
         cls.conn.commit()
 
@@ -78,7 +85,8 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
     def setUp(self):
         self.cur.execute(f'SET search_path TO "{self.schema}", public')
         self.cur.execute(
-            "TRUNCATE erp_push_logs, ocr_history, erp_endpoints, workspace_clients, tenants"
+            "TRUNCATE erp_target_refresh_requests, erp_push_logs, ocr_history, "
+            "erp_endpoints, workspace_clients, tenants"
         )
         self.cur.execute("INSERT INTO tenants VALUES (%s, 'active')", (TENANT,))
         self.cur.execute(

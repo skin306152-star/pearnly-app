@@ -36,6 +36,7 @@ def from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "posting_kind": payload.get("posting_kind")
         or (posting_mode if adapter == "express" else None),
         "payment": payload.get("payment") or (posting_mode if adapter == "mrerp" else None),
+        "master_refresh_request_id": payload.get("master_refresh_request_id"),
     }
 
 
@@ -120,6 +121,9 @@ def normalize(
         "payment": payment,
         "posting_mode": posting_kind or payment,
     }
+    refresh_request_id = str(values.get("master_refresh_request_id") or "").strip()
+    if refresh_request_id:
+        normalized["master_refresh_request_id"] = refresh_request_id[:36]
     return readiness, normalized
 
 

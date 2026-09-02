@@ -16,6 +16,7 @@ from core import db
 from core.auth import JWT_ALGORITHM, _jwt_secret, get_current_user_from_request
 from core.feature_flags import erp_line_enabled_for
 from core.workspace_context import WS_HEADER
+from services.erp import target_refresh
 from services.auth.entrance import require_erp_portal
 from services.erp import team_access
 from services.line_erp import (
@@ -273,6 +274,15 @@ async def erp_draft_get(request: Request, draft_id: str):
         workspace_client_id=payload.get("workspace_client_id"),
         refresh=False,
     )
+    refresh_state = None
+    refresh_request_id = str(payload.get("master_refresh_request_id") or "")
+    if refresh_request_id:
+        refresh_state = await asyncio.to_thread(
+            target_refresh.refresh_status,
+            refresh_request_id,
+            tenant_id=str(binding["tenant_id"]),
+            endpoint_id=str(payload.get("endpoint_id") or ""),
+        )
     return {
         "ok": True,
         "data": {
@@ -281,6 +291,7 @@ async def erp_draft_get(request: Request, draft_id: str):
             "direction": payload.get("mode"),
             "targets": target_result["targets"],
             "selection": target_selection.from_payload(payload),
+            "master_refresh": refresh_state,
             "records": webhook.draft_records(
                 str(claims["user_id"]), str(binding["tenant_id"]), draft_id, history_ids
             ),

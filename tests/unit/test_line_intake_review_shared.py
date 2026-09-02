@@ -102,12 +102,10 @@ class SharedEditorSourceTests(unittest.TestCase):
         source_page = (ROOT / "static/line-intake-review/source-page.js").read_text(
             encoding="utf-8"
         )
-        document_viewer = (
-            ROOT / "static/line-intake-review/document-viewer.js"
-        ).read_text(encoding="utf-8")
-        shared_i18n = (ROOT / "static/line-intake-review/i18n.js").read_text(
+        document_viewer = (ROOT / "static/line-intake-review/document-viewer.js").read_text(
             encoding="utf-8"
         )
+        shared_i18n = (ROOT / "static/line-intake-review/i18n.js").read_text(encoding="utf-8")
         for html in (cowork, erp):
             self.assertIn("/static/line-intake-review/batch-review.js?v=3", html)
             self.assertIn("/static/line-intake-review/i18n.js?v=3", html)

@@ -1,8 +1,8 @@
 # ERP LINE 目标、套账与主档一致性合同
 
-> 状态：`P3B1_PROD_VERIFIED / FEATURE_FLAG_ALL / P3C_EXPRESS_PENDING`
-> P3a 底座：`fc9e48b9`；MR.ERP live + LINE/Web：`2521ee8f`；生产重复码修复：
-> `1011d8ea7f1db1f3801aa6d1ff6e85fef654405f`，Manual CD `33590988040`。
+> 状态：`P3C_READY_FOR_DEPLOY / FEATURE_FLAG_ALL / P4_CAS_PENDING`
+> P3a 底座：`fc9e48b9`；LINE polling 止血：`34606115`；durable refresh + Express
+> canonical ingestion 候选：`9247c615`；Companion 协议最低版本：`1.1.72`。
 > 本文只定义连接、套账、主档与 LINE 选择的一致性边界；第三方 ERP 推送状态继续唯一来自
 > `erp_push_logs`，不在这里建立第二套推送状态。
 
@@ -102,35 +102,41 @@ snapshot；同一内容重复上报只更新 freshness，不生成假 revision�
 
 ## 4. 刷新与确认协议
 
-### 4.1 触发点
+### 4.1 触发点与性能边界
 
-以下动作都先刷新连接与套账状态，不等 OCR 完成后才检查：
+连接检查与主档刷新是两个状态：ERP online 不等于 master fresh。普通菜单、draft GET、LIFF
+打开/保存和状态 polling 只读服务器 current snapshot，绝不在高频交互请求里同步访问第三方 ERP。
 
-1. 点击 ERP rich menu 或发送“菜单”；
-2. 点击采购/销售；
-3. 选择或切换 ERP/数据根/套账；
-4. 打开 LIFF 编辑器；
-5. 保存草稿或确认入账；
-6. 重试第三方 ERP 推送。
+当前新单协议固定为：
 
-连接检查与主档刷新是两个状态：ERP online 不等于 master fresh。
+1. 选择 ERP 类型时创建 endpoint-scope refresh request，立即返回“正在更新”；
+2. 用户点击“再次检查”只读 request 状态；成功后从 canonical snapshot 显示最新套账 quick replies；
+3. 选择精确套账时创建 account-set-scope refresh request；
+4. MR.ERP 云端 worker 或 Express Companion 在后台完成采集并原子发布 snapshot；
+5. 确认入账只读 refresh 状态，只有 `succeeded` 才继续，`requested/leased/failed` 均 fail closed。
+
+同一 endpoint/account-set 同时只保留一个 active request；重复点击合并请求，不制造扫描风暴。
 
 ### 4.2 MR.ERP
 
-开始新单、切换套账和确认时走 live fetch，成功后原子发布新 snapshot。普通页面可使用 TTL 减压，
-但不得把 10 分钟缓存冒充“确认时最新”。live fetch 失败时保留旧 snapshot 供只读展示，同时
-禁止声称最新；需要主档选择的确认动作 fail closed。
+MR.ERP endpoint refresh 只更新套账目录，account-set refresh 才采集该套账的商品与客户；两者均由
+云端后台 worker 执行，LINE/Web 请求本身不等待外部 API。成功后原子发布新 snapshot；失败时
+保留旧 snapshot 供只读展示，同时 refresh request 标记 failed，确认动作 fail closed。
 
 ### 4.3 Express
 
-云端向对应 Companion Profile 发 refresh request；Companion 对同一 account_dir 只执行一次共享
-后台扫描，并回传完整 snapshot + source hash。LINE 最多等待一个有界时间；超时则显示上次同步
-时间并阻止需要最新主档的确认，不回退到“30 分钟内算新”。managed 与 legacy heartbeat 必须共用
-同一 catalog ingestion，不能再丢弃 managed 上报。
+云端向对应 Companion Profile 发 durable refresh request，并在正常 Agent lease/poll 响应中下发，
+所以不必等 60 秒 heartbeat。Companion 对同一 account_dir 只执行一次共享后台扫描；endpoint scope
+扫描全部可用套账，account-set scope 扫描精确套账的商品、客户与科目，再随 heartbeat 回传 request
+id、scope、目标套账和结果。managed 与 legacy heartbeat 共用同一 canonical ingestion，普通心跳
+缺少 catalog 时不得清空上次主档。
+
+该严格协议只对 Companion `>=1.1.72` 启用。旧版本继续原有 snapshot/30 分钟 catalog 行为，保持
+可用但不宣称“下一张立即最新”；网页手动 strict refresh 对旧版本返回 update-required。
 
 ### 4.4 确认前 CAS
 
-确认请求携带 draft 的 `master_revision`。服务端拿 current revision 做 compare-and-swap：
+P4 将让确认请求携带 draft 的 `master_revision`，服务端拿 current revision 做 compare-and-swap：
 
 - revision 相同且所选 source id 仍 active：允许继续；
 - 仅标签修改：返回最新标签，要求用户确认刷新后的内容；
@@ -145,7 +151,7 @@ snapshot；同一内容重复上报只更新 freshness，不生成假 revision�
 
 对话顺序固定为：
 
-`菜单 → 采购/销售 → ERP → 年度/数据根（Express）→ 套账 → 现金/赊账或库存/非库存 → 上传`
+`菜单 → 采购/销售 → ERP → 后台刷新/再次检查 → 年度或套账 → 套账主档刷新 → 现金/赊账或库存/非库存 → 上传`
 
 - ERP rich menu 永远可呼出，使用 Cowork/DMS 同款品牌图标与 2×3 六宫格；ERP 不 ready 时入口
   仍在，点击后显示对应连接、配置、套账或主档错误，不用一张总错误卡覆盖整个菜单。
@@ -180,16 +186,17 @@ P1 获得真机 `USER_ACCEPTED` 后才进入 P2。
 
 - **P3a 已实现**：immutable snapshot、current head、normalized items、原子发布、稳定 hash、component
   revision、freshness、租户 RLS 与只读 API。
-- **P3b1 已实现并全量打开**：MR.ERP live fetch 已接套账、商品、客户；LINE/Cowork 新草稿及确认
-  前强制刷新，网页 endpoint 商品/客户列表绕过旧 600 秒缓存并读同一投影。生产真实快照为 2 套账、
-  300 商品、111 客户；LINE 真实 active identity 回读 online/selectable 且两套账可选，网页两类列表
-  均 `cached=false`、`stale=false`、`master_revision=1`。
+- **P3b1 已实现并全量打开**：MR.ERP 已接套账、商品、客户 canonical snapshot。同步 live fetch 曾误接
+  到 LINE 高频 polling，已由生产 hotfix `34606115` 移除；普通交互恢复 snapshot-only，生产 draft poll
+  实测 68ms/61ms。
 - **P3b2 待实现**：MR.ERP 供应商、单位、分支、科目及第三方动态字段/按钮尚无已验证 live collector；
   当前 form schema 对这四类明确标 `collector_not_connected`，不得宣称六类已全量同步。
-- **P3c 待实现**：接 legacy/managed Express ingestion 与 Companion refresh request，共用同一 catalog。
-- **生产证据**：目标 SHA `1011d8ea7f1db1f3801aa6d1ff6e85fef654405f`，Manual CD
-  `33590988040`，deploy log `health check OK after 21s`，service/health/ready 全绿。生产首刷暴露的
-  MR.ERP 重复 code 已在 adapter 边界稳定去重，旧 snapshot 未被错误覆盖。
+- **P3c 应用候选已实现**：`9247c615` 增加 durable coalesced request、MR.ERP 后台 worker、Express
+  lease/poll 命令、legacy/managed canonical ingestion、LINE 两级 refresh gate 与旧 Companion 兼容闸。
+  Companion 候选 `v1.1.72` 增加非阻塞 endpoint/account-set 扫描与 request-scoped ACK；待 pinned-SHA
+  生产发布及 Windows release 后更新为 PROD_VERIFIED。
+- **当前生产证据**：hotfix SHA `34606115a7ee7b2dcb5cfdea2172b91808d7560d`，Manual CD
+  `33596453457`，service/health/ready 全绿；首次轻量套账刷新 808ms，随后 draft poll 68ms/61ms。
 
 ### P4 LINE 选择、编辑器和确认 CAS
 

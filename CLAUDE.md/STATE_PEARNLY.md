@@ -1,17 +1,17 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 09-02 ERP 最新主档 P3b1 PROD_VERIFIED → P3c DISCOVERY
+## 当前状态卡 · 09-02 ERP 最新主档 P3c READY_FOR_DEPLOY
 
-- **▶ 当前 task**:第三方 ERP 最新主档统一投影；P3a 底座=`fc9e48b9`，MR.ERP live + LINE/Web=`2521ee8f`，生产重复码修复=`1011d8ea`。
-- **✅ 已打开**:`erp_target_projection` 为全量 rollout；不关闭、不等待本轮真机，继续 P3c Express refresh/ingestion。
-- **✅ MR.ERP 已接**:每张新 LINE/Cowork 草稿及确认前跳过旧 probe/listing cache，live 拉套账、商品、客户并原子发布同一 snapshot；网页 endpoint 商品/客户列表读同一投影。
-- **✅ 一致性**:同内容不造假版本；失败保留最后成功 snapshot 但新单 fail closed；attempted/observed 分离；租户 RLS；`erp_push_logs` 仍是推送状态唯一源。
-- **✅ 生产实测**:目标 SHA=`1011d8ea7f1db1f3801aa6d1ff6e85fef654405f`，Manual CD=`33590988040`，deploy log `health check OK after 21s`，service/health/ready 全绿。
-- **✅ 真源快照**:已绑定 MR.ERP endpoint live refresh 成功；scope=`6:1`，fresh，revision/master_revision=`1`，2 套账、300 商品、111 客户。
-- **✅ LINE/Web 回读**:真实 active LINE identity 读到 2 套账、online/selectable、missing=[]；网页 products/customers 均 `cached=false`、`stale=false`，300/111 条且 master_revision 同为 1。
-- **✅ 本地证据**:完整 pre-push 两次全绿（unittest 1117 模块/6 片）；真实 PostgreSQL projection smoke 全绿；生产暴露的重复 ERP code 已按 source id 稳定去重并补回归。
-- **🚧 明确未做**:MR.ERP suppliers/units/branches/accounts 与动态字段/按钮采集器尚无可信源；Express 仍是 30 分钟 catalog 上报且 managed heartbeat 丢 catalog；draft/confirm revision CAS 尚未接。
-- **⏭ 下一批**:P3c 先把 legacy/managed Express heartbeat 归一发布到同一 snapshot，再做云端 refresh request ↔ Companion 有界回传；随后 P4 revision CAS。
+- **▶ 当前 task**:第三方 ERP 最新主档统一投影；当前应用候选=`9247c615`，Express Companion 候选=`v1.1.72`。
+- **✅ 功能保持打开**:`erp_target_projection` 继续全量 rollout；不因本轮改造关闭，也不等待真机才继续发布前验证。
+- **✅ 性能事故已止血**:生产 hotfix=`34606115`，Manual CD=`33596453457`；LINE 普通 draft/target polling 改为只读服务器 snapshot，不再每拍 live 拉第三方 ERP。生产实测首次轻量套账刷新 808ms，随后 draft poll 68ms/61ms。
+- **✅ 新刷新协议**:开始新单选择 ERP 时只入 durable refresh request；MR.ERP 由云端后台采集，Express 由 Companion 正常约 3 秒 poll 领取命令并后台扫描。交互请求只轮询数据库状态。
+- **✅ Express 单一投影**:legacy/managed heartbeat 共用 canonical ingestion；endpoint refresh 更新套账列表，精确 account-set refresh 更新商品、客户、科目；缺 catalog 的普通 heartbeat 不清空最后成功主档。
+- **✅ LINE fail closed**:套账列表刷新完成后才显示最新 quick replies；选定套账后再次刷新该套账主档；确认只接受 refresh=`succeeded`，pending/failed 不冒充最新。
+- **✅ 兼容闸**:严格刷新只对 MR.ERP 和 Companion `>=1.1.72` 生效；旧 Express Companion 继续旧流程，不会被新协议阻断，但也不承诺“下一单立即最新”。
+- **✅ 本地证据**:应用相关 129 tests + 10 subtests、完整 pre-push 1119 modules/6 shards 全绿；Companion 新路径 21 tests 全绿，全套与原仓相同仅 5 个 macOS/Windows-only 基线失败。
+- **🚧 明确未做**:MR.ERP suppliers/units/branches/accounts、通用动态字段/按钮 collector 仍缺；LINE 编辑器尚无泛型主档下拉 schema；draft `master_revision` 全程 CAS 尚待 P4。
+- **⏭ 下一步**:发布应用精确 SHA → 生产 MR.ERP refresh/poll 延迟复验 → 发布 Companion `v1.1.72` installer → 保持生产 `/erp` 打开。
 
 ---
 

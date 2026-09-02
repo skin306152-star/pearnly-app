@@ -31,6 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from core import db as _db  # noqa: E402,F401
 from services.erp import push_log_meta as meta  # noqa: E402
 from services.erp import push_log_queries as q  # noqa: E402
 

@@ -5,9 +5,9 @@
       "cyclesInWindow": 8,
       "rescans": 0,
       "noticeFires": 8,
-      "worstGapMs": 977,
+      "worstGapMs": 928,
       "noticeOnScreen": true,
-      "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+      "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
       "plusOne": {
         "before": "1",
         "after": "2",
@@ -20,12 +20,12 @@
           "1"
         ],
         "grand": "350.00",
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
         "actLabel": "+1 · เป็นชิ้นที่สอง",
         "coveredBy": "",
         "visible": true,
         "fires": 8,
-        "worstGapMs": 977
+        "worstGapMs": 928
       },
       "ok": true
     },
@@ -34,9 +34,9 @@
       "cyclesInWindow": 7,
       "rescans": 0,
       "noticeFires": 6,
-      "worstGapMs": 1204,
+      "worstGapMs": 1131,
       "noticeOnScreen": true,
-      "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+      "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
       "plusOne": {
         "before": "1",
         "after": "2",
@@ -49,12 +49,12 @@
           "1"
         ],
         "grand": "350.00",
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
         "actLabel": "+1 · เป็นชิ้นที่สอง",
         "coveredBy": "",
         "visible": true,
         "fires": 6,
-        "worstGapMs": 1204
+        "worstGapMs": 1131
       },
       "ok": true
     },
@@ -63,9 +63,9 @@
       "cyclesInWindow": 5,
       "rescans": 0,
       "noticeFires": 5,
-      "worstGapMs": 1378,
+      "worstGapMs": 1329,
       "noticeOnScreen": true,
-      "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+      "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
       "plusOne": {
         "before": "1",
         "after": "2",
@@ -78,12 +78,12 @@
           "1"
         ],
         "grand": "350.00",
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
         "actLabel": "+1 · เป็นชิ้นที่สอง",
         "coveredBy": "",
         "visible": true,
         "fires": 5,
-        "worstGapMs": 1378
+        "worstGapMs": 1329
       },
       "ok": true
     },
@@ -92,14 +92,14 @@
       "cyclesInWindow": 5,
       "rescans": 0,
       "noticeFires": 4,
-      "worstGapMs": 1515,
+      "worstGapMs": 1522,
       "noticeOnScreen": true,
-      "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+      "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
       "plusOne": {
         "before": "1",
         "after": "2",
         "lookups": 1,
-        "rowGone": true
+        "rowGone": false
       },
       "state": {
         "count": "สแกนแล้ว 1 ชิ้น",
@@ -107,12 +107,12 @@
           "1"
         ],
         "grand": "350.00",
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
         "actLabel": "+1 · เป็นชิ้นที่สอง",
         "coveredBy": "",
         "visible": true,
         "fires": 4,
-        "worstGapMs": 1515
+        "worstGapMs": 1522
       },
       "ok": true
     },
@@ -194,9 +194,9 @@
       "lookups": 1,
       "qtys": "1",
       "count": "สแกนแล้ว 1 ชิ้น",
-      "noticeFires": 1,
-      "worstGapMs": 1027,
-      "noticeOnScreen": true,
+      "noticeFires": 0,
+      "worstGapMs": 0,
+      "noticeOnScreen": false,
       "ok": true
     },
     "hold-p50-2": {
@@ -212,27 +212,27 @@
       "lookups": 1,
       "qtys": "1",
       "count": "สแกนแล้ว 1 ชิ้น",
-      "noticeFires": 3,
-      "worstGapMs": 1067,
-      "noticeOnScreen": true,
+      "noticeFires": 0,
+      "worstGapMs": 0,
+      "noticeOnScreen": false,
       "ok": true
     },
     "hold-p50-4": {
       "lookups": 1,
       "qtys": "1",
       "count": "สแกนแล้ว 1 ชิ้น",
-      "noticeFires": 3,
-      "worstGapMs": 1104,
-      "noticeOnScreen": true,
+      "noticeFires": 0,
+      "worstGapMs": 0,
+      "noticeOnScreen": false,
       "ok": true
     },
     "hold-p50-5": {
       "lookups": 1,
       "qtys": "1",
       "count": "สแกนแล้ว 1 ชิ้น",
-      "noticeFires": 1,
-      "worstGapMs": 948,
-      "noticeOnScreen": true,
+      "noticeFires": 0,
+      "worstGapMs": 0,
+      "noticeOnScreen": false,
       "ok": true
     },
     "hold-p50-6": {
@@ -258,7 +258,7 @@
       "qtys": "1",
       "count": "สแกนแล้ว 1 ชิ้น",
       "noticeFires": 3,
-      "worstGapMs": 880,
+      "worstGapMs": 867,
       "noticeOnScreen": true,
       "ok": true
     },
@@ -267,7 +267,7 @@
       "qtys": "1",
       "count": "สแกนแล้ว 1 ชิ้น",
       "noticeFires": 2,
-      "worstGapMs": 1324,
+      "worstGapMs": 1274,
       "noticeOnScreen": true,
       "ok": true
     }
@@ -275,12 +275,12 @@
   "mixed": {
     "mix1200-2000": {
       "y4m": ".blinkmix.y4m",
-      "rearms": 1,
-      "noticeFires": 4,
+      "rearms": 2,
+      "noticeFires": 3,
       "appeared": 1,
       "vanished": 0,
-      "pollSamples": 120,
-      "qtys": "2",
+      "pollSamples": 140,
+      "qtys": "3",
       "noticeOnScreen": true,
       "ok": true
     }

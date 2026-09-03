@@ -1,10 +1,10 @@
 {
   "holdSteady": {
     "ok": true,
-    "native": false,
+    "native": true,
     "lazy": [
       "scan",
-      "zxing"
+      "barcode-detector"
     ],
     "samples": [
       "350.00",

@@ -75,6 +75,8 @@ def _build(sale=_SALE, seller=_SELLER, cashier={"display_name": "Mint"}):
 class AssemblyTests(unittest.TestCase):
     def test_seller_query_carries_compliance_and_brand_columns(self):
         cur, _doc, _sv = _build()
+        lines_sql = next(sql for sql, _p in cur.calls if "pos_sale_lines" in sql)
+        self.assertIn("line_discount", lines_sql)
         seller_sql = next(sql for sql, _p in cur.calls if "workspace_clients" in sql)
         for col in (
             "vat_registered",

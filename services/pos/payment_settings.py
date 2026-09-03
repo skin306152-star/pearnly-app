@@ -12,11 +12,13 @@ from __future__ import annotations
 import logging
 from decimal import Decimal, InvalidOperation
 
+from core.pos_api import PosError
 from core.rls import apply_tenant_rls
+from services.pos import tax_policy
 
 logger = logging.getLogger("mr-pilot")
 
-# 默认值:现金恒开;PromptPay/刷卡默认开(老板可关);价格含 VAT(泰国零售惯例)。
+# 默认值:现金恒开;PromptPay/刷卡默认开(老板可关);已登记 VAT 的账套默认价内税。
 # 银行转账默认关——填了银行信息才有意义开,不像 PromptPay/刷卡开着也能用。
 # 服务费默认按业态智能给:餐厅 10%(泰国餐厅惯例·老板可改),其余 0。见 _default_service_rate。
 _DEFAULTS = {
@@ -84,7 +86,14 @@ def _clean_rate(value) -> Decimal:
     return Decimal("100") if d > 100 else d
 
 
-def get_settings(cur, *, tenant_id: str, workspace_client_id: int, promptpay_id=None) -> dict:
+def get_settings(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    promptpay_id=None,
+    vat_registered=None,
+) -> dict:
     """返回该账套收款设置(无行回落默认)+ 账套 promptpay_id。
 
     promptpay_id 传入(非 None)则跳过 workspace_clients 查询——bootstrap 已握有该值,免重复 I/O。
@@ -96,19 +105,27 @@ def get_settings(cur, *, tenant_id: str, workspace_client_id: int, promptpay_id=
         (tenant_id, workspace_client_id),
     )
     row = cur.fetchone()
-    if promptpay_id is None:
+    if promptpay_id is None or vat_registered is None:
         cur.execute(
-            "SELECT promptpay_id FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+            "SELECT promptpay_id, vat_registered FROM workspace_clients "
+            "WHERE id = %s AND tenant_id = %s",
             (workspace_client_id, tenant_id),
         )
-        pp = cur.fetchone()
-        promptpay_id = pp["promptpay_id"] if pp else None
+        store = cur.fetchone()
+        if promptpay_id is None:
+            promptpay_id = store["promptpay_id"] if store else None
+        if vat_registered is None:
+            vat_registered = bool(store and store["vat_registered"])
+    vat_registered = bool(vat_registered)
+    vat_rate = tax_policy.VAT_RATE if vat_registered else Decimal("0")
     if row is not None:
         return {
             "promptpay_enabled": bool(row["promptpay_enabled"]),
             "card_enabled": bool(row["card_enabled"]),
             "service_charge_rate": _rate_str(row["service_charge_rate"]),
-            "price_includes_vat": bool(row["price_includes_vat"]),
+            "price_includes_vat": vat_registered and bool(row["price_includes_vat"]),
+            "vat_registered": vat_registered,
+            "vat_rate": _rate_str(vat_rate),
             "promptpay_id": promptpay_id or "",
             "bank_transfer_enabled": bool(row["bank_transfer_enabled"]),
             "bank_name": row["bank_name"] or "",
@@ -120,7 +137,9 @@ def get_settings(cur, *, tenant_id: str, workspace_client_id: int, promptpay_id=
         "promptpay_enabled": _DEFAULTS["promptpay_enabled"],
         "card_enabled": _DEFAULTS["card_enabled"],
         "service_charge_rate": _default_service_rate(cur, tenant_id),
-        "price_includes_vat": _DEFAULTS["price_includes_vat"],
+        "price_includes_vat": vat_registered and _DEFAULTS["price_includes_vat"],
+        "vat_registered": vat_registered,
+        "vat_rate": _rate_str(vat_rate),
         "promptpay_id": promptpay_id or "",
         "bank_transfer_enabled": _DEFAULTS["bank_transfer_enabled"],
         "bank_name": "",
@@ -145,6 +164,11 @@ def save_settings(
     bank_account_name: str = "",
 ) -> dict:
     """upsert 收款设置 + 回写账套 promptpay_id(现金恒开不存)。返回回读视图。"""
+    vat_registered = tax_policy.is_vat_registered(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+    )
+    if price_includes_vat and not vat_registered:
+        raise PosError("pos.vat_not_registered", 422)
     rate = _clean_rate(service_charge_rate)
     cur.execute(
         """
@@ -181,4 +205,10 @@ def save_settings(
         "UPDATE workspace_clients SET promptpay_id = %s WHERE id = %s AND tenant_id = %s",
         ((promptpay_id or "").strip()[:40] or None, workspace_client_id, tenant_id),
     )
-    return get_settings(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    return get_settings(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        promptpay_id=(promptpay_id or "").strip()[:40],
+        vat_registered=vat_registered,
+    )

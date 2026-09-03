@@ -16,11 +16,10 @@ from typing import Optional
 
 from core.pos_api import PosError
 from services.accounting import hooks as acct_hooks
-from services.pos import numbering, sales_store
+from services.pos import numbering, payment_settlement, sales_store, tax_policy
 from services.pos.restaurant import order_store, store
 from services.sales.totals import compute_totals
 
-VAT_RATE = Decimal("7")
 _CENT = Decimal("0.01")
 _HUNDRED = Decimal("100")
 
@@ -62,7 +61,14 @@ def request_bill(cur, *, tenant_id: str, session_id: str) -> dict:
     }
 
 
-def _compute(billable: list, *, service_rate, price_includes_vat: bool, header_discount) -> dict:
+def _compute(
+    billable: list,
+    *,
+    service_rate,
+    price_includes_vat: bool,
+    header_discount,
+    vat_rate: Decimal = tax_policy.VAT_RATE,
+) -> dict:
     """菜品 → totals + 服务费 + 合并 VAT。返回算价 + 每行规范(供落库/预览复用)。"""
     totals_lines = [
         {
@@ -77,7 +83,7 @@ def _compute(billable: list, *, service_rate, price_includes_vat: bool, header_d
     hd_amount, hd_pct = _header_discount(header_discount)
     t = compute_totals(
         totals_lines,
-        vat_rate=VAT_RATE,
+        vat_rate=vat_rate,
         price_includes_vat=price_includes_vat,
         header_discount_amount=hd_amount,
         header_discount_pct=hd_pct,
@@ -87,10 +93,10 @@ def _compute(billable: list, *, service_rate, price_includes_vat: bool, header_d
     service = _round(food_net * rate / _HUNDRED) if rate > 0 else Decimal("0.00")
     billed_base = food_net + service
     if price_includes_vat:
-        vat = _round(billed_base * VAT_RATE / (_HUNDRED + VAT_RATE))
+        vat = _round(billed_base * vat_rate / (_HUNDRED + vat_rate))
         grand = _round(billed_base)
     else:
-        vat = _round(billed_base * VAT_RATE / _HUNDRED)
+        vat = _round(billed_base * vat_rate / _HUNDRED)
         grand = _round(billed_base + vat)
     return {
         "totals": t,
@@ -125,6 +131,7 @@ def bill_preview(
     cur,
     *,
     tenant_id: str,
+    workspace_client_id: int,
     session_id: str,
     mode: str = "whole",
     line_ids=None,
@@ -138,11 +145,18 @@ def bill_preview(
     billable = _billable_for(
         cur, tenant_id=tenant_id, session_id=session_id, mode=mode, line_ids=line_ids
     )
+    tax = tax_policy.resolve(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        price_includes_vat=price_includes_vat,
+    )
     c = _compute(
         billable,
         service_rate=service_rate,
-        price_includes_vat=price_includes_vat,
+        price_includes_vat=tax["price_includes_vat"],
         header_discount=header_discount,
+        vat_rate=tax["vat_rate"],
     )
     out = {
         "mode": mode,
@@ -156,6 +170,7 @@ def bill_preview(
         ),
         "vat_amount": _money(c["vat_amount"]),
         "price_includes_vat": c["price_includes_vat"],
+        "vat_registered": tax["vat_registered"],
         "grand_total": _money(c["grand_total"]),
     }
     split = _split(c["grand_total"], ways) if mode == "aa" else None
@@ -196,13 +211,23 @@ def checkout(
     billable = _billable_for(
         cur, tenant_id=tenant_id, session_id=session_id, mode=mode, line_ids=payload.get("line_ids")
     )
-    incl = bool(payload.get("price_includes_vat", True))
+    tax = tax_policy.resolve(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        price_includes_vat=bool(payload.get("price_includes_vat", True)),
+    )
     c = _compute(
         billable,
         service_rate=payload.get("service_rate", "10"),
-        price_includes_vat=incl,
+        price_includes_vat=tax["price_includes_vat"],
         header_discount=payload.get("header_discount"),
+        vat_rate=tax["vat_rate"],
     )
+    grand = c["grand_total"]
+    if grand <= 0:
+        raise PosError("pos.zero_total", 422)
+    payments, paid_total, change = payment_settlement.validate(payload.get("payments") or [], grand)
 
     sold_at = _parse_sold_at(payload.get("sold_at"))
     shift_id = payload.get("shift_id")
@@ -217,15 +242,10 @@ def checkout(
         cur,
         tenant_id=tenant_id,
         terminal_id=terminal_id,
-        kind="receipt",
+        kind=tax["doc_kind"],
         on=sold_at.date(),
         workspace_client_id=workspace_client_id,
     )
-
-    payments = payload.get("payments") or []
-    paid_total = sum((Decimal(str(p.get("amount", 0))) for p in payments), Decimal("0"))
-    grand = c["grand_total"]
-    change = (paid_total - grand) if paid_total > grand else Decimal("0.00")
 
     sale = sales_store.insert_sale(
         cur,
@@ -237,7 +257,7 @@ def checkout(
             "terminal_id": terminal_id,
             "cashier_id": cashier_id,
             "receipt_no": receipt_no,
-            "doc_kind": "receipt",
+            "doc_kind": tax["doc_kind"],
             "sale_type": "sale",
             "refund_of_sale_id": None,
             "member_client_id": payload.get("member_client_id"),
@@ -245,7 +265,7 @@ def checkout(
             "discount_total": c["discount_total"],
             "vat_amount": c["vat_amount"],
             "grand_total": grand,
-            "price_includes_vat": incl,
+            "price_includes_vat": tax["price_includes_vat"],
             "paid_total": paid_total,
             "change_amount": change,
             "status": "completed",
@@ -357,12 +377,14 @@ def _checkout_result(
         "sale": {
             "id": str(sale["id"]),
             "receipt_no": sale["receipt_no"],
+            "doc_kind": sale.get("doc_kind", "receipt"),
             "subtotal": _money(sale["subtotal"]),
             "service_charge": _money(
                 _sale_service_charge(cur, tenant_id=tenant_id, sale_id=str(sale["id"]))
             ),
             "vat_amount": _money(sale["vat_amount"]),
             "grand_total": _money(sale["grand_total"]),
+            "price_includes_vat": bool(sale.get("price_includes_vat", False)),
             "paid_total": _money(sale["paid_total"]),
             "change_amount": _money(sale["change_amount"]),
             "status": sale["status"],

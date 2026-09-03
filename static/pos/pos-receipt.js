@@ -91,6 +91,15 @@
                     '</td></tr>'
             )
             .join('');
+        const discount = Number(sale.discount_total || 0);
+        const discountRows =
+            discount > 0
+                ? '<tr><td>ยอดรวม (Subtotal)</td><td class="r">฿' +
+                  fmt(sale.subtotal) +
+                  '</td></tr><tr><td>ส่วนลด (Discount)</td><td class="r">-฿' +
+                  fmt(discount) +
+                  '</td></tr>'
+                : '';
         const vatLine =
             isVat && sale.vat_amount != null
                 ? '<tr><td>ภาษีมูลค่าเพิ่ม 7%' +
@@ -118,6 +127,7 @@
                 : '';
         return (
             rows +
+            discountRows +
             // 合计标签同服务端 PDF 固定写法(票面法规文本不跟 UI 语言走)
             '<tr class="tot"><td>ยอดสุทธิ (Total)</td><td class="r">฿' +
             fmt(sale.grand_total) +
@@ -133,8 +143,12 @@
         printLocal(sale) {
             const info = POS.receiptInfo.load();
             // 缓存缺失时按票号前缀兜底,方向安全:宁印普通收据,不给未注册户冒印税票字样。
-            const isVat = info ? !!info.vat_registered : /^ABB-/.test(sale.receipt_no || '');
-            const inclVat = !state.payment || state.payment.price_includes_vat !== false;
+            const isVat = sale.doc_kind
+                ? sale.doc_kind === 'abbrev_tax_invoice'
+                : info
+                  ? !!info.vat_registered
+                  : /^ABB-/.test(sale.receipt_no || '');
+            const inclVat = sale.price_includes_vat === true;
             const foot =
                 '<hr><div class="c">ขอบคุณค่ะ / Thank You</div>' +
                 (info && info.footer_text

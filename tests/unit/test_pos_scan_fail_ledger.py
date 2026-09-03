@@ -102,7 +102,15 @@ const subtotal = () => Number(document.getElementById('cart-subtotal').textConte
 POS.state.online = true;
 POS.offline = { hasSnapshot: () => false, filterCached: () => [] };
 // 收款设置这一层归 POS.pay(本测不验它)· 结账要走完必须有它。
-POS.pay = { inclVat: () => false, settings: () => ({}), applyMethods() {}, refresh() {}, ensure() {} };
+POS.pay = {
+    inclVat: () => false,
+    vatRate: () => 0,
+    isVatRegistered: () => false,
+    settings: () => ({}),
+    applyMethods() {},
+    refresh() {},
+    ensure() {},
+};
 // 挂单存本地(clearCart 的三条真实来路之一);node 里没有 localStorage。
 const LS = {};
 global.localStorage = {

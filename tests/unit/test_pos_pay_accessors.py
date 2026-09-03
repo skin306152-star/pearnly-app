@@ -7,7 +7,7 @@ POS 收款设置共享访问器(static/pos/pos-data.js · POS.pay)守门。
 
 收银台(pos-cashier.js)与餐厅埋单(pos-restaurant-ops.js)原各写一份 state.payment 默认访问器
 + 硬编码 show/hide,去重后统一走 POS.pay。这里用真 node 加载 pos-data.js,验三件事:
-  1. settings/inclVat/svcRate 默认与覆盖语义(未拉到收款设置=默认全开 + 价内 VAT + 服务费回落 10)。
+  1. settings/inclVat/svcRate 默认与覆盖语义(登记状态未知时安全按不计 VAT,服务费回落 10)。
   2. applyMethods 数据驱动显隐:现金(无开关)恒显,关掉的方式置 display:none。
   3. data-pm 键 qr(收银台)/ promptpay(餐厅)都映射到 promptpay_enabled —— 这是不归一键(免改后端
      method 字符串/报表分组)却共用一个 applyMethods 的关键,必须双向覆盖防回归。
@@ -48,20 +48,24 @@ function mkEls(pms) {
     return pms.map((pm) => ({ dataset: { pm }, style: {} }));
 }
 
-// ── 未拉到收款设置 → settings() 给全默认(全开 + 价内VAT)──
+// ── 未拉到收款设置 → 支付方式默认可用,VAT 登记状态未知时不计税 ──
 POS.state.payment = null;
 const defaults = POS.pay.settings();
 
 // ── 派生访问器 inclVat / svcRate(开票 payload 用)逐场景 ──
 const accessor = [
-    null, // 默认:价内VAT=true,服务费回落 '10'
-    { price_includes_vat: false },
-    { price_includes_vat: true },
+    null,
+    { price_includes_vat: false, vat_registered: true, vat_rate: '7' },
+    { price_includes_vat: true, vat_registered: true, vat_rate: '7' },
     { service_charge_rate: '7.5' },
     { service_charge_rate: 0 }, // 0 ≠ null → 取 '0'(不回落)
 ].map((payment) => {
     POS.state.payment = payment;
-    return { inclVat: POS.pay.inclVat(), svcRate: POS.pay.svcRate() };
+    return {
+        inclVat: POS.pay.inclVat(),
+        vatRate: POS.pay.vatRate(),
+        svcRate: POS.pay.svcRate(),
+    };
 });
 
 // ── applyMethods:收银台 .pm(cash/qr/card) + 餐厅 button(cash/promptpay/card) ──
@@ -117,14 +121,16 @@ EXPECTED = {
         "promptpay_enabled": True,
         "card_enabled": True,
         "bank_transfer_enabled": False,
-        "price_includes_vat": True,
+        "price_includes_vat": False,
+        "vat_registered": False,
+        "vat_rate": "0",
     },
     "accessor": [
-        {"inclVat": True, "svcRate": "10"},  # null → 价内VAT + 服务费回落 10
-        {"inclVat": False, "svcRate": "10"},
-        {"inclVat": True, "svcRate": "10"},
-        {"inclVat": True, "svcRate": "7.5"},
-        {"inclVat": True, "svcRate": "0"},
+        {"inclVat": False, "vatRate": "0", "svcRate": "10"},
+        {"inclVat": False, "vatRate": "7", "svcRate": "10"},
+        {"inclVat": True, "vatRate": "7", "svcRate": "10"},
+        {"inclVat": False, "vatRate": "0", "svcRate": "7.5"},
+        {"inclVat": False, "vatRate": "0", "svcRate": "0"},
     ],
     # 现金无开关 → applyMethods 不碰它(style.display 保持未设 = None),由 HTML/CSS 决定显示。
     "apply": {

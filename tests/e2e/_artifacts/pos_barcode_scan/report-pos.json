@@ -35,7 +35,7 @@
     },
     "lineVisible": true,
     "lineBox": {
-      "h": 59,
+      "h": 61,
       "inView": true,
       "onTop": true,
       "qtyText": "2",
@@ -58,7 +58,7 @@
     },
     "toast": {
       "txt": "已加入 可乐 325ml",
-      "opacity": "0.924938"
+      "opacity": "0.908607"
     },
     "hits": [
       "8850999320014",

@@ -76,7 +76,7 @@ function setLabel(host: CamHost, running: boolean): void {
     if (label) label.textContent = t(running ? 'inv-scan-cam-stop' : 'inv-scan-cam');
 }
 
-function paintFrame(stage: HTMLElement, crop: { width: number; height: number }): void {
+function paintFrame(stage: HTMLElement, crop: { width: number; height: number }): HTMLElement {
     const box = frameBox(crop);
     const frame = document.createElement('div');
     frame.className = 'inv-scan-frame';
@@ -85,6 +85,7 @@ function paintFrame(stage: HTMLElement, crop: { width: number; height: number })
     frame.style.left = box.left + '%';
     frame.style.top = box.top + '%';
     stage.appendChild(frame);
+    return frame;
 }
 
 function onState(host: CamHost, state: string): void {
@@ -137,9 +138,9 @@ export async function openCamera(host: CamHost): Promise<void> {
         onDuplicate: (code) => host.onDup(code),
     });
     cam = handle;
-    paintFrame(stage, handle.cropRatio());
+    const frame = paintFrame(stage, handle.cropRatio());
     controls?.destroy();
-    controls = mountScanCameraControls(stage, handle);
+    controls = mountScanCameraControls(stage, handle, frame);
     setLabel(host, true);
     void handle.start();
 }

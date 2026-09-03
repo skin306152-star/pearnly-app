@@ -4,7 +4,7 @@
 单一职责:读单据/明细/收款/卖方/收银员 → 组 doc 给渲染叶子。合计按存额组装不重算
 (票面自洽,防历史单据被事后价改动影响)。版式身份跟 sale.doc_kind 走(单据是历史
 文件,账套后来改 VAT 状态不改变已开出票的身份);账套 VAT 状态只在开单时刻定号段
-与 doc_kind(见 sale._receipt_doc_kind)。
+与 doc_kind(见 tax_policy.receipt_doc_kind)。
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def build_receipt_pdf(
     if not sale:
         raise PosError("pos.product_not_found", 404)
     cur.execute(
-        "SELECT l.qty, l.unit_price, l.line_total, p.name_th, p.name_en "
+        "SELECT l.qty, l.unit_price, l.line_discount, l.line_total, p.name_th, p.name_en "
         "FROM pos_sale_lines l JOIN products p ON p.id = l.product_id "
         "WHERE l.tenant_id = %s AND l.sale_id = %s ORDER BY l.id",
         (tenant_id, sale_id),
@@ -43,6 +43,7 @@ def build_receipt_pdf(
             "description": r["name_th"] or r["name_en"],
             "qty": r["qty"],
             "unit_price": r["unit_price"],
+            "discount": r["line_discount"],
             "line_total": r["line_total"],
         }
         for r in cur.fetchall()

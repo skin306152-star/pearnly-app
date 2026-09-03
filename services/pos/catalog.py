@@ -250,5 +250,6 @@ def bootstrap(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
             promptpay_id=(store_row["promptpay_id"] if store_row else ""),
+            vat_registered=bool(store_row and store_row["vat_registered"]),
         ),
     }

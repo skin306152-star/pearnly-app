@@ -17,13 +17,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.071225
+      "videoTime": 7.135385
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 821
+        "at": 807
       }
     ],
     "gaps": [],
@@ -47,13 +47,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.807277
+      "videoTime": 7.738478
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 1497
+        "at": 1399
       }
     ],
     "gaps": [],
@@ -77,13 +77,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.537551
+      "videoTime": 7.405346
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 1203
+        "at": 1057
       }
     ],
     "gaps": [],
@@ -107,13 +107,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.068578
+      "videoTime": 7.135132
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 723
+        "at": 789
       }
     ],
     "gaps": [],
@@ -137,13 +137,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.080937
+      "videoTime": 7.139087
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 716
+        "at": 792
       }
     ],
     "gaps": [],
@@ -175,7 +175,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 4.002163
+      "videoTime": 4.136718
     },
     "after": {
       "count": "สแกนแล้ว 2 ชิ้น",
@@ -193,13 +193,13 @@
       "acts": [
         {
           "label": "ลองใหม่",
-          "w": 125,
+          "w": 128,
           "h": 48,
           "inView": true
         },
         {
           "label": "พิมพ์บาร์โค้ดเอง",
-          "w": 180,
+          "w": 177,
           "h": 48,
           "inView": true
         }
@@ -237,7 +237,7 @@
       ],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 0.072957
+      "videoTime": 0.068598
     },
     "busy": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
     "retryLabel": "ลองใหม่",
@@ -266,7 +266,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 4.005715
+      "videoTime": 4.005874
     },
     "after": {
       "count": "สแกนแล้ว 3 ชิ้น",
@@ -284,7 +284,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 11.011578
+      "videoTime": 11.005932
     },
     "counted": [
       2,
@@ -356,7 +356,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 11.273119
+      "videoTime": 11.003525
     },
     "after": {
       "count": "สแกนแล้ว 4 ชิ้น",
@@ -374,7 +374,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 12.276923
+      "videoTime": 12.13449
     },
     "resumed": true,
     "lookupsBefore": 3,
@@ -401,7 +401,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 4.003204
+      "videoTime": 4.004587
     },
     "after": {
       "count": "สแกนแล้ว 2 ชิ้น",
@@ -419,13 +419,13 @@
       "acts": [
         {
           "label": "ลองใหม่",
-          "w": 125,
+          "w": 128,
           "h": 48,
           "inView": true
         },
         {
           "label": "พิมพ์บาร์โค้ดเอง",
-          "w": 180,
+          "w": 177,
           "h": 48,
           "inView": true
         }

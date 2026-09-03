@@ -109,14 +109,16 @@
         return !state.workspaceClientId;
     };
 
-    // ── 收款设置访问器(老板配 · bootstrap 拉到 state.payment;未拉到用默认全开)──
+    // ── 收款设置访问器(老板配 · bootstrap 拉到 state.payment;未拉到按未登记 VAT 安全回落)──
     // 收银台与餐厅埋单共用。支付方式显隐数据驱动:data-pm 值同时是发后端的 method 字符串
     // (收银台 qr / 餐厅 promptpay 指同一 PromptPay),不归一以免改动报表分组,经 PM_FLAG 映射到开关。
     const PAY_DEFAULTS = {
         promptpay_enabled: true,
         card_enabled: true,
         bank_transfer_enabled: false,
-        price_includes_vat: true,
+        price_includes_vat: false,
+        vat_registered: false,
+        vat_rate: '0',
     };
     const PM_FLAG = {
         qr: 'promptpay_enabled',
@@ -130,7 +132,13 @@
         return state.payment || PAY_DEFAULTS;
     };
     pay.inclVat = function () {
-        return pay.settings().price_includes_vat !== false;
+        return pay.isVatRegistered() && pay.settings().price_includes_vat === true;
+    };
+    pay.isVatRegistered = function () {
+        return pay.settings().vat_registered === true;
+    };
+    pay.vatRate = function () {
+        return pay.isVatRegistered() ? String(pay.settings().vat_rate || '7') : '0';
     };
     pay.svcRate = function () {
         const r = pay.settings().service_charge_rate;
@@ -142,7 +150,10 @@
         if (state.payment) return;
         try {
             const b = await POS.data.bootstrap();
-            if (b && b.payment) state.payment = b.payment;
+            if (b && b.payment) {
+                state.payment = b.payment;
+                window.dispatchEvent(new CustomEvent('pos:payment-settings'));
+            }
             if (b && b.store && POS.cacheStoreInfo) POS.cacheStoreInfo(b.store);
         } catch (_) {}
     };
@@ -160,6 +171,7 @@
             const p = await POS.data.paymentMethods();
             if (!p) return;
             state.payment = p;
+            window.dispatchEvent(new CustomEvent('pos:payment-settings'));
             const mask = document.getElementById('pay-mask');
             if (mask && mask.classList.contains('show')) pay.applyMethods('#pay-mask .pm');
         } catch (_) {}
@@ -575,25 +587,7 @@
             // 在线请求却网络失败(信封缺失 = isRouteMissing)且引擎在 → 落 outbox 不丢单
             if (POS.isRouteMissing(e) && POS.offline && !POS.allowMock())
                 return POS.offline.enqueueSale(payload);
-            if (POS.isRouteMissing(e) && POS.allowMock()) {
-                const grand = payload.lines.reduce(
-                    (s, l) => s + Number(l.unit_price) * Number(l.qty),
-                    0
-                );
-                const paid = payload.payments.reduce((s, p) => s + Number(p.amount), 0);
-                return {
-                    sale: {
-                        id: POS.uuid(),
-                        receipt_no: 'RCP-LOCAL-' + Math.floor(Math.random() * 90000 + 10000),
-                        grand_total: grand.toFixed(2),
-                        paid_total: paid.toFixed(2),
-                        change_amount: Math.max(0, paid - grand).toFixed(2),
-                        status: 'completed',
-                    },
-                    stock_applied: true,
-                    deduped: false,
-                };
-            }
+            if (POS.isRouteMissing(e) && POS.allowMock()) return POS.cartMath.mockSale(payload);
             throw e;
         }
     };

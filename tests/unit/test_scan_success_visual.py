@@ -84,6 +84,7 @@ firstCard.fire('animationend');
 const afterFirstCard = body.children.length;
 firstRing.fire('animationend');
 const controlHost = new FakeNode('controls');
+const controlAnchor = new FakeNode('frame');
 let torchOn = false;
 const torchCalls = [];
 const camera = {
@@ -96,6 +97,7 @@ const camera = {
 };
 const control = api.mountControls({
   container: controlHost,
+  anchor: controlAnchor,
   camera,
   t: (key) => ({
     'scan-controls.animation': '扫码动画',
@@ -103,7 +105,7 @@ const control = api.mountControls({
     'scan-controls.torch-off': '关闭手电筒',
   })[key] || key,
 });
-const toolbar = controlHost.children[0];
+const toolbar = controlAnchor.children[0];
 const torch = toolbar.children[0];
 const checkbox = toolbar.children[1].children[0];
 checkbox.checked = false;
@@ -127,6 +129,8 @@ Promise.resolve().then(() => Promise.resolve()).then(() => {
       torchCalls,
       torchPressed: torch.attributes['aria-pressed'],
       torchTitle: torch.title,
+      hostChildren: controlHost.children.length,
+      anchorChildren: controlAnchor.children.length,
     },
   }));
 });
@@ -178,6 +182,8 @@ Promise.resolve().then(() => Promise.resolve()).then(() => {
         self.assertEqual(controls["torchCalls"], [True])
         self.assertEqual(controls["torchPressed"], "true")
         self.assertEqual(controls["torchTitle"], "关闭手电筒")
+        self.assertEqual(controls["hostChildren"], 0)
+        self.assertEqual(controls["anchorChildren"], 1)
 
     def test_all_three_success_paths_call_the_shared_visual(self):
         pos = (ROOT / "static" / "pos" / "pos-scan.js").read_text()
@@ -189,9 +195,10 @@ Promise.resolve().then(() => Promise.resolve()).then(() => {
         self.assertIn("checkState === 'free' || checkState === 'self'", products)
         self.assertIn("visual.mountControls({", pos)
         inventory_camera = (ROOT / "src" / "home" / "inventory-scan-camera.ts").read_text()
-        self.assertIn("mountScanCameraControls(stage, handle)", inventory_camera)
+        self.assertIn("mountScanCameraControls(stage, handle, frame)", inventory_camera)
+        self.assertIn("anchor: $('bscan-frame')", pos)
         product_camera = (ROOT / "src" / "home" / "sales-products-scan-cam.ts").read_text()
-        self.assertIn("mountScanCameraControls(view, h)", product_camera)
+        self.assertIn("mountScanCameraControls(view, h, frame)", product_camera)
 
     def test_builds_ship_the_shared_source_and_style_to_both_apps(self):
         js_build = (ROOT / "scripts" / "build-home-js.mjs").read_text()

@@ -7,7 +7,7 @@
       "visibility": "visible",
       "opacity": "1",
       "w": 390,
-      "h": 19,
+      "h": 20,
       "inViewport": true,
       "onTop": true,
       "text": "กำลังเปิดกล้อง…"
@@ -21,7 +21,7 @@
       "h": 780,
       "inViewport": true,
       "onTop": true,
-      "text": "กำลังเปิดกล้อง…\n          \n            \n              \n              \n            \n          \n        \n        \n          สแกนแล้ว 0 ชิ้น\n          \n          เสร็จสิ้น"
+      "text": "แอนิเมชันตอนสแกน\n          กำลังเปิดกล้อง…\n          \n            \n              \n              \n            \n          \n        \n        \n          สแกนแล้ว 0 ชิ้น\n          \n          เสร็จสิ้น"
     },
     "video": {
       "display": "block",
@@ -42,7 +42,7 @@
       "h": 146,
       "inViewport": true,
       "onTop": true,
-      "text": ""
+      "text": "แอนิเมชันตอนสแกน"
     },
     "bar": {
       "count": "สแกนแล้ว 1 ชิ้น",
@@ -71,9 +71,8 @@
         "โค้ก 325ml฿350.00 / ชิ้น−1+฿350.00"
       ]
     },
-    "zxingHits": [
-      "http://127.0.0.1:56922/static/dist/zxing.js?v=12044204"
-    ]
+    "native": true,
+    "fallbackHits": []
   },
   "desktopCameraToCart": {
     "ok": true,
@@ -83,7 +82,7 @@
       "visibility": "visible",
       "opacity": "1",
       "w": 1280,
-      "h": 19,
+      "h": 20,
       "inViewport": true,
       "onTop": true,
       "text": "กำลังเปิดกล้อง…"
@@ -97,7 +96,7 @@
       "h": 800,
       "inViewport": true,
       "onTop": true,
-      "text": "กำลังเปิดกล้อง…\n          \n            \n              \n              \n            \n          \n        \n        \n          สแกนแล้ว 0 ชิ้น\n          \n          เสร็จสิ้น"
+      "text": "แอนิเมชันตอนสแกน\n          กำลังเปิดกล้อง…\n          \n            \n              \n              \n            \n          \n        \n        \n          สแกนแล้ว 0 ชิ้น\n          \n          เสร็จสิ้น"
     },
     "video": {
       "display": "block",
@@ -118,7 +117,7 @@
       "h": 364,
       "inViewport": true,
       "onTop": true,
-      "text": ""
+      "text": "แอนิเมชันตอนสแกน"
     },
     "bar": {
       "count": "สแกนแล้ว 1 ชิ้น",
@@ -147,9 +146,8 @@
         "โค้ก 325ml฿350.00 / ชิ้น−1+฿350.00"
       ]
     },
-    "zxingHits": [
-      "http://127.0.0.1:56922/static/dist/zxing.js?v=12044204"
-    ]
+    "native": true,
+    "fallbackHits": []
   },
   "missShowsCode": {
     "ok": true,
@@ -158,7 +156,7 @@
       "display": "inline-block",
       "visibility": "visible",
       "opacity": "1",
-      "w": 130,
+      "w": 129,
       "h": 23,
       "inViewport": true,
       "onTop": true,
@@ -350,10 +348,10 @@
   },
   "iosFallback": {
     "ok": true,
-    "nativeBarcodeDetectorPresent": false,
+    "nativeBarcodeDetectorPresent": true,
     "requests": [
-      "http://127.0.0.1:56922/static/dist/scan.js?v=12044204",
-      "http://127.0.0.1:56922/static/dist/zxing.js?v=12044204"
+      "http://127.0.0.1:49176/static/dist/scan.js?v=12060020",
+      "http://127.0.0.1:49176/static/dist/barcode-detector.js?v=12060020"
     ]
   },
   "nativePathSkipsZxing": {
@@ -389,7 +387,7 @@
       "visibility": "visible",
       "opacity": "1",
       "w": 315,
-      "h": 38,
+      "h": 40,
       "inViewport": true,
       "onTop": true,
       "text": "อุปกรณ์นี้เปิดกล้องในแอปไม่ได้ · ใช้เครื่องยิงบาร์โค้ดหรือพิมพ์รหัส"

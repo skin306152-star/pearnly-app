@@ -12,6 +12,7 @@ import inspect
 import unittest
 from decimal import Decimal
 
+from core.pos_api import PosError
 from services.pos import payment_settings as svc
 
 
@@ -43,19 +44,27 @@ class RateHelpersTests(unittest.TestCase):
 class GetSettingsTests(unittest.TestCase):
     # 第3次 fetchone = _default_service_rate→get_business_type 的哨兵行查询。
     def test_defaults_when_no_row_non_restaurant(self):
-        cur = FakeCursor([None, {"promptpay_id": None}, None])  # 业态哨兵 None → 非餐厅
+        cur = FakeCursor([None, {"promptpay_id": None, "vat_registered": True}, None])
         out = svc.get_settings(cur, tenant_id="t-1", workspace_client_id=7)
         self.assertTrue(out["promptpay_enabled"])
         self.assertTrue(out["card_enabled"])
         self.assertEqual(out["service_charge_rate"], "0")  # 非餐厅默认 0
         self.assertTrue(out["price_includes_vat"])
+        self.assertTrue(out["vat_registered"])
+        self.assertEqual(out["vat_rate"], "7")
         self.assertEqual(out["promptpay_id"], "")
         self.assertIn("tenant_id = %s AND workspace_client_id = %s", cur.calls[0][0])
         self.assertEqual(cur.calls[0][1], ("t-1", 7))
 
     def test_restaurant_default_service_rate_is_10(self):
         # 餐厅业态(哨兵 restaurant)无显式设置 → 服务费智能默认 10%
-        cur = FakeCursor([None, {"promptpay_id": None}, {"config": {"value": "restaurant"}}])
+        cur = FakeCursor(
+            [
+                None,
+                {"promptpay_id": None, "vat_registered": True},
+                {"config": {"value": "restaurant"}},
+            ]
+        )
         out = svc.get_settings(cur, tenant_id="t-1", workspace_client_id=7)
         self.assertEqual(out["service_charge_rate"], "10")
 
@@ -72,7 +81,7 @@ class GetSettingsTests(unittest.TestCase):
                     "bank_account_no": "123-456-789",
                     "bank_account_name": "Sister Makeup",
                 },
-                {"promptpay_id": "0812345678"},
+                {"promptpay_id": "0812345678", "vat_registered": True},
                 {"config": {"value": "restaurant"}},  # 业态查询(显式行会覆盖费率,不受默认影响)
             ]
         )
@@ -87,18 +96,21 @@ class GetSettingsTests(unittest.TestCase):
         self.assertEqual(out["bank_account_name"], "Sister Makeup")
 
     def test_defaults_include_bank_transfer_off(self):
-        cur = FakeCursor([None, {"promptpay_id": None}, None])
+        cur = FakeCursor([None, {"promptpay_id": None, "vat_registered": False}, None])
         out = svc.get_settings(cur, tenant_id="t-1", workspace_client_id=7)
         self.assertFalse(out["bank_transfer_enabled"])
         self.assertEqual(out["bank_name"], "")
         self.assertEqual(out["bank_account_no"], "")
         self.assertEqual(out["bank_account_name"], "")
+        self.assertFalse(out["price_includes_vat"])
+        self.assertFalse(out["vat_registered"])
+        self.assertEqual(out["vat_rate"], "0")
 
 
 class SaveSettingsTests(unittest.TestCase):
     def test_upsert_and_writeback_promptpay_and_clamp(self):
         # save 末尾会调 get_settings(settings + promptpay + 业态哨兵 3 次查询)→ 备好回读结果
-        cur = FakeCursor([None, {"promptpay_id": "088"}, None])
+        cur = FakeCursor([{"vat_registered": True}, None, None])
         svc.save_settings(
             cur,
             tenant_id="t-1",
@@ -109,18 +121,18 @@ class SaveSettingsTests(unittest.TestCase):
             price_includes_vat=True,
             promptpay_id="  088  ",
         )
-        upsert = cur.calls[0]
+        upsert = cur.calls[1]
         self.assertIn("INSERT INTO pos_payment_settings", upsert[0])
         self.assertIn("ON CONFLICT (tenant_id, workspace_client_id)", upsert[0])
         self.assertEqual(upsert[1][0], "t-1")
         self.assertEqual(upsert[1][1], 7)
         self.assertEqual(upsert[1][4], Decimal("100"))  # 费率 clamp
-        writeback = cur.calls[1]
+        writeback = cur.calls[2]
         self.assertIn("UPDATE workspace_clients SET promptpay_id", writeback[0])
         self.assertEqual(writeback[1], ("088", 7, "t-1"))  # trim + 账套 + 租户
 
     def test_upsert_writes_bank_transfer_fields(self):
-        cur = FakeCursor([None, {"promptpay_id": None}, None])
+        cur = FakeCursor([{"vat_registered": True}, None, None])
         svc.save_settings(
             cur,
             tenant_id="t-1",
@@ -135,12 +147,12 @@ class SaveSettingsTests(unittest.TestCase):
             bank_account_no="  123-456  ",
             bank_account_name="  Sister Makeup  ",
         )
-        upsert = cur.calls[0]
+        upsert = cur.calls[1]
         self.assertIn("bank_transfer_enabled", upsert[0])
         self.assertEqual(upsert[1][6:], (True, "SCB", "123-456", "Sister Makeup"))  # trimmed
 
     def test_upsert_blank_bank_fields_store_null(self):
-        cur = FakeCursor([None, {"promptpay_id": None}, None])
+        cur = FakeCursor([{"vat_registered": True}, None, None])
         svc.save_settings(
             cur,
             tenant_id="t-1",
@@ -151,8 +163,24 @@ class SaveSettingsTests(unittest.TestCase):
             price_includes_vat=True,
             promptpay_id="",
         )
-        upsert = cur.calls[0]
+        upsert = cur.calls[1]
         self.assertEqual(upsert[1][6:], (False, None, None, None))
+
+    def test_unregistered_store_cannot_enable_vat(self):
+        cur = FakeCursor([{"vat_registered": False}])
+        with self.assertRaises(PosError) as ctx:
+            svc.save_settings(
+                cur,
+                tenant_id="t-1",
+                workspace_client_id=7,
+                promptpay_enabled=True,
+                card_enabled=True,
+                service_charge_rate=0,
+                price_includes_vat=True,
+                promptpay_id="",
+            )
+        self.assertEqual(ctx.exception.code, "pos.vat_not_registered")
+        self.assertEqual(len(cur.calls), 1)
 
 
 class RoutesContractTests(unittest.TestCase):

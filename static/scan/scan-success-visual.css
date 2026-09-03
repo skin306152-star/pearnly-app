@@ -159,8 +159,9 @@
 .scan-view-controls {
   position: absolute;
   z-index: 4;
-  top: max(12px, env(safe-area-inset-top));
-  right: 12px;
+  top: 0;
+  right: 0;
+  transform: translateY(calc(-100% - 8px));
   display: flex;
   align-items: center;
   gap: 8px;

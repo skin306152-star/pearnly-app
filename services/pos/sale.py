@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
 """POS 小票编排(POS 项目 · PO-B2 · docs/pos/04 §6)。
 
 建小票 = 一个事务:幂等(client_uuid 命中返原结果)→ 校班次 → 算价(复用销项 totals.py · 价内外)
-→ 发终端连号 → FEFO 扣库存 → 落 pos_sales/lines/payments。取单/作废同此层。钱 Decimal、量
-numeric(14,3)、应用层 WHERE tenant_id。
+→ 发终端连号 → FEFO 扣库存 → 落 pos_sales/lines/payments。取单/作废同此层。钱 Decimal、量 numeric(14,3)、应用层 WHERE tenant_id。
 """
 
 from __future__ import annotations
@@ -15,12 +13,20 @@ from typing import Optional
 from core.pos_api import PosError
 from services.accounting import hooks as acct_hooks
 from services.inventory import store as inv_store
-from services.pos import numbering, payment_settlement, sale_caps, sales_store, stock, void
+from services.pos import (
+    numbering,
+    payment_settlement,
+    sale_caps,
+    sales_store,
+    stock,
+    tax_policy,
+    void,
+)
 from services.pos.sale_binding import resolve as _resolve_sale_binding
 from services.sales.dates import BANGKOK, bangkok_today
 from services.sales.totals import compute_totals
 
-VAT_RATE = Decimal("7")  # 泰国标准 VAT(价内外均按此 · 复用 totals.py)
+VAT_RATE = tax_policy.VAT_RATE
 
 
 def _money(v) -> str:
@@ -80,21 +86,6 @@ def _assert_shift_open(cur, *, tenant_id: str, shift_id: Optional[str]) -> None:
     row = cur.fetchone()
     if not row or row["status"] != "open":
         raise PosError("pos.shift_closed", 409)
-
-
-def _receipt_doc_kind(cur, *, tenant_id: str, workspace_client_id: int) -> str:
-    """小票单据身份(G1):账套已登记 VAT → 简式税票(ABB 号段+版式),否则普通收据(RCP)。
-
-    合规判定服务端权威,不信 payload(未注册户绝不发 ABB 号 = 冒开税票违法;注册户
-    漏出 RCP = 少开税票)。唯一读源 = workspace_clients.vat_registered(tax_settings
-    里的第二份事实本批不读,收口另批)。
-    """
-    cur.execute(
-        "SELECT vat_registered FROM workspace_clients WHERE tenant_id = %s AND id = %s",
-        (tenant_id, workspace_client_id),
-    )
-    row = cur.fetchone()
-    return "abbrev_tax_invoice" if row and row["vat_registered"] else "receipt"
 
 
 def _header_discount(hd: dict) -> tuple:
@@ -160,9 +151,9 @@ def create_sale(
         )
         # 没挂牌价(基本单位看 products.unit_price,箱/打看 product_units.price)不许卖:
         # 客户端 `unit_price` 缺键就是 0,整箱货 ฿0 出门、฿0 落账,小票和日结都看不出异常。
-        # 收银台前端已经拦了一道(pos-cashier.priced),这里是后端那一道 —— 拦的是"没定价",
-        # 不是"定价为 0":真的赠品 list_price 是 0,照旧卖得出去。餐厅那条路同款闸见
-        # services/pos/restaurant/sessions.add_lines。
+        # 收银台前端已经拦了一道(pos-cashier.priced),这里是后端那一道。未定价
+        # 与明确 0 价仍要区分；后者可作为有价订单的赠品行，但整单 0 元会在算价后拒绝。
+        # 餐厅未定价闸见 services/pos/restaurant/sessions.add_lines。
         if list_price is None:
             raise PosError("pos.line_invalid", 422, detail="no_price")
         unit_price = Decimal(str(ln.get("unit_price", 0)))
@@ -191,14 +182,22 @@ def create_sale(
             }
         )
 
+    tax = tax_policy.resolve(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        price_includes_vat=bool(payload.get("price_includes_vat")),
+    )
     hd_amount, hd_pct = _header_discount(payload.get("header_discount"))
     totals = compute_totals(
         totals_lines,
-        vat_rate=VAT_RATE,
-        price_includes_vat=bool(payload.get("price_includes_vat")),
+        vat_rate=tax["vat_rate"],
+        price_includes_vat=tax["price_includes_vat"],
         header_discount_amount=hd_amount,
         header_discount_pct=hd_pct,
     )
+    if totals["grand_total"] <= 0:
+        raise PosError("pos.zero_total", 422)
     payments, paid_total, change = payment_settlement.validate(
         payload.get("payments") or [], totals["grand_total"]
     )
@@ -215,7 +214,7 @@ def create_sale(
     )
 
     terminal_id = binding["terminal_id"]
-    doc_kind = _receipt_doc_kind(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    doc_kind = tax["doc_kind"]
     receipt_no, _n = numbering.next_number(
         cur,
         tenant_id=tenant_id,
@@ -245,7 +244,7 @@ def create_sale(
             "discount_total": totals["discount_total"] + totals["header_discount_amount"],
             "vat_amount": totals["vat_amount"],
             "grand_total": grand,
-            "price_includes_vat": bool(payload.get("price_includes_vat")),
+            "price_includes_vat": tax["price_includes_vat"],
             "paid_total": paid_total,
             "change_amount": change,
             "status": "completed",
@@ -390,8 +389,12 @@ def _sale_result(sale: dict, *, deduped: bool) -> dict:
         "sale": {
             "id": str(sale["id"]),
             "receipt_no": sale["receipt_no"],
+            "subtotal": _money(sale.get("subtotal")),
+            "discount_total": _money(sale.get("discount_total")),
             "grand_total": _money(sale["grand_total"]),
             "vat_amount": _money(sale["vat_amount"]),
+            "doc_kind": sale.get("doc_kind"),
+            "price_includes_vat": bool(sale.get("price_includes_vat", False)),
             "paid_total": _money(sale["paid_total"]),
             "change_amount": _money(sale["change_amount"]),
             "status": sale["status"],

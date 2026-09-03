@@ -10,7 +10,7 @@
 会出事的输入(不是"挂了 ฿350 的箱"那种永远绿的):
   · 商品建了「箱」这条单位行但价留空(product_units.price IS NULL)—— 扫箱码就是这条路;
   · 基本单位没设价(products.unit_price IS NULL)—— 扫码就地建品建出来的货全长这样;
-  · 真的赠品(挂牌价就是 0)必须照旧卖得出去 —— 拦的是"没定价",不是"定价为 0"。
+  · 真的赠品(挂牌价就是 0)也不能单独结成整单 0 元;免费赠送应与有价商品同单。
 """
 
 import unittest
@@ -99,12 +99,15 @@ class UnpricedUnitIsRefusedTests(unittest.TestCase):
         receipt.assert_not_called()
         deduct.assert_not_called()
 
-    def test_a_real_zero_priced_unit_still_sells(self):
-        """免费赠品是真业务:挂牌价就是 0 → 照旧卖得出去(整单 0 元不收钱,故不带 payments)。
-        混成一个值的话,病灶只是从"分不清"换成另一种"分不清"。"""
-        err, receipt, _ = _sell(Decimal("15"), {"factor_to_base": 24, "price": Decimal("0")}, "ลัง")
-        self.assertIsNone(err, "定价为 0 的赠品被当成没定价拦掉了")
-        receipt.assert_called()  # 真领到了收据号 = 这一单过了闸,不是在半路被别的错吞掉
+    def test_a_real_zero_priced_unit_cannot_be_the_whole_order(self):
+        """免费赠品可以作为有价订单的一行,但整单 0 元不许发号、不动库存。"""
+        err, receipt, deduct = _sell(
+            Decimal("15"), {"factor_to_base": 24, "price": Decimal("0")}, "ลัง"
+        )
+        self.assertIsNotNone(err)
+        self.assertEqual(err.code, "pos.zero_total")
+        receipt.assert_not_called()
+        deduct.assert_not_called()
 
     def test_a_priced_unit_still_sells(self):
         err, receipt, _ = _sell(

@@ -76,6 +76,18 @@ class CheckoutComputeTests(unittest.TestCase):
         self.assertEqual(c["grand_total"], Decimal("440.00"))
         self.assertEqual(c["vat_amount"], Decimal("28.79"))  # 440×7/107=28.785 → HALF_UP
 
+    def test_unregistered_store_has_no_vat(self):
+        c = co._compute(
+            UI_LINES,
+            service_rate="10",
+            price_includes_vat=False,
+            header_discount=None,
+            vat_rate=Decimal("0"),
+        )
+        self.assertEqual(c["service_charge"], Decimal("44.00"))
+        self.assertEqual(c["vat_amount"], Decimal("0.00"))
+        self.assertEqual(c["grand_total"], Decimal("484.00"))
+
     def test_header_discount_lowers_service_base(self):
         # 整单 40 折扣 → 菜品净额 400 → 服务费 40 → billed 440 → 价内
         c = co._compute(

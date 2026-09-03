@@ -14,7 +14,7 @@
     <!-- PWA 预留(离线 PO-B5 再注册 Service Worker;此处先挂 manifest 占位) -->
     <link rel="manifest" href="/static/pos/cashier.webmanifest?v=11871100" />
     <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
-    <link rel="stylesheet" href="/static/dist/pos.css?v=12060015" />
+    <link rel="stylesheet" href="/static/dist/pos.css?v=12060020" />
   </head>
   <body>
     <!-- ── 设备绑定(未绑店铺 · 照稿 12②)── -->
@@ -319,9 +319,16 @@
                 <a id="cart-disc-btn" data-i18n="posui.cart.add.discount">+ 加折扣</a></span
               ><span class="tnum">฿<span id="cart-disc-amt">0.00</span></span>
             </div>
+            <div class="trow" id="cart-vat-row">
+              <span id="cart-vat-label"></span
+              ><span class="tnum" id="cart-vat-value">฿<span id="cart-vat-amt">0.00</span></span>
+            </div>
             <div class="grand">
-              <span class="lbl" data-i18n="posui.cart.due">应收</span>
-              <span class="val tnum">฿<span id="cart-grand">0.00</span></span>
+              <span class="lbl" data-i18n="posui.cart.due">应收</span
+              ><span class="val tnum">฿<span id="cart-grand">0.00</span></span>
+            </div>
+            <div class="trow" id="cart-zero-note" hidden>
+              <span data-i18n="posui.cart.zero">整单应收必须大于 ฿0.00</span>
             </div>
             <button class="pay-btn" id="cart-pay-btn" disabled>
               <svg
@@ -1212,7 +1219,7 @@
             >
           </div>
           <div class="trow vat">
-            <span data-i18n="posui.rest.bill.vat">含 VAT 7%</span
+            <span id="rb-vat-label" data-i18n="posui.rest.bill.vat">含 VAT 7%</span
             ><span class="tnum">฿<span id="rb-vat">0.00</span></span>
           </div>
           <div class="trow" id="rb-split-row" style="display: none">
@@ -1342,7 +1349,7 @@
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=12060012"></script>
-    <script src="/static/dist/pos.js?v=12060019" defer></script>
+    <script src="/static/pos/pos-i18n.js?v=12060020"></script>
+    <script src="/static/dist/pos.js?v=12060020" defer></script>
   </body>
 </html>

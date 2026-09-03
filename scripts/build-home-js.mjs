@@ -59,7 +59,7 @@ const BUNDLES = [
             'landing/landing-tour.js',
         ],
     },
-    // POS 收银 SPA(零售/药房/餐厅三业态):8 个 plain-script 逻辑文件按 DOM 顺序拼成一个
+    // POS 收银 SPA(零售/药房/餐厅三业态):plain-script 逻辑文件按 DOM 顺序拼成一个
     // bundle(pos.js 原是 defer · 整 bundle 在 pos.html 以 defer 加载,执行时序不变)。
     // pos-i18n.js 是纯翻译数据(window.POSI18N),保留独立 raw 先加载。
     // 离线链路(pos-offline outbox / pos-totals 本地算价)只是被打包,逻辑零改;pos-sw
@@ -70,6 +70,7 @@ const BUNDLES = [
             ...SCAN_RESIDENT,
             'pos/pos-totals.js',
             'pos/pos-data.js',
+            'pos/pos-cart-math.js',
             // pos-receipt.js 加载期就取 POS.state/fmt(pos-data.js 定义)→ 必须排在它之后。
             'pos/pos-receipt.js',
             'pos/pos-offline.js',

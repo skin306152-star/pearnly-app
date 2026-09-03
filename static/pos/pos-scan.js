@@ -338,6 +338,7 @@
         if (visual && typeof visual.mountControls === 'function') {
             controls = visual.mountControls({
                 container: $('bscan-stage'),
+                anchor: $('bscan-frame'),
                 camera: cam,
                 t: POS.t,
             });

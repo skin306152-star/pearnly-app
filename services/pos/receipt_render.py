@@ -156,7 +156,11 @@ def _meta_lines(doc, kv):
 def _total_lines(doc, kv, fs):
     """合计区:件数小计 → 折扣(有才印)→ 总额(大字)→ VAT 拆示行(仅 ABB)。"""
     qty_total = _qty(sum(Decimal(str(ln.get("qty") or 0)) for ln in doc.get("lines", [])))
-    s = [kv(f"รวม {qty_total} ชิ้น (Subtotal)", pdf_mod._money(doc.get("subtotal")))]
+    line_discount = sum(
+        (Decimal(str(ln.get("discount") or 0)) for ln in doc.get("lines", [])), Decimal("0")
+    )
+    gross_subtotal = Decimal(str(doc.get("subtotal") or 0)) + line_discount
+    s = [kv(f"รวม {qty_total} ชิ้น (Subtotal)", pdf_mod._money(gross_subtotal))]
     discount = Decimal(str(doc.get("discount_total") or 0))
     if discount > 0:
         s.append(kv("ส่วนลด (Discount)", "-" + pdf_mod._money(discount)))

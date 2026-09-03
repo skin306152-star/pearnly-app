@@ -14,11 +14,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 22,
-        "maxGapMs": 510,
-        "failCycleMs": 29,
+        "sampleHitRate": 18,
+        "maxGapMs": 508,
+        "failCycleMs": 18,
         "failDecodeMs": 0,
-        "samples": 198
+        "samples": 249
       },
       "600": {
         "legMs": 600,
@@ -30,11 +30,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 23,
-        "maxGapMs": 651,
-        "failCycleMs": 26,
+        "sampleHitRate": 19,
+        "maxGapMs": 661,
+        "failCycleMs": 18,
         "failDecodeMs": 0,
-        "samples": 195
+        "samples": 246
       },
       "1400": {
         "legMs": 1400,
@@ -44,13 +44,13 @@
         "qtys": [
           "1"
         ],
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
         "noticeOnScreen": true,
-        "sampleHitRate": 19,
-        "maxGapMs": 1492,
-        "failCycleMs": 18,
+        "sampleHitRate": 16,
+        "maxGapMs": 1493,
+        "failCycleMs": 19,
         "failDecodeMs": 0,
-        "samples": 217
+        "samples": 264
       },
       "1600": {
         "legMs": 1600,
@@ -62,27 +62,27 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 19,
-        "maxGapMs": 1732,
-        "failCycleMs": 28,
+        "sampleHitRate": 16,
+        "maxGapMs": 1736,
+        "failCycleMs": 18,
         "failDecodeMs": 0,
-        "samples": 208
+        "samples": 261
       },
       "6000": {
         "legMs": 6000,
         "cyclesInWindow": 2,
-        "lookups": 2,
+        "lookups": 1,
         "count": "สแกนแล้ว 2 ชิ้น",
         "qtys": [
           "2"
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 31,
-        "maxGapMs": 6148,
-        "failCycleMs": 29,
+        "sampleHitRate": 30,
+        "maxGapMs": 6108,
+        "failCycleMs": 19,
         "failDecodeMs": 0,
-        "samples": 315
+        "samples": 334
       }
     },
     "hold": {
@@ -93,18 +93,18 @@
       ],
       "noticeText": "",
       "noticeOnScreen": false,
-      "sampleHitRate": 22,
-      "maxGapMs": 528,
-      "failCycleMs": 16,
+      "sampleHitRate": 21,
+      "maxGapMs": 554,
+      "failCycleMs": 18,
       "failDecodeMs": 0,
-      "samples": 180
+      "samples": 182
     },
     "ok": true
   },
   "zxing": {
-    "floorMs": 6000,
-    "floorBracket": "(1600, 6000]",
-    "silentBelowMs": 400,
+    "floorMs": 1600,
+    "floorBracket": "(1400, 1600]",
+    "silentBelowMs": 600,
     "away": {
       "400": {
         "legMs": 400,
@@ -116,11 +116,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 59,
-        "maxGapMs": 511,
-        "failCycleMs": 112,
-        "failDecodeMs": 97,
-        "samples": 74
+        "sampleHitRate": null,
+        "maxGapMs": 0,
+        "failCycleMs": null,
+        "failDecodeMs": null,
+        "samples": 0
       },
       "600": {
         "legMs": 600,
@@ -130,13 +130,13 @@
         "qtys": [
           "1"
         ],
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
-        "noticeOnScreen": true,
-        "sampleHitRate": 58,
-        "maxGapMs": 876,
-        "failCycleMs": 196,
-        "failDecodeMs": 175,
-        "samples": 60
+        "noticeText": "",
+        "noticeOnScreen": false,
+        "sampleHitRate": null,
+        "maxGapMs": 0,
+        "failCycleMs": null,
+        "failDecodeMs": null,
+        "samples": 0
       },
       "1400": {
         "legMs": 1400,
@@ -146,115 +146,29 @@
         "qtys": [
           "1"
         ],
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "noticeText": "8850999320014 ยังอยู่ในกรอบสแกนชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1+1 · เป็นชิ้นที่สอง",
         "noticeOnScreen": true,
-        "sampleHitRate": 64,
-        "maxGapMs": 1731,
-        "failCycleMs": 223,
-        "failDecodeMs": 202,
-        "samples": 58
+        "sampleHitRate": null,
+        "maxGapMs": 0,
+        "failCycleMs": null,
+        "failDecodeMs": null,
+        "samples": 0
       },
       "1600": {
         "legMs": 1600,
         "cyclesInWindow": 2,
-        "lookups": 0,
-        "count": "สแกนแล้ว 1 ชิ้น",
-        "qtys": [
-          "1"
-        ],
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
-        "noticeOnScreen": true,
-        "sampleHitRate": 57,
-        "maxGapMs": 1730,
-        "failCycleMs": 119,
-        "failDecodeMs": 103,
-        "samples": 69
-      },
-      "6000": {
-        "legMs": 6000,
-        "cyclesInWindow": 2,
         "lookups": 2,
-        "count": "สแกนแล้ว 2 ชิ้น",
+        "count": "สแกนแล้ว 3 ชิ้น",
         "qtys": [
-          "2"
+          "3"
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 60,
-        "maxGapMs": 6213,
-        "failCycleMs": 223,
-        "failDecodeMs": 100,
-        "samples": 159
-      }
-    },
-    "hold": {
-      "lookups": 0,
-      "count": "สแกนแล้ว 1 ชิ้น",
-      "qtys": [
-        "1"
-      ],
-      "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
-      "noticeOnScreen": true,
-      "sampleHitRate": 36,
-      "maxGapMs": 1000,
-      "failCycleMs": 126,
-      "failDecodeMs": 111,
-      "samples": 58
-    },
-    "ok": true
-  },
-  "slow": {
-    "floorMs": 6000,
-    "floorBracket": "(4000, 6000]",
-    "silentBelowMs": 0,
-    "away": {
-      "600": {
-        "legMs": 600,
-        "cyclesInWindow": 7,
-        "lookups": 0,
-        "count": "สแกนแล้ว 1 ชิ้น",
-        "qtys": [
-          "1"
-        ],
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
-        "noticeOnScreen": true,
-        "sampleHitRate": 52,
-        "maxGapMs": 1231,
-        "failCycleMs": 405,
-        "failDecodeMs": 387,
-        "samples": 23
-      },
-      "1600": {
-        "legMs": 1600,
-        "cyclesInWindow": 2,
-        "lookups": 0,
-        "count": "สแกนแล้ว 1 ชิ้น",
-        "qtys": [
-          "1"
-        ],
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
-        "noticeOnScreen": true,
-        "sampleHitRate": 52,
-        "maxGapMs": 2400,
-        "failCycleMs": 405,
-        "failDecodeMs": 389,
-        "samples": 23
-      },
-      "4000": {
-        "legMs": 4000,
-        "cyclesInWindow": 2,
-        "lookups": 0,
-        "count": "สแกนแล้ว 1 ชิ้น",
-        "qtys": [
-          "1"
-        ],
-        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
-        "noticeOnScreen": true,
-        "sampleHitRate": 57,
-        "maxGapMs": 4542,
-        "failCycleMs": 407,
-        "failDecodeMs": 390,
-        "samples": 44
+        "sampleHitRate": null,
+        "maxGapMs": 0,
+        "failCycleMs": null,
+        "failDecodeMs": null,
+        "samples": 0
       },
       "6000": {
         "legMs": 6000,
@@ -266,11 +180,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 52,
-        "maxGapMs": 6480,
-        "failCycleMs": 407,
-        "failDecodeMs": 389,
-        "samples": 58
+        "sampleHitRate": null,
+        "maxGapMs": 0,
+        "failCycleMs": null,
+        "failDecodeMs": null,
+        "samples": 0
       }
     },
     "hold": {
@@ -279,13 +193,99 @@
       "qtys": [
         "1"
       ],
-      "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
-      "noticeOnScreen": true,
-      "sampleHitRate": 42,
-      "maxGapMs": 2493,
-      "failCycleMs": 418,
-      "failDecodeMs": 404,
-      "samples": 19
+      "noticeText": "",
+      "noticeOnScreen": false,
+      "sampleHitRate": null,
+      "maxGapMs": 0,
+      "failCycleMs": null,
+      "failDecodeMs": null,
+      "samples": 0
+    },
+    "ok": true
+  },
+  "slow": {
+    "floorMs": 1600,
+    "floorBracket": "(600, 1600]",
+    "silentBelowMs": 600,
+    "away": {
+      "600": {
+        "legMs": 600,
+        "cyclesInWindow": 7,
+        "lookups": 0,
+        "count": "สแกนแล้ว 1 ชิ้น",
+        "qtys": [
+          "1"
+        ],
+        "noticeText": "",
+        "noticeOnScreen": false,
+        "sampleHitRate": null,
+        "maxGapMs": 0,
+        "failCycleMs": null,
+        "failDecodeMs": null,
+        "samples": 0
+      },
+      "1600": {
+        "legMs": 1600,
+        "cyclesInWindow": 2,
+        "lookups": 2,
+        "count": "สแกนแล้ว 3 ชิ้น",
+        "qtys": [
+          "3"
+        ],
+        "noticeText": "",
+        "noticeOnScreen": false,
+        "sampleHitRate": null,
+        "maxGapMs": 0,
+        "failCycleMs": null,
+        "failDecodeMs": null,
+        "samples": 0
+      },
+      "4000": {
+        "legMs": 4000,
+        "cyclesInWindow": 2,
+        "lookups": 2,
+        "count": "สแกนแล้ว 3 ชิ้น",
+        "qtys": [
+          "3"
+        ],
+        "noticeText": "",
+        "noticeOnScreen": false,
+        "sampleHitRate": null,
+        "maxGapMs": 0,
+        "failCycleMs": null,
+        "failDecodeMs": null,
+        "samples": 0
+      },
+      "6000": {
+        "legMs": 6000,
+        "cyclesInWindow": 2,
+        "lookups": 2,
+        "count": "สแกนแล้ว 3 ชิ้น",
+        "qtys": [
+          "3"
+        ],
+        "noticeText": "",
+        "noticeOnScreen": false,
+        "sampleHitRate": null,
+        "maxGapMs": 0,
+        "failCycleMs": null,
+        "failDecodeMs": null,
+        "samples": 0
+      }
+    },
+    "hold": {
+      "lookups": 0,
+      "count": "สแกนแล้ว 1 ชิ้น",
+      "qtys": [
+        "1"
+      ],
+      "noticeText": "",
+      "noticeOnScreen": false,
+      "sampleHitRate": null,
+      "maxGapMs": 0,
+      "failCycleMs": null,
+      "failDecodeMs": null,
+      "samples": 0
     },
     "ok": true
   }

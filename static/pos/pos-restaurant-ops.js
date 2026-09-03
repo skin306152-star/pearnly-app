@@ -32,7 +32,9 @@
                 '&mode=' +
                 mode +
                 '&service_rate=' +
-                POS.pay.svcRate();
+                POS.pay.svcRate() +
+                '&price_includes_vat=' +
+                POS.pay.inclVat();
             (lineIds || []).forEach((id) => (p += '&line_ids=' + id));
             if (ways) p += '&ways=' + ways;
             return POS.apiFetch('GET', p);
@@ -254,6 +256,13 @@
         $('rb-service').textContent = fmt(p ? p.service_charge : 0);
         $('rb-service-rate').textContent = p ? p.service_rate : '10';
         $('rb-vat').textContent = fmt(p ? p.vat_amount : 0);
+        $('rb-vat-label').textContent = POS.t(
+            p && p.vat_registered
+                ? p.price_includes_vat
+                    ? 'posui.cart.vat.included'
+                    : 'posui.cart.vat.excluded'
+                : 'posui.cart.vat.unregistered'
+        );
         $('rb-grand').textContent = fmt(p ? p.grand_total : 0);
         const split = p && p.split;
         $('rb-split-row').style.display = split ? 'flex' : 'none';

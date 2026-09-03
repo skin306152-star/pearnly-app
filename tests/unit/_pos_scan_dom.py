@@ -253,6 +253,9 @@ POS.state.lang = 'zh';
 POS.state.workspaceClientId = 7; // 真租户(不是纯本地预览 → 不走 mock 目录)
 const toasts = [];
 POS.toast = (msg, type) => toasts.push({ msg: msg, type: type || '' });
+load('pos-totals.js');
+POS.totals = global.POS.totals;
+load('pos-cart-math.js');
 load('pos-cashier.js');
 // 顺序照 dist/pos.js 的真实拼法:失败清单那本账在 pos-scan.js 加载期就被 create()。
 load('pos-scan-fails.js');

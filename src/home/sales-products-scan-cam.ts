@@ -110,7 +110,7 @@ export function frameBox(crop: CropRatio): {
     return { width, height, left: (100 - width) / 2, top: (100 - height) / 2 };
 }
 
-function paintFrame(view: HTMLElement, crop: CropRatio): void {
+function paintFrame(view: HTMLElement, crop: CropRatio): HTMLElement {
     document.getElementById(FRAME_ID)?.remove(); // 重试会再 create 一次,别叠出两个框
     const box = frameBox({
         width: crop.width * PRODUCT_VISUAL_ZOOM,
@@ -124,6 +124,7 @@ function paintFrame(view: HTMLElement, crop: CropRatio): void {
     frame.style.left = box.left + '%';
     frame.style.top = box.top + '%';
     view.appendChild(frame);
+    return frame;
 }
 
 let handle: CameraHandle | null = null;
@@ -212,9 +213,9 @@ async function startCamera(onCode: (code: string) => void): Promise<void> {
         },
     });
     handle = h;
-    paintFrame(view, h.cropRatio());
+    const frame = paintFrame(view, h.cropRatio());
     controls?.destroy();
-    controls = mountScanCameraControls(view, h);
+    controls = mountScanCameraControls(view, h, frame);
     void h.start();
 }
 

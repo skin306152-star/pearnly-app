@@ -34,6 +34,14 @@ context.window = context;
 context.window.addEventListener = () => {};
 context.window.dispatchEvent = (event) => events.push(event);
 let uuid = 0;
+let localTotal = {
+    subtotal: '10.00',
+    discount_total: '0.00',
+    header_discount_amount: '0.00',
+    grand_total: '10.00',
+    grand_total_cents: 1000,
+    vat_amount: '0.00',
+};
 context.POS = {
     state: { terminalId: 4, online: false, token: null },
     uuid: () => `12345678-0000-4000-8000-${String(++uuid).padStart(12, '0')}`,
@@ -43,7 +51,12 @@ context.POS = {
             this.code = code;
         }
     },
-    totals: { localTotals: () => ({ grand_total: '10.00', vat_amount: '0.65' }) },
+    pay: {
+        vatRate: () => '0',
+        inclVat: () => false,
+        isVatRegistered: () => false,
+    },
+    totals: { localTotals: () => localTotal },
     t: (key) => key,
     tf: (key, vars) => `${key}:${vars.n}`,
     data: {},
@@ -70,6 +83,19 @@ const pending = await context.POS.offline.enqueueSale(payload);
 assert.equal(pending.sale.status, 'pending');
 assert.equal(pending.sale.temporary_receipt, true);
 assert.match(pending.sale.receipt_no, /^OFF-[A-Z0-9]{8}-T04-/);
+
+localTotal = { ...localTotal, grand_total: '0.00', grand_total_cents: 0 };
+await assert.rejects(
+    context.POS.offline.enqueueSale({
+        ...payload,
+        client_uuid: 'sale-zero',
+        lines: [{ ...payload.lines[0], qty: 1 }],
+        payments: [],
+    }),
+    (error) => error.code === 'pos.zero_total'
+);
+assert.equal(await context.POS.offline.pendingCount(), 1);
+localTotal = { ...localTotal, grand_total: '10.00', grand_total_cents: 1000 };
 
 await assert.rejects(
     context.POS.offline.enqueueSale({ ...payload, client_uuid: 'sale-2' }),

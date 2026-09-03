@@ -1,11 +1,11 @@
-# UI 设计合规扫描报告 · 608 个源文件全扫
+# UI 设计合规扫描报告 · 609 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 2(2 文件)
      1  static/admin/admin.css
         └ 521: color: #2563eb;
      1  static/pos/pos-data.js
-        └ 349: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+        └ 361: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
 
 ## 旧token名(应用全局emerald) — 命中 178(27 文件)
     51  static/pos/pos.css
@@ -97,7 +97,7 @@
         └ 2005: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static/pos/pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 366: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 372: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src/home/core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static/home-12-drawer-search.css
@@ -110,7 +110,7 @@
         └ 140: <div class="check-heart" aria-hidden="true">♥</div>
         └ 242: <div class="copyright">© 2026 PEARNLY Co., Ltd. All rights reserved.</div>
      2  static/pos/pos-restaurant-ops.js
-        └ 83: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
+        └ 85: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
      1  src/home/app-shell-sidebar-html.ts
         └ 378: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src/home/dms-intake-invoice-submit.ts

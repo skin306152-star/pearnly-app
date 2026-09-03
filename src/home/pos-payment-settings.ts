@@ -11,6 +11,8 @@ interface PaySettings {
     card_enabled: boolean;
     service_charge_rate: string;
     price_includes_vat: boolean;
+    vat_registered: boolean;
+    vat_rate: string;
     promptpay_id: string;
     bank_transfer_enabled: boolean;
     bank_name: string;
@@ -64,6 +66,7 @@ const STYLE = `
 .rpay .sw::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:var(--card);transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
 .rpay .pm.on .sw{background:var(--btn-blue,var(--accent));}.rpay .pm.on .sw::after{left:21px;}
 .rpay .pm.lock .sw{background:var(--accent-weak);cursor:not-allowed;}.rpay .pm.lock .sw::after{left:21px;}
+.rpay .pm.lock.vat-off .sw{background:var(--line);}.rpay .pm.lock.vat-off .sw::after{left:2px;}
 .rpay .sub-cfg{margin:12px 0 0 50px;}
 .rpay .sub-cfg label{display:block;font-size:12px;color:var(--ink2);margin-bottom:6px;}
 .rpay .fld{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 13px;display:flex;align-items:center;background:var(--line2);}
@@ -170,8 +173,8 @@ function render(s: PaySettings): void {
         <div class="card"><div class="ch">${escapeHtml(t('rpay.other'))}</div>
             <div class="row"><div class="tx"><div class="n">${escapeHtml(t('rpay.service'))}</div><div class="d">${escapeHtml(t('rpay.service_d'))}</div></div>
                 <div class="pctfld"><input id="rpay-svc" type="number" min="0" max="100" value="${escapeHtml(s.service_charge_rate)}"><span>%</span></div></div>
-            <div class="row" data-pm="vat"><div class="tx"><div class="n">${escapeHtml(t('rpay.vat'))}</div><div class="d">${escapeHtml(t('rpay.vat_d'))}</div></div>
-                <div class="pm ${s.price_includes_vat ? 'on' : ''}" style="padding:0;border:0;"><div class="sw" data-toggle="vat"></div></div></div>
+            <div class="row" data-pm="vat"><div class="tx"><div class="n">${escapeHtml(t('rpay.vat'))}</div><div class="d">${escapeHtml(t(s.vat_registered ? 'rpay.vat_d' : 'rpay.vat_unregistered'))}</div></div>
+                <div class="pm ${s.price_includes_vat ? 'on' : ''} ${s.vat_registered ? '' : 'lock vat-off'}" style="padding:0;border:0;"><div class="sw" data-toggle="vat"></div></div></div>
         </div>
         <button class="save" id="rpay-save">${escapeHtml(t('rpay.save'))}</button>`;
     body.querySelectorAll('.sw[data-toggle]').forEach((sw) =>

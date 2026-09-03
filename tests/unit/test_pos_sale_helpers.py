@@ -10,7 +10,16 @@ from decimal import Decimal
 from unittest import mock
 
 from core.pos_api import PosError
-from services.pos import sale
+from services.pos import sale, tax_policy
+
+_NONZERO_TOTALS = {
+    "subtotal": Decimal("10"),
+    "discount_total": Decimal("0"),
+    "header_discount_amount": Decimal("0"),
+    "vat_amount": Decimal("0"),
+    "grand_total": Decimal("10"),
+    "lines": [],
+}
 
 
 class _Cur:
@@ -46,7 +55,7 @@ class HelperTests(unittest.TestCase):
         self.assertIsInstance(sale._parse_sold_at(None), datetime)
 
     def test_vat_rate_is_seven(self):
-        self.assertEqual(sale.VAT_RATE, Decimal("7"))
+        self.assertEqual(tax_policy.VAT_RATE, Decimal("7"))
 
 
 class PaymentSettlementTests(unittest.TestCase):
@@ -161,7 +170,7 @@ class ReceiptDocKindTests(unittest.TestCase):
 
     def test_vat_registered_issues_abbrev_tax_invoice(self):
         cur = _Cur(ones=[{"vat_registered": True}])
-        kind = sale._receipt_doc_kind(cur, tenant_id="t1", workspace_client_id=9)
+        kind = tax_policy.receipt_doc_kind(cur, tenant_id="t1", workspace_client_id=9)
         self.assertEqual(kind, "abbrev_tax_invoice")
         sql, params = cur.calls[0]
         self.assertIn("vat_registered", sql)
@@ -172,7 +181,8 @@ class ReceiptDocKindTests(unittest.TestCase):
             with self.subTest(ones=ones):
                 cur = _Cur(ones=ones)
                 self.assertEqual(
-                    sale._receipt_doc_kind(cur, tenant_id="t1", workspace_client_id=9), "receipt"
+                    tax_policy.receipt_doc_kind(cur, tenant_id="t1", workspace_client_id=9),
+                    "receipt",
                 )
 
     def test_create_sale_numbers_by_vat_state_not_payload(self):
@@ -186,6 +196,7 @@ class ReceiptDocKindTests(unittest.TestCase):
             mock.patch.object(
                 sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
             ),
+            mock.patch.object(sale, "compute_totals", return_value=_NONZERO_TOTALS),
             mock.patch.object(
                 sale.numbering, "next_number", return_value=("ABB-T1-2026-00001", 1)
             ) as nn,
@@ -195,7 +206,9 @@ class ReceiptDocKindTests(unittest.TestCase):
                 return_value={
                     "id": "sale1",
                     "receipt_no": "ABB-T1-2026-00001",
-                    "grand_total": Decimal("0"),
+                    "subtotal": Decimal("10"),
+                    "discount_total": Decimal("0"),
+                    "grand_total": Decimal("10"),
                     "vat_amount": Decimal("0"),
                     "paid_total": Decimal("0"),
                     "change_amount": Decimal("0"),
@@ -209,10 +222,38 @@ class ReceiptDocKindTests(unittest.TestCase):
                 tenant_id="t1",
                 workspace_client_id=9,
                 # payload 硬塞 receipt 也拗不过账套 VAT 状态(老前端兼容 · 合规服务端权威)
-                payload={"shift_id": "shift1", "doc_kind": "receipt", "lines": [], "payments": []},
+                payload={
+                    "shift_id": "shift1",
+                    "doc_kind": "receipt",
+                    "lines": [],
+                    "payments": [{"method": "cash", "amount": "10"}],
+                },
             )
         self.assertEqual(nn.call_args.kwargs["kind"], "abbrev_tax_invoice")
         self.assertEqual(ins.call_args.kwargs["fields"]["doc_kind"], "abbrev_tax_invoice")
+
+    def test_zero_total_is_blocked_before_receipt_numbering(self):
+        cur = _Cur(ones=[{"vat_registered": False}])
+        with (
+            mock.patch.object(
+                sale,
+                "_resolve_sale_binding",
+                return_value={"terminal_id": 1, "cashier_id": "cashier-1"},
+            ),
+            mock.patch.object(
+                sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
+            ),
+            mock.patch.object(sale.numbering, "next_number") as numbering,
+            self.assertRaises(PosError) as ctx,
+        ):
+            sale.create_sale(
+                cur,
+                tenant_id="t1",
+                workspace_client_id=9,
+                payload={"shift_id": "shift1", "lines": [], "payments": []},
+            )
+        self.assertEqual(ctx.exception.code, "pos.zero_total")
+        numbering.assert_not_called()
 
 
 class IdempotencyTests(unittest.TestCase):
@@ -402,6 +443,7 @@ class NumberingBucketDateTests(unittest.TestCase):
             mock.patch.object(
                 sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
             ),
+            mock.patch.object(sale, "compute_totals", return_value=_NONZERO_TOTALS),
             mock.patch.object(
                 sale.numbering, "next_number", return_value=("ABB-T1-2026-00001", 1)
             ) as nn,
@@ -411,7 +453,9 @@ class NumberingBucketDateTests(unittest.TestCase):
                 return_value={
                     "id": "sale1",
                     "receipt_no": "ABB-T1-2026-00001",
-                    "grand_total": Decimal("0"),
+                    "subtotal": Decimal("10"),
+                    "discount_total": Decimal("0"),
+                    "grand_total": Decimal("10"),
                     "vat_amount": Decimal("0"),
                     "paid_total": Decimal("0"),
                     "change_amount": Decimal("0"),
@@ -428,7 +472,7 @@ class NumberingBucketDateTests(unittest.TestCase):
                     "shift_id": "shift1",
                     "sold_at": "2025-12-31T17:30:00Z",
                     "lines": [],
-                    "payments": [],
+                    "payments": [{"method": "cash", "amount": "10"}],
                 },
             )
         # 跨午夜的单:on= 是曼谷 1-1,不是 UTC 的 12-31 —— 号桶跟着票面日走

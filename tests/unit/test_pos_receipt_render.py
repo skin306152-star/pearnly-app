@@ -104,6 +104,30 @@ class AbbLayoutTests(unittest.TestCase):
         self.assertIn("ส่วนลด (Discount)", t)
         self.assertIn("57.00", t)
 
+    def test_subtotal_is_gross_before_line_and_header_discounts(self):
+        lines = [
+            {
+                "description": "สินค้า",
+                "qty": 1,
+                "unit_price": "100.00",
+                "discount": "10.00",
+                "line_total": "90.00",
+            }
+        ]
+        t = _text(
+            _doc(
+                lines=lines,
+                subtotal="90.00",
+                discount_total="20.00",
+                vat_amount="0.00",
+                grand_total="80.00",
+            ),
+            _seller(),
+        )
+        self.assertIn("100.00", t)
+        self.assertIn("20.00", t)
+        self.assertIn("80.00", t)
+
     def test_change_line_only_when_change_due(self):
         t = _text(
             _doc(

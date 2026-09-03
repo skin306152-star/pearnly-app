@@ -239,7 +239,7 @@ async function posSearchTyping(browser, origin) {
     }));
     await shot(page, '04-pos-search-cn-typed.png');
     // 再来一串「长得像条码」的:13 位数字打进搜索框,楦子照旧不许吃(枪速也不许)
-    await page.keyboard.press('Control+a');
+    await page.locator('#main-search').selectText();
     await page.keyboard.type(BOX, { delay: GUN_DELAY });
     const digits = await page.evaluate(() => document.getElementById('main-search').value);
     await page.keyboard.press('Enter');

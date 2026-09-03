@@ -370,6 +370,13 @@
         return Math.max(0, Math.min(discount, sub));
     }
 
+    function cartTotals() {
+        return POS.cartMath.calculate(cart, {
+            mode: discountMode,
+            amount: discount,
+            pct: discountPctValue,
+        });
+    }
     function renderCart() {
         const lines = $('cart-lines');
         const empty = $('cart-empty');
@@ -416,15 +423,8 @@
                 k: cart.length,
             });
         }
-        const sub = subtotalOf(cart);
-        const disc = discountFor(sub);
-        const grand = sub - disc;
-        $('cart-subtotal').textContent = fmt(sub);
-        $('cart-disc-amt').textContent = fmt(disc);
-        $('cart-grand').textContent = fmt(grand);
-        $('cart-pay-btn').disabled = cart.length === 0;
-        $('cart-peek-count').textContent = itemCount;
-        $('cart-peek-grand').textContent = fmt(grand);
+        const totals = cartTotals();
+        POS.cartMath.paint(totals, itemCount, cart.length > 0);
     }
 
     function openDiscountPad() {
@@ -459,8 +459,7 @@
     // 收款设置访问器/显隐/拉取统一在 POS.pay(与餐厅埋单共用)。
 
     function grandTotal() {
-        const sub = subtotalOf(cart);
-        return sub - discountFor(sub);
+        return Number(cartTotals().grand_total);
     }
 
     // ── 混合支付 running-tender ──
@@ -586,6 +585,7 @@
         if (!cart.length) return;
         closeSheet();
         const due = grandTotal();
+        if (POS.cartMath.blockZero(due)) return;
         $('pay-due').textContent = fmt(due);
         $('pay-qr-amt').textContent = fmt(due);
         tendered = 0;
@@ -752,20 +752,25 @@
 
     async function submitSale(payments, errId, btn) {
         btn.disabled = true;
-        const grand = grandTotal();
+        const totals = cartTotals();
+        const grand = Number(totals.grand_total);
         const paidTotal = payments.reduce((s, p) => s + p.amount, 0);
-        const snapshot = {
-            lines: cart.map((c) => ({
-                name: c.name,
-                qty: c.qty,
-                price: c.price,
-                sell_unit: c.sell_unit,
-            })),
-            payments: payments.map((p) => ({ method: p.method, amount: p.amount, ref: p.ref })),
-            grand,
-            change: Math.max(0, paidTotal - grand),
-        };
         const payload = buildSalePayload(payments);
+        const snapshot = Object.assign(
+            {
+                client_uuid: payload.client_uuid,
+                lines: cart.map((c) => ({
+                    name: c.name,
+                    qty: c.qty,
+                    price: c.price,
+                    sell_unit: c.sell_unit,
+                })),
+                payments: payments.map((p) => ({ method: p.method, amount: p.amount, ref: p.ref })),
+                grand,
+                change: Math.max(0, paidTotal - grand),
+            },
+            POS.cartMath.saleMeta(totals)
+        );
         const onOk = (res) => {
             taken = [];
             closePay();
@@ -795,18 +800,20 @@
     // ════════════════ 成交成功面板 + 屏2 升级税票 ════════════════
     function showDone(res, snap) {
         const sale = (res && res.sale) || {};
-        lastSale = {
-            id: sale.id || null,
-            client_uuid: snap.client_uuid || sale.id || null,
-            receipt_no: sale.receipt_no || '',
-            grand_total: sale.grand_total != null ? sale.grand_total : snap.grand.toFixed(2),
-            change_amount: sale.change_amount,
-            offline: !!(res && res.offline), // 离线补单(Part B5)→ 不可即时开税票
-            temporary_receipt: !!sale.temporary_receipt,
-            lines: snap.lines,
-            payments: snap.payments,
-            sold_at: new Date(),
-        };
+        lastSale = Object.assign(
+            {
+                id: sale.id || null,
+                client_uuid: snap.client_uuid || sale.id || null,
+                receipt_no: sale.receipt_no || '',
+                change_amount: sale.change_amount,
+                offline: !!(res && res.offline), // 离线补单(Part B5)→ 不可即时开税票
+                temporary_receipt: !!sale.temporary_receipt,
+                lines: snap.lines,
+                payments: snap.payments,
+                sold_at: new Date(),
+            },
+            POS.cartMath.receiptMeta(sale, snap)
+        );
         // 后端据 paid_total 算的找零优先;离线本地兜底用快照。找零>0 才显(只在含现金溢出时发生)。
         const change =
             lastSale.change_amount != null ? lastSale.change_amount : snap.change.toFixed(2);
@@ -902,8 +909,11 @@
         grid.innerHTML = list
             .map((h) => {
                 const items = h.cart.reduce((s, c) => s + c.qty, 0);
-                const sub = subtotalOf(h.cart);
-                const total = sub - Math.min(h.discount || 0, sub);
+                const heldTotals = POS.cartMath.calculate(h.cart, {
+                    mode: 'amount',
+                    amount: h.discount,
+                });
+                const total = Number(heldTotals.grand_total);
                 const names = h.cart.map((c) => POS.esc(POS.nm(c.name)) + ' ×' + c.qty).join(' · ');
                 return (
                     '<div class="held"><div class="h"><span class="no">' +
@@ -969,6 +979,7 @@
         $('cart-refund-btn').addEventListener('click', () => POS.showView('refund'));
         $('cart-disc-btn').addEventListener('click', openDiscountPad);
         $('cart-pay-btn').addEventListener('click', openPay);
+        window.addEventListener('pos:payment-settings', renderCart);
         $('main-menu-btn').addEventListener('click', () => POS.showView('shift'));
         $('net-pill').addEventListener('click', () => {
             POS.setNet(!state.online);

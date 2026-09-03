@@ -11,7 +11,6 @@
 (function () {
     const POS = (window.POS = window.POS || {});
     const state = POS.state;
-    const VAT_RATE = 7; // 对齐后端 services/pos/sale.VAT_RATE
 
     // ── 持久层:IndexedDB 优先,失败回落 localStorage ──
     const DB_NAME = 'pearnly_pos';
@@ -202,8 +201,8 @@
                 vat_applicable: l.vat_applicable !== false,
             })),
             {
-                vat_rate: VAT_RATE,
-                price_includes_vat: !!payload.price_includes_vat,
+                vat_rate: POS.pay.vatRate(),
+                price_includes_vat: POS.pay.inclVat(),
                 header_discount_amount:
                     payload.header_discount && payload.header_discount.type === 'amount'
                         ? payload.header_discount.value
@@ -216,6 +215,8 @@
         );
         const paid = (payload.payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
         const grand = Number(totals.grand_total);
+        if (totals.grand_total_cents <= 0) throw new POS.PosErr('pos.zero_total', 422, null, true);
+        payload.price_includes_vat = POS.pay.inclVat();
         const change = paid > grand ? (paid - grand).toFixed(2) : '0.00';
         const receiptNo = await nextLocalReceiptNo();
         const rec = {
@@ -237,8 +238,14 @@
             sale: {
                 id: payload.client_uuid,
                 receipt_no: receiptNo,
+                subtotal: totals.subtotal,
+                discount_total: (
+                    Number(totals.discount_total) + Number(totals.header_discount_amount)
+                ).toFixed(2),
                 grand_total: totals.grand_total,
                 vat_amount: totals.vat_amount,
+                doc_kind: POS.pay.isVatRegistered() ? 'abbrev_tax_invoice' : 'receipt',
+                price_includes_vat: POS.pay.inclVat(),
                 paid_total: paid.toFixed(2),
                 change_amount: change,
                 status: 'pending',

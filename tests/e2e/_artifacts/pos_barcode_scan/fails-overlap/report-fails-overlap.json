@@ -14,7 +14,7 @@
       "isVisible": true,
       "display": "block",
       "position": "static",
-      "h": 20,
+      "h": 21,
       "top": 80,
       "onTop": true,
       "topTag": "main-search"
@@ -47,7 +47,7 @@
       "isVisible": true,
       "display": "block",
       "position": "static",
-      "h": 20,
+      "h": 21,
       "top": 84,
       "onTop": true,
       "topTag": "main-search"

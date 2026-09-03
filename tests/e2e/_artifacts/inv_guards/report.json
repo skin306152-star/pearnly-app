@@ -15,19 +15,19 @@
       "visibility": "visible",
       "opacity": "1",
       "inView": true,
-      "text": "刚才这一下当成同一件了(相机没看见它离开)\n8850999320014\n是第二件 · 加 1"
+      "text": "条码仍在取景框内，数量未增加\n8850999320014\n确实是第二件 · +1"
     },
     "btn": {
       "found": true,
-      "w": 110,
+      "w": 126,
       "h": 30,
       "display": "block",
       "visibility": "visible",
       "opacity": "1",
       "inView": true,
-      "text": "是第二件 · 加 1"
+      "text": "确实是第二件 · +1"
     },
-    "copy": "刚才这一下当成同一件了(相机没看见它离开)",
+    "copy": "条码仍在取景框内，数量未增加",
     "lookups": 2
   },
   "secondBoxAboveFloor": {
@@ -59,7 +59,7 @@
       "visibility": "visible",
       "opacity": "1",
       "inView": true,
-      "text": "刚才这一下当成同一件了(相机没看见它离开)\n8850999320014\n是第二件 · 加 1"
+      "text": "条码仍在取景框内，数量未增加\n8850999320014\n确实是第二件 · +1"
     }
   },
   "camRevokedSpeaksUp": {

@@ -166,7 +166,7 @@
 
     function mountControls(opts) {
         if (!doc || !opts || !opts.container || !opts.camera) return null;
-        var container = opts.container;
+        var container = opts.anchor || opts.container;
         var camera = opts.camera;
         var t = opts.t;
         var controls = doc.createElement('div');

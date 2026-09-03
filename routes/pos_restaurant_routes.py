@@ -291,6 +291,7 @@ async def api_bill_preview(
         lambda cur, tid, ws, user: checkout_svc.bill_preview(
             cur,
             tenant_id=tid,
+            workspace_client_id=ws,
             session_id=session_id,
             mode=mode,
             line_ids=line_ids,

@@ -12,6 +12,7 @@ interface ScanSuccessVisualApi {
     show(options: ScanSuccessVisualOptions): boolean;
     mountControls(options: {
         container: HTMLElement;
+        anchor?: HTMLElement;
         camera: ScanCameraControlsHandle;
         t: (key: string) => string;
     }): ScanCameraControls | null;
@@ -42,9 +43,10 @@ export function showScanSuccessVisual(
 
 export function mountScanCameraControls(
     container: HTMLElement,
-    camera: ScanCameraControlsHandle
+    camera: ScanCameraControlsHandle,
+    anchor?: HTMLElement
 ): ScanCameraControls | null {
     const api = visualApi();
     if (!api || typeof api.mountControls !== 'function') return null;
-    return api.mountControls({ container, camera, t: (key) => t(key) });
+    return api.mountControls({ container, anchor, camera, t: (key) => t(key) });
 }

@@ -353,6 +353,8 @@ async function run() {
             api.create = orig;
         };
     });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(200);
     await page.click('#sx-pf-bc-scan');
     let camera = null;
     try {
@@ -366,6 +368,7 @@ async function run() {
                 const controls = document.querySelector('#sx-bcm-view [data-scan-view-controls]');
                 const motion = controls?.querySelector('[data-scan-motion-toggle]');
                 const torch = controls?.querySelector('.scan-view-torch');
+                const cb = controls?.getBoundingClientRect();
                 return {
                     // 屏幕上的取景框 ÷ 画面 == 引擎 cropRatio,才叫「框里」
                     frameW: fb.width / vb.width,
@@ -382,6 +385,9 @@ async function run() {
                         motionLabel: motion?.parentElement?.textContent?.trim() || '',
                         pointerEvents: controls ? getComputedStyle(controls).pointerEvents : '',
                         torchHidden: !!torch?.hidden,
+                        insideViewport: !!cb && cb.top >= 0 && cb.right <= innerWidth + 1,
+                        aboveFrame: !!cb && cb.bottom <= fb.top - 4,
+                        rightAligned: !!cb && Math.abs(cb.right - fb.right) <= 2,
                     },
                 };
             },
@@ -414,12 +420,16 @@ async function run() {
         camera.controls.exists &&
             camera.controls.motionChecked &&
             camera.controls.motionLabel === copy['scan-controls.animation'] &&
-            camera.controls.pointerEvents === 'auto'
+            camera.controls.pointerEvents === 'auto' &&
+            camera.controls.insideViewport &&
+            camera.controls.aboveFrame &&
+            camera.controls.rightAligned
     );
     await chk('假摄像头不支持补光时不显示无效手电筒按钮', camera.controls.torchHidden);
     await page.screenshot({ path: path.join(OUT, '06-camera-scanning.png') });
     await page.click('#sx-bcm-x');
     await page.evaluate(() => window.__restoreCreate());
+    await page.setViewportSize({ width: 1320, height: 960 });
     await chk(
         '手动关窗后相机也释放',
         page.evaluate(() => !document.querySelector('.bscan-video'))

@@ -497,12 +497,8 @@
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && POS.pay) POS.pay.refresh();
         });
-        // PWA 外壳 SW(08 ADR-1 · PS-5 迁址)· 失败不影响在线使用。收银台新家在 /cashier,从根路径
-        // /cashier-sw.js 注册 + scope:/cashier → SW 能控 /cashier 导航(断网重开外壳)。只注销更旧的
-        // /static/pos/ 作用域残留;老 /pos 作用域 SW 故意保留 —— 迁移中的老设备靠它离线兜底老壳,
-        // 落到 /cashier 后各管各的作用域,互不抢导航。
-        // 注意:作用域只隔离导航,不隔离缓存 —— CacheStorage 按源共享,两个 SW 删得掉对方的缓存。
-        // 隔离靠的是两边 dropStaleCaches 各按缓存名前缀只删自己那一族(static/pos/*-sw.js)。
+        // /cashier SW 与旧 /pos SW 作用域分开,缓存则靠各自前缀隔离;只注销更早的残留作用域。
+        // 老 /pos SW 留给迁移中的设备离线兜底。
         // 注册 URL 的指纹跟页面走(assetVersion 抠的是 <script src=dist/pos.js?v=>):写死一个数
         // 就会像它此前那样停在 11911102 不动,而外壳早已发到 12043xxx —— 各造一套版本号必然漂。
         if ('serviceWorker' in navigator) {

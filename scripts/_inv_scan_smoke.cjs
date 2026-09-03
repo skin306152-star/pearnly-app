@@ -242,8 +242,18 @@ async function gunFlow(browser, origin) {
     await page.waitForFunction(
         () => document.querySelector('#inv-in-mask-rows [data-k="product_id"]').value !== ''
     );
+    await page.locator('[data-scan-success-fly]').waitFor({ state: 'attached' });
     const afterFirst = await page.evaluate(rowSnapshot);
     const focusFirst = await page.evaluate(() => document.activeElement?.dataset.k || '');
+    const visualFirst = await page.evaluate(() => {
+        const fly = document.querySelector('[data-scan-success-fly]');
+        return {
+            label: fly?.querySelector('.scan-success-name')?.textContent || '',
+            increment: fly?.querySelector('.scan-success-amount')?.textContent || '',
+            pointerEvents: fly ? getComputedStyle(fly).pointerEvents : '',
+        };
+    });
+    await shot(page, '02-gun-visual-first.png');
 
     // ② 同一个码再扫一次:此刻焦点在数量框里(枪的字符会落进去)→ 该 +1 且不生成第二行,
     //    数量框里不许留下一串条码
@@ -252,6 +262,7 @@ async function gunFlow(browser, origin) {
         () => document.querySelector('#inv-in-mask-rows [data-k="qty"]').value === '2'
     );
     const afterSecond = await page.evaluate(rowSnapshot);
+    const overlappingVisuals = await page.locator('[data-scan-success-fly]').count();
 
     // ③ 批次品:批号/效期格必须真的露出来(走 onProductChange 同一套显隐)
     await gunScan(page, MILK);
@@ -287,8 +298,12 @@ async function gunFlow(browser, origin) {
             afterFirst[0].product === 'p-cola' &&
             afterFirst[0].qty === '1' &&
             focusFirst === 'qty' &&
+            visualFirst.label === P_COLA.name_th &&
+            visualFirst.increment === '+1' &&
+            visualFirst.pointerEvents === 'none' &&
             afterSecond.length === 2 &&
             afterSecond[0].qty === '2' &&
+            overlappingVisuals >= 2 &&
             !afterSecond[0].qty.includes(COLA) &&
             afterSecond[1].product === '' &&
             afterMilk[1].product === 'p-milk' &&
@@ -302,6 +317,8 @@ async function gunFlow(browser, origin) {
         camStyle,
         afterFirst,
         focusFirst,
+        visualFirst,
+        overlappingVisuals,
         afterSecond,
         afterMilk,
         notFound,

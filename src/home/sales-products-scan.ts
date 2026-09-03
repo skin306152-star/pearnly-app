@@ -10,6 +10,7 @@
 // 相机弹窗那一段在 sales-products-scan-cam.ts。
 /* global t, escapeHtml */
 import { salesFetch, htmlVal } from './sales-common.js';
+import { showScanSuccessVisual } from './scan-success-visual.js';
 import {
     NO_CAMERA_KEY,
     closeScanModal,
@@ -167,6 +168,20 @@ function inputEl(): HTMLInputElement | null {
     return document.getElementById(INPUT_ID) as HTMLInputElement | null;
 }
 
+function formValue(id: string): string {
+    return (document.getElementById(id) as HTMLInputElement | null)?.value.trim() || '';
+}
+
+function showCodeAccepted(code: string): void {
+    const label = formValue('sx-pf-th') || formValue('sx-pf-en') || formValue('sx-pf-zh') || code;
+    showScanSuccessVisual({
+        label,
+        imageUrl: formValue('sx-pf-image'),
+        target: inputEl(),
+        increment: false,
+    });
+}
+
 function renderState(): void {
     const el = document.getElementById(STATE_ID);
     if (!el) return;
@@ -217,7 +232,7 @@ function renderState(): void {
 
 // 404 = 没有别的商品占这个码;网络/服务器错 ≠ 没撞码,必须说「查不了」并给重查按钮。
 // 把查不了当放行,等于把撞码悄悄放过 —— 而撞码只有到收银台才暴露,那时改不了。
-async function runCheck(code: string): Promise<void> {
+async function runCheck(code: string, scanned = false): Promise<void> {
     const seq = ++checkSeq;
     if (!code) {
         hitProduct = null;
@@ -259,6 +274,7 @@ async function runCheck(code: string): Promise<void> {
     // 不是码的东西背书。撞码与查不了照旧显示 —— 那两档压下去就是把硬拦路藏起来了。
     checkState = typedBurst && next === 'free' ? 'typed' : next;
     renderState();
+    if (scanned && (checkState === 'free' || checkState === 'self')) showCodeAccepted(code);
 }
 
 /**
@@ -305,7 +321,7 @@ function applyCode(raw: string): void {
     input.value = code;
     input.focus();
     clearTimeout(checkTimer);
-    void runCheck(code);
+    void runCheck(code, true);
 }
 
 /**

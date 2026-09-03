@@ -161,6 +161,15 @@
 
     function onHit(item) {
         const added = POS.tf('posui.bscan.added', { name: POS.nm(item.name) });
+        const visual = window.PearnlyScanSuccessVisual;
+        if (visual && typeof visual.show === 'function') {
+            visual.show({
+                label: POS.nm(item.name),
+                imageUrl: item.image_url,
+                target: [$('cart-peek'), $('cart')],
+                loadImage: POS.data.loadProdImg,
+            });
+        }
         if (!cameraOpen()) {
             POS.toast(added);
             return;

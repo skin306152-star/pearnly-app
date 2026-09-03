@@ -46,7 +46,12 @@ const esbuild = require('esbuild');
 const fs = require('fs');
 const path = require('path');
 const dir = process.argv[1];
-const STUB = { salesFetch: () => {}, salesErrMsg: () => '', localizedName: () => '' };
+const STUB = {
+    salesFetch: () => {},
+    salesErrMsg: () => '',
+    localizedName: () => '',
+    showScanSuccessVisual: () => false,
+};
 const cache = {};
 
 function load(name) {

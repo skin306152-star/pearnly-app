@@ -191,6 +191,7 @@ async function liveHit(browser, origin, viewport, tag) {
         };
         const cs = getComputedStyle(f);
         const done = document.getElementById('bscan-done');
+        const fly = document.querySelector('[data-scan-success-fly]');
         let crossings = 0;
         const samples = window.__scanSamples || [];
         for (let i = 1; i < samples.length; i++) {
@@ -226,6 +227,14 @@ async function liveHit(browser, origin, viewport, tag) {
 
             count: document.getElementById('bscan-count').textContent,
             last: document.getElementById('bscan-last').textContent,
+            visual: fly
+                ? {
+                      count: document.querySelectorAll('[data-scan-success-fly]').length,
+                      label: fly.querySelector('.scan-success-name')?.textContent || '',
+                      increment: fly.querySelector('.scan-success-amount')?.textContent || '',
+                      pointerEvents: getComputedStyle(fly).pointerEvents,
+                  }
+                : null,
             feedback: {
                 ...window.__scanFeedback,
                 crossings,
@@ -263,6 +272,11 @@ async function liveHit(browser, origin, viewport, tag) {
         live.doneLabel === th.copy['posui.bscan.done'] &&
         live.count === th.copy['posui.bscan.count'].replace('{n}', '1') &&
         live.last === th.copy['posui.bscan.added'].replace('{name}', 'โค้ก 325ml') &&
+        live.visual &&
+        live.visual.count === 1 &&
+        live.visual.label === 'โค้ก 325ml' &&
+        live.visual.increment === '+1' &&
+        live.visual.pointerEvents === 'none' &&
         live.feedback.starts === 1 &&
         live.feedback.stops === 1 &&
         live.feedback.vibrates.join(',') === '60' &&
@@ -558,6 +572,10 @@ async function refusals(browser, origin) {
         grand: document.getElementById('cart-grand').textContent,
         lines: [...document.querySelectorAll('#cart-lines .li-nm .n')].map((e) => e.textContent),
         toasts: window.__toasts,
+        visuals: [...document.querySelectorAll('[data-scan-success-fly]')].map((el) => ({
+            label: el.querySelector('.scan-success-name')?.textContent || '',
+            pointerEvents: getComputedStyle(el).pointerEvents,
+        })),
     }));
     await page.close();
 
@@ -580,6 +598,8 @@ async function refusals(browser, origin) {
         bothKept === 2 && // 第二件失败没把第一件顶掉
         burst.grand === '53.00' &&
         burst.lines.join('|') === 'น้ำเปล่า|ขนมปัง|นมจืด' && // 落地顺序 = 扫的顺序
+        burst.visuals.length >= 2 && // 前一件还在飞,下一件已经独立进车
+        burst.visuals.every((visual) => visual.pointerEvents === 'none') &&
         burst.toasts.includes(q(1)) &&
         burst.toasts.includes(q(2));
     return { ok, lang: th.lang, noPrice, unitGone, bothKept, burst };

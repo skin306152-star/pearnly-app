@@ -1,0 +1,157 @@
+/* Shared scan-success motion. It never receives pointer events or participates in layout. */
+.scan-success-fly {
+  position: fixed;
+  z-index: 12050;
+  width: 112px;
+  pointer-events: none;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  color: var(--ink);
+  transform: translate3d(-50%, -50%, 0) scale(0.72);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: scan-success-fly 680ms cubic-bezier(0.2, 0.82, 0.28, 1) forwards;
+}
+.scan-success-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  overflow: visible;
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: 0 14px 34px rgba(17, 24, 39, 0.34);
+}
+.scan-success-thumb img,
+.scan-success-placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 17px;
+}
+.scan-success-thumb img {
+  object-fit: cover;
+  opacity: 0;
+}
+.scan-success-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: var(--accent-weak);
+}
+.scan-success-placeholder svg {
+  width: 42px;
+  height: 42px;
+}
+.scan-success-fly.has-image .scan-success-thumb img {
+  opacity: 1;
+}
+.scan-success-fly.has-image .scan-success-placeholder {
+  opacity: 0;
+}
+.scan-success-check {
+  position: absolute;
+  right: -8px;
+  bottom: -7px;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border: 3px solid var(--card);
+  border-radius: 50%;
+  background: var(--green);
+  color: rgba(255, 255, 255, 0.98);
+}
+.scan-success-check svg {
+  width: 16px;
+  height: 16px;
+}
+.scan-success-caption {
+  display: flex;
+  align-items: center;
+  max-width: 148px;
+  min-height: 25px;
+  padding: 4px 8px 4px 10px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: 0 7px 18px rgba(17, 24, 39, 0.24);
+  font-size: 12px;
+  font-weight: 700;
+}
+.scan-success-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scan-success-amount {
+  flex: none;
+  margin-left: 6px;
+  color: var(--green);
+}
+.scan-success-ring {
+  position: fixed;
+  z-index: 12049;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate3d(-50%, -50%, 0) scale(0.4);
+  animation: scan-success-ring 300ms ease-out 500ms forwards;
+}
+@keyframes scan-success-fly {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, calc(-50% + 14px), 0) scale(0.72);
+  }
+  18% {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1.04);
+  }
+  42% {
+    opacity: 1;
+    transform: translate3d(-50%, calc(-50% - 8px), 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(-50% + var(--scan-fly-x)), calc(-50% + var(--scan-fly-y)), 0)
+      scale(0.28);
+  }
+}
+@keyframes scan-success-ring {
+  0% {
+    opacity: 0.8;
+    transform: translate3d(-50%, -50%, 0) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(1.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scan-success-fly {
+    animation: scan-success-confirm 360ms ease-out forwards;
+  }
+  .scan-success-ring {
+    animation-delay: 190ms;
+  }
+  @keyframes scan-success-confirm {
+    0% {
+      opacity: 0;
+      transform: translate3d(-50%, -50%, 0) scale(0.82);
+    }
+    35% {
+      opacity: 1;
+      transform: translate3d(-50%, -50%, 0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translate3d(-50%, -50%, 0) scale(0.92);
+    }
+  }
+}

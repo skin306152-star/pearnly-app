@@ -26,7 +26,9 @@ const { chromium } = require('playwright');
 
 const ROOT = path.resolve(__dirname, '..');
 const Y4M = path.resolve(process.argv[2] || '.scan_fixture.y4m');
-const OUT = path.join(ROOT, 'tests', 'e2e', '_artifacts', 'products_barcode');
+const OUT = path.resolve(
+    process.argv[3] || path.join(ROOT, 'tests', 'e2e', '_artifacts', 'products_barcode')
+);
 const SCAN_CODE = '8850999320014'; // y4m 里那张码
 const DUP_CODE = '8851959132074';
 const LANG = 'zh'; // 泰文那一屏另有 _sx_barcode_copy_accept.cjs 专验
@@ -324,6 +326,17 @@ async function run() {
         { timeout: 8000 }
     );
     await chk('扫完立刻查了一次重', true);
+    await page.locator('[data-scan-success-fly]').waitFor({ state: 'attached' });
+    const productVisual = await page.evaluate(() => {
+        const fly = document.querySelector('[data-scan-success-fly]');
+        return {
+            label: fly?.querySelector('.scan-success-name')?.textContent || '',
+            increment: !!fly?.querySelector('.scan-success-amount'),
+            pointerEvents: fly ? getComputedStyle(fly).pointerEvents : '',
+        };
+    });
+    await chk('建品扫码有独立视觉确认且不冒充数量 +1', !!productVisual.label && !productVisual.increment);
+    await chk('建品扫码动画不拦下一次输入', productVisual.pointerEvents === 'none');
     await page.screenshot({ path: path.join(OUT, '07-scanned-filled.png') });
 
     // ⑤b 取景框几何量真盒子。假摄像头第一帧就有码,整条链(拉包→授权→出帧→解码)不到 200ms

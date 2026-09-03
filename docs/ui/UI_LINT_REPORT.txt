@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 597 个源文件全扫
+# UI 设计合规扫描报告 · 607 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 2(2 文件)
@@ -81,8 +81,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 192(25 文件)
     96  static/i18n-data.js
-        └ 1405: 'billing-accuracy-good': '✅ 准',
-        └ 1406: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1396: 'billing-accuracy-good': '✅ 准',
+        └ 1397: 'billing-accuracy-fair': '⚠ 一般',
     35  static/erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -97,7 +97,7 @@
         └ 2005: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static/pos/pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 364: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 363: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src/home/core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static/home-12-drawer-search.css
@@ -114,7 +114,7 @@
      1  src/home/app-shell-sidebar-html.ts
         └ 378: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src/home/dms-intake-invoice-submit.ts
-        └ 127: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
+        └ 120: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src/home/erp-log-card.ts
         └ 160: statusIcon = '⏭';
      1  src/home/erp-log-detail.ts
@@ -140,7 +140,7 @@
      1  static/home-37-html-inline.css
         └ 153: /* v102 · 统一「需复核」⚠ icon · 替代原「缺金额 → 补金额」黄按钮 */
 
-## 小固定max-width(查是否@media) — 命中 144(79 文件)
+## 小固定max-width(查是否@media) — 命中 146(80 文件)
      8  src/home/sales-detail.ts
         └ 116: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
         └ 161: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
@@ -237,6 +237,9 @@
      2  static/home-41-inventory.css
         └ 147: max-width: 320px;
         └ 336: max-width: 640px;
+     2  static/home-49-dms-intake.css
+        └ 206: .dmsx .dx-sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;text-align:left;m
+        └ 400: .dmsx .dx-item-default select{flex:1;max-width:210px}
      2  static/recon-mapping.js
         └ 127: '.rmap-box{background:#fff;border-radius:12px;max-width:920px;width:100%;max-height:88vh;d
         └ 134: '.rmap-tbl th,.rmap-tbl td{border:1px solid #e8e8e3;padding:5px 8px;text-align:left;white-
@@ -322,8 +325,6 @@
         └ 79: overflow: hidden; max-width: 200px;
      1  static/home-39-sales.css
         └ 104: max-width: 300px;
-     1  static/home-49-dms-intake.css
-        └ 206: .dmsx .dx-sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;text-align:left;m
      1  static/home-54-records.css
         └ 295: max-width: 380px;
      1  static/landing/landing-static-bg.css
@@ -332,6 +333,8 @@
         └ 9: this.mobileNoSound = window.matchMedia('(max-width: 720px)').matches;
      1  static/recon-review.js
         └ 126: '.rrv-modal{background:#fff;border-radius:12px;max-width:920px;width:100%;max-height:88vh;
+     1  static/scan/scan-success-visual.css
+        └ 76: max-width: 148px;
 
 ## 内联旧弹窗/抽屉 — 命中 57(13 文件)
     33  src/home/ocr-results.ts
@@ -409,8 +412,8 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static/i18n-data.js
-        └ 1212: 'time-min-ago-suffix': ' 分钟前',
-        └ 1213: 'time-hour-ago-suffix': ' 小时前',
+        └ 1203: 'time-min-ago-suffix': ' 分钟前',
+        └ 1204: 'time-hour-ago-suffix': ' 小时前',
      4  static/admin/admin-i18n.js
         └ 556: 'time-hours-ago': '{n} 小时前',
         └ 557: 'time-days-ago': '{n} 天前',
@@ -424,8 +427,8 @@
         └ 377: .results-table th.amount-col { text-align: right }
         └ 1179: .bank-tx-table thead th.bank-col-amt { text-align: right }
      3  static/home-49-dms-intake.css
-        └ 257: .dmsx .dx-item-tbl th.r,.dmsx .dx-item-tbl td.r { text-align: right }
-        └ 263: .dmsx .dx-item-tbl td.r .dx-item-in { text-align: right }
+        └ 260: .dmsx .dx-item-tbl th.r,.dmsx .dx-item-tbl td.r { text-align: right }
+        └ 266: .dmsx .dx-item-tbl td.r .dx-item-in { text-align: right }
      1  static/ai/ai-matrix.css
         └ 125: .mx-table thead th.num { text-align: right }
      1  static/ai/ai-shadow.css

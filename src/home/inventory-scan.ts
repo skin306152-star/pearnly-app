@@ -12,6 +12,7 @@
 /* global t, escapeHtml */
 import { salesFetch, salesErrMsg } from './sales-common.js';
 import { localizedName, fmtQty } from './inventory-common.js';
+import { showScanSuccessVisual } from './scan-success-visual.js';
 import {
     ackFails,
     blockedText,
@@ -74,6 +75,7 @@ interface LookupProduct {
     name_en?: string | null;
     name_zh?: string | null;
     track_batch?: boolean;
+    image_url?: string | null;
 }
 // GET /api/sales/products/lookup 的信封(routes/products_routes.py::api_lookup_product)。
 // 字段名照后端那三个写,跟建品侧(sales-products-scan.ts)读的是同一份,别自创第二套。
@@ -348,6 +350,7 @@ function applyHit(code: string, product: LookupProduct, unit: string): void {
     }
     row.scrollIntoView({ block: 'nearest' });
     setMsg('ok', hitMsg(plan.kind, before, hit, name));
+    showScanSuccessVisual({ label: name, imageUrl: product.image_url, target: row });
     // 这个码这次真进单了(多半是建完品回来重扫)→ 它那条待办到此为止
     resolveFail(part('msg'), code);
 }

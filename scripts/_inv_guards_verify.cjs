@@ -549,6 +549,7 @@ async function costGunLandsAsARow(browser, origin) {
     );
     const cost = page.locator('#inv-in-mask-rows [data-row]:first-child [data-k="unit_cost"]');
     await cost.click();
+    await cost.selectText();
     await page.keyboard.type('9.5', { delay: 200 }); // 人手先填好真单价:还原得对得上它
     const before = await cost.inputValue();
     bag.lookups.length = 0;
@@ -587,6 +588,7 @@ async function barcodeAsCostIsStopped(browser, origin) {
     await page.keyboard.type('12', { delay: 200 });
     const cost = page.locator('#inv-in-mask-rows [data-row]:first-child [data-k="unit_cost"]');
     await cost.click();
+    await cost.selectText();
     await page.keyboard.type(BOX, { delay: 200 }); // 200ms/字符 = 人手,楔子不抢
     await page.locator('#inv-in-mask-submit').click();
     await page.waitForTimeout(600);
@@ -626,7 +628,9 @@ async function aRealHighCostStillPosts(browser, origin) {
     );
     await page.locator('#inv-in-mask-rows [data-row]:first-child [data-k="qty"]').click();
     await page.keyboard.type('2', { delay: 120 });
-    await page.locator('#inv-in-mask-rows [data-row]:first-child [data-k="unit_cost"]').click();
+    const cost = page.locator('#inv-in-mask-rows [data-row]:first-child [data-k="unit_cost"]');
+    await cost.click();
+    await cost.selectText();
     await page.keyboard.type('2400000', { delay: 120 });
     await page.locator('#inv-in-mask-submit').click();
     const closed = await page

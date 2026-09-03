@@ -7,7 +7,7 @@
     ],
     "hint": {
       "text": "เว้นว่างไว้ได้ถ้ายังไม่รู้ราคา · แคชเชียร์จะกันสินค้านี้ไว้ ไม่ขายที่ ฿ 0",
-      "h": 30
+      "h": 32
     },
     "want": {
       "noprice": "ยังไม่ตั้งราคา",
@@ -182,18 +182,21 @@
       {
         "product_id": "p-milk",
         "qty": "1",
+        "unit_cost": "28",
         "batch_no": "A-01",
         "expiry_date": "2026-08-10"
       },
       {
         "product_id": "p-milk",
         "qty": "1",
+        "unit_cost": "28",
         "batch_no": "B-02",
         "expiry_date": "2026-11-02"
       },
       {
         "product_id": "p-cola",
-        "qty": "2"
+        "qty": "2",
+        "unit_cost": "9.5"
       }
     ]
   }

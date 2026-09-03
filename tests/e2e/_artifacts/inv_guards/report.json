@@ -130,7 +130,8 @@
         "lines": [
           {
             "product_id": "p-cola",
-            "qty": "250000"
+            "qty": "250000",
+            "unit_cost": "9.5"
           }
         ]
       }

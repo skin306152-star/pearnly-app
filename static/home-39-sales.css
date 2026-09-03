@@ -216,6 +216,16 @@ table.sx-tbl tr.click:hover td {
 #page-sales-products .sx-tbl th:nth-child(7) {
     width: 86px;
 }
+#page-sales-products .sx-tbl.with-cost th:nth-child(5),
+#page-sales-products .sx-tbl.with-cost th:nth-child(6) {
+    width: 12%;
+}
+#page-sales-products .sx-tbl.with-cost th:nth-child(7) {
+    width: 9%;
+}
+#page-sales-products .sx-tbl.with-cost th:nth-child(8) {
+    width: 86px;
+}
 .sx-chev {
     border: 0;
     background: none;

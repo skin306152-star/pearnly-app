@@ -137,17 +137,23 @@ async def api_stock(
     filter: str = Query("all"),
     q: Optional[str] = None,
 ):
-    return _read(
-        request,
-        workspace_client_id,
-        lambda cur, tid: queries.stock_overview(
+    def _stock(cur, tid):
+        cost_visible = field_mask.cost_visible(request)
+        data = queries.stock_overview(
             cur,
             tenant_id=tid,
             workspace_client_id=workspace_client_id,
             filter_=filter,
             q=q,
-            mask_cost=not field_mask.cost_visible(request),
-        ),
+            mask_cost=not cost_visible,
+        )
+        data["cost_visible"] = cost_visible
+        return data
+
+    return _read(
+        request,
+        workspace_client_id,
+        _stock,
     )
 
 

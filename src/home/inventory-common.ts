@@ -38,6 +38,7 @@ export interface InvSummary {
 export interface StockResp {
     items: InvItem[];
     summary: InvSummary;
+    cost_visible: boolean;
 }
 export interface NearExpiryItem {
     product_id: string;
@@ -179,11 +180,18 @@ export const invApi = {
 
     // 入库/盘点弹窗商品下拉:用最近加载的本账套在售商品(无需另请求)。
     // track_batch/batches 一并带出:入库按它显隐批号/效期、盘点按它决定是否逐批。
-    products(): { product_id: string; name: string; track_batch: boolean; batches: InvBatch[] }[] {
+    products(): {
+        product_id: string;
+        name: string;
+        track_batch: boolean;
+        avg_cost: number | null;
+        batches: InvBatch[];
+    }[] {
         return lastItems.map((it) => ({
             product_id: it.product_id,
             name: localizedName(it.name),
             track_batch: !!it.track_batch,
+            avg_cost: it.avg_cost,
             batches: it.batches || [],
         }));
     },
@@ -213,10 +221,8 @@ export function fmtMoney(v: number | string | null | undefined): string {
     });
 }
 
-// 成本/货值列:无 field.cost.view 码的角色,后端把均价/货值返 null(G4 遮蔽)→ 显「--」;
-// 真零成本仍是数字 0 → 显示成 0.00,只有 null 才是被遮蔽。
-export function fmtCost(v: number | string | null | undefined): string {
-    return v == null ? '--' : BAHT + fmtMoney(v);
+export function fmtCost(v: number | string | null | undefined, missing = '--'): string {
+    return v == null ? missing : BAHT + fmtMoney(v);
 }
 
 // 效期的年份带子。上限是 4 位年份这条硬线;下限挡的是 0490-12-31 这种「四位但明显不是人填的」
@@ -297,7 +303,7 @@ export function isSaneQty(value: string): boolean {
  */
 export function isSaneCost(value: string): boolean {
     const v = String(value || '').trim();
-    if (!v) return true; // 空 = 单价缺省,后端按 0 落账
+    if (!v) return true; // 空 = 没记录进价,后端保留 NULL
     return withinDigits(v, MAX_COST_DIGITS);
 }
 

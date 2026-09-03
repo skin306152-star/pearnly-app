@@ -257,9 +257,17 @@ class InventoryScanWiringTests(unittest.TestCase):
         # 上一轮 syncRow 只收 row:那边照旧拿商品 id 去列表缓存里查,刚建完的货查不到 → 当成
         # 非批次品 → 批号格永不出现 → 一批批次品静默落进散装桶。这条接缝在两个文件之间,
         # 真跑那条路的是 scripts/_inv_p1_verify.cjs::freshProduct;这里只钉住契约别再退回去。
-        self.assertIn("syncRow: (row: HTMLElement, tracksBatch: boolean) => void;", self.scan)
-        self.assertIn("active.host.syncRow(row, hit.tracksBatch);", self.scan)
-        self.assertIn("function onProductChange(row: HTMLElement, scanned?: boolean)", self.modals)
+        self.assertIn(
+            "syncRow: (row: HTMLElement, tracksBatch: boolean, "
+            "referenceCost?: number | null) => void;",
+            self.scan,
+        )
+        self.assertIn("active.host.syncRow(row, hit.tracksBatch, product.default_cost);", self.scan)
+        self.assertIn(
+            "function onProductChange(row: HTMLElement, scanned?: boolean, "
+            "scannedCost?: number | null)",
+            self.modals,
+        )
         # 查码应答优先于缓存,且记下来 —— 店员在下拉里切走再切回来时缓存照旧答不出
         self.assertIn("scannedTrackBatch.set(id, scanned)", self.modals)
         self.assertIn("const isBatch = !!id && tracksBatch(id);", self.modals)

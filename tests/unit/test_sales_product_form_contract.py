@@ -272,6 +272,40 @@ class QuickCreatePriceTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端链路测试")
+class ProductReferenceCostFormTests(unittest.TestCase):
+    def _open_and_save(self, visible: bool) -> dict:
+        return run(f"""
+window.PearnlyScanWedge = {{ register: () => () => {{}} }};
+apiGet = async () => ({{ products: [], cost_visible: {str(visible).lower()} }});
+answer = (url, opts) => opts && opts.method === 'POST'
+    ? reply({{ ok: true, product: {{}} }})
+    : reply({{ detail: 'sales.product_not_found' }}, 404);
+loadProducts();
+(async () => {{
+    window.openProductFormWithBarcode('{CODE13}', {{ overlay: true }});
+    await tick(); await tick();
+    const cost = document.getElementById('sx-pf-cost');
+    document.getElementById('sx-pf-th').value = 'น้ำ';
+    if (cost) cost.value = '9.75';
+    await document.getElementById('sx-p-save').onclick();
+    await tick();
+    const wrote = calls.filter((c) => c.method === 'POST')[0] || null;
+    out({{ costField: !!cost, body: wrote && wrote.body }});
+}})();
+""")
+
+    def test_authorized_form_sends_reference_cost(self):
+        got = self._open_and_save(True)
+        self.assertTrue(got["costField"])
+        self.assertEqual(got["body"]["default_cost"], 9.75)
+
+    def test_unauthorized_form_neither_shows_nor_sends_cost(self):
+        got = self._open_and_save(False)
+        self.assertFalse(got["costField"])
+        self.assertNotIn("default_cost", got["body"])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端链路测试")
 class ClearFieldTests(unittest.TestCase):
     """P1-⑪ · 表单里清掉的东西,要真的清得掉(条码撞了才有出路;价格填错了才改得回)。"""
 

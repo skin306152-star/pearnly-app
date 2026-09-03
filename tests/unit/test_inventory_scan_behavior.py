@@ -138,6 +138,18 @@ class ScanLandsOnARow(unittest.TestCase):
         self.assertEqual("", got["rows"][0]["unit"])
         self.assertTrue(got["rows"][0]["unitHidden"])
 
+    def test_receive_cost_prefers_current_average_over_reference(self):
+        got = scenario(
+            "(async () => { openIn(); await feed(COLA); out({ rows: snapshot() }); })();"
+        )
+        self.assertEqual("8.5", got["rows"][0]["cost"])
+
+    def test_uncached_scan_prefills_the_reference_cost(self):
+        got = scenario(
+            "(async () => { openIn(); await feed(MILK); out({ rows: snapshot() }); })();"
+        )
+        self.assertEqual("6.2", got["rows"][0]["cost"])
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过真 DOM 行为测试")
 class UnmatchedCode(unittest.TestCase):

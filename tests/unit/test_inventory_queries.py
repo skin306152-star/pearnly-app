@@ -122,6 +122,15 @@ class StatusAndSummaryTests(unittest.TestCase):
         self.assertIsNone(out["items"][0]["avg_cost"])
         self.assertIsNone(out["summary"]["stock_value"])
 
+    def test_stock_value_is_unknown_when_any_on_hand_cost_is_missing(self):
+        cur = FakeCursor(
+            [[_prow(10, avg_cost=2, product_id="pA"), _prow(3, avg_cost=None, product_id="pB")], []]
+        )
+        out = queries.stock_overview(cur, tenant_id="t", workspace_client_id=9)
+        self.assertIsNone(out["summary"]["stock_value"])
+        self.assertEqual(out["items"][0]["avg_cost"], 2.0)
+        self.assertIsNone(out["items"][1]["avg_cost"])
+
 
 class NearExpiryTests(unittest.TestCase):
     def test_query_filters_expiry_window(self):

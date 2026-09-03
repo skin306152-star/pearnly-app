@@ -58,7 +58,7 @@
     ]
   },
   "gunFromDateField": {
-    "ok": true,
+    "ok": false,
     "focusDate": {
       "k": "expiry_date",
       "type": "date"
@@ -110,7 +110,7 @@
     "typedOffer": {
       "shown": true,
       "code": "8850999320014",
-      "residue": "88509-09-14"
+      "residue": "275760-08-08"
     },
     "afterSlow": [
       {
@@ -144,7 +144,7 @@
         "label": "鲜奶 1L",
         "qty": "1",
         "batchNo": "",
-        "expiry": "2027-05-20",
+        "expiry": "",
         "batchCellShown": true
       },
       {
@@ -170,7 +170,7 @@
         "label": "鲜奶 1L",
         "qty": "1",
         "batchNo": "L-2026",
-        "expiry": "2027-05-20",
+        "expiry": "",
         "batchCellShown": true
       },
       {
@@ -221,7 +221,7 @@
   },
   "badExpiryBlocked": {
     "ok": true,
-    "wrecked": "49012-03-31",
+    "wrecked": "275760-04-09",
     "beforeFill": [
       {
         "product": "p-milk",
@@ -253,6 +253,7 @@
           {
             "product_id": "p-milk",
             "qty": "1",
+            "unit_cost": "10",
             "batch_no": "L-9",
             "expiry_date": "2027-01-31"
           }

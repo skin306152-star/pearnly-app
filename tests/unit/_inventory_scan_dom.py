@@ -334,6 +334,7 @@ function snapshot() {
         unit: field(r, 'unit_name').value,
         unitText: r.querySelector('[data-runit]').textContent,
         unitHidden: r.querySelector('[data-runit]').hidden,
+        cost: field(r, 'unit_cost').value,
         batchShown: r.querySelector('[data-batchcell]').style.display !== 'none',
     }));
 }
@@ -395,8 +396,8 @@ const COLA = '8850999320014';
 const BOX = '8850999320021';   // 同一件可乐的箱码(挂在 product_units 上)
 const MILK = '4901234567894';  // 批次品
 const GHOST = '9999999999999'; // 库里没有
-const P_COLA = { id: 'p-cola', name_th: 'coke', name_en: 'Coke', name_zh: 'kele', track_batch: false };
-const P_MILK = { id: 'p-milk', name_th: 'nom', name_en: 'Milk', name_zh: 'niunai', track_batch: true };
+const P_COLA = { id: 'p-cola', name_th: 'coke', name_en: 'Coke', name_zh: 'kele', track_batch: false, default_cost: 9 };
+const P_MILK = { id: 'p-milk', name_th: 'nom', name_en: 'Milk', name_zh: 'niunai', track_batch: true, default_cost: 6.2 };
 const LOOKUP = {
     [COLA]: { product: P_COLA, matched_by: 'product', matched_unit: 'khuad' },
     [BOX]: { product: P_COLA, matched_by: 'unit', matched_unit: 'lang' },
@@ -407,7 +408,7 @@ reply = (url) => {
     return LOOKUP[code] ? answer(LOOKUP[code]) : answer({ detail: 'sales.product_not_found' }, 404);
 };
 shelf = [
-    { product_id: 'p-cola', name: { th: 'coke', en: 'Coke', zh: 'kele' }, track_batch: false, batches: [] },
+    { product_id: 'p-cola', name: { th: 'coke', en: 'Coke', zh: 'kele' }, track_batch: false, avg_cost: 8.5, batches: [] },
 ];
 
 // 扫码只从产品自己的入口进:扫码框里回车(mountInvScan 绑的 onkeydown)。

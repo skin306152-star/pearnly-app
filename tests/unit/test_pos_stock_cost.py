@@ -87,8 +87,11 @@ class CostForMovesTests(unittest.TestCase):
     def test_unknown_batch_cost_makes_whole_line_none(self):
         # 老批次没记过进价(unit_cost NULL)→ 整行诚实置空,不拿另一段拼凑
         cur = object()
-        with mock.patch.object(
-            stock.inv_store, "get_batch", return_value={"id": "b1", "unit_cost": None}
+        with (
+            mock.patch.object(
+                stock.inv_store, "get_batch", return_value={"id": "b1", "unit_cost": None}
+            ),
+            mock.patch.object(stock.costing, "product_reference_cost", return_value=None),
         ):
             cost = stock.cost_for_moves(
                 cur,
@@ -102,8 +105,11 @@ class CostForMovesTests(unittest.TestCase):
 
     def test_unknown_loose_average_makes_whole_line_none(self):
         cur = object()
-        with mock.patch.object(
-            stock.inv_store, "weighted_avg_purchase_cost_loose", return_value=None
+        with (
+            mock.patch.object(
+                stock.inv_store, "weighted_avg_purchase_cost_loose", return_value=None
+            ),
+            mock.patch.object(stock.costing, "product_reference_cost", return_value=None),
         ):
             cost = stock.cost_for_moves(
                 cur,
@@ -117,7 +123,10 @@ class CostForMovesTests(unittest.TestCase):
 
     def test_missing_batch_row_treated_as_unknown(self):
         cur = object()
-        with mock.patch.object(stock.inv_store, "get_batch", return_value=None):
+        with (
+            mock.patch.object(stock.inv_store, "get_batch", return_value=None),
+            mock.patch.object(stock.costing, "product_reference_cost", return_value=None),
+        ):
             cost = stock.cost_for_moves(
                 cur,
                 tenant_id="t",
@@ -127,6 +136,27 @@ class CostForMovesTests(unittest.TestCase):
                 moves=[("gone", Decimal("1"))],
             )
         self.assertIsNone(cost)
+
+    def test_reference_cost_fills_only_a_missing_actual_cost(self):
+        cur = object()
+        with (
+            mock.patch.object(
+                stock.inv_store, "weighted_avg_purchase_cost_loose", return_value=None
+            ),
+            mock.patch.object(
+                stock.costing, "product_reference_cost", return_value=Decimal("7.25")
+            ) as fallback,
+        ):
+            cost = stock.cost_for_moves(
+                cur,
+                tenant_id="t",
+                workspace_client_id=9,
+                warehouse_id=1,
+                product_id="p",
+                moves=[(None, Decimal("4"))],
+            )
+        self.assertEqual(cost, Decimal("29.00"))
+        fallback.assert_called_once()
 
     def test_zero_qty_segments_skipped(self):
         cur = object()

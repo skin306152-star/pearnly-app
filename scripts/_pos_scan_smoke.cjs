@@ -170,7 +170,7 @@ async function costVisibility(browser, origin) {
     await authorized.addInitScript(seed);
     await login(authorized, origin, true);
     const th = await dict(authorized);
-    const expected = th.copy['posui.product.avg_cost'] + ' ฿10.00';
+    const expected = th.copy['posui.product.cost'] + ' ฿10.00';
     const productCost = await text(authorized, '#main-grid .prod .cost');
     const productCostVisible = await authorized.evaluate(() => {
         const card = document.querySelector('#main-grid .prod').getBoundingClientRect();

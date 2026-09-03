@@ -83,8 +83,8 @@
     },
     "afterClick": {
       "text": "1 件没加进这张收货单\n知道了\n扫到 9999999999994,但这个条码还没建成商品\n用这个码建商品",
-      "productForm": true,
-      "barcodeValue": "9999999999994"
+      "productForm": false,
+      "barcodeValue": null
     }
   }
 }

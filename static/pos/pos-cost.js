@@ -24,10 +24,13 @@
 
     function markup(cost) {
         if (!visible()) return '';
-        const value = cost === null || cost === undefined ? '--' : '฿' + POS.fmt(cost);
+        const value =
+            cost === null || cost === undefined
+                ? POS.t('posui.product.cost_missing')
+                : '฿' + POS.fmt(cost);
         return (
             '<div class="cost tnum">' +
-            POS.esc(POS.t('posui.product.avg_cost')) +
+            POS.esc(POS.t('posui.product.cost')) +
             ' ' +
             value +
             '</div>'

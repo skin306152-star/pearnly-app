@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core import workspace_context as wc
 from core.route_helpers import translate_unique_violation
+from services.authz import field_mask
 from services.authz.deps import require_perm_tid
 from services.sales import product_import
 from services.sales import products as products_dal
@@ -120,7 +121,7 @@ def _patch_fields(req, nullable: set) -> dict:
     return {k: v for k, v in sent.items() if v is not None or k in nullable}
 
 
-def _out(p: dict) -> dict:
+def _out(p: dict, *, cost_visible: bool = True) -> dict:
     return {
         "id": str(p["id"]),
         "code": p.get("code"),
@@ -141,11 +142,25 @@ def _out(p: dict) -> dict:
         "track_expiry": bool(p.get("track_expiry")),
         "is_weighed": bool(p.get("is_weighed")),
         "min_stock": float(p["min_stock"]) if p.get("min_stock") is not None else None,
-        "default_cost": float(p["default_cost"]) if p.get("default_cost") is not None else None,
+        "default_cost": (
+            float(p["default_cost"]) if cost_visible and p.get("default_cost") is not None else None
+        ),
         "is_active": bool(p.get("is_active")),
         "created_at": p["created_at"].isoformat() if p.get("created_at") else None,
         "updated_at": p["updated_at"].isoformat() if p.get("updated_at") else None,
     }
+
+
+def _sent_fields(req) -> set[str]:
+    fields = getattr(req, "model_fields_set", None)
+    if fields is None:
+        fields = getattr(req, "__fields_set__", set())
+    return set(fields)
+
+
+def _guard_cost_write(req, request: Request) -> None:
+    if "default_cost" in _sent_fields(req) and not field_mask.cost_visible(request):
+        raise HTTPException(403, detail="authz.forbidden")
 
 
 def _unit_out(u: dict) -> dict:
@@ -169,6 +184,7 @@ async def api_list_products(
     request: Request, include_inactive: bool = False, q: Optional[str] = None
 ):
     tid, _ = require_perm_tid(request, "sales.product.view")
+    cost_visible = field_mask.cost_visible(request)
     with db.get_cursor_rls(tid) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         rows = products_dal.list_products(
@@ -178,12 +194,17 @@ async def api_list_products(
             include_inactive=include_inactive,
             query=q,
         )
-    return {"products": [_out(r) for r in rows]}
+    return {
+        "products": [_out(r, cost_visible=cost_visible) for r in rows],
+        "cost_visible": cost_visible,
+    }
 
 
 @router.post("")
 async def api_create_product(req: ProductCreate, request: Request):
     tid, _ = require_perm_tid(request, "sales.product.manage")
+    _guard_cost_write(req, request)
+    cost_visible = field_mask.cost_visible(request)
     with (
         db.get_cursor_rls(tid, commit=True) as cur,
         translate_unique_violation("sales.product_code_exists", _PRODUCT_UNIQUE_CODES),
@@ -192,7 +213,7 @@ async def api_create_product(req: ProductCreate, request: Request):
         row = products_dal.create_product(
             cur, tenant_id=tid, workspace_client_id=ws, fields=_dump(req)
         )
-    return {"ok": True, "product": _out(row)}
+    return {"ok": True, "product": _out(row, cost_visible=cost_visible)}
 
 
 @router.get("/lookup")
@@ -208,6 +229,7 @@ async def api_lookup_product(
     前端要靠它把"这码是 X 商品【箱】的码"说准,不然只能含糊说"已被占用"。
     """
     tid, _ = require_perm_tid(request, "sales.product.view")
+    cost_visible = field_mask.cost_visible(request)
     key, value = next(
         ((k, v) for k, v in (("code", code), ("barcode", barcode), ("qr", qr)) if v),
         (None, None),
@@ -220,7 +242,7 @@ async def api_lookup_product(
     if not row:
         raise HTTPException(404, detail="sales.product_not_found")
     return {
-        "product": _out(row),
+        "product": _out(row, cost_visible=cost_visible),
         "matched_by": row.get("matched_by"),
         "matched_unit": row.get("matched_unit"),
     }
@@ -253,6 +275,7 @@ async def api_import_products(request: Request, file: UploadFile = File(...)):
 @router.get("/{product_id}")
 async def api_get_product(product_id: str, request: Request):
     tid, _ = require_perm_tid(request, "sales.product.view")
+    cost_visible = field_mask.cost_visible(request)
     with db.get_cursor_rls(tid) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         row = products_dal.get_product(
@@ -260,12 +283,14 @@ async def api_get_product(product_id: str, request: Request):
         )
     if not row:
         raise HTTPException(404, detail="sales.product_not_found")
-    return {"product": _out(row)}
+    return {"product": _out(row, cost_visible=cost_visible), "cost_visible": cost_visible}
 
 
 @router.patch("/{product_id}")
 async def api_update_product(product_id: str, req: ProductUpdate, request: Request):
     tid, _ = require_perm_tid(request, "sales.product.manage")
+    _guard_cost_write(req, request)
+    cost_visible = field_mask.cost_visible(request)
     raw = _patch_fields(req, products_dal.NULLABLE_FIELDS)
     if not raw:
         raise HTTPException(400, detail="sales.no_changes")
@@ -279,7 +304,7 @@ async def api_update_product(product_id: str, req: ProductUpdate, request: Reque
         )
     if not row:
         raise HTTPException(404, detail="sales.product_not_found")
-    return {"ok": True, "product": _out(row)}
+    return {"ok": True, "product": _out(row, cost_visible=cost_visible)}
 
 
 @router.delete("/{product_id}")

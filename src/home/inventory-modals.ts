@@ -85,12 +85,18 @@ function tracksBatch(id: string): boolean {
 // 选中商品后按是否批次品调整行:收货行显隐批号/效期(非批次品清空不发批号);
 // 盘点行显隐并填充批次下拉(逐批盘:选具体批次单独对账,或「合计」走整品聚合)。
 // scanned:扫码加行时由查码应答带过来的 track_batch(店员自己改下拉时没有,走 tracksBatch)。
-function onProductChange(row: HTMLElement, scanned?: boolean) {
+function onProductChange(row: HTMLElement, scanned?: boolean, scannedCost?: number | null) {
     const sel = row.querySelector<HTMLSelectElement>('[data-k="product_id"]');
     const id = sel ? sel.value : '';
     if (scanned !== undefined && id) scannedTrackBatch.set(id, scanned);
     const prod = id ? productById(id) : null;
     const isBatch = !!id && tracksBatch(id);
+
+    const cost = row.querySelector<HTMLInputElement>('[data-k="unit_cost"]');
+    if (cost) {
+        const suggested = prod?.avg_cost ?? scannedCost;
+        cost.value = suggested == null ? '' : String(suggested);
+    }
 
     const cell = row.querySelector<HTMLElement>('[data-batchcell]');
     if (cell) {
@@ -317,7 +323,7 @@ async function doSubmit(cfg: ModalCfg, submit: HTMLButtonElement) {
         focusRowField(cfg.maskId, badExpiry, 'expiry_date');
         return;
     }
-    // 空批号/效期不发(后端 Optional · 空串会把效期当坏日期);单价缺省 0。
+    // 空批号/效期不发(后端 Optional · 空串会把效期当坏日期);空单价保留未知成本。
     // unit_name 只有扫到单位码(箱码)才有值:后端按 factor_to_base 折算成基本单位落账,
     // 不发就是按基本单位算 —— 12 瓶一箱会变成 1 瓶。
     const lines: InLine[] = raw

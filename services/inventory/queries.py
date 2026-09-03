@@ -131,6 +131,7 @@ def stock_overview(
     items = []
     sku_count = low_count = out_count = 0
     stock_value = Decimal("0")
+    cost_complete = True
     for r in rows:
         qty = Decimal(str(r["qty_on_hand"]))
         status = _status(qty, r["min_stock"])
@@ -146,6 +147,8 @@ def stock_overview(
             out_count += 1
         if r["avg_cost"] is not None:
             stock_value += qty * Decimal(str(r["avg_cost"]))
+        elif qty != 0:
+            cost_complete = False
         items.append(
             {
                 "product_id": str(r["product_id"]),
@@ -163,7 +166,7 @@ def stock_overview(
         )
     summary = {
         "sku_count": sku_count,
-        "stock_value": None if mask_cost else _f(stock_value),
+        "stock_value": None if mask_cost or not cost_complete else _f(stock_value),
         "low_count": low_count,
         "out_count": out_count,
     }

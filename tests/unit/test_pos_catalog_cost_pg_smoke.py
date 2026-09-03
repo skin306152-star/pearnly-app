@@ -8,6 +8,7 @@ import uuid
 from decimal import Decimal
 
 from services.inventory import queries
+from services.pos import stock
 from tests.unit._pg_smoke import connect_or_skip
 
 
@@ -31,7 +32,7 @@ class PosCatalogCostPgSmokeTests(unittest.TestCase):
         cls.cur.execute(
             "CREATE TEMP TABLE inventory_transactions ("
             "product_id uuid NOT NULL, tenant_id uuid NOT NULL, workspace_client_id bigint NOT NULL, "
-            "qty_delta numeric, unit_cost numeric, txn_type text, batch_id uuid)"
+            "warehouse_id bigint, qty_delta numeric, unit_cost numeric, txn_type text, batch_id uuid)"
         )
 
     @classmethod
@@ -98,6 +99,32 @@ class PosCatalogCostPgSmokeTests(unittest.TestCase):
         self.assertEqual(result[batch_id], Decimal("7.00"))
         self.assertEqual(result[loose_id], Decimal("7.6000000000000000"))
         self.assertEqual(result[default_id], Decimal("3.25"))
+
+    def test_sale_cost_uses_reference_only_when_actual_cost_is_missing(self):
+        tenant = str(uuid.uuid4())
+        product_id = str(uuid.uuid4())
+        self.cur.execute(
+            "INSERT INTO products (id, tenant_id, workspace_client_id, default_cost) "
+            "VALUES (%s, %s, 9, 4.50)",
+            (product_id, tenant),
+        )
+
+        result = stock.cost_for_moves(
+            self.cur,
+            tenant_id=tenant,
+            workspace_client_id=9,
+            warehouse_id=3,
+            product_id=product_id,
+            moves=[(None, Decimal("2"))],
+        )
+
+        self.assertEqual(result, Decimal("9.00"))
+        self.cur.execute(
+            "SELECT COUNT(*) AS count FROM inventory_transactions "
+            "WHERE tenant_id = %s AND product_id = %s",
+            (tenant, product_id),
+        )
+        self.assertEqual(self.cur.fetchone()["count"], 0)
 
 
 if __name__ == "__main__":

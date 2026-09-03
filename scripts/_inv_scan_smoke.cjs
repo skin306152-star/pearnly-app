@@ -38,6 +38,7 @@ const P_COLA = {
     name_th: 'โค้ก 325ml',
     name_en: 'Coke 325ml',
     name_zh: '可乐 325ml',
+    default_cost: 7,
     track_batch: false,
 };
 const P_MILK = {
@@ -45,6 +46,7 @@ const P_MILK = {
     name_th: 'นมสด 1L',
     name_en: 'Milk 1L',
     name_zh: '鲜奶 1L',
+    default_cost: 20,
     track_batch: true,
 };
 
@@ -113,6 +115,7 @@ async function stubApi(page, posted) {
                     ok: true,
                     data: {
                         items: STOCK_ITEMS,
+                        cost_visible: true,
                         summary: {
                             sku_count: 2,
                             stock_value: 282,
@@ -183,6 +186,7 @@ function rowSnapshot() {
             product: row.querySelector('[data-k="product_id"]').value,
             label: row.querySelector('[data-k="product_id"]').selectedOptions[0]?.textContent || '',
             qty: row.querySelector('[data-k="qty"]').value,
+            cost: row.querySelector('[data-k="unit_cost"]').value,
             unit: row.querySelector('[data-k="unit_name"]').value,
             unitShown: getComputedStyle(unit).display !== 'none',
             unitText: unit.textContent,
@@ -297,6 +301,7 @@ async function gunFlow(browser, origin) {
             camStyle.disabled === false &&
             afterFirst[0].product === 'p-cola' &&
             afterFirst[0].qty === '1' &&
+            afterFirst[0].cost === '9.5' &&
             focusFirst === 'qty' &&
             visualFirst.label === P_COLA.name_th &&
             visualFirst.increment === '+1' &&
@@ -367,9 +372,12 @@ async function batchSplitFlow(browser, origin) {
             filledFirst &&
             filledSecond &&
             milk.length === 2 &&
-            milk.every((r) => r.qty === '1' && r.batchCellShown) &&
+            milk.every((r) => r.qty === '1' && r.cost === '28' && r.batchCellShown) &&
             lines.length === 2 &&
-            lines.every((l) => l.product_id === 'p-milk' && Number(l.qty) === 1) &&
+            lines.every(
+                (l) =>
+                    l.product_id === 'p-milk' && Number(l.qty) === 1 && Number(l.unit_cost) === 28
+            ) &&
             lines[0].batch_no === 'A-01' &&
             lines[0].expiry_date === '2026-08-10' &&
             lines[1].batch_no === 'B-02' &&
@@ -437,9 +445,11 @@ async function unitCodeFlow(browser, origin) {
             rows[0].unitShown &&
             rows[0].unitText === BOX_UNIT &&
             rows[0].qty === '1' &&
+            rows[0].cost === '9.5' &&
             rows[1].product === 'p-cola' &&
             rows[1].unit === '' &&
             rows[1].qty === '1' &&
+            rows[1].cost === '9.5' &&
             // 屏上要说清这一行按什么单位入(逐字对真词条 · 裸键在这一步就现形)
             msgText === wantMsg &&
             lines.length === 2 &&

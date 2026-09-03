@@ -76,6 +76,7 @@ interface LookupProduct {
     name_zh?: string | null;
     track_batch?: boolean;
     image_url?: string | null;
+    default_cost?: number | null;
 }
 // GET /api/sales/products/lookup 的信封(routes/products_routes.py::api_lookup_product)。
 // 字段名照后端那三个写,跟建品侧(sales-products-scan.ts)读的是同一份,别自创第二套。
@@ -94,7 +95,7 @@ interface LookupBody {
 export interface ScanHost {
     maskId: string;
     addRow: () => HTMLElement | null;
-    syncRow: (row: HTMLElement, tracksBatch: boolean) => void;
+    syncRow: (row: HTMLElement, tracksBatch: boolean, referenceCost?: number | null) => void;
 }
 
 // ── 纯判定(单测直接验)────────────────────────────────────────────────
@@ -334,7 +335,7 @@ function applyHit(code: string, product: LookupProduct, unit: string): void {
             setRowUnit(row, unit);
             // 批次品的批号/效期格走 onProductChange 同一套显隐,不在这里另判一遍;但「管不管
             // 批次」这个事实得由查码应答带过去 —— 那边的列表缓存里可能根本没有这件刚建的货。
-            active.host.syncRow(row, hit.tracksBatch);
+            active.host.syncRow(row, hit.tracksBatch, product.default_cost);
         }
     }
     const qty = row.querySelector<HTMLInputElement>('[data-k="qty"]');

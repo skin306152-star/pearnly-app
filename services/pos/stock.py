@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Optional
 
 from core.pos_api import PosError
-from services.inventory import fefo, ledger
+from services.inventory import costing, fefo, ledger
 from services.inventory import store as inv_store
 
 
@@ -297,10 +297,12 @@ def cost_for_moves(
 
     批次段用该批次 inventory_batches.unit_cost(精确·批次自带进价);散装段没有批次可指,
     退而求其次用该品散装进货的加权平均成本(store.weighted_avg_purchase_cost_loose · WAC)。
-    任一段成本未知(没记过进价)→ 整行 cost_total 为 None,报表按"无数据"诚实置空,绝不
-    拿已知段拼一个偏低的假成本出来。
+    实际批次价/散装加权进价缺失时才退回商品参考成本。参考成本也没填,整行 cost_total
+    为 None,报表按"无数据"诚实置空,绝不把未知成本当 0。
     """
     total = Decimal("0")
+    reference_cost = None
+    reference_loaded = False
     for batch_id, qty in moves:
         q = Decimal(str(qty))
         if q <= 0:
@@ -322,6 +324,16 @@ def cost_for_moves(
                 product_id=product_id,
                 warehouse_id=warehouse_id,
             )
+        if unit_cost is None:
+            if not reference_loaded:
+                reference_cost = costing.product_reference_cost(
+                    cur,
+                    tenant_id=tenant_id,
+                    workspace_client_id=workspace_client_id,
+                    product_id=product_id,
+                )
+                reference_loaded = True
+            unit_cost = reference_cost
         if unit_cost is None:
             return None
         total += q * Decimal(str(unit_cost))

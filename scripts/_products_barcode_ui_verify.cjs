@@ -117,7 +117,7 @@ async function boot(browser, origin) {
         const req = route.request();
         const u = req.url();
         if (req.method() === 'POST' || req.method() === 'PATCH') {
-            posts.push(req.method() + ' ' + u);
+            posts.push({ method: req.method(), url: u, body: req.postDataJSON() });
             return route.fulfill(json({ ok: true, product: DUP_PRODUCT }));
         }
         if (u.includes('/api/sales/products/lookup')) {
@@ -125,7 +125,8 @@ async function boot(browser, origin) {
             if (lookupMode === 'boom') return route.fulfill(json({ detail: 'oops' }, 500));
             return route.fulfill(json({ detail: 'sales.product_not_found' }, 404));
         }
-        if (u.includes('/api/sales/products')) return route.fulfill(json({ products: [] }));
+        if (u.includes('/api/sales/products'))
+            return route.fulfill(json({ products: [], cost_visible: true }));
         if (u.includes('/api/me/plan')) return route.fulfill(json({ plan: 'lifetime' }));
         if (u.includes('/api/ocr/quota')) return route.fulfill(json({ used: 0, limit: 100 }));
         return route.fulfill(json({ ok: true, items: [] }));
@@ -229,17 +230,24 @@ async function run() {
         const btn = document.getElementById('sx-pf-bc-scan');
         const row = btn && btn.closest('.sx-bc-row');
         const hint = row && row.parentElement.querySelector('.sx-field-hint');
+        const cost = document.getElementById('sx-pf-cost');
         const b = btn && btn.getBoundingClientRect();
         return {
             btnVisible:
                 !!btn && b.width > 20 && b.height > 20 && getComputedStyle(btn).display !== 'none',
             hint: hint ? hint.innerText.trim() : '',
             optIn: document.getElementById('sx-pf-barcode')?.hasAttribute('data-enable-barcode'),
+            costVisible: !!cost && cost.getBoundingClientRect().height > 20,
+            costHint: cost?.parentElement?.querySelector('.sx-field-hint')?.innerText.trim() || '',
         };
     });
     await chk('扫码按钮可见且够大(≥20px)', field.btnVisible);
     await chk('旁边写的是真词典里那句「只填条码」', field.hint === copy['sx-p-bc-hint']);
     await chk('条码框对条码枪 opt-in(data-enable-barcode)', field.optIn === true);
+    await chk(
+        '有成本权限时显示参考成本及实际入库优先提示',
+        field.costVisible && field.costHint === copy['sx-p-f-cost-hint']
+    );
     await page.screenshot({ path: path.join(OUT, '01-field-desktop.png') });
 
     // ② 撞码:红字 + 「去编辑那个商品」出路,并且真的拦住保存(没有 POST 发出)
@@ -495,6 +503,7 @@ async function run() {
         const inp = document.getElementById('sx-pf-barcode');
         const btn = document.getElementById('sx-pf-bc-scan');
         const st = document.getElementById('sx-pf-bc-state');
+        const cost = document.getElementById('sx-pf-cost').getBoundingClientRect();
         const r = inp.getBoundingClientRect();
         const b = btn.getBoundingClientRect();
         return {
@@ -502,13 +511,29 @@ async function run() {
             noOverflow: b.right <= window.innerWidth + 1 && r.left >= -1,
             stateVisible: st.getBoundingClientRect().width > 100,
             tap: Math.min(b.width, b.height),
+            costFits: cost.left >= -1 && cost.right <= window.innerWidth + 1,
         };
     });
     await chk('手机端按钮与输入框同一行不换行', mob.inRow);
     await chk('手机端不溢出屏幕', mob.noOverflow);
     await chk('手机端状态区仍有宽度', mob.stateVisible);
     await chk('扫码按钮触控目标 ≥36px', mob.tap >= 36);
+    await chk('参考成本框在手机端不溢出', mob.costFits);
     await page.screenshot({ path: path.join(OUT, '09-mobile-390.png'), fullPage: true });
+    await page.locator('#sx-pf-cost').scrollIntoViewIfNeeded();
+    await chk('参考成本框在手机弹窗内可滚动到', await page.isVisible('#sx-pf-cost'));
+    await page.screenshot({ path: path.join(OUT, '09b-cost-mobile.png'), fullPage: false });
+
+    // ⑩ 成本输入不是摆设:填入后随建品 POST 发出,而且用的是 default_cost 契约列。
+    await page.setViewportSize({ width: 1320, height: 960 });
+    lookupMode = 'free';
+    await page.fill('#sx-pf-th', 'ต้นทุนทดสอบ');
+    await page.fill('#sx-pf-cost', '9.75');
+    posts.length = 0;
+    await page.click('#sx-p-save');
+    await page.waitForFunction(() => !document.getElementById('sx-pf-cost'), { timeout: 8000 });
+    const costWrite = posts.find((p) => p.method === 'POST');
+    await chk('参考成本随商品保存为 default_cost', costWrite?.body?.default_cost === 9.75);
 
     await chk('零 console pageerror', errs.length === 0);
     if (errs.length) console.log('pageerror:', errs.slice(0, 3));

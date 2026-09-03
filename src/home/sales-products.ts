@@ -32,6 +32,7 @@ export interface Product {
     unit?: string;
     // null = 没设过价(≠ 免费)· 收银台靠这个区分「忘了填」和「真的 ฿ 0」,见 pos-cashier.priced
     unit_price: number | null;
+    default_cost?: number | null;
     vat_applicable: boolean;
     track_batch?: boolean;
     image_url?: string;
@@ -45,6 +46,7 @@ const IC_TRASH =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
 
 let products: Product[] = [];
+let costVisible: boolean | null = null;
 let keyword = '';
 let searchTimer: number | undefined;
 
@@ -70,7 +72,7 @@ function closeMask(id: string) {
 function rowsHtml(): string {
     const list = products;
     if (!list.length)
-        return `<tr><td colspan="7"><div class="sx-state">${escapeHtml(t('sx-products-empty'))}</div></td></tr>`;
+        return `<tr><td colspan="${costVisible ? 8 : 7}"><div class="sx-state">${escapeHtml(t('sx-products-empty'))}</div></td></tr>`;
     return list
         .map((p) => {
             const name = productLabel(p);
@@ -83,6 +85,7 @@ function rowsHtml(): string {
                 <td><b>${escapeHtml(name)}</b></td>
                 <td>${escapeHtml(p.unit || '—')}</td>
                 <td class="r">${p.unit_price == null ? escapeHtml(t('sx-p-noprice')) : fmtMoney(p.unit_price)}</td>
+                ${costVisible ? `<td class="r">${p.default_cost == null ? escapeHtml(t('sx-p-nocost')) : fmtMoney(p.default_cost)}</td>` : ''}
                 <td>${p.vat_applicable ? '<span class="sx-badge issued">7%</span>' : '<span class="sx-badge draft">—</span>'}</td>
                 <td class="r"><button class="sx-chev" data-edit="${escapeHtml(p.id)}">${IC_EDIT}</button><button class="sx-chev" data-del="${escapeHtml(p.id)}">${IC_TRASH}</button></td>
             </tr>`;
@@ -96,11 +99,13 @@ function listHtml(): string {
         <button class="btn btn-ghost" id="sx-p-import">${escapeHtml(t('sx-p-import'))}</button>
         <button class="btn btn-primary" id="sx-p-add">${escapeHtml(t('sx-p-add'))}</button>
     </div>
-    <div class="sx-panel"><table class="sx-tbl">
+    <div class="sx-panel"><table class="sx-tbl${costVisible ? ' with-cost' : ''}">
         <thead><tr>
             <th>${escapeHtml(t('sx-p-col-img'))}</th><th>${escapeHtml(t('sx-p-col-code'))}</th>
             <th>${escapeHtml(t('sx-p-col-name'))}</th><th>${escapeHtml(t('sx-p-col-unit'))}</th>
-            <th class="r">${escapeHtml(t('sx-p-col-price'))}</th><th>${escapeHtml(t('sx-p-col-vat'))}</th><th></th>
+            <th class="r">${escapeHtml(t('sx-p-col-price'))}</th>
+            ${costVisible ? `<th class="r">${escapeHtml(t('sx-p-col-cost'))}</th>` : ''}
+            <th>${escapeHtml(t('sx-p-col-vat'))}</th><th></th>
         </tr></thead>
         <tbody id="sx-p-tbody">${rowsHtml()}</tbody>
     </table></div>`;
@@ -162,6 +167,7 @@ function openEdit(p: Product | null, barcodePrefill?: string) {
                 <div><label>${escapeHtml(t('sx-p-f-unit'))}</label><input type="text" id="sx-pf-unit" value="${htmlVal(p?.unit)}" maxlength="50"></div>
                 <div><label>${escapeHtml(t('sx-p-f-price'))}</label><input type="number" id="sx-pf-price" value="${htmlVal(p?.unit_price)}" min="0" step="0.01"><div class="sx-field-hint">${escapeHtml(t('sx-p-f-price-hint'))}</div></div>
             </div>
+            ${costVisible ? `<div class="form-row"><label>${escapeHtml(t('sx-p-f-cost'))}</label><input type="number" id="sx-pf-cost" value="${htmlVal(p?.default_cost)}" min="0" step="0.01"><div class="sx-field-hint">${escapeHtml(t('sx-p-f-cost-hint'))}</div></div>` : ''}
             <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sx-pf-vat" ${!p || p.vat_applicable ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-p-f-vat'))}</label></div>
             <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sx-pf-batch" ${p && p.track_batch ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-p-f-batch'))}</label><div class="sx-field-hint">${escapeHtml(t('sx-p-f-batch-hint'))}</div></div>
             <div class="form-row">${imageFieldHtml('sx-pf-image', t('sx-p-f-image'), p?.image_url)}</div>
@@ -197,7 +203,7 @@ function priceOrNull(raw: string): number | null {
 
 function readForm() {
     const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value.trim();
-    return {
+    const payload: Record<string, string | number | boolean | null> = {
         name_th: val('sx-pf-th'),
         // 清空 = 发 null,且每次都把全部键发齐:PATCH 那侧按 exclude_unset 分「这次没改」与
         // 「改成空」(routes.products_routes._patch_fields),键不发出去就等于没改 —— 清空条码
@@ -212,6 +218,8 @@ function readForm() {
         track_batch: (document.getElementById('sx-pf-batch') as HTMLInputElement).checked,
         image_url: val('sx-pf-image') || null,
     };
+    if (costVisible) payload.default_cost = priceOrNull(val('sx-pf-cost'));
+    return payload;
 }
 
 async function failMsg(r: Response, fallbackKey: string): Promise<string> {
@@ -346,6 +354,7 @@ async function fetchProducts(): Promise<Product[]> {
     const kw = keyword.trim();
     const url = '/api/sales/products' + (kw ? '?q=' + encodeURIComponent(kw) : '');
     const data = await apiGet(url);
+    costVisible = data && data.cost_visible === true;
     return (data && (data.products as Product[])) || [];
 }
 
@@ -383,6 +392,18 @@ async function load() {
 // 调用方自己的弹窗之上(入库单跳页就会连半张单一起丢)。桥挂在扫码模块上,开表单的手在这里;
 // 反向 import 会成环,所以开机把手注册过去。
 registerProductFormOpener((code) => {
+    if (costVisible === null) {
+        const mask = ensureMask('sales-prod-mask');
+        mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px"><div class="modal-body"><div class="sx-state">${escapeHtml(t('sx-loading'))}</div></div></div>`;
+        mask.style.display = 'flex';
+        void fetchProducts()
+            .catch(() => {
+                costVisible = false;
+                return [];
+            })
+            .then(() => openEdit(null, code));
+        return true;
+    }
     openEdit(null, code);
     // 真开出来了才回 true:调用方靠它决定要不要显示「先去商品数据页建品」的诚实回落文案
     const mask = document.getElementById('sales-prod-mask');

@@ -8,7 +8,7 @@
  * 结果是泰文界面配中文提示还全绿 —— 拿自己比自己,漏译天然照不出来。
  *
  * 重点验三件在静态断言里验不出来的事:
- *   ① 取景框在屏幕上的真实像素框 ÷ 画面像素框 == 引擎 cropRatio(0.9 × 0.5)——
+ *   ① 取景框在屏幕上的真实像素框 ÷ 画面像素框 == 商品引擎 cropRatio(0.8 × 0.44)——
  *      不等就是「框里对准了却读不出」,只有量真盒子才发现;
  *   ② 撞码真的拦住保存(监听有没有发出 POST),不是「红字显示了就算拦了」;
  *   ③ 查不了(500)不冒充「这个码没人用」——两种截然相反的结论不能长得一样。
@@ -87,6 +87,31 @@ async function boot(browser, origin) {
     await page.addInitScript((lang) => {
         localStorage.setItem('mrpilot_token', 'tok');
         localStorage.setItem('mrpilot_lang', lang); // 真语言键 · 写别的键 = 语言压根没切
+        window.__scanFeedback = { starts: 0, stops: 0, vibrates: [] };
+        class Param {
+            setValueAtTime() {}
+            exponentialRampToValueAtTime() {}
+        }
+        class ScanAudioContext {
+            constructor() {
+                this.state = 'running';
+                this.currentTime = 1;
+                this.destination = {};
+            }
+            createOscillator() {
+                return {
+                    frequency: new Param(),
+                    connect() {},
+                    start: () => (window.__scanFeedback.starts += 1),
+                    stop: () => (window.__scanFeedback.stops += 1),
+                };
+            }
+            createGain() {
+                return { gain: new Param(), connect() {} };
+            }
+        }
+        window.AudioContext = ScanAudioContext;
+        navigator.vibrate = (value) => window.__scanFeedback.vibrates.push(value);
     }, LANG);
     await page.route('**/api/**', async (route) => {
         const req = route.request();
@@ -285,6 +310,9 @@ async function run() {
         { timeout: 30000 }
     );
     await chk('真解出 y4m 里那张 EAN-13 并填进框', true);
+    const feedback = await page.evaluate(() => window.__scanFeedback);
+    await chk('扫中只响一次短滴声', feedback.starts === 1 && feedback.stops === 1);
+    await chk('扫中只请求一次 60ms 短震动', feedback.vibrates.join(',') === '60');
     await chk('扫中后扫码弹窗自己关掉', !(await page.isVisible('#sx-bcm')));
     await chk(
         '相机已释放(video 摘掉 / srcObject 清空)',
@@ -350,8 +378,8 @@ async function run() {
             tracksLive: 0,
         };
     }
-    await chk('取景框宽占画面 90%(±2%)', Math.abs(camera.frameW - 0.9) < 0.02);
-    await chk('取景框高占画面 50%(±2%)', Math.abs(camera.frameH - 0.5) < 0.02);
+    await chk('取景框宽占缩放画面 80%(±2%)', Math.abs(camera.frameW - 0.8) < 0.02);
+    await chk('取景框高占缩放画面 44%(±2%)', Math.abs(camera.frameH - 0.44) < 0.02);
     await chk('取景框居中(与画面中心差 <3px)', camera.centeredX < 3 && camera.centeredY < 3);
     await chk('相机正常出画时给的是真词条「对准框」不是转圈', camera.msg === copy['sx-p-bc-aim']);
     await chk('扫码弹窗给了手动输入的出路(真词条)', camera.manual === copy['bscan.manual']);

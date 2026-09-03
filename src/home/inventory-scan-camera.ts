@@ -17,6 +17,7 @@ interface CameraHandle {
 interface CameraApi {
     unsupportedReason: () => string | null;
     ensureLoaded: () => Promise<CameraApi>;
+    armFeedback?: () => boolean;
     create?: (opts: {
         container?: HTMLElement;
         t?: (key: string) => string;
@@ -102,6 +103,7 @@ export async function openCamera(host: CamHost): Promise<void> {
         msg(host, 'warn', blockedText(blocked || 'no_camera_api'));
         return;
     }
+    if (api.armFeedback) api.armFeedback();
     const btn = scanPart(host.maskId, 'cam') as HTMLButtonElement | null;
     msg(host, 'busy', escapeHtml(t('inv-scan-opening')));
     if (btn) btn.disabled = true;

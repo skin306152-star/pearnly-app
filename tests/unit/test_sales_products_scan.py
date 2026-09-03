@@ -508,11 +508,15 @@ class ViewfinderTests(unittest.TestCase):
     """P2-5 / P2-9 · 取景框比例跟引擎走,边框两套主题都看得见。"""
 
     @staticmethod
-    def _engine_crop() -> tuple:
-        engine = _read("static", "scan", "scan-camera.js")
-        m = re.search(r"cropRatio:\s*\{\s*width:\s*([\d.]+),\s*height:\s*([\d.]+)\s*\}", engine)
-        assert m, "scan-camera.js 的 cropRatio 读不到 · 闸失效"
-        return float(m.group(1)), float(m.group(2))
+    def _product_geometry() -> tuple:
+        cam = _read("src", "home", "sales-products-scan-cam.ts")
+        zoom = re.search(r"PRODUCT_VISUAL_ZOOM\s*=\s*([\d.]+)", cam)
+        crop = re.search(
+            r"PRODUCT_CROP\s*=\s*\{\s*width:\s*([\d.]+),\s*height:\s*([\d.]+)\s*\}",
+            cam,
+        )
+        assert zoom and crop, "商品扫码的显示缩放/解码裁切读不到 · 闸失效"
+        return float(crop.group(1)), float(crop.group(2)), float(zoom.group(1))
 
     @staticmethod
     def _frame_rule() -> str:
@@ -522,7 +526,7 @@ class ViewfinderTests(unittest.TestCase):
         return m.group(1)
 
     def test_frame_is_painted_from_engine_crop_ratio(self):
-        crop_w, crop_h = self._engine_crop()
+        crop_w, crop_h, visual_zoom = self._product_geometry()
         res = run(SETUP + """
         (async () => {
             window.PearnlyScanCamera = {
@@ -550,10 +554,12 @@ class ViewfinderTests(unittest.TestCase):
             "取景框没按引擎 cropRatio 现算位置 · 比例又回到手抄",
         )
         pct = {k: float(str(v).rstrip("%")) for k, v in res["style"].items()}
-        self.assertAlmostEqual(pct["width"], crop_w * 100, places=6)
-        self.assertAlmostEqual(pct["height"], crop_h * 100, places=6)
-        self.assertAlmostEqual(pct["left"], (100 - crop_w * 100) / 2, places=6)
-        self.assertAlmostEqual(pct["top"], (100 - crop_h * 100) / 2, places=6)
+        shown_w = crop_w * visual_zoom * 100
+        shown_h = crop_h * visual_zoom * 100
+        self.assertAlmostEqual(pct["width"], shown_w, places=6)
+        self.assertAlmostEqual(pct["height"], shown_h, places=6)
+        self.assertAlmostEqual(pct["left"], (100 - shown_w) / 2, places=6)
+        self.assertAlmostEqual(pct["top"], (100 - shown_h) / 2, places=6)
 
     def test_frame_css_carries_no_hand_copied_geometry(self):
         rule = self._frame_rule()

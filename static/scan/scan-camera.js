@@ -28,6 +28,8 @@
     if (!trackApi || typeof trackApi.createTracker !== 'function') {
         throw new Error('scan-camera.js 需要 scan-track.js(dist/scan.js 里排在本文件之前)先加载');
     }
+    var trackControls = (root && root.PearnlyScanTrackControls) || null;
+    var feedback = (root && root.PearnlyScanFeedback) || null;
     var scanError = shell.scanError;
     var isScanError = shell.isScanError;
     var mediaErrorCode = shell.mediaErrorCode;
@@ -322,9 +324,7 @@
                     // 一帧解出两个码 = 两件货各记一次。贴了两个码的同一件货因此会多记一次,
                     // 但止步于一次 —— 只看 codes[0] 的旧写法在这个场景下每帧都记。
                     for (var j = 0; j < ev.accepted.length; j++) {
-                        if (root.navigator && typeof root.navigator.vibrate === 'function') {
-                            root.navigator.vibrate(100);
-                        }
+                        if (feedback && typeof feedback.success === 'function') feedback.success();
                         if (o.onScan) o.onScan(ev.accepted[j]);
                     }
                     for (var k = 0; k < ev.dups.length; k++) {
@@ -360,20 +360,9 @@
                     stream = s;
                     var tracks = s.getVideoTracks ? s.getVideoTracks() : [];
                     var cameraTrack = tracks[0];
-                    try {
-                        if (
-                            cameraTrack &&
-                            cameraTrack.getCapabilities &&
-                            cameraTrack.applyConstraints
-                        ) {
-                            var caps = cameraTrack.getCapabilities();
-                            if (caps.focusMode && caps.focusMode.indexOf('continuous') >= 0) {
-                                cameraTrack
-                                    .applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
-                                    .catch(function () {});
-                            }
-                        }
-                    } catch {}
+                    if (trackControls && typeof trackControls.configure === 'function') {
+                        trackControls.configure(cameraTrack, o);
+                    }
                     // 轨道自己死掉不在 start/stop/destroy/onError 这四条路里 —— 没人盯着它,
                     // 相机被收走之后屏上会一直说在扫(见 scan-errors.js 的 watchTracks)。
                     watch = shell.watchTracks(s, function () {

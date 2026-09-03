@@ -331,6 +331,7 @@
             POS.cashier.openScanPad(POS.t(UNSUPPORTED_KEY[why]));
             return;
         }
+        if (CAM.armFeedback) CAM.armFeedback();
         $('bscan-mask').classList.add('show');
         scanned = 0;
         paintCount();

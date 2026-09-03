@@ -31,10 +31,13 @@ interface CameraApi {
 interface ScanCameraShell {
     unsupportedReason(): string | null;
     ensureLoaded(): Promise<CameraApi>;
+    armFeedback?(): boolean;
 }
 
 const MASK_ID = 'sx-bcm';
 const FRAME_ID = 'sx-bcm-frame';
+const PRODUCT_VISUAL_ZOOM = 1.125;
+const PRODUCT_CROP = { width: 0.8, height: 0.44 };
 
 // 探针给出的两种「这台设备扫不了」→ 对应两句不同的话。Odoo 在非 HTTPS 下让扫码按钮
 // 静默消失,用户只觉得「功能没了」;这里按钮不显示但原因必须写在旁边。
@@ -51,12 +54,12 @@ const STYLE = `
 .sx-bcm-box{width:420px;max-width:92vw;overflow:hidden;border-radius:14px;background:var(--card);box-shadow:var(--sh2);}
 .sx-bcm-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);}
 .sx-bcm-title{font-size:15px;font-weight:700;color:var(--ink);}
-/* 预览高度由画面自己定(video height:auto)· 容器 == 画面,取景框才跟引擎真正解码的那块
-   像素严丝合缝;写死容器高比例一旦跟 cropRatio 不一致,就是「框里对准了却读不出」。 */
+/* 预览高度由画面自己定。商品建档用轻度数字放大,让条码离镜头远一点仍看得够大;
+   解码裁切与取景框按同一个倍率换算,避免画面放大后「框里对准了却读不出」。 */
 /* overflow:hidden 是必须的:取景框用一圈巨大的半透明 box-shadow 压暗框外,不裁就把整个
    弹窗(标题栏/按钮)一起压暗,看着像整个界面被禁用了。 */
 .sx-bcm-view{position:relative;overflow:hidden;line-height:0;background:var(--ink);}
-.sx-bcm-view .bscan-video{display:block;width:100%;height:auto;}
+.sx-bcm-view .bscan-video{display:block;width:100%;height:auto;transform:scale(${PRODUCT_VISUAL_ZOOM});transform-origin:center;}
 /* 位置与大小由 paintFrame 按引擎的 cropRatio 现算后写进 style:比例在两处各写一份必然漂,
    漂了就是「框里对准了却读不出」。边框走 --accent —— 它两套主题压在摄像头画面上都立得住;
    曾用的 --accent-ink 暗夜近黑,等于没画框。对比度由 test_sales_products_scan 量真令牌值把关。 */
@@ -88,8 +91,8 @@ export function scanUnsupportedReason(): string | null {
 }
 
 /**
- * 屏上取景框的位置(百分比),由引擎真正解码的 cropRatio 现算。预览是 width:100%/height:auto,
- * 容器就是画面本身,不像 object-fit:cover 那样会裁边 → 框可以跟解码区严丝合缝,不留余量。
+ * 屏上取景框的位置(百分比),由引擎真正解码的 cropRatio 现算。调用方若缩放预览,
+ * paintFrame 还要乘同一个显示倍率,框才能继续对应原始画面里被解码的区域。
  */
 export function frameBox(crop: CropRatio): {
     width: number;
@@ -104,7 +107,10 @@ export function frameBox(crop: CropRatio): {
 
 function paintFrame(view: HTMLElement, crop: CropRatio): void {
     document.getElementById(FRAME_ID)?.remove(); // 重试会再 create 一次,别叠出两个框
-    const box = frameBox(crop);
+    const box = frameBox({
+        width: crop.width * PRODUCT_VISUAL_ZOOM,
+        height: crop.height * PRODUCT_VISUAL_ZOOM,
+    });
     const frame = document.createElement('div');
     frame.id = FRAME_ID;
     frame.className = 'sx-bcm-frame';
@@ -183,6 +189,8 @@ async function startCamera(onCode: (code: string) => void): Promise<void> {
     if (handle) handle.destroy();
     const h = api.create({
         container: view,
+        cropRatio: PRODUCT_CROP,
+        preferredZoom: 1.2,
         t,
         onScan: onCode,
         onError: (e: ScanError) => renderScanError(e, e.retryable ? () => void h.retry() : null),
@@ -206,6 +214,7 @@ async function startCamera(onCode: (code: string) => void): Promise<void> {
 export function openScanModal(onCode: (code: string) => void, onBackToField: () => void): void {
     if (document.getElementById(MASK_ID)) return; // 开着就不再开:两张同 id 的窗会互相抢元素
     if (scanUnsupportedReason()) return; // 按钮本就不该在 · 双保险
+    shell()?.armFeedback?.();
     ensureStyle();
     onManual = onBackToField;
     const mask = document.createElement('div');

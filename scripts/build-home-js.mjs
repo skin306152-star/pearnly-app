@@ -15,9 +15,9 @@ import path from 'path';
 import { ROOT, readSource, writeDist } from './build-lib.mjs';
 
 // 扫码地基的常驻层:条码枪楔子(枪可能在页面刚开就被扫,必须首屏挂上)+ 懒加载门面
-// (首屏只答「能不能扫」,真要扫才拉 dist/scan.js)。两个文件零依赖、不碰 DOM 结构,
+// (首屏只答「能不能扫」,真要扫才拉 dist/scan.js)。三份文件零依赖、不碰 DOM 结构,
 // 排在各 bundle 最前 —— 后面任何模块想订阅枪都已经能拿到 window.PearnlyScanWedge。
-const SCAN_RESIDENT = ['scan/scan-loader.js', 'scan/scan-wedge.js'];
+const SCAN_RESIDENT = ['scan/scan-loader.js', 'scan/scan-feedback.js', 'scan/scan-wedge.js'];
 
 const BUNDLES = [
     { out: 'static/dist/pre.js', files: [...SCAN_RESIDENT, 'recon-mapping.js', 'recon-review.js'] },
@@ -33,6 +33,7 @@ const BUNDLES = [
             'scan/scan-zxing-shim.js',
             'scan/scan-errors.js',
             'scan/scan-track.js',
+            'scan/scan-track-controls.js',
             'scan/scan-camera.js',
         ],
     },

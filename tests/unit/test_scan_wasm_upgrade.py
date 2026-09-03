@@ -81,10 +81,11 @@ class ScannerAssetTests(unittest.TestCase):
 
     def test_camera_requests_hd_and_continuous_focus(self):
         source = (SCAN / "scan-camera.js").read_text(encoding="utf-8")
+        controls = (SCAN / "scan-track-controls.js").read_text(encoding="utf-8")
         self.assertIn("idealWidth", source)
         self.assertIn("idealHeight", source)
-        self.assertIn("focusMode", source)
-        self.assertIn("applyConstraints", source)
+        self.assertIn("focusMode", controls)
+        self.assertIn("applyConstraints", controls)
 
     def test_wasm_is_same_origin_and_versioned(self):
         shim = (SCAN / "scan-wasm-shim.js").read_text(encoding="utf-8")

@@ -248,6 +248,7 @@ function load(name) {
     (0, eval)(fs.readFileSync(dir + '/' + name, 'utf8'));
 }
 load('pos-data.js');
+load('pos-cost.js');
 const POS = win.POS;
 POS.state.lang = 'zh';
 POS.state.workspaceClientId = 7; // 真租户(不是纯本地预览 → 不走 mock 目录)

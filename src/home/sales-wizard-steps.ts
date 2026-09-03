@@ -13,8 +13,9 @@ import {
 } from './sales-wizard-calc.js';
 import { getSellers, getProducts } from './sales-wizard-io.js';
 import { previewArea } from './sales-wizard-preview.js';
-import { wt, wpack, getWizardLang } from './sales-wizard-i18n.js';
+import { wt, wpack } from './sales-wizard-i18n.js';
 import { BAHT } from './money.js';
+import { productDisplayName } from './product-names.js';
 
 export const ICO = {
     check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>',
@@ -39,15 +40,7 @@ const PCOLORS = [
 ];
 
 export function pname(p: { name_th?: string; name_en?: string; name_zh?: string }): string {
-    const l = getWizardLang();
-    return (
-        (l === 'zh' && (p.name_zh || p.name_th)) ||
-        (l === 'en' && (p.name_en || p.name_th)) ||
-        p.name_th ||
-        p.name_en ||
-        p.name_zh ||
-        '—'
-    );
+    return productDisplayName(p);
 }
 
 export function step1(st: WState): string {

@@ -11,6 +11,7 @@
 /* global t, escapeHtml */
 import { salesFetch, htmlVal } from './sales-common.js';
 import { showScanSuccessVisual } from './scan-success-visual.js';
+import { productDisplayName } from './product-names.js';
 import {
     NO_CAMERA_KEY,
     closeScanModal,
@@ -148,7 +149,7 @@ let wedgeOff: (() => void) | null = null;
 let typedBurst: { code: string; before: string } | null = null;
 
 export function productLabel(p: { name_th?: string; name_en?: string; name_zh?: string }): string {
-    return p.name_th || p.name_en || p.name_zh || '—';
+    return productDisplayName(p);
 }
 
 // 只在真查到别的商品时非空。「查不了」不算撞码 —— 凭一次网络失败拦住保存是撒谎。

@@ -172,5 +172,11 @@
       "count": "",
       "last": ""
     }
+  },
+  "stableProductName": {
+    "ok": true,
+    "before": "น้ำ / Water / 水",
+    "after": "น้ำ / Water / 水",
+    "expected": "น้ำ / Water / 水"
   }
 }

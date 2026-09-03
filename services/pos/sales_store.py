@@ -85,6 +85,7 @@ def ensure_sales_schema() -> None:
                     tenant_id uuid NOT NULL,
                     sale_id uuid NOT NULL REFERENCES pos_sales(id) ON DELETE CASCADE,
                     product_id uuid NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+                    product_name_snapshot text,
                     sell_unit text,
                     unit_factor numeric(14,3) NOT NULL DEFAULT 1,
                     qty numeric(14,3) NOT NULL,
@@ -100,6 +101,9 @@ def ensure_sales_schema() -> None:
             # 0062:成本快照(卖出扣库存那一刻的 COGS · 报表毛利用);老行/无成本数据保持 NULL。
             cur.execute(
                 "ALTER TABLE pos_sale_lines ADD COLUMN IF NOT EXISTS cost_total numeric(14,2)"
+            )
+            cur.execute(
+                "ALTER TABLE pos_sale_lines ADD COLUMN IF NOT EXISTS product_name_snapshot text"
             )
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS ix_pos_sale_lines_sale ON pos_sale_lines (sale_id)"
@@ -263,6 +267,7 @@ def insert_sale(cur, *, tenant_id: str, fields: dict) -> dict:
 def insert_line(cur, *, tenant_id: str, sale_id: str, fields: dict) -> dict:
     cols = [
         "product_id",
+        "product_name_snapshot",
         "sell_unit",
         "unit_factor",
         "qty",
@@ -300,7 +305,7 @@ def insert_payment(cur, *, tenant_id: str, sale_id: str, method: str, amount, re
 
 def list_lines(cur, *, tenant_id: str, sale_id: str, for_update: bool = False) -> list:
     cur.execute(
-        "SELECT id, product_id, sell_unit, unit_factor, qty, qty_base, unit_price, "
+        "SELECT id, product_id, product_name_snapshot, sell_unit, unit_factor, qty, qty_base, unit_price, "
         "line_discount, vat_applicable, batch_id, refund_of_line_id, line_total, cost_total "
         "FROM pos_sale_lines WHERE tenant_id = %s AND sale_id = %s ORDER BY id"
         + (" FOR UPDATE" if for_update else ""),

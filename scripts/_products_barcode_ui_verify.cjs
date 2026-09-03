@@ -47,6 +47,7 @@ const DUP_PRODUCT = {
     code: 'C-100',
     barcode: DUP_CODE,
     name_th: 'น้ำอัดลม 325 มล.',
+    name_en: 'Soda 325 ml',
     name_zh: '汽水 325ml',
     unit: 'กระป๋อง',
     unit_price: 15,
@@ -239,6 +240,12 @@ async function run() {
             optIn: document.getElementById('sx-pf-barcode')?.hasAttribute('data-enable-barcode'),
             costVisible: !!cost && cost.getBoundingClientRect().height > 20,
             costHint: cost?.parentElement?.querySelector('.sx-field-hint')?.innerText.trim() || '',
+            primaryNameLabel:
+                document.getElementById('sx-pf-th')?.parentElement?.querySelector('label')
+                    ?.innerText || '',
+            primaryNameHint:
+                document.getElementById('sx-pf-th')?.parentElement?.querySelector('.sx-field-hint')
+                    ?.innerText || '',
         };
     });
     await chk('扫码按钮可见且够大(≥20px)', field.btnVisible);
@@ -248,6 +255,11 @@ async function run() {
         '有成本权限时显示参考成本及实际入库优先提示',
         field.costVisible && field.costHint === copy['sx-p-f-cost-hint']
     );
+    await chk(
+        '第一名称明确标作固定主名称',
+        field.primaryNameLabel === copy['sx-p-f-name-th'] + ' *'
+    );
+    await chk('名称用途提示来自真词典', field.primaryNameHint === copy['sx-p-f-name-hint']);
     await page.screenshot({ path: path.join(OUT, '01-field-desktop.png') });
 
     // ② 撞码:红字 + 「去编辑那个商品」出路,并且真的拦住保存(没有 POST 发出)
@@ -261,7 +273,10 @@ async function run() {
         '撞码提示是真词条 + 带撞上的那个商品名 + 给出路',
         dup.parts.join('|') ===
             [
-                copy['sx-p-bc-dup'].replace('{name}', DUP_PRODUCT.name_th),
+                copy['sx-p-bc-dup'].replace(
+                    '{name}',
+                    [DUP_PRODUCT.name_th, DUP_PRODUCT.name_en, DUP_PRODUCT.name_zh].join(' / ')
+                ),
                 copy['sx-p-bc-dup-open'],
             ].join('|')
     );

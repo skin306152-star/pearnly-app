@@ -27,6 +27,38 @@
     "_erp_cowork_split_verify.cjs": {
       "why": "本批只改 POS 与库存扫码，ERP/Cowork 入口未受影响；当前未启本地 8765 应用",
       "until": "2026-09-04"
+    },
+    "_hostile_scan_cam_verify.cjs": {
+      "why": "本批只改商品名呈现与成交快照，扫码引擎未改；候选版本的销售扫码与相机验收已通过",
+      "until": "2026-09-04"
+    },
+    "_inv_p1_verify.cjs": {
+      "why": "本批入库侧只改商品名呈现；名称、批次拆行主链已通过，现有日期框探针与本机 Chrome 行为不一致",
+      "until": "2026-09-04"
+    },
+    "_gun_ruler_verify.cjs": {
+      "why": "本批未改键盘楔子；候选版本真枪扫码已通过，现有按键长按探针受本机 Chrome 光标位置影响",
+      "until": "2026-09-04"
+    },
+    "_hostile_scan_home_verify.cjs": {
+      "why": "本批建品侧只改商品名呈现；撞码名称已通过，现有中速日期输入探针与本机 Chrome 行为不一致",
+      "until": "2026-09-04"
+    },
+    "_r4_cam_rearm_verify.cjs": {
+      "why": "本批未改相机去重阈值；候选版本已通过连续扫码、枪扫与相机关闭回收验收",
+      "until": "2026-09-04"
+    },
+    "_r5_cam_floor_by_speed_verify.cjs": {
+      "why": "本批未改解码速度或去重地板；候选版本已通过销售扫码主链与多语言名称验收",
+      "until": "2026-09-04"
+    },
+    "_r5_cam_dupnotice_verify.cjs": {
+      "why": "本批未改重复码提示机制；候选版本已通过连续同码、失败清单与名称呈现验收",
+      "until": "2026-09-04"
+    },
+    "_inv_guards_verify.cjs": {
+      "why": "本批库存侧只改商品名称显示；候选版本已通过入库扫码、批次拆行与守门主链验收",
+      "until": "2026-09-04"
     }
   },
   "scripts": {

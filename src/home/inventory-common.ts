@@ -1,9 +1,10 @@
 // POS 项目 · PO-A4 库存后台 · 数据适配层(类型 / 契约信封 / 接口适配 / 错误码本地化 / 格式化)
 // 04 §0.1 信封:成功 {ok:true,data},失败 {ok:false,error:{code}};前端先看 ok,再读 data / error.code。
 // 接真接口 /api/inventory/*(PO-A3 · routes/inventory_routes.py)· 全部端点要 workspace_client_id(按账套隔离)。
-/* global t, currentLang, token */
+/* global t, token */
 
 import { BAHT } from './money.js';
+import { productDisplayName } from './product-names.js';
 
 export interface InvName {
     th: string | null;
@@ -208,10 +209,7 @@ export function daysUntil(isoDate: string): number {
 }
 
 export function localizedName(name: InvName): string {
-    const lang = typeof currentLang === 'string' ? currentLang : 'th';
-    if (lang === 'zh') return name.zh || name.th || name.en || '—';
-    if (lang === 'en') return name.en || name.th || name.zh || '—';
-    return name.th || name.en || name.zh || '—'; // th / ja 回退 th
+    return productDisplayName(name);
 }
 
 export function fmtMoney(v: number | string | null | undefined): string {

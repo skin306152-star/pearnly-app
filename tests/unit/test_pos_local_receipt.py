@@ -21,6 +21,7 @@ global.window = {{
     hm: () => '12:00',
     esc: (v) => String(v),
     nm: (v) => String(v),
+    pnm: (v) => String(v),
     t: (v) => v,
     toast: () => {{}},
   }},

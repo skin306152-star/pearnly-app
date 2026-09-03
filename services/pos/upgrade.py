@@ -19,6 +19,7 @@ from typing import Optional
 
 from core.pos_api import PosError
 from services.pos import sale as sale_svc, sales_store
+from services.products.names import display_product_name
 from services.sales import document as doc_svc
 from services.sales import settings as settings_svc
 from services.sales.dates import BANGKOK, bangkok_today
@@ -58,6 +59,7 @@ def _sale_lines_as_doc_lines(cur, *, tenant_id: str, sale_id: str) -> tuple[list
     """小票行 → 单据行入参(qty/unit_price/line_discount/vat 逐字搬),并返回行折扣合计。"""
     cur.execute(
         "SELECT l.qty, l.unit_price, l.line_discount, l.vat_applicable, l.product_id, "
+        "l.product_name_snapshot, "
         "p.name_th, p.name_en, p.name_zh "
         "FROM pos_sale_lines l JOIN products p ON p.id = l.product_id "
         "WHERE l.tenant_id = %s AND l.sale_id = %s ORDER BY l.id",
@@ -70,7 +72,7 @@ def _sale_lines_as_doc_lines(cur, *, tenant_id: str, sale_id: str) -> tuple[list
         lines.append(
             {
                 "product_id": str(r["product_id"]),
-                "description": r["name_th"] or r["name_en"] or r["name_zh"] or "",
+                "description": r.get("product_name_snapshot") or display_product_name(r),
                 "qty": Decimal(str(r["qty"])),
                 "unit_price": Decimal(str(r["unit_price"])),
                 "discount": disc,

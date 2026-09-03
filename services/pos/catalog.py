@@ -15,12 +15,13 @@ from services.inventory import store as inv_store
 from services.modules import store as modules_store
 from services.pos import cashier as cashier_dal
 from services.pos import caps as caps_svc
+from services.products.names import product_name_object
 
 _DEFAULT_NEAR_EXPIRY_DAYS = 30
 
 
 def _name(r) -> dict:
-    return {"th": r["name_th"], "en": r["name_en"], "zh": r["name_zh"]}
+    return product_name_object(r)
 
 
 def _units_by_product(cur, *, tenant_id: str, workspace_client_id: int, product_ids: list) -> dict:
@@ -158,9 +159,9 @@ def list_products(
     )
     params: list = [tenant_id, workspace_client_id]
     if q:
-        sql += " AND (name_th ILIKE %s OR name_en ILIKE %s OR barcode ILIKE %s)"
+        sql += " AND (name_th ILIKE %s OR name_en ILIKE %s OR name_zh ILIKE %s OR barcode ILIKE %s)"
         like = f"%{q}%"
-        params += [like, like, like]
+        params += [like, like, like, like]
     if category:
         sql += " AND category_id = %s"
         params.append(category)

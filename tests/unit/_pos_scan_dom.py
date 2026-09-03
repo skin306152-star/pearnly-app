@@ -248,6 +248,7 @@ function load(name) {
     (0, eval)(fs.readFileSync(dir + '/' + name, 'utf8'));
 }
 load('pos-data.js');
+load('pos-product-names.js');
 load('pos-cost.js');
 const POS = win.POS;
 POS.state.lang = 'zh';

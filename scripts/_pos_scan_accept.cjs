@@ -29,6 +29,7 @@ const SHOTS = path.resolve(
     process.argv[3] || path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/accept')
 );
 const CODE = '8850999320014'; // 假摄像头画面里那张真 EAN-13(泰国 GS1 前缀 885)
+const COKE_NAME = 'โค้ก 325ml / Coke 325ml / 可乐 325ml / コーラ 325ml';
 const BOTTLE = '8850999320007'; // 同商品的瓶码 · 用来证明扫箱码不是碰巧对上默认单位
 const MIME = {
     '.js': 'text/javascript',
@@ -257,7 +258,7 @@ async function cameraToCart(browser, origin, viewport, tag) {
     await page.close();
 
     const wantCount = fmt(th['posui.bscan.count'], { n: 1 });
-    const wantAdded = fmt(th['posui.bscan.added'], { name: 'โค้ก 325ml' });
+    const wantAdded = fmt(th['posui.bscan.added'], { name: COKE_NAME });
     return {
         ok:
             painted(mask) &&

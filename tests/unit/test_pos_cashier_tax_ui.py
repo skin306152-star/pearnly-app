@@ -43,6 +43,7 @@ const load = (name) => (0, eval)(fs.readFileSync(dir + '/' + name, 'utf8'));
 load('pos-i18n.js');
 load('pos-totals.js');
 load('pos-data.js');
+load('pos-product-names.js');
 load('pos-cost.js');
 load('pos-cart-math.js');
 const POS = win.POS;

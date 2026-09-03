@@ -115,6 +115,7 @@ global.fetch = () => Promise.reject(new Error('本测不打网络'));
 const load = (name) => (0, eval)(fs.readFileSync(dir + '/' + name, 'utf8'));
 load('pos-i18n.js');
 load('pos-data.js');
+load('pos-product-names.js');
 load('pos-cost.js');
 const POS = win.POS;
 POS.state.lang = 'zh';

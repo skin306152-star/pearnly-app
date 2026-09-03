@@ -2,11 +2,11 @@
   "c1_payModalScanSpeaksUp": {
     "ok": true,
     "staleToastShownBeforeScan": false,
-    "staleToastText": "เพิ่มแล้ว โค้ก",
+    "staleToastText": "เพิ่มแล้ว โค้ก / Coke / 可乐 / コーラ",
     "burst": {
       "n": 14,
-      "stampMax": 8.2,
-      "perfMax": 8.4
+      "stampMax": 7.6,
+      "perfMax": 7.9
     },
     "toast": {
       "shown": true,
@@ -140,8 +140,8 @@
     "ok": true,
     "ruler": {
       "n": 14,
-      "stampMax": 104.9,
-      "perfMax": 104.8
+      "stampMax": 103.5,
+      "perfMax": 103.5
     },
     "inHandBand": true,
     "toast": {
@@ -190,7 +190,7 @@
         "stroke": "rgb(52, 211, 153)",
         "bg": "rgb(17, 24, 39)"
       },
-      "text": "เพิ่มแล้ว โค้ก",
+      "text": "เพิ่มแล้ว โค้ก / Coke / 可乐 / コーラ",
       "error": false
     },
     "notAdded": {
@@ -208,7 +208,7 @@
         "stroke": "rgb(52, 211, 153)",
         "bg": "rgb(17, 24, 39)"
       },
-      "text": "เพิ่มแล้ว โค้ก",
+      "text": "เพิ่มแล้ว โค้ก / Coke / 可乐 / コーラ",
       "error": false
     },
     "rowsAfter": [],

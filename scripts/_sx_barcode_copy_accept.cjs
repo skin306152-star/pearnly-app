@@ -24,6 +24,7 @@ const SHOTS = path.resolve(
 const CODE = '8850999320014';
 const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' };
 const DUP = { id: 'p-dup', name_th: 'น้ำอัดลม 325 มล.', name_en: 'Soda 325ml', barcode: CODE };
+const DUP_NAME = `${DUP.name_th} / ${DUP.name_en}`;
 
 let lookupMode = 'free';
 
@@ -172,7 +173,7 @@ const textOf = (page, sel) =>
 
     // 撞码那格里是「一句话 + 一个链接按钮」两个节点,innerText 会在中间塞换行 —— 分开比,
     // 别把渲染细节写进期望值(否则下次换个 <br> 就红,而文案其实没问题)。
-    const wantDup = [th['sx-p-bc-dup'].split('{name}').join(DUP.name_th), th['sx-p-bc-dup-open']];
+    const wantDup = [th['sx-p-bc-dup'].split('{name}').join(DUP_NAME), th['sx-p-bc-dup-open']];
     const checks = [
         ['界面语言真的是泰文', lang === 'th'],
         ['条码框旁的提示是泰文真词条', hint && hint.visible && hint.text === th['sx-p-bc-hint']],

@@ -363,6 +363,7 @@ class CreateSaleCostWiringTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         fields = calls[0]["fields"]
         self.assertEqual(fields["cost_total"], Decimal("18.00"))
+        self.assertEqual(fields["product_name_snapshot"], "โค้ก / Coke / 可乐")
         self.assertEqual(fields["batch_id"], "b1")  # 展示锚点仍是首批
 
     def test_line_persists_none_when_cost_unknown(self):

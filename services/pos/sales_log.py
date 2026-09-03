@@ -21,7 +21,11 @@ SELECT s.id, s.receipt_no, s.sold_at, s.cashier_id, c.display_name AS cashier_na
        s.shift_id, sh.opened_at AS shift_opened_at, sh.closed_at AS shift_closed_at,
        s.subtotal, s.discount_total, s.vat_amount, s.grand_total,
        s.paid_total, s.change_amount,
-       (SELECT string_agg(p2.name_th || ' x' || l.qty, ', ' ORDER BY l.id)
+       (SELECT string_agg(
+                   COALESCE(NULLIF(l.product_name_snapshot, ''),
+                            concat_ws(' / ', NULLIF(p2.name_th, ''), NULLIF(p2.name_en, ''),
+                                      NULLIF(p2.name_zh, ''))) || ' x' || l.qty,
+                   ', ' ORDER BY l.id)
         FROM pos_sale_lines l JOIN products p2 ON p2.id = l.product_id
         WHERE l.tenant_id = s.tenant_id AND l.sale_id = s.id) AS items,
        (SELECT COALESCE(SUM(l.qty), 0) FROM pos_sale_lines l

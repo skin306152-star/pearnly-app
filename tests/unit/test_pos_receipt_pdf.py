@@ -58,8 +58,8 @@ class _Cur:
         return self._alls.pop(0) if self._alls else []
 
 
-def _build(sale=_SALE, seller=_SELLER, cashier={"display_name": "Mint"}):
-    cur = _Cur(ones=[dict(seller), cashier], alls=[[], []])
+def _build(sale=_SALE, seller=_SELLER, cashier={"display_name": "Mint"}, lines=None):
+    cur = _Cur(ones=[dict(seller), cashier], alls=[list(lines or []), []])
     with (
         mock.patch.object(receipt_pdf.sales_store, "get_sale", return_value=dict(sale)),
         mock.patch.object(receipt_pdf.sales_store, "list_payments", return_value=[]),
@@ -110,6 +110,23 @@ class AssemblyTests(unittest.TestCase):
     def test_cashier_name_resolved_onto_doc(self):
         _cur, doc, _sv = _build()
         self.assertEqual(doc["cashier_name"], "Mint")
+
+    def test_receipt_uses_sale_time_name_snapshot(self):
+        _cur, doc, _sv = _build(
+            lines=[
+                {
+                    "product_name_snapshot": "น้ำ / Water / 水",
+                    "name_th": "ชื่อใหม่",
+                    "name_en": "New name",
+                    "name_zh": "新名称",
+                    "qty": 1,
+                    "unit_price": 10,
+                    "line_discount": 0,
+                    "line_total": 10,
+                }
+            ]
+        )
+        self.assertEqual(doc["lines"][0]["description"], "น้ำ / Water / 水")
 
     def test_no_cashier_row_leaves_name_none(self):
         _cur, doc, _sv = _build(sale=dict(_SALE, cashier_id=None))

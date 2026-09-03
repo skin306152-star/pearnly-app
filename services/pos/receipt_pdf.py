@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from core.pos_api import PosError
 from services.pos import receipt_render, receipt_settings, sales_store
+from services.products.names import display_product_name
 
 VAT_RATE = Decimal("7")  # 泰国标准 VAT(与 sale.VAT_RATE 同值 · 票面拆示用)
 
@@ -33,14 +34,15 @@ def build_receipt_pdf(
     if not sale:
         raise PosError("pos.product_not_found", 404)
     cur.execute(
-        "SELECT l.qty, l.unit_price, l.line_discount, l.line_total, p.name_th, p.name_en "
+        "SELECT l.qty, l.unit_price, l.line_discount, l.line_total, "
+        "l.product_name_snapshot, p.name_th, p.name_en, p.name_zh "
         "FROM pos_sale_lines l JOIN products p ON p.id = l.product_id "
         "WHERE l.tenant_id = %s AND l.sale_id = %s ORDER BY l.id",
         (tenant_id, sale_id),
     )
     doc_lines = [
         {
-            "description": r["name_th"] or r["name_en"],
+            "description": r.get("product_name_snapshot") or display_product_name(r),
             "qty": r["qty"],
             "unit_price": r["unit_price"],
             "discount": r["line_discount"],

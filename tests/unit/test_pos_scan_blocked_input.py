@@ -175,7 +175,7 @@ class PosScanBlockedInputTest(unittest.TestCase):
         self.assertEqual(self.r["retry_calls"], 1, "关掉窗口后这一发没去查码 = 补扫这条路断了")
         self.assertEqual(self.r["retry_cart"], 1, "关掉窗口后补扫仍然进不了车")
         self.assertEqual(self.r["retry_rows"], 0, "货已经在车里了,清单还挂着它没进车")
-        self.assertEqual(self.r["retry_toast"], "已加入 可乐")
+        self.assertEqual(self.r["retry_toast"], "已加入 โค้ก / Coke / 可乐 / コーラ")
 
     # ── 3. 判成「人在打字」的那一发 ──
     def test_a_burst_judged_as_typing_is_announced_too(self):

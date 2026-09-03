@@ -34,6 +34,7 @@ const SHOTS = path.resolve(
     process.argv[2] || path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan')
 );
 const shot = shotter(SHOTS);
+const COKE_NAME = 'โค้ก 325ml / Coke 325ml / 可乐 325ml / コーラ 325ml';
 
 // ── POS(收银主屏)────────────────────────────────────────────────────────
 function posSeed() {
@@ -197,7 +198,7 @@ async function posCart(browser, origin) {
             first.lineCount === 1 &&
             first.qtys[0] === '1' &&
             first.grand === '350.00' && // 扫箱码按箱价,不是默认瓶价 15
-            toast.txt === '已加入 可乐 325ml' && // 真 zh 字典,未注入
+            toast.txt === '已加入 ' + COKE_NAME && // 真 zh 字典,未注入
             parseFloat(toast.opacity) > 0.9 &&
             second.lineCount === 1 &&
             second.qtys[0] === '2' &&

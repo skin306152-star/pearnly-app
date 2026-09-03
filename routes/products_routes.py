@@ -21,6 +21,7 @@ from services.authz.deps import require_perm_tid
 from services.sales import product_import
 from services.sales import products as products_dal
 from services.products import units as units_dal
+from services.products.names import display_product_name
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/products", tags=["sales-products"])
@@ -130,6 +131,7 @@ def _out(p: dict, *, cost_visible: bool = True) -> dict:
         "name_th": p.get("name_th"),
         "name_en": p.get("name_en"),
         "name_zh": p.get("name_zh"),
+        "display_name": display_product_name(p),
         "unit": p.get("unit"),
         # 没设价回 null,不回 0.0:回 0 等于替用户拍板"这货免费",前端就再也画不出
         # "还没定价"这个状态,POS 也分不出该拦谁。四态诚实,数据层是什么就回什么。

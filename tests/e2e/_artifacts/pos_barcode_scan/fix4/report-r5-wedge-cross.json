@@ -5,7 +5,7 @@
     "focusJumped": true,
     "qtyBefore": "1",
     "qtyAfter": "1",
-    "stampMax": 10.9,
+    "stampMax": 10.1,
     "asked": [
       "8850999320014"
     ],
@@ -18,7 +18,7 @@
     "focusJumped": true,
     "qtyBefore": "1",
     "qtyAfter": "1",
-    "stampMax": 10.9,
+    "stampMax": 10,
     "asked": [
       "8850999320014"
     ],
@@ -29,7 +29,7 @@
     "ok": true,
     "focusWas": "BODY",
     "repeatFlags": 11,
-    "stampMax": 27.7,
+    "stampMax": 26.9,
     "asked": [],
     "fails": [],
     "why": ""
@@ -37,7 +37,7 @@
   "c3_realGunOnCashierMain": {
     "ok": true,
     "focusWas": "BODY",
-    "stampMax": 10.5,
+    "stampMax": 9.7,
     "asked": [
       "8850999320014"
     ],
@@ -55,7 +55,7 @@
     "ok": true,
     "batchBefore": "LOT-B240301",
     "batchAfter": "LOT-B240301",
-    "stampMax": 11.2,
+    "stampMax": 10.1,
     "asked": [
       "8850999320014"
     ],

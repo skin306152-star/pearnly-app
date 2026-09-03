@@ -21,7 +21,7 @@
         return l.sale_line_id || l.id;
     }
     function lineName(l) {
-        if (l.name) return POS.nm(l.name);
+        if (l.name) return POS.pnm(l.name);
         return POS.productName(l.product_id) || l.sell_unit || '';
     }
     // 支付方式四语标签(与收银台收款一致:qr 走 PromptPay,transfer 走转账)。

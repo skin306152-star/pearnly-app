@@ -22,6 +22,7 @@ const ROOT = path.resolve(__dirname, '..');
 const Y4M = path.resolve(process.argv[2] || '.scan_fixture.y4m');
 const SHOTS = path.resolve(process.argv[3] || path.join(ROOT, 'tests/e2e/_artifacts/pos_scan'));
 const CODE = '8850999320014'; // 假摄像头画面里那个码(泰国 GS1 前缀 885)
+const COKE_NAME = 'โค้ก 325ml / Coke 325ml / 可乐 325ml / コーラ 325ml';
 const PHONE = { width: 390, height: 780 };
 
 const serve = () => startStaticServer({ root: ROOT, notFoundBody: 'not found' });
@@ -383,10 +384,10 @@ async function liveHit(browser, origin, viewport, tag) {
         live.doneH >= 44 &&
         live.doneLabel === th.copy['posui.bscan.done'] &&
         live.count === th.copy['posui.bscan.count'].replace('{n}', '1') &&
-        live.last === th.copy['posui.bscan.added'].replace('{name}', 'โค้ก 325ml') &&
+        live.last === th.copy['posui.bscan.added'].replace('{name}', COKE_NAME) &&
         live.visual &&
         live.visual.count === 1 &&
-        live.visual.label === 'โค้ก 325ml' &&
+        live.visual.label === COKE_NAME &&
         live.visual.increment === '+1' &&
         live.visual.pointerEvents === 'none' &&
         live.controls.exists &&
@@ -522,7 +523,7 @@ async function gun(browser, origin) {
         afterGun.grand === '350.00' &&
         parseFloat(afterGun.toastOpacity) > 0.9 &&
         afterGun.toastOnTop &&
-        afterGun.toast === th.copy['posui.bscan.added'].replace('{name}', 'โค้ก 325ml') &&
+        afterGun.toast === th.copy['posui.bscan.added'].replace('{name}', COKE_NAME) &&
         afterGun.maskHidden && // 枪走的路不该弹出取景层
         typed.value === '8850999320007' &&
         typed.grand === '350.00'; // 搜索框里打的字没被当成扫码
@@ -704,7 +705,7 @@ async function refusals(browser, origin) {
         noPrice.text ===
             th.copy['posui.cart.unit_no_price']
                 .replace('{unit}', 'ลัง')
-                .replace('{name}', 'โค้ก 325ml') &&
+                .replace('{name}', COKE_NAME) &&
         noPrice.hint === th.copy['posui.cart.fix_in_backoffice'] &&
         noPrice.grand === '0.00' && // ฿0 的整箱货没能混进车
         unitGone.visible &&

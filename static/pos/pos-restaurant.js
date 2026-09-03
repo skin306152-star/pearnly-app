@@ -315,7 +315,7 @@
             p.id +
             '"><div class="img"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 11h18M5 11a7 7 0 0 1 14 0M12 3v2M2 21h20"/></svg></div>' +
             '<div class="m"><div class="n">' +
-            POS.nm(p.name) +
+            POS.pnm(p.name) +
             '</div><div class="p tnum">฿' +
             fmt(dishPrice(p)) +
             '</div></div></div>'
@@ -386,7 +386,7 @@
                     '<div class="ln sent"><div class="top1"><span class="nm" data-sent="' +
                     POS.t('posui.rest.ordered') +
                     '">' +
-                    POS.nm(l.name) +
+                    POS.pnm(l.name) +
                     (Number(l.qty) > 1 ? ' ×' + Number(l.qty) : '') +
                     (l.note ? ' · ' + l.note : '') +
                     '</span><span class="amt tnum">฿' +
@@ -398,7 +398,7 @@
             .map(
                 (l) =>
                     '<div class="ln"><div class="top1"><span class="nm">' +
-                    POS.nm(l.name) +
+                    POS.pnm(l.name) +
                     '</span><div class="stp"><button data-dec="' +
                     l.id +
                     '">−</button><span class="q">' +

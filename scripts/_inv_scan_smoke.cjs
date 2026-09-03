@@ -49,6 +49,8 @@ const P_MILK = {
     default_cost: 20,
     track_batch: true,
 };
+const productName = (product) =>
+    [product.name_th, product.name_en, product.name_zh].filter(Boolean).join(' / ');
 
 // 信封照 routes/products_routes.py 的 /lookup:{product: _out(row)} + matched_by/matched_unit
 // (与建品侧 sales-products-scan.ts 读的是同一份)。主码命中那一档照 POS by-barcode 的老实现
@@ -303,7 +305,7 @@ async function gunFlow(browser, origin) {
             afterFirst[0].qty === '1' &&
             afterFirst[0].cost === '9.5' &&
             focusFirst === 'qty' &&
-            visualFirst.label === P_COLA.name_th &&
+            visualFirst.label === productName(P_COLA) &&
             visualFirst.increment === '+1' &&
             visualFirst.pointerEvents === 'none' &&
             afterSecond.length === 2 &&
@@ -356,7 +358,7 @@ async function batchSplitFlow(browser, origin) {
     });
     // 另起一行必须当场说清为什么,否则店员只看见行数变多。期望值取页面里的真词条。
     const msgText = await page.locator('#inv-in-mask-scan-msg').innerText();
-    const wantMsg = await copyOf(page, 'inv-scan-batch-row', { name: P_MILK.name_th });
+    const wantMsg = await copyOf(page, 'inv-scan-batch-row', { name: productName(P_MILK) });
     const filledFirst = await fillBatch(page, 0, 'A-01', '2026-08-10');
     const filledSecond = await fillBatch(page, 1, 'B-02', '2026-11-02');
     const rows = await page.evaluate(rowSnapshot);
@@ -407,7 +409,7 @@ async function unitCodeFlow(browser, origin) {
     );
     const msgText = await page.locator('#inv-in-mask-scan-msg').innerText();
     const wantMsg =
-        (await copyOf(page, 'inv-scan-added', { name: P_COLA.name_th })) +
+        (await copyOf(page, 'inv-scan-added', { name: productName(P_COLA) })) +
         ' · ' +
         (await copyOf(page, 'inv-scan-unit-hit', { unit: BOX_UNIT }));
 

@@ -46,7 +46,7 @@
     },
     "bar": {
       "count": "สแกนแล้ว 1 ชิ้น",
-      "last": "เพิ่มแล้ว โค้ก 325ml",
+      "last": "เพิ่มแล้ว โค้ก 325ml / Coke 325ml / 可乐 325ml / コーラ 325ml",
       "done": "เสร็จสิ้น"
     },
     "layout": {
@@ -68,7 +68,7 @@
       ],
       "grand": "350.00",
       "lines": [
-        "โค้ก 325ml฿350.00 / ชิ้น−1+฿350.00"
+        "โค้ก 325ml / Coke 325ml / 可乐 325ml / コーラ 325ml฿350.00 / ชิ้น−1+฿350.00"
       ]
     },
     "native": true,
@@ -121,7 +121,7 @@
     },
     "bar": {
       "count": "สแกนแล้ว 1 ชิ้น",
-      "last": "เพิ่มแล้ว โค้ก 325ml",
+      "last": "เพิ่มแล้ว โค้ก 325ml / Coke 325ml / 可乐 325ml / コーラ 325ml",
       "done": "เสร็จสิ้น"
     },
     "layout": {
@@ -143,7 +143,7 @@
       ],
       "grand": "350.00",
       "lines": [
-        "โค้ก 325ml฿350.00 / ชิ้น−1+฿350.00"
+        "โค้ก 325ml / Coke 325ml / 可乐 325ml / コーラ 325ml฿350.00 / ชิ้น−1+฿350.00"
       ]
     },
     "native": true,
@@ -343,15 +343,15 @@
     },
     "recovered": {
       "grand": "350.00",
-      "last": "เพิ่มแล้ว โค้ก 325ml"
+      "last": "เพิ่มแล้ว โค้ก 325ml / Coke 325ml / 可乐 325ml / コーラ 325ml"
     }
   },
   "iosFallback": {
     "ok": true,
     "nativeBarcodeDetectorPresent": true,
     "requests": [
-      "http://127.0.0.1:49176/static/dist/scan.js?v=12060020",
-      "http://127.0.0.1:49176/static/dist/barcode-detector.js?v=12060020"
+      "http://127.0.0.1:62307/static/dist/scan.js?v=12060023",
+      "http://127.0.0.1:62307/static/dist/barcode-detector.js?v=12060023"
     ]
   },
   "nativePathSkipsZxing": {

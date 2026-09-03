@@ -47,6 +47,7 @@ const P_MILK = { id: 'p-milk', name_th: 'นมสด 1L', name_zh: '鲜奶 1L',
 // 刚在「用这个码建商品」里勾了批次管理保存出来的那件:建品的 save() 之后 load() 因为库存页
 // 没有 #sx-p-body 直接 return,列表缓存一点没刷 —— 所以它只在查码应答里存在。
 const P_YOG = { id: 'p-yog', name_th: 'โยเกิร์ต', name_zh: '酸奶杯', track_batch: true };
+const productName = (product) => [product.name_th, product.name_zh].filter(Boolean).join(' / ');
 
 const LOOKUP = {
     [COLA]: { product: P_COLA, matched_by: 'product', matched_unit: 'ขวด' },
@@ -229,7 +230,7 @@ async function freshProduct(browser, origin) {
             inCache === false && // 前提:缓存里确实没有这件货
             focus.tag !== 'INPUT' &&
             afterScan[0].product === P_YOG.id &&
-            afterScan[0].label === P_YOG.name_zh &&
+            afterScan[0].label === productName(P_YOG) &&
             afterScan[0].batchCellShown === true &&
             afterReselect[0].batchCellShown === true &&
             fillable &&
@@ -389,7 +390,7 @@ async function failuresSurvive(browser, origin) {
         page,
         () => document.querySelector('#inv-in-mask-rows [data-k="qty"]').value === '2'
     );
-    const wantHit = await copyOf(page, 'inv-scan-bumped', { name: P_COLA.name_zh });
+    const wantHit = await copyOf(page, 'inv-scan-bumped', { name: productName(P_COLA) });
     const wantCount = await copyOf(page, 'inv-scan-fails-n', { n: 2 });
     const msg = await page.evaluate(() => {
         const el = document.getElementById('inv-in-mask-scan-msg');

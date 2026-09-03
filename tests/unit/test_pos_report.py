@@ -113,7 +113,10 @@ class AssemblyTests(unittest.TestCase):
             },
         )
         self.assertEqual(out["by_method"], {"cash": "200.00"})  # 净额口径(此桶无找零)
-        self.assertEqual(out["top_products"][0]["name"], {"th": "โค้ก", "en": "Coke", "zh": "可乐"})
+        self.assertEqual(
+            out["top_products"][0]["name"],
+            {"th": "โค้ก", "en": "Coke", "zh": "可乐", "display": "โค้ก / Coke / 可乐"},
+        )
         self.assertEqual(out["top_products"][0]["qty"], "12.000")
         self.assertEqual(out["top_products"][0]["cost"], "70.00")
         self.assertEqual(out["top_products"][0]["gross_profit"], "110.00")  # 180 - 70

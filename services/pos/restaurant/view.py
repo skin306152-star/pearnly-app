@@ -9,6 +9,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from services.products.names import product_name_object
+
 
 def money(v) -> str:
     return f"{Decimal(str(v if v is not None else 0)):.2f}"
@@ -19,7 +21,7 @@ def qty(v) -> str:
 
 
 def name_obj(row) -> dict:
-    return {"th": row.get("name_th"), "en": row.get("name_en"), "zh": row.get("name_zh")}
+    return product_name_object(row)
 
 
 def iso(dt) -> str | None:

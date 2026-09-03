@@ -18,6 +18,7 @@ from core.pos_api import PosError
 from services.accounting import hooks as acct_hooks
 from services.pos import numbering, payment_settlement, sales_store, tax_policy
 from services.pos.restaurant import order_store, store
+from services.products.names import display_product_name, product_name_object
 from services.sales.totals import compute_totals
 
 _CENT = Decimal("0.01")
@@ -287,6 +288,7 @@ def checkout(
             sale_id=sale_id,
             fields={
                 "product_id": str(src["product_id"]),
+                "product_name_snapshot": display_product_name(src),
                 "sell_unit": src["sell_unit"],
                 "unit_factor": factor,
                 "qty": qty,
@@ -362,7 +364,7 @@ def _bill_line(r: dict) -> dict:
     return {
         "line_id": str(r["id"]),
         "product_id": str(r["product_id"]),
-        "name": {"th": r.get("name_th"), "en": r.get("name_en"), "zh": r.get("name_zh")},
+        "name": product_name_object(r),
         "qty": f"{Decimal(str(r['qty'])):.3f}",
         "unit_price": _money(r["unit_price"]),
         "line_total": _money(r["line_total"]),

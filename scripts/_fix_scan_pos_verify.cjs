@@ -148,6 +148,30 @@ async function bootCam(browser, origin, delayMs) {
     return page;
 }
 
+async function stableProductName(browser, origin) {
+    const page = await bootCam(browser, origin, 0);
+    const expected = 'น้ำ / Water / 水';
+    await page.evaluate(() => {
+        window.POS.mock.PRODUCTS[0].name = { th: 'น้ำ', en: 'Water', zh: '水' };
+        window.POS.cashier.enterMain();
+    });
+    await page.waitForFunction(
+        (name) => document.querySelector('#main-grid .prod .nm')?.textContent === name,
+        expected
+    );
+    const before = await page.locator('#main-grid .prod .nm').first().innerText();
+    await page.locator('#view-main .topbar-langs button[data-lang="zh"]').click();
+    await page.waitForFunction(() => window.POS.state.lang === 'zh');
+    const after = await page.locator('#main-grid .prod .nm').first().innerText();
+    const visible = await page.locator('#main-grid .prod .nm').first().evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        return box.width > 0 && box.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+    });
+    await shot(page, 'fix-i-product-name-stable.png');
+    await page.close();
+    return { ok: visible && before === expected && after === expected, before, after, expected };
+}
+
 // 屏上的取景框 ↔ 引擎真解的那块像素,在浏览器里量真盒子。参照系有三层(舞台 / 画面 /
 // 原生帧),错一层就是「框里对准了读不出」或「框外的货被解进购物车」,而两种都不报错。
 const FRAME_GEOM = () => {
@@ -474,6 +498,7 @@ const CASES = [
     ['burstThree', burstThree, 'steady'],
     ['lateGrantRelease', lateGrantRelease, 'steady'],
     ['zeroPriceBlocked', zeroPriceBlocked, 'steady'],
+    ['stableProductName', stableProductName, 'steady'],
 ];
 
 const launch = (y4m) =>

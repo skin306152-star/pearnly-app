@@ -83,7 +83,7 @@
             .map(
                 (l) =>
                     '<tr><td>' +
-                    POS.esc(POS.nm(l.name)) +
+                    POS.esc(POS.pnm(l.name)) +
                     ' ×' +
                     l.qty +
                     '</td><td class="r">฿' +

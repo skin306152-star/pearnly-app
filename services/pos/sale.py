@@ -23,6 +23,7 @@ from services.pos import (
     void,
 )
 from services.pos.sale_binding import resolve as _resolve_sale_binding
+from services.products.names import display_product_name
 from services.sales.dates import BANGKOK, bangkok_today
 from services.sales.totals import compute_totals
 
@@ -170,6 +171,7 @@ def create_sale(
         resolved.append(
             {
                 "product_id": str(prod["id"]),
+                "product_name_snapshot": display_product_name(prod),
                 "sell_unit": ln.get("sell_unit") or prod["base_unit"],
                 "factor": factor,
                 "qty": qty,
@@ -283,6 +285,7 @@ def create_sale(
             sale_id=sale_id,
             fields={
                 "product_id": item["product_id"],
+                "product_name_snapshot": item["product_name_snapshot"],
                 "sell_unit": item["sell_unit"],
                 "unit_factor": item["factor"],
                 "qty": item["qty"],
@@ -450,6 +453,7 @@ def _detail_view(cur, *, tenant_id: str, sale: dict) -> dict:
             {
                 "id": str(ln["id"]),
                 "product_id": str(ln["product_id"]),
+                "name": ln.get("product_name_snapshot"),
                 "sell_unit": ln["sell_unit"],
                 "qty": float(ln["qty"]),
                 "qty_base": float(ln["qty_base"]),
@@ -487,14 +491,4 @@ def _header_view(sale: dict) -> dict:
     }
 
 
-def void_sale(
-    cur, *, tenant_id: str, workspace_client_id: int, sale_id: str, created_by=None, operator=None
-) -> dict:
-    return void.void_sale(
-        cur,
-        tenant_id=tenant_id,
-        workspace_client_id=workspace_client_id,
-        sale_id=sale_id,
-        created_by=created_by,
-        operator=operator,
-    )
+void_sale = void.void_sale

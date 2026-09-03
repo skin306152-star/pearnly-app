@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""POS 小票行 DAL 守门测试(services/pos/sales_store · 成本快照列)。
+"""POS 小票行 DAL 守门测试(services/pos/sales_store · 成本与名称快照列)。
 
 锁定:insert_line 把 cost_total 当钱字段走 Decimal 参数化(不是裸浮点拼 SQL)、None 原样
 传(诚实占位,不当 0);list_lines 把 cost_total 带出来供报表/详情用。
@@ -40,6 +40,7 @@ class InsertLineCostTests(unittest.TestCase):
             sale_id="s1",
             fields={
                 "product_id": "p1",
+                "product_name_snapshot": "โค้ก / Coke / 可乐",
                 "sell_unit": "ea",
                 "unit_factor": 1,
                 "qty": 2,
@@ -54,6 +55,8 @@ class InsertLineCostTests(unittest.TestCase):
             },
         )
         self.assertIn("cost_total", cur.last_sql)
+        self.assertIn("product_name_snapshot", cur.last_sql)
+        self.assertIn("โค้ก / Coke / 可乐", cur.last_params)
         self.assertIn(Decimal("18.5"), cur.last_params)
 
     def test_cost_total_none_passes_through_not_coerced_to_zero(self):
@@ -64,6 +67,7 @@ class InsertLineCostTests(unittest.TestCase):
             sale_id="s1",
             fields={
                 "product_id": "p1",
+                "product_name_snapshot": "โค้ก",
                 "sell_unit": "ea",
                 "unit_factor": 1,
                 "qty": 2,
@@ -86,6 +90,7 @@ class ListLinesTests(unittest.TestCase):
         cur.fetchall = lambda: []
         sales_store.list_lines(cur, tenant_id="t1", sale_id="s1")
         self.assertIn("cost_total", cur.calls[0][0])
+        self.assertIn("product_name_snapshot", cur.calls[0][0])
 
 
 if __name__ == "__main__":

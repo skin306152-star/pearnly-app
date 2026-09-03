@@ -81,7 +81,7 @@
     "afterMaster": {
       "lines": [
         {
-          "name": "可乐整箱",
+          "name": "โค้กยกลัง / Coke by case / 可乐整箱 / コーラ",
           "price": "฿15.00 / 件",
           "qty": "1"
         }
@@ -91,12 +91,12 @@
     "afterBox": {
       "lines": [
         {
-          "name": "可乐整箱",
+          "name": "โค้กยกลัง / Coke by case / 可乐整箱 / コーラ",
           "price": "฿15.00 / 件",
           "qty": "1"
         },
         {
-          "name": "可乐整箱",
+          "name": "โค้กยกลัง / Coke by case / 可乐整箱 / コーラ",
           "price": "฿350.00 / 件",
           "qty": "1"
         }

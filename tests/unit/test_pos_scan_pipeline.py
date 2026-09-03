@@ -645,7 +645,7 @@ class PosScanPipelineTest(unittest.TestCase):
         want = (
             DICT_ZH["posui.cart.unit_no_price"]
             .replace("{unit}", "ลัง")
-            .replace("{name}", "百事 325ml")
+            .replace("{name}", "เป๊ปซี่ 325ml / Pepsi 325ml / 百事 325ml / ペプシ")
         )
         self.assertIn(want, self.r["zero_price_text"])
         self.assertIn(DICT_ZH["posui.cart.fix_in_backoffice"], self.r["zero_price_text"])

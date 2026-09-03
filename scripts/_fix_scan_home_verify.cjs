@@ -51,6 +51,8 @@ const P_MILK = {
     name_zh: '鲜奶 1L',
     track_batch: true,
 };
+const productName = (product) =>
+    [product.name_th, product.name_en, product.name_zh].filter(Boolean).join(' / ');
 // 一件"只填了名字就建档"的货(unit_price 为 null)+ 一件正常有价的货
 const PRICED = [
     { id: 'p-new', name_th: 'น้ำเปล่า', unit_price: null, vat_applicable: true },
@@ -277,7 +279,7 @@ async function typedBarcodeKept(browser, origin) {
     // 旧行为查的是半截码(桩里没有)→ 这里会变成「这个码没人用」的绿字,放行撞码。
     const copy = await page.evaluate(
         (name) => window.I18N[window._currentLang]['sx-p-bc-dup'].replace('{name}', name),
-        P_COLA.name_th
+        productName(P_COLA)
     );
     const runs = [];
     for (const segs of TYPED_SPLITS) runs.push(await typeOneSplit(page, segs, asked, copy));
@@ -370,7 +372,7 @@ async function batchFork(browser, origin) {
     const splitMsg = await page.locator('#inv-in-mask-scan-msg').innerText();
     const wantSplit = await page.evaluate(
         (name) => window.I18N[window._currentLang]['inv-scan-batch-row'].replace('{name}', name),
-        P_MILK.name_th
+        productName(P_MILK)
     );
     const batchRows = await page.evaluate(rowSnapshot);
     // 各填各的批号/效期:填得进去本身就是「第二箱有地方写自己的效期」
@@ -404,7 +406,7 @@ async function batchFork(browser, origin) {
     const bumpMsg = await page.locator('#inv-in-mask-scan-msg').innerText();
     const wantBump = await page.evaluate(
         (name) => window.I18N[window._currentLang]['inv-scan-bumped'].replace('{name}', name),
-        P_COLA.name_th
+        productName(P_COLA)
     );
     const allRows = await page.evaluate(rowSnapshot);
     await shot(page, 'fix-g2-nonbatch-one-row-qty2.png');

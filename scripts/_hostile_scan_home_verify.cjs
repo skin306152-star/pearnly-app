@@ -45,6 +45,7 @@ const YOG = '8858899000012'; // 只在查码应答里存在 · /api/inventory/st
 const P_COLA = { id: 'p-cola', name_th: 'โค้ก 325ml', name_zh: '可乐 325ml', track_batch: false };
 const P_MILK = { id: 'p-milk', name_th: 'นมสด 1L', name_zh: '鲜奶 1L', track_batch: true };
 const P_YOG = { id: 'p-yog', name_th: 'โยเกิร์ต', name_zh: '酸奶', track_batch: true };
+const productName = (product) => [product.name_th, product.name_zh].filter(Boolean).join(' / ');
 
 const LOOKUP = {
     [COLA]: { product: P_COLA, matched_by: 'product', matched_unit: 'ขวด' },
@@ -248,7 +249,7 @@ async function typedWithBackspace(browser, origin) {
     });
     const wantDup = await page.evaluate(
         (name) => window.I18N[window._currentLang]['sx-p-bc-dup'].replace('{name}', name),
-        P_COLA.name_th
+        productName(P_COLA)
     );
     await shot(page, 'h1-typed-with-backspace.png');
     await page.close();

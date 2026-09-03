@@ -10,6 +10,7 @@ import {
     type Supplier,
 } from './purchase-common.js';
 import { BAHT } from './money.js';
+import { productDisplayName } from './product-names.js';
 
 const CSS = `
 .purm-scrim{position:fixed;inset:0;background:rgba(17,24,39,.42);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1200;}
@@ -205,7 +206,7 @@ window.openPurchaseMatch = function (lineArg, onDone) {
     const okBtn = mask.querySelector('#purm-mok') as HTMLButtonElement;
     const listEl = mask.querySelector('#purm-mlist') as HTMLElement;
     const search = mask.querySelector('#purm-msearch') as HTMLInputElement;
-    const pname = (p: MatchProduct) => p.name_th || p.name_en || p.name_zh || '—';
+    const pname = (p: MatchProduct) => productDisplayName(p);
     const newRow = `<div class="row new" data-pid="__new__">+ ${escapeHtml(t('pur-make-new'))}</div>`;
 
     const bindRows = () => {

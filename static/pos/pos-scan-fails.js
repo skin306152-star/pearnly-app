@@ -44,7 +44,7 @@
         if (f.errCode) return POS.posErrMsg(f.errCode, 'pos.unexpected');
         if (!f.vars && !f.name) return POS.t(f.msgKey); // 不插值:{code} 留给 renderMsg 切
         const vars = Object.assign({}, f.vars);
-        if (f.name) vars.name = POS.nm(f.name);
+        if (f.name) vars.name = POS.pnm(f.name);
         return POS.tf(f.msgKey, vars);
     }
 

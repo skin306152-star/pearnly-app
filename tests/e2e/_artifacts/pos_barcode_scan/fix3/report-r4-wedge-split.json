@@ -3,14 +3,14 @@
     "ok": true,
     "focusWas": "BODY",
     "blockedMs": 300,
-    "stampMax": 10.7,
-    "perfMax": 310.3,
+    "stampMax": 9.5,
+    "perfMax": 309.2,
     "asked": [
       "8850999320014"
     ],
     "cart": {
       "names": [
-        "โค้ก"
+        "โค้ก / Coke / 可乐 / コーラ"
       ],
       "qtys": [
         "1"
@@ -25,19 +25,19 @@
     "before": "LOT-B240301",
     "after": "LOT-B240301",
     "blockedMs": 300,
-    "stampMax": 10.5,
-    "perfMax": 307.3,
+    "stampMax": 9.9,
+    "perfMax": 309.2,
     "asked": [
       "8850999320014"
     ],
     "rows": 2,
-    "msg": "เพิ่ม โค้ก แล้ว",
+    "msg": "เพิ่ม โค้ก / 可乐 แล้ว",
     "why": ""
   },
   "w3_heldKeyOnMain": {
     "ok": true,
     "repeatFlags": 11,
-    "stampMax": 27.8,
+    "stampMax": 27,
     "asked": [],
     "cart": {
       "names": [],
@@ -50,14 +50,14 @@
   "w4_gapTaskSplit": {
     "ok": true,
     "blockedMs": 300,
-    "stampMax": 10.5,
-    "perfMax": 300.2,
+    "stampMax": 9.5,
+    "perfMax": 299.7,
     "asked": [
       "8850999320014"
     ],
     "cart": {
       "names": [
-        "โค้ก"
+        "โค้ก / Coke / 可乐 / コーラ"
       ],
       "qtys": [
         "1"

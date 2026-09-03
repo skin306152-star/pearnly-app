@@ -89,7 +89,7 @@
                     '<div class="it"><span class="q">' +
                     Number(it.qty) +
                     '×</span>' +
-                    POS.nm(it.name) +
+                    POS.pnm(it.name) +
                     (it.note ? '<span class="nt">' + it.note + '</span>' : '') +
                     '</div>'
             )
@@ -209,7 +209,7 @@
                     l.line_id +
                     '"><div class="chk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>' +
                     '<div class="nm">' +
-                    POS.nm(l.name) +
+                    POS.pnm(l.name) +
                     '</div><span class="q tnum">×' +
                     Number(l.qty) +
                     '</span><span class="amt tnum">฿' +

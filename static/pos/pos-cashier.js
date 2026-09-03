@@ -4,7 +4,7 @@
  */
 (function () {
     const POS = window.POS;
-    const state = POS.state;
+    const { state, pnm } = POS;
     const $ = (id) => document.getElementById(id);
     const fmt = POS.fmt;
 
@@ -122,7 +122,7 @@
                     // 点了没反应是最难排查的一种坏:没加进车必须当场说为什么。
                     if (refused) {
                         POS.toast(
-                            POS.tf(refused.key, { name: POS.nm(p.name), unit: refused.unit }),
+                            POS.tf(refused.key, { name: pnm(p.name), unit: refused.unit }),
                             'error'
                         );
                     }
@@ -154,7 +154,7 @@
             '">' +
             qty +
             '</span></div><div class="meta"><div class="nm">' +
-            POS.esc(POS.nm(p.name)) +
+            POS.esc(pnm(p.name)) +
             '</div><div class="pr tnum">฿' +
             fmt(unit.price) +
             '</div>' +
@@ -211,7 +211,7 @@
     function openQtyPad(i) {
         qtyIdx = i;
         qtyBuf = '';
-        $('qty-item-name').textContent = POS.nm(cart[i].name);
+        $('qty-item-name').textContent = pnm(cart[i].name);
         updateQtyDisp();
         $('qty-mask').classList.add('show');
     }
@@ -380,7 +380,7 @@
                     const costMarkup = POS.cost.markup(c.unitCost);
                     return (
                         '<div class="line"><div class="li-nm"><div class="n">' +
-                        POS.esc(POS.nm(c.name)) +
+                        POS.esc(pnm(c.name)) +
                         '</div><div class="u tnum">฿' +
                         fmt(c.price) +
                         ' ' +
@@ -906,7 +906,7 @@
                     amount: h.discount,
                 });
                 const total = Number(heldTotals.grand_total);
-                const names = h.cart.map((c) => POS.esc(POS.nm(c.name)) + ' ×' + c.qty).join(' · ');
+                const names = h.cart.map((c) => POS.esc(pnm(c.name)) + ' ×' + c.qty).join(' · ');
                 return (
                     '<div class="held"><div class="h"><span class="no">' +
                     POS.esc(h.no) +

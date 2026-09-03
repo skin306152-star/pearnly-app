@@ -16,6 +16,7 @@ from decimal import Decimal
 from typing import Optional
 
 from services.pos.report_window import bangkok_day_range as _range
+from services.products.names import product_name_object
 from services.sales.dates import bangkok_today
 
 _HEAT_DAYS = 14
@@ -322,7 +323,7 @@ def _top_products(cur, base, date_from, date_to, top_n) -> list:
         gross = Decimal(str(r["gross"]))
         entry = {
             "product_id": str(r["product_id"]),
-            "name": {"th": r["name_th"], "en": r["name_en"], "zh": r["name_zh"]},
+            "name": product_name_object(r),
             "qty": _qty(r["qty"]),
             "gross": _money(gross),
         }

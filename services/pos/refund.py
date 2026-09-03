@@ -184,6 +184,7 @@ def refund(
             sale_id=refund_sale_id,
             fields={
                 "product_id": str(oline["product_id"]),
+                "product_name_snapshot": oline.get("product_name_snapshot"),
                 "sell_unit": oline["sell_unit"],
                 "unit_factor": oline["unit_factor"],
                 "qty": item["qty"],

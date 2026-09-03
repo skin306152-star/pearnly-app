@@ -61,7 +61,7 @@
     POS.nameCache = {};
     POS.productName = function (productId) {
         const n = POS.nameCache[productId];
-        return n ? POS.nm(n) : '';
+        return n ? POS.pnm(n) : '';
     };
     // ── 错误码本地化(09 §A.3)──
     // posErrText:查得到返当前语言文案,查不到返 null(绝不抛原始码)。

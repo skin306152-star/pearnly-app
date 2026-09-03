@@ -14,6 +14,7 @@ import re
 
 from core.rls import apply_tenant_rls
 from services.pos import sheets_labels
+from services.products.names import display_product_name
 from services.sales.dates import BANGKOK
 
 logger = logging.getLogger("mr-pilot")
@@ -176,13 +177,16 @@ def _sale_row(cur, *, tenant_id: str, sale: dict, lang: str) -> list:
     from services.pos import sales_store
 
     cur.execute(
-        "SELECT l.qty, p.name_th, p.name_en FROM pos_sale_lines l "
+        "SELECT l.qty, l.product_name_snapshot, p.name_th, p.name_en, p.name_zh "
+        "FROM pos_sale_lines l "
         "JOIN products p ON p.id = l.product_id "
         "WHERE l.tenant_id = %s AND l.sale_id = %s ORDER BY l.id",
         (tenant_id, sale["id"]),
     )
     lines = cur.fetchall()
-    items = ", ".join(f"{r['name_th'] or r['name_en']} x{r['qty']}" for r in lines)
+    items = ", ".join(
+        f"{r.get('product_name_snapshot') or display_product_name(r)} x{r['qty']}" for r in lines
+    )
     qty_total = sum(r["qty"] or 0 for r in lines)
 
     cashier_name = ""

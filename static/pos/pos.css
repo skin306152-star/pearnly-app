@@ -133,7 +133,7 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .cats { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 2px; }
 .pos-view--main .cat { flex: 0 0 auto; height: 34px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink-2); font-size: 13.5px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; }
 .pos-view--main .cat.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-.pos-view--main .grid { flex: 1; overflow-y: auto; display: grid; gap: 12px; padding-bottom: 16px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); align-content: start; }
+.pos-view--main .grid { flex: 1; overflow-y: auto; display: grid; gap: 12px; padding-bottom: 16px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); grid-auto-rows: max-content; align-content: start; }
 .pos-view--main .prod { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; cursor: pointer; transition: transform .08s ease, box-shadow .12s ease; display: flex; flex-direction: column; }
 .pos-view--main .prod:hover { box-shadow: var(--shadow); }
 .pos-view--main .prod:active { transform: scale(.97); }
@@ -145,6 +145,7 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .prod .meta { padding: 9px 11px 11px; }
 .pos-view--main .prod .nm { font-size: 13.5px; line-height: 1.3; height: 35px; overflow: hidden; }
 .pos-view--main .prod .pr { margin-top: 5px; font-weight: 700; color: var(--ink); }
+.pos-view--main .prod .cost { margin-top: 3px; font-size: 11.5px; color: var(--ink-3); }
 .pos-view--main .grid-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink3); gap: 12px; padding: 40px; text-align: center; }
 .pos-view--main .grid-state svg { opacity: .5; }
 .pos-view--main .grid-state button { margin-top: 4px; height: 38px; padding: 0 18px; border-radius: 9px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
@@ -161,6 +162,7 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .line .li-nm { flex: 1; min-width: 0; }
 .pos-view--main .line .li-nm .n { font-size: 14px; }
 .pos-view--main .line .li-nm .u { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.pos-view--main .line .li-nm .cost { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
 .pos-view--main .stepper { display: flex; align-items: center; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .pos-view--main .stepper button { width: 30px; height: 30px; border: 0; background: #fff; color: var(--ink); font-size: 17px; cursor: pointer; }
 .pos-view--main .stepper button:active { background: var(--blue-l); }

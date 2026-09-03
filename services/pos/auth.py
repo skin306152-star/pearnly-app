@@ -13,6 +13,7 @@ import bcrypt
 from core.auth import create_pos_token
 from core.pos_api import PosError
 from services.pos import cashier as cashier_dal
+from services.pos import caps as caps_svc
 
 
 def hash_pin(pin: str) -> str:
@@ -54,10 +55,15 @@ def login(cur, *, tenant_id: str, workspace_client_id: int, cashier_id: str, pin
         workspace_client_id=workspace_client_id,
         cashier_id=str(row["id"]),
     )
+    effective_caps = caps_svc.resolve_caps(cur, tenant_id, dict(row))
     return {
         "token": token,
         "offline_ttl_hours": ttl_hours,
-        "cashier": {"id": str(row["id"]), "display_name": row["display_name"]},
+        "cashier": {
+            "id": str(row["id"]),
+            "display_name": row["display_name"],
+            "caps": effective_caps,
+        },
         "shift": _shift_view(shift),
     }
 

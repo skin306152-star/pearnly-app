@@ -31,6 +31,7 @@ function seed() {
     localStorage.setItem('pos_store_token', 'e2e-smoke');
     localStorage.setItem('pos_store_name', 'ร้าน E2E');
     localStorage.setItem('mrpilot_lang', 'th');
+    localStorage.removeItem('pos_held_orders');
 }
 
 function instrumentFeedback() {
@@ -83,6 +84,7 @@ function product(matchedUnit) {
         category_id: 1,
         base_unit: 'ขวด',
         image_url: null,
+        avg_cost: '10.00',
         vat_applicable: true,
         units: [
             {
@@ -123,7 +125,35 @@ async function routeBarcode(page, mode) {
     });
 }
 
-async function login(page, origin) {
+async function login(page, origin, costVisible) {
+    if (typeof costVisible === 'boolean') {
+        await page.route('**/api/pos/auth/pin', (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    ok: true,
+                    data: {
+                        token: 'e2e-cashier-token',
+                        offline_ttl_hours: 12,
+                        cashier: {
+                            id: 'mock-c1',
+                            display_name: 'Nok',
+                            caps: { cost_visible: costVisible },
+                        },
+                        shift: null,
+                    },
+                }),
+            })
+        );
+        await page.route('**/api/pos/products?*', (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: { items: [product(null)] } }),
+            })
+        );
+    }
     await page.goto(`${origin}/static/pos/pos.html`);
     await page.waitForSelector('#login-cashiers .ca', { timeout: 15000 });
     for (const d of ['1', '2', '3', '4']) {
@@ -133,6 +163,77 @@ async function login(page, origin) {
     await page.click('#shift-open-go');
     await page.waitForSelector('#view-main.is-active', { timeout: 10000 });
     await page.waitForSelector('#main-grid .prod', { timeout: 10000 });
+}
+
+async function costVisibility(browser, origin) {
+    const authorized = await browser.newPage({ viewport: PHONE });
+    await authorized.addInitScript(seed);
+    await login(authorized, origin, true);
+    const th = await dict(authorized);
+    const expected = th.copy['posui.product.avg_cost'] + ' ฿10.00';
+    const productCost = await text(authorized, '#main-grid .prod .cost');
+    const productCostVisible = await authorized.evaluate(() => {
+        const card = document.querySelector('#main-grid .prod').getBoundingClientRect();
+        const cost = document.querySelector('#main-grid .prod .cost').getBoundingClientRect();
+        return cost.top >= card.top && cost.bottom <= card.bottom + 0.5;
+    });
+    await authorized.click('#main-grid .prod');
+    await authorized.click('#cart-peek');
+    await authorized.waitForTimeout(350);
+    const cartCost = await text(authorized, '#cart-lines .cost');
+    await authorized.screenshot({ path: path.join(SHOTS, '11-cost-visible.png') });
+    const safety = await authorized.evaluate(() => {
+        document.getElementById('cart-hold-btn').click();
+        const held = JSON.parse(localStorage.getItem('pos_held_orders') || '[]');
+        window.POS.offline.cacheCatalog([
+            {
+                id: 'secret-cost',
+                name: { th: 'สินค้า' },
+                avg_cost: '7.00',
+                units: [],
+                stock: { qty_base: '1' },
+            },
+        ]);
+        const cached = window.POS.offline.filterCached('', null)[0];
+        return {
+            costVisible: window.POS.cost.visible(),
+            heldHasCost: Object.prototype.hasOwnProperty.call(held[0].cart[0], 'unitCost'),
+            cachedHasCost: Object.prototype.hasOwnProperty.call(cached, 'avg_cost'),
+        };
+    });
+    await authorized.close();
+
+    const unauthorized = await browser.newPage({ viewport: PHONE });
+    await unauthorized.addInitScript(seed);
+    await login(unauthorized, origin, false);
+    const productCostCount = await unauthorized.locator('#main-grid .prod .cost').count();
+    await unauthorized.click('#main-grid .prod');
+    await unauthorized.click('#cart-peek');
+    await unauthorized.waitForTimeout(350);
+    const cartCostCount = await unauthorized.locator('#cart-lines .cost').count();
+    const hidden = await unauthorized.evaluate(() => !window.POS.cost.visible());
+    await unauthorized.screenshot({ path: path.join(SHOTS, '12-cost-hidden.png') });
+    await unauthorized.close();
+
+    return {
+        ok:
+            th.lang === 'th' &&
+            productCost === expected &&
+            productCostVisible &&
+            cartCost === expected &&
+            safety.costVisible &&
+            !safety.heldHasCost &&
+            !safety.cachedHasCost &&
+            hidden &&
+            productCostCount === 0 &&
+            cartCostCount === 0,
+        productCost,
+        productCostVisible,
+        cartCost,
+        expected,
+        safety,
+        unauthorized: { hidden, productCostCount, cartCostCount },
+    };
 }
 
 const text = (page, sel) => page.textContent(sel);
@@ -644,6 +745,7 @@ async function refusals(browser, origin) {
         gun: await gun(browser, origin),
         manualFallback: await manualFallback(browser, origin),
         refusals: await refusals(browser, origin),
+        costVisibility: await costVisibility(browser, origin),
     };
     await browser.close();
     server.close();

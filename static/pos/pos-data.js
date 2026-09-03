@@ -19,7 +19,7 @@
         workspaceClientId: null,
         terminalId: null,
         store: '',
-        cashier: null, // { id, display_name, color }
+        cashier: null, // { id, display_name, color, caps }
         shift: null, // { id, opened_at, opening_float }
         online: true,
     });
@@ -63,7 +63,6 @@
         const n = POS.nameCache[productId];
         return n ? POS.nm(n) : '';
     };
-
     // ── 错误码本地化(09 §A.3)──
     // posErrText:查得到返当前语言文案,查不到返 null(绝不抛原始码)。
     POS.posErrText = function (code) {

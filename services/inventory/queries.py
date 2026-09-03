@@ -23,6 +23,41 @@ def _status(qty: Decimal, min_stock) -> str:
     return "ok"
 
 
+def average_costs_by_product(
+    cur, *, tenant_id: str, workspace_client_id: int, product_ids: list
+) -> dict[str, Decimal | None]:
+    """按库存页同一口径返回商品平均成本，供已授权的业务界面复用。"""
+    if not product_ids:
+        return {}
+    cur.execute(
+        "SELECT p.id AS product_id, "
+        "COALESCE(b.avg_cost, w.wac, p.default_cost) AS avg_cost "
+        "FROM products p "
+        "LEFT JOIN (SELECT product_id, AVG(unit_cost) AS avg_cost FROM inventory_batches "
+        "           WHERE tenant_id = %s AND workspace_client_id = %s "
+        "           GROUP BY product_id) b ON b.product_id = p.id "
+        "LEFT JOIN (SELECT product_id, "
+        "                  SUM(qty_delta * unit_cost) / NULLIF(SUM(qty_delta), 0) AS wac "
+        "           FROM inventory_transactions "
+        "           WHERE tenant_id = %s AND workspace_client_id = %s "
+        "           AND txn_type = 'purchase_in' AND batch_id IS NULL "
+        "           AND unit_cost IS NOT NULL AND qty_delta > 0 "
+        "           GROUP BY product_id) w ON w.product_id = p.id "
+        "WHERE p.tenant_id = %s AND p.workspace_client_id = %s "
+        "AND p.id = ANY(%s::uuid[])",
+        (
+            tenant_id,
+            workspace_client_id,
+            tenant_id,
+            workspace_client_id,
+            tenant_id,
+            workspace_client_id,
+            product_ids,
+        ),
+    )
+    return {str(row["product_id"]): row["avg_cost"] for row in cur.fetchall()}
+
+
 def stock_overview(
     cur,
     *,

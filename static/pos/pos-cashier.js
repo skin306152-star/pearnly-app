@@ -8,7 +8,7 @@
     const $ = (id) => document.getElementById(id);
     const fmt = POS.fmt;
 
-    let cart = []; // { id, name, sell_unit, qty, price }
+    let cart = []; // { id, name, sell_unit, qty, price, unitCost? }
     let activeCat = null;
     let tendered = 0;
     let taken = []; // 本单已收明细(混合支付):{ method, amount:Number, ref? }·每次开收款窗重置
@@ -136,6 +136,7 @@
         const out = qty <= 0;
         const unit = (p.units || []).find((u) => u.default_sell) ||
             (p.units || [])[0] || { price: '0' };
+        const costMarkup = POS.cost.markup(POS.cost.forUnit(p, unit));
         const thumbInner = p.image_url
             ? '<img class="pimg" alt="" data-pimg="' +
               String(p.image_url).replace(/"/g, '&quot;').replace(/</g, '&lt;') +
@@ -156,28 +157,13 @@
             POS.esc(POS.nm(p.name)) +
             '</div><div class="pr tnum">฿' +
             fmt(unit.price) +
-            '</div></div></div>'
+            '</div>' +
+            costMarkup +
+            '</div></div>'
         );
     }
 
     // ════════════════ 购物车 ════════════════
-    // 单位没设价时 price 是 null,Number(null) 是 0 —— 整箱货会以 ฿0.00 进车、฿0 出门,
-    // 而后端 SaleLine 允许 0、改价闸也不拦,小票和报表上一样看不出异常。
-    function priced(unit) {
-        const raw = unit.price;
-        if (raw === null || raw === undefined || String(raw).trim() === '') return false;
-        return Number.isFinite(Number(raw));
-    }
-
-    // 「扫中的单位在 units 里找不到」只有一种成因:后端拿 products.barcode 命中,matched_unit
-    // 回的是基本单位,而这个商品只建了命名单位行(箱/打)。基本单位挂了牌价 → 按它卖(后端
-    // 认 base_unit);没挂价 → 回 null,由调用方照旧拒收 —— ฿0 进车比卖不出去更糟。
-    function baseUnitFallback(p) {
-        if (!p.base_unit || p.matched_unit !== p.base_unit) return null;
-        if (!priced({ price: p.base_price })) return null;
-        return { unit_name: p.base_unit, price: p.base_price };
-    }
-
     // 回 null = 加进车了;回 {key, unit} = 没加,由调用方决定用卡片还是 toast 说(扫码那条路
     // 屏幕被取景层盖着,toast 在层后面看不见)。绝不静默换单位或按 ฿0 加。
     function addToCart(p) {
@@ -189,13 +175,14 @@
         // 单位行 → units 里找不到它。三条分界:基本单位有挂牌价就按基本单位卖(后端认它,
         // 见 services/pos/sale.py 的 _resolve_unit);价不明才拒。绝不回落到别的单位 ——
         // 那是扫一瓶收一箱 ฿350 的钱、库存按箱扣 24 瓶,而屏上一个字都没有。
-        const base = scanned ? null : baseUnitFallback(p);
+        const base = scanned ? null : POS.cost.baseUnitFallback(p);
         if (p.matched_unit && !scanned && !base) {
             return { key: 'posui.cart.unit_unknown', unit: p.matched_unit };
         }
         const unit = scanned || base || units.find((u) => u.default_sell) || units[0];
         if (!unit) return { key: 'posui.cart.unit_unknown', unit: p.base_unit || '' };
-        if (!priced(unit)) return { key: 'posui.cart.unit_no_price', unit: unit.unit_name };
+        if (!POS.cost.priced(unit))
+            return { key: 'posui.cart.unit_no_price', unit: unit.unit_name };
         const ex = cart.find((c) => c.id === p.id && c.sell_unit === unit.unit_name);
         if (ex) ex.qty++;
         else
@@ -205,6 +192,7 @@
                 sell_unit: unit.unit_name,
                 qty: 1,
                 price: Number(unit.price),
+                unitCost: POS.cost.forUnit(p, unit),
                 vat_applicable: p.vat_applicable !== false,
             });
         renderCart();
@@ -388,15 +376,18 @@
         } else {
             empty.style.display = 'none';
             lines.innerHTML = cart
-                .map(
-                    (c, i) =>
+                .map((c, i) => {
+                    const costMarkup = POS.cost.markup(c.unitCost);
+                    return (
                         '<div class="line"><div class="li-nm"><div class="n">' +
                         POS.esc(POS.nm(c.name)) +
                         '</div><div class="u tnum">฿' +
                         fmt(c.price) +
                         ' ' +
                         POS.t('posui.cart.unit') +
-                        '</div></div><div class="stepper"><button data-dec="' +
+                        '</div>' +
+                        costMarkup +
+                        '</div><div class="stepper"><button data-dec="' +
                         i +
                         '">−</button><span class="q tnum" data-qi="' +
                         i +
@@ -407,7 +398,8 @@
                         '">+</button></div><div class="li-amt tnum">฿' +
                         fmt(c.price * c.qty) +
                         '</div></div>'
-                )
+                    );
+                })
                 .join('');
             lines
                 .querySelectorAll('[data-dec]')
@@ -888,7 +880,7 @@
             id: POS.uuid(),
             no: 'H-' + String(list.length + 1).padStart(2, '0'),
             time: POS.hm(new Date()),
-            cart: cart.slice(),
+            cart: POS.cost.stripCart(cart),
             discount: discountFor(subtotalOf(cart)), // 挂单快照存生效额(pct 也折成当时金额,取单按金额续)
         });
         saveHeld(list);

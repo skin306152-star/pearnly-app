@@ -179,6 +179,12 @@
         "static/scan/scan-feedback.js",
         "static/scan/scan-camera.js",
         "static/scan/scan-track.js",
+        "static/pos/pos-cashier.js",
+        "static/pos/pos-cost.js",
+        "static/pos/pos-data.js",
+        "static/pos/pos-offline.js",
+        "static/pos/pos-i18n.js",
+        "static/pos/pos.css",
         "static/pos/pos.html"
       ],
       "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
@@ -186,7 +192,8 @@
         "真 ZXing 从假摄像头画面里解出真 EAN-13 → 真进购物车:桌面 Chromium 没有原生 BarcodeDetector,走的是真解码器",
         "销售取景框接受商品的同一刻只触发一次 2.45kHz 成功音与一次受支持设备振动:要跨真 POS bundle、扫码引擎与接受回调",
         "#bscan-* 那几个真节点的显隐与文案:单测里这层 DOM 不存在",
-        "失败清单画在取景层(z=60)之上、点得到:靠 elementFromPoint 在真排版下问「这一点点到的是谁」"
+        "失败清单画在取景层(z=60)之上、点得到:靠 elementFromPoint 在真排版下问「这一点点到的是谁」",
+        "成本权限同时决定商品卡和购物车的真 DOM,且成本不能落入离线目录或挂单:要跨 PIN 回包、真实 bundle、localStorage 和移动端排版验证"
       ]
     },
     "_pos_scan_accept.cjs": {

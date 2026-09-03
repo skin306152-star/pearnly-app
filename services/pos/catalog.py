@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from typing import Optional
 
+from services.inventory import queries as inv_queries
 from services.inventory import store as inv_store
 from services.modules import store as modules_store
 from services.pos import cashier as cashier_dal
+from services.pos import caps as caps_svc
 
 _DEFAULT_NEAR_EXPIRY_DAYS = 30
 
@@ -70,7 +72,7 @@ def _stock_by_product(
     return {"qty": qty, "near": near}
 
 
-def _row_to_item(r, units: dict, stock: dict) -> dict:
+def _row_to_item(r, units: dict, stock: dict, *, avg_cost=None, cost_visible: bool = False) -> dict:
     pid = str(r["id"])
     base_price = f"{r['unit_price']:.2f}" if r["unit_price"] is not None else None
     base_units = units.get(pid)
@@ -95,6 +97,7 @@ def _row_to_item(r, units: dict, stock: dict) -> dict:
         # 找不到它,只能一律拒收,这瓶货在收银台就卖不出去了。后端本来认基本单位
         # (services/pos/sale.py 的 _resolve_unit 走 products.unit_price),缺的只是这一行。
         "base_price": base_price,
+        "avg_cost": f"{avg_cost:.2f}" if cost_visible and avg_cost is not None else None,
         "image_url": r["image_url"],
         "vat_applicable": bool(r["vat_applicable"]),
         "units": base_units,
@@ -113,6 +116,32 @@ _PROD_COLS = (
 )
 
 
+def _cost_projection(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    product_ids: list,
+    operator: Optional[dict],
+) -> tuple[bool, dict]:
+    if not operator:
+        return False, {}
+    caps = caps_svc.operator_caps(
+        cur,
+        user=operator,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+    )
+    if not caps.get("cost_visible"):
+        return False, {}
+    return True, inv_queries.average_costs_by_product(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        product_ids=product_ids,
+    )
+
+
 def list_products(
     cur,
     *,
@@ -121,6 +150,7 @@ def list_products(
     q: Optional[str] = None,
     category: Optional[str] = None,
     near_days: int = _DEFAULT_NEAR_EXPIRY_DAYS,
+    operator: Optional[dict] = None,
 ) -> dict:
     sql = (
         f"SELECT {_PROD_COLS} FROM products "
@@ -148,10 +178,35 @@ def list_products(
         near_days=near_days,
         product_ids=pids,
     )
-    return {"items": [_row_to_item(r, units, stock) for r in rows]}
+    cost_visible, costs = _cost_projection(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        product_ids=pids,
+        operator=operator,
+    )
+    return {
+        "items": [
+            _row_to_item(
+                r,
+                units,
+                stock,
+                avg_cost=costs.get(str(r["id"])),
+                cost_visible=cost_visible,
+            )
+            for r in rows
+        ]
+    }
 
 
-def product_by_barcode(cur, *, tenant_id: str, workspace_client_id: int, code: str) -> dict:
+def product_by_barcode(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    code: str,
+    operator: Optional[dict] = None,
+) -> dict:
     """扫码取单品。先配单位码(箱码≠瓶码),再配商品主码;命中单位回 matched_unit。
 
     单位码查询带 product_active:停用商品的单位行保留 barcode 值(靠谓词让位 · 见
@@ -203,12 +258,27 @@ def product_by_barcode(cur, *, tenant_id: str, workspace_client_id: int, code: s
         near_days=_DEFAULT_NEAR_EXPIRY_DAYS,
         product_ids=[str(row["id"])],
     )
-    item = _row_to_item(row, units, stock)
+    cost_visible, costs = _cost_projection(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        product_ids=[str(row["id"])],
+        operator=operator,
+    )
+    item = _row_to_item(
+        row,
+        units,
+        stock,
+        avg_cost=costs.get(str(row["id"])),
+        cost_visible=cost_visible,
+    )
     item["matched_unit"] = matched_unit or row["base_unit"]
     return item
 
 
-def bootstrap(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
+def bootstrap(
+    cur, *, tenant_id: str, workspace_client_id: int, operator: Optional[dict] = None
+) -> dict:
     """前台启动包(登录后一次拉全 · 支撑离线)。"""
     modules = modules_store.get_modules(cur, tenant_id=tenant_id)
     pos_cfg = modules.get("pos", {}).get("config", {}) or {}
@@ -226,7 +296,11 @@ def bootstrap(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
     )
     products = list_products(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, near_days=near_days
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        near_days=near_days,
+        operator=operator,
     )["items"]
     inv_store.get_or_create_default_warehouse(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id

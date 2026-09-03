@@ -6,6 +6,7 @@
 
 import os
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("JWT_SECRET", "test-secret-key-of-sufficient-length")
 
@@ -44,12 +45,24 @@ class LoginTests(unittest.TestCase):
             "display_name": "Nok",
             "pin_hash": auth.hash_pin(pin),
             "is_active": active,
+            "user_id": None,
+            "caps": {"cost_visible": True},
         }
 
-    def test_success_issues_pos_token(self):
+    @patch("services.pos.auth.caps_svc.resolve_caps")
+    def test_success_issues_pos_token(self, resolve_caps):
+        resolve_caps.return_value = {
+            "discount_limit_pct": 0,
+            "can_refund": False,
+            "can_void": False,
+            "can_override_price": False,
+            "cost_visible": True,
+        }
         cur = FakeCursor(ones=[self._cashier_row(), None])  # cashier, then no open shift
         out = auth.login(cur, tenant_id="t", workspace_client_id=9, cashier_id="c1", pin="1234")
         self.assertEqual(out["cashier"]["display_name"], "Nok")
+        self.assertTrue(out["cashier"]["caps"]["cost_visible"])
+        resolve_caps.assert_called_once()
         self.assertIsNone(out["shift"])
         self.assertEqual(out["offline_ttl_hours"], core_auth.POS_TOKEN_TTL_HOURS)
         payload = core_auth.decode_access_token(out["token"])

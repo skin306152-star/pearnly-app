@@ -88,7 +88,9 @@ async def api_bootstrap(request: Request, workspace_client_id: Optional[int] = Q
     return _read(
         request,
         workspace_client_id,
-        lambda cur, tid, ws, user: catalog.bootstrap(cur, tenant_id=tid, workspace_client_id=ws),
+        lambda cur, tid, ws, user: catalog.bootstrap(
+            cur, tenant_id=tid, workspace_client_id=ws, operator=user
+        ),
         commit=True,
     )
 
@@ -122,7 +124,12 @@ async def api_products(
         request,
         workspace_client_id,
         lambda cur, tid, ws, user: catalog.list_products(
-            cur, tenant_id=tid, workspace_client_id=ws, q=q, category=category
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            q=q,
+            category=category,
+            operator=user,
         ),
     )
 
@@ -151,7 +158,7 @@ async def api_by_barcode(
         request,
         workspace_client_id,
         lambda cur, tid, ws, user: catalog.product_by_barcode(
-            cur, tenant_id=tid, workspace_client_id=ws, code=code
+            cur, tenant_id=tid, workspace_client_id=ws, code=code, operator=user
         ),
     )
 

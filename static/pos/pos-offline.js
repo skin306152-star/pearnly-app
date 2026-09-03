@@ -147,8 +147,8 @@
     }
     function cacheCatalog(items) {
         if (!items || !items.length) return;
-        snapshot = items;
-        kvSet('catalog', items);
+        snapshot = POS.cost.stripCatalog(items);
+        kvSet('catalog', snapshot);
     }
     function hasSnapshot() {
         return !!(snapshot && snapshot.length);

@@ -70,6 +70,7 @@ const BUNDLES = [
             ...SCAN_RESIDENT,
             'pos/pos-totals.js',
             'pos/pos-data.js',
+            'pos/pos-cost.js',
             'pos/pos-cart-math.js',
             // pos-receipt.js 加载期就取 POS.state/fmt(pos-data.js 定义)→ 必须排在它之后。
             'pos/pos-receipt.js',

@@ -5,7 +5,7 @@
      1  static/admin/admin.css
         └ 521: color: #2563eb;
      1  static/pos/pos-data.js
-        └ 361: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+        └ 365: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
 
 ## 旧token名(应用全局emerald) — 命中 178(27 文件)
     51  static/pos/pos.css
@@ -97,7 +97,7 @@
         └ 2005: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static/pos/pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 372: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 373: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src/home/core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static/home-12-drawer-search.css
@@ -160,8 +160,8 @@
         └ 660: max-width: 420px;
         └ 1201: max-width: 420px;
      4  static/pos/pos.css
-        └ 243: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
-        └ 263: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 245: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 265: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      3  src/home/purchase-modals.ts
         └ 16: .purm{background:var(--card);border-radius:16px;width:100%;max-width:440px;box-shadow:var(
         └ 17: .purm.w480{max-width:480px;} .purm.w560{max-width:560px;}

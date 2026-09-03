@@ -25,6 +25,7 @@
     };
 
     let cam = null; // 摄像头 handle · 懒建:真的开相机那一刻才有
+    let controls = null; // 取景框右上角:补光灯 + 动画开关
     let offWedge = null; // 摄像头层开着时的独占订阅(它在,页面级订阅者收不到 → 不会加两次)
     let scanned = 0; // 本轮连扫件数(每次开层归零)
 
@@ -270,7 +271,10 @@
         else if (s === 'scanning') hint.textContent = POS.t('posui.bscan.aim');
         else hint.textContent = '';
         $('bscan-frame').classList.toggle('live', s === 'scanning');
-        if (s === 'scanning') sizeFrame(); // 出帧后才知道画面多大 → 框这时才画得准
+        if (s === 'scanning') {
+            sizeFrame(); // 出帧后才知道画面多大 → 框这时才画得准
+            if (controls) controls.refreshTorch();
+        }
     }
     function paintCount() {
         $('bscan-count').textContent = POS.tf('posui.bscan.count', { n: scanned });
@@ -330,6 +334,14 @@
             onError: onCamError,
             onState: paintState,
         });
+        const visual = window.PearnlyScanSuccessVisual;
+        if (visual && typeof visual.mountControls === 'function') {
+            controls = visual.mountControls({
+                container: $('bscan-stage'),
+                camera: cam,
+                t: POS.t,
+            });
+        }
         sizeFrame();
     }
 
@@ -385,6 +397,10 @@
         if (cam) {
             cam.destroy();
             cam = null;
+        }
+        if (controls) {
+            controls.destroy();
+            controls = null;
         }
     }
 

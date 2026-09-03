@@ -602,12 +602,23 @@ async function cameraFlow(browser, origin) {
         probe.destroy();
         const vr = v.getBoundingClientRect();
         const fr = f.getBoundingClientRect();
+        const controls = document.querySelector(
+            '#inv-in-mask-scan-stage [data-scan-view-controls]'
+        );
+        const motion = controls?.querySelector('[data-scan-motion-toggle]');
+        const torch = controls?.querySelector('.scan-view-torch');
         return {
             crop,
             wRatio: fr.width / vr.width,
             hRatio: fr.height / vr.height,
             inside: fr.left >= vr.left && fr.right <= vr.right && fr.top >= vr.top,
             frameVisible: getComputedStyle(f).borderTopWidth !== '0px',
+            controls: {
+                exists: !!controls,
+                motionChecked: !!motion?.checked,
+                pointerEvents: controls ? getComputedStyle(controls).pointerEvents : '',
+                torchHidden: !!torch?.hidden,
+            },
         };
     });
     await shot(page, '04-camera-live-mobile.png');
@@ -640,6 +651,10 @@ async function cameraFlow(browser, origin) {
             released.streams === 1 &&
             released.live === 0 &&
             released.videoLeft === 0 &&
+            geom.controls.exists &&
+            geom.controls.motionChecked &&
+            geom.controls.pointerEvents === 'auto' &&
+            geom.controls.torchHidden &&
             released.wedgeSubs === 0 &&
             !released.modalOpen,
         beforeLoad,

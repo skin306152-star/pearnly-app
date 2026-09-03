@@ -3,7 +3,6 @@ import subprocess
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 VISUAL_JS = ROOT / "static" / "scan" / "scan-success-visual.js"
 VISUAL_CSS = ROOT / "static" / "scan" / "scan-success-visual.css"
@@ -41,6 +40,11 @@ class FakeNode {
 const body = new FakeNode('body');
 const target = new FakeNode('target');
 target.rect = {left: 10, top: 700, width: 40, height: 40};
+const saved = new Map();
+global.localStorage = {
+  getItem: (key) => saved.has(key) ? saved.get(key) : null,
+  setItem: (key, value) => saved.set(key, value),
+};
 global.document = {
   body,
   documentElement: {clientWidth: 390, clientHeight: 844},
@@ -79,15 +83,53 @@ const overlapCount = body.children.length;
 firstCard.fire('animationend');
 const afterFirstCard = body.children.length;
 firstRing.fire('animationend');
-console.log(JSON.stringify({
-  firstResult,
-  second,
-  secondCaptionChildren: secondCaption.children.length,
-  overlapCount,
-  afterFirstCard,
-  afterFirstRing: body.children.length,
-  timerDelays: timers.map((timer) => timer.delay),
-}));
+const controlHost = new FakeNode('controls');
+let torchOn = false;
+const torchCalls = [];
+const camera = {
+  cameraControl: (name, next) => {
+    if (name === 'torchAvailable') return true;
+    if (name === 'torchEnabled') return torchOn;
+    if (name === 'setTorch') { torchCalls.push(next); torchOn = next; return Promise.resolve(true); }
+    return false;
+  },
+};
+const control = api.mountControls({
+  container: controlHost,
+  camera,
+  t: (key) => ({
+    'scan-controls.animation': '扫码动画',
+    'scan-controls.torch-on': '打开手电筒',
+    'scan-controls.torch-off': '关闭手电筒',
+  })[key] || key,
+});
+const toolbar = controlHost.children[0];
+const torch = toolbar.children[0];
+const checkbox = toolbar.children[1].children[0];
+checkbox.checked = false;
+checkbox.fire('change');
+const disabledVisual = api.show({label: 'Disabled', target});
+torch.fire('click');
+Promise.resolve().then(() => Promise.resolve()).then(() => {
+  console.log(JSON.stringify({
+    firstResult,
+    second,
+    secondCaptionChildren: secondCaption.children.length,
+    overlapCount,
+    afterFirstCard,
+    afterFirstRing: body.children.length,
+    timerDelays: timers.map((timer) => timer.delay),
+    controls: {
+      checkboxLabel: toolbar.children[1].children[1].textContent,
+      disabledVisual,
+      motionStored: saved.get('pearnly_scan_motion'),
+      torchHidden: torch.hidden,
+      torchCalls,
+      torchPressed: torch.attributes['aria-pressed'],
+      torchTitle: torch.title,
+    },
+  }));
+});
 """
         out = subprocess.run(
             ["node", "-e", script, str(VISUAL_JS)],
@@ -124,6 +166,18 @@ console.log(JSON.stringify({
         self.assertIn("prefers-reduced-motion: reduce", css)
         self.assertIn("scan-success-fly 680ms", css)
         self.assertIn("will-change: transform, opacity", css)
+        self.assertIn(".scan-view-torch[hidden]", css)
+        self.assertIn(".scan-view-motion input", css)
+
+    def test_shared_controls_persist_animation_and_toggle_supported_torch(self):
+        controls = self._run_harness()["controls"]
+        self.assertEqual(controls["checkboxLabel"], "扫码动画")
+        self.assertFalse(controls["disabledVisual"])
+        self.assertEqual(controls["motionStored"], "0")
+        self.assertFalse(controls["torchHidden"])
+        self.assertEqual(controls["torchCalls"], [True])
+        self.assertEqual(controls["torchPressed"], "true")
+        self.assertEqual(controls["torchTitle"], "关闭手电筒")
 
     def test_all_three_success_paths_call_the_shared_visual(self):
         pos = (ROOT / "static" / "pos" / "pos-scan.js").read_text()
@@ -133,6 +187,11 @@ console.log(JSON.stringify({
         self.assertIn("showScanSuccessVisual({ label: name", inventory)
         self.assertIn("showCodeAccepted(code)", products)
         self.assertIn("checkState === 'free' || checkState === 'self'", products)
+        self.assertIn("visual.mountControls({", pos)
+        inventory_camera = (ROOT / "src" / "home" / "inventory-scan-camera.ts").read_text()
+        self.assertIn("mountScanCameraControls(stage, handle)", inventory_camera)
+        product_camera = (ROOT / "src" / "home" / "sales-products-scan-cam.ts").read_text()
+        self.assertIn("mountScanCameraControls(view, h)", product_camera)
 
     def test_builds_ship_the_shared_source_and_style_to_both_apps(self):
         js_build = (ROOT / "scripts" / "build-home-js.mjs").read_text()

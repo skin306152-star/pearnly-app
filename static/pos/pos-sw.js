@@ -8,7 +8,7 @@
  */
 // 版本号跟 pos.html 里 dist/pos.js 的 ?v= 保持一致:外壳 bundle 一变(本次并入扫码常驻层)
 // 就换缓存名,否则离线缓存里那份旧 bundle 永远不会被换掉,店里那台机器扫码功能压根不存在。
-const V = '12060018';
+const V = '12060019';
 // 前缀 = 「这一族缓存是我的」的唯一凭据(见 dropStaleCaches)。CACHE 由它拼出来,两处不分家。
 const PREFIX = 'pearnly-pos-v';
 const CACHE = PREFIX + V;

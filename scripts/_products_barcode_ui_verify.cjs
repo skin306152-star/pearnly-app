@@ -335,7 +335,10 @@ async function run() {
             pointerEvents: fly ? getComputedStyle(fly).pointerEvents : '',
         };
     });
-    await chk('建品扫码有独立视觉确认且不冒充数量 +1', !!productVisual.label && !productVisual.increment);
+    await chk(
+        '建品扫码有独立视觉确认且不冒充数量 +1',
+        !!productVisual.label && !productVisual.increment
+    );
     await chk('建品扫码动画不拦下一次输入', productVisual.pointerEvents === 'none');
     await page.screenshot({ path: path.join(OUT, '07-scanned-filled.png') });
 
@@ -360,6 +363,9 @@ async function run() {
                 const vb = video.getBoundingClientRect();
                 if (vb.height <= 0) return null;
                 const fb = document.querySelector('.sx-bcm-frame').getBoundingClientRect();
+                const controls = document.querySelector('#sx-bcm-view [data-scan-view-controls]');
+                const motion = controls?.querySelector('[data-scan-motion-toggle]');
+                const torch = controls?.querySelector('.scan-view-torch');
                 return {
                     // 屏幕上的取景框 ÷ 画面 == 引擎 cropRatio,才叫「框里」
                     frameW: fb.width / vb.width,
@@ -370,6 +376,13 @@ async function run() {
                     manual: (document.getElementById('sx-bcm-manual')?.innerText || '').trim(),
                     tracksLive: video.srcObject.getTracks().filter((t) => t.readyState === 'live')
                         .length,
+                    controls: {
+                        exists: !!controls,
+                        motionChecked: !!motion?.checked,
+                        motionLabel: motion?.parentElement?.textContent?.trim() || '',
+                        pointerEvents: controls ? getComputedStyle(controls).pointerEvents : '',
+                        torchHidden: !!torch?.hidden,
+                    },
                 };
             },
             null,
@@ -387,6 +400,7 @@ async function run() {
             msg: '',
             manual: '',
             tracksLive: 0,
+            controls: {},
         };
     }
     await chk('取景框宽占缩放画面 80%(±2%)', Math.abs(camera.frameW - 0.8) < 0.02);
@@ -395,6 +409,14 @@ async function run() {
     await chk('相机正常出画时给的是真词条「对准框」不是转圈', camera.msg === copy['sx-p-bc-aim']);
     await chk('扫码弹窗给了手动输入的出路(真词条)', camera.manual === copy['bscan.manual']);
     await chk('相机真开着(live track ≥1)', camera.tracksLive >= 1);
+    await chk(
+        '建品取景框有默认开启的扫码动画开关',
+        camera.controls.exists &&
+            camera.controls.motionChecked &&
+            camera.controls.motionLabel === copy['scan-controls.animation'] &&
+            camera.controls.pointerEvents === 'auto'
+    );
+    await chk('假摄像头不支持补光时不显示无效手电筒按钮', camera.controls.torchHidden);
     await page.screenshot({ path: path.join(OUT, '06-camera-scanning.png') });
     await page.click('#sx-bcm-x');
     await page.evaluate(() => window.__restoreCreate());

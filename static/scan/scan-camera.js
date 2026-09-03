@@ -1,17 +1,12 @@
 /*
  * Pearnly · scan-camera.js · 摄像头扫商品条码引擎(无界面)
  *
- * 职责边界:本文件只管「开相机 → 裁取景框 → 解码 → 回调」和「出错时给出一个能翻译成人话的错误
- * 对象」。弹窗长什么样、错误卡怎么画、重试按钮放哪,全归调用方 —— POS 和主站 SPA 各有一套设计
- * 语言与翻译函数,引擎里写死任何一套都会让另一套变形。
+ * 职责边界:这里只管开相机、裁取景框、解码、回调与错误对象；弹窗、重试和翻译全归调用方，
+ * 不把 POS 或主站 SPA 的界面语言写进引擎。
  *
- * 依赖 scan-loader.js(首屏 bundle 里):能力探针 + 同源 loadScript。本文件只可能被 loader 的
- * ensureLoaded() 拉进来,所以那层一定在。错误分档(scanError / withTimeout)在同一个懒加载
- * 产物里的 scan-errors.js,「每拍解码结果 → 扫描事件」的裁决(在场去重 / 新码多帧确认 /
- * 压制告警)在 scan-track.js,两个都排在本文件之前。
+ * 依赖 scan-loader.js；scan-errors.js 与 scan-track.js 必须在同一个懒加载产物里排在本文件之前。
  *
- * 跟常见实现相比，这里不死等出帧、不静默隐藏错误、只解取景框；新码还要多帧确认，
- * 避免糊帧吐出的校验位合法误码直接进入商品、入库或购物车。
+ * 不死等出帧、不静默隐藏错误、只解取景框；新码多帧确认后才进入商品、入库或购物车。
  */
 (function (root) {
     'use strict';
@@ -29,6 +24,7 @@
         throw new Error('scan-camera.js 需要 scan-track.js(dist/scan.js 里排在本文件之前)先加载');
     }
     var trackControls = (root && root.PearnlyScanTrackControls) || null;
+    var torch = (root && root.PearnlyScanTorch) || null;
     var feedback = (root && root.PearnlyScanFeedback) || null;
     var scanError = shell.scanError;
     var isScanError = shell.isScanError;
@@ -203,6 +199,7 @@
         var ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         var stream = null;
+        var cameraTrack = null;
         var watch = null; // 轨道生死看门人(scan-errors.js 的 watchTracks)· 拿到 stream 才有
         var detector = null;
         var timer = null;
@@ -242,6 +239,7 @@
                 stopTracks(stream);
                 stream = null;
             }
+            cameraTrack = null;
             if (video.srcObject) video.srcObject = null;
         }
 
@@ -359,7 +357,7 @@
                     }
                     stream = s;
                     var tracks = s.getVideoTracks ? s.getVideoTracks() : [];
-                    var cameraTrack = tracks[0];
+                    cameraTrack = tracks[0] || null;
                     if (trackControls && typeof trackControls.configure === 'function') {
                         trackControls.configure(cameraTrack, o);
                     }
@@ -459,6 +457,8 @@
             state: function () {
                 return state;
             },
+            cameraControl: (name, value) =>
+                torch ? torch.control(cameraTrack, name, value) : false,
             // 屏上取景框的唯一事实源,CSS 里别写第二份 —— 两处一漂就是「对准了却读不出」,
             // 而这种病不报任何错,只会被当成「扫码不好使」。
             cropRatio: function () {

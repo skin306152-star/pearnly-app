@@ -8,6 +8,11 @@
 // 真开相机才 ensureLoaded 懒加载解码器。
 /* global t, escapeHtml */
 import { IC_X } from './sales-common.js';
+import {
+    mountScanCameraControls,
+    type ScanCameraControls,
+    type ScanCameraControlsHandle,
+} from './scan-success-visual.js';
 
 export interface ScanError {
     code: string;
@@ -19,7 +24,7 @@ export interface CropRatio {
     width: number;
     height: number;
 }
-interface CameraHandle {
+interface CameraHandle extends ScanCameraControlsHandle {
     start(): Promise<boolean>;
     retry(): Promise<boolean>;
     destroy(): void;
@@ -122,6 +127,7 @@ function paintFrame(view: HTMLElement, crop: CropRatio): void {
 }
 
 let handle: CameraHandle | null = null;
+let controls: ScanCameraControls | null = null;
 let onManual: (() => void) | null = null;
 
 function setScanMsg(html: string): void {
@@ -151,6 +157,8 @@ export function closeScanModal(): void {
         handle.destroy();
         handle = null;
     }
+    controls?.destroy();
+    controls = null;
     onManual = null;
     document.getElementById(MASK_ID)?.remove();
 }
@@ -199,11 +207,14 @@ async function startCamera(onCode: (code: string) => void): Promise<void> {
             else if (s === 'scanning') {
                 setScanMsg(escapeHtml(t('sx-p-bc-aim')));
                 setScanFoot(manualBtnHtml());
+                controls?.refreshTorch();
             }
         },
     });
     handle = h;
     paintFrame(view, h.cropRatio());
+    controls?.destroy();
+    controls = mountScanCameraControls(view, h);
     void h.start();
 }
 

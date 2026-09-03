@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 607 个源文件全扫
+# UI 设计合规扫描报告 · 608 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 2(2 文件)
@@ -97,7 +97,7 @@
         └ 2005: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static/pos/pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 363: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 366: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src/home/core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static/home-12-drawer-search.css

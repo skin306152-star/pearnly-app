@@ -51,6 +51,7 @@ const STUB = {
     salesErrMsg: () => '',
     localizedName: () => '',
     showScanSuccessVisual: () => false,
+    mountScanCameraControls: () => null,
 };
 const cache = {};
 

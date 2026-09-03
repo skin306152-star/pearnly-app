@@ -147,6 +147,7 @@ const COMMON = {
     loadAuthedImg: async () => {},
     // 飞入反馈由自己的 DOM/并发测试覆盖;本 harness 只验建品表单业务状态机。
     showScanSuccessVisual: () => false,
+    mountScanCameraControls: () => null,
     IC_X: '<svg></svg>',
 };
 

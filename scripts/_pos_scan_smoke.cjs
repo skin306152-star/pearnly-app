@@ -192,6 +192,9 @@ async function liveHit(browser, origin, viewport, tag) {
         const cs = getComputedStyle(f);
         const done = document.getElementById('bscan-done');
         const fly = document.querySelector('[data-scan-success-fly]');
+        const controls = document.querySelector('[data-scan-view-controls]');
+        const motion = controls?.querySelector('[data-scan-motion-toggle]');
+        const torch = controls?.querySelector('.scan-view-torch');
         let crossings = 0;
         const samples = window.__scanSamples || [];
         for (let i = 1; i < samples.length; i++) {
@@ -235,6 +238,13 @@ async function liveHit(browser, origin, viewport, tag) {
                       pointerEvents: getComputedStyle(fly).pointerEvents,
                   }
                 : null,
+            controls: {
+                exists: !!controls,
+                motionChecked: !!motion?.checked,
+                motionLabel: motion?.parentElement?.textContent?.trim() || '',
+                pointerEvents: controls ? getComputedStyle(controls).pointerEvents : '',
+                torchHidden: !!torch?.hidden,
+            },
             feedback: {
                 ...window.__scanFeedback,
                 crossings,
@@ -249,6 +259,7 @@ async function liveHit(browser, origin, viewport, tag) {
         return {
             hidden: getComputedStyle(m).display === 'none',
             tracks: document.querySelectorAll('.bscan-video').length,
+            controls: document.querySelectorAll('[data-scan-view-controls]').length,
             grand: document.getElementById('cart-grand').textContent,
             items: document.getElementById('cart-sub').textContent,
         };
@@ -277,6 +288,11 @@ async function liveHit(browser, origin, viewport, tag) {
         live.visual.label === 'โค้ก 325ml' &&
         live.visual.increment === '+1' &&
         live.visual.pointerEvents === 'none' &&
+        live.controls.exists &&
+        live.controls.motionChecked &&
+        live.controls.motionLabel === th.copy['scan-controls.animation'] &&
+        live.controls.pointerEvents === 'auto' &&
+        live.controls.torchHidden &&
         live.feedback.starts === 1 &&
         live.feedback.stops === 1 &&
         live.feedback.vibrates.join(',') === '60' &&
@@ -287,6 +303,7 @@ async function liveHit(browser, origin, viewport, tag) {
         live.feedback.active > 3500 &&
         closed.hidden &&
         closed.tracks === 0 && // destroy() 把自建的 video 摘掉了
+        closed.controls === 0 &&
         closed.grand === '350.00'; // 扫箱码 = 箱价,不是默认瓶价 15
     return { ok, lang: th.lang, starting, live, closed };
 }

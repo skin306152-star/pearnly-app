@@ -5,9 +5,14 @@
 // (window.PearnlyScanCamera)只回调,弹窗长什么样归调用方,故本文件只画 stage 那一块。
 /* global t, escapeHtml */
 import { blockedText, errorHtml, frameBox, paintNote, scanPart } from './inventory-scan-ui.js';
+import {
+    mountScanCameraControls,
+    type ScanCameraControls,
+    type ScanCameraControlsHandle,
+} from './scan-success-visual.js';
 import type { ScanError } from './inventory-scan-ui.js';
 
-interface CameraHandle {
+interface CameraHandle extends ScanCameraControlsHandle {
     start: () => Promise<boolean>;
     retry: () => Promise<boolean>;
     destroy: () => void;
@@ -43,6 +48,7 @@ export interface CamHost {
 }
 
 let cam: CameraHandle | null = null;
+let controls: ScanCameraControls | null = null;
 
 function shell(): CameraApi | null {
     const w = window as unknown as { PearnlyScanCamera?: CameraApi };
@@ -83,7 +89,10 @@ function paintFrame(stage: HTMLElement, crop: { width: number; height: number })
 
 function onState(host: CamHost, state: string): void {
     if (state === 'starting') msg(host, 'busy', escapeHtml(t('inv-scan-opening')));
-    else if (state === 'scanning') msg(host, 'tip', escapeHtml(t('inv-scan-aim')));
+    else if (state === 'scanning') {
+        msg(host, 'tip', escapeHtml(t('inv-scan-aim')));
+        controls?.refreshTorch();
+    }
 }
 
 function decoderError(): ScanError {
@@ -129,6 +138,8 @@ export async function openCamera(host: CamHost): Promise<void> {
     });
     cam = handle;
     paintFrame(stage, handle.cropRatio());
+    controls?.destroy();
+    controls = mountScanCameraControls(stage, handle);
     setLabel(host, true);
     void handle.start();
 }
@@ -157,4 +168,6 @@ export function rejectCameraCode(code: string): void {
 export function releaseCamera(): void {
     if (cam) cam.destroy();
     cam = null;
+    controls?.destroy();
+    controls = null;
 }

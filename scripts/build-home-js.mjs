@@ -39,6 +39,7 @@ const BUNDLES = [
             'scan/scan-errors.js',
             'scan/scan-track.js',
             'scan/scan-track-controls.js',
+            'scan/scan-torch.js',
             'scan/scan-camera.js',
         ],
     },

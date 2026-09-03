@@ -1,11 +1,11 @@
-# UI 设计合规扫描报告 · 609 个源文件全扫
+# UI 设计合规扫描报告 · 610 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 2(2 文件)
      1  static/admin/admin.css
         └ 521: color: #2563eb;
      1  static/pos/pos-data.js
-        └ 365: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+        └ 360: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
 
 ## 旧token名(应用全局emerald) — 命中 178(27 文件)
     51  static/pos/pos.css

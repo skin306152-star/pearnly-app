@@ -17,6 +17,7 @@ class PosCashierSecurityContractTests(unittest.TestCase):
         policy = response.headers["content-security-policy"]
         script = next(part for part in policy.split(";") if "script-src" in part)
         self.assertIn("script-src 'self'", script)
+        self.assertIn("'wasm-unsafe-eval'", script)
         self.assertNotIn("'unsafe-inline'", script)
         self.assertNotIn("'unsafe-eval'", script)
 

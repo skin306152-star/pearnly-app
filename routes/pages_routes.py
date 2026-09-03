@@ -46,7 +46,8 @@ _NO_CACHE = {
 _CASHIER_HEADERS = {
     **_NO_CACHE,
     "Content-Security-Policy": (
-        "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; "
+        "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' "
+        "https://static.cloudflareinsights.com; "
         "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; "
         "font-src 'self' data:; connect-src 'self' https://static.cloudflareinsights.com; "
         "worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "

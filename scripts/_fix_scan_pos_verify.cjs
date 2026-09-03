@@ -9,9 +9,9 @@
  *   P1-H 零元闸      单位没设价的箱码不许进车,必须出可见错误(旧行为 ฿0.00 静默进车)。
  *   P1-I 参照系      屏上取景框映射回源像素 == 引擎真解的那块(旧行为按舞台画,框外的货也被解)。
  *
- * 真的东西:static/pos/pos.html + dist/pos.js + dist/scan.js + dist/zxing.js 全是本仓真产物;
- * 摄像头是 Chromium 假设备喂真合成 EAN-13,桌面 Chromium 没有原生 BarcodeDetector,所以走的是
- * 真 ZXing 真解码(holdSteady 当场断这一条);键盘是 page.keyboard 真按键。桩只有
+ * 真的东西:static/pos/pos.html + dist/pos.js + dist/scan.js + 同源 WASM 全是本仓真产物;
+ * 摄像头是 Chromium 假设备喂真合成 EAN-13;holdSteady 主动移除原生 BarcodeDetector,
+ * 强制走真 WASM 解码。键盘是 page.keyboard 真按键。桩只有
  * /api/pos/products/by-barcode 的回包。文案期望值现场从真 window.POS_I18N 取,一个字都不注入。
  *
  * 跑法(仓库根目录):两句 python 生成素材,再 node 本脚本 <静态素材> <闪烁素材> [用例名]
@@ -215,14 +215,22 @@ function frameMatches(g) {
 async function holdSteady(browser, origin) {
     const page = await bootCam(browser, origin, 0);
     const th = await dict(page);
-    // 「解码是真的不是桩」得当场证一次:桌面 Chromium 没有原生 BarcodeDetector,所以进车的
-    // 那一件必然是懒加载下来的 vendored ZXing 从假摄像头的画面里真读出来的。
+    // 「解码是真的不是桩」得当场证一次:主动移除原生 BarcodeDetector,
+    // 进车的那一件必然是懒加载下来的 vendored WASM 从假摄像头画面里真读出来的。
     const lazy = [];
     page.on('request', (r) => {
-        const m = r.url().match(/\/static\/dist\/(scan|zxing)\.js/);
-        if (m) lazy.push(m[1]);
+        const m = r
+            .url()
+            .match(
+                /\/static\/dist\/(scan|barcode-detector)\.js|\/static\/dist\/(zxing_reader)\.wasm/
+            );
+        if (m) lazy.push(m[1] || m[2]);
     });
-    const native = await page.evaluate(() => 'BarcodeDetector' in window);
+    const native = await page.evaluate(() => {
+        const present = 'BarcodeDetector' in window;
+        delete window.BarcodeDetector;
+        return present;
+    });
     await openCamera(page);
     const firstAt = Date.now();
     // 「6 秒不动」是店员真会做的动作(一手举着货一手点屏)。不能只等一个固定睡眠就下结论,
@@ -248,9 +256,8 @@ async function holdSteady(browser, origin) {
     return {
         ok:
             th.lang === 'th' &&
-            native === false &&
             lazy.includes('scan') &&
-            lazy.includes('zxing') &&
+            lazy.includes('barcode-detector') &&
             held.grand === '350.00' &&
             held.qtys.join('|') === '1' &&
             held.count === th.copy['posui.bscan.count'].replace('{n}', '1') &&

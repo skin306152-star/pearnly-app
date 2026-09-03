@@ -208,9 +208,8 @@
             'posui.bscan.typed': 'ถือว่าพิมพ์ด้วยมือ · {code} ไม่ได้อ่านเป็นบาร์โค้ด',
             'posui.bscan.typed_hint': 'ถ้ายิงจากเครื่องสแกน ให้ยิงอีกครั้ง',
             'posui.bscan.search_code': 'ค้นหาสินค้าด้วยรหัสนี้',
-            'posui.bscan.same_code': 'อ่านรหัส {code} ซ้ำ · นับเป็นชิ้นเดิม',
-            'posui.bscan.same_code_hint':
-                'ถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า',
+            'posui.bscan.same_code': '{code} ยังอยู่ในกรอบสแกน',
+            'posui.bscan.same_code_hint': 'ชิ้นที่สองให้ยกชิ้นแรกออกแล้วสแกนใหม่ หรือกด +1',
             'posui.bscan.add_one': '+1 · เป็นชิ้นที่สอง',
             'posui.bscan.create_where':
                 'ให้เจ้าของเพิ่มสินค้าในระบบหลังร้าน (สินค้า → เพิ่มสินค้า) แล้วใส่บาร์โค้ดนี้ในช่อง "บาร์โค้ด" ครั้งต่อไปสแกนขายได้เลย',
@@ -527,9 +526,9 @@
             'posui.bscan.typed': 'Treated as typing · {code} was not read as a barcode',
             'posui.bscan.typed_hint': 'If that was a scan, scan it again',
             'posui.bscan.search_code': 'Search products with this code',
-            'posui.bscan.same_code': 'Code {code} read again · counted as the same item',
+            'posui.bscan.same_code': '{code} is still inside the scan frame',
             'posui.bscan.same_code_hint':
-                'If that was a second identical item, tap +1 to put it in the cart',
+                'For a second identical item, move the first away and scan again, or tap +1',
             'posui.bscan.add_one': '+1 · it was a second item',
             'posui.bscan.create_where':
                 'Ask the owner to add it in the back office (Products → New product) and put this barcode in the "Barcode" field — after that it scans straight into the cart',
@@ -846,8 +845,8 @@
             'posui.bscan.typed': '按手打的处理了 · {code} 没当条码读',
             'posui.bscan.typed_hint': '确实是扫的就再扫一次',
             'posui.bscan.search_code': '用这个码搜商品',
-            'posui.bscan.same_code': '同一个码 {code} 又读到一次 · 已按同一件算',
-            'posui.bscan.same_code_hint': '如果这是第二件同款货,点「+1」把它加进购物车',
+            'posui.bscan.same_code': '{code} 仍在取景框内',
+            'posui.bscan.same_code_hint': '第二件同款可移开后再扫，或点「+1」',
             'posui.bscan.add_one': '+1 · 这是第二件',
             'posui.bscan.create_where':
                 '让老板在后台「商品 → 新建商品」把这个码填进「条码」,之后扫码就能直接卖',
@@ -1159,9 +1158,8 @@
             'posui.bscan.typed': '手入力として処理 · {code} はバーコードとして読んでいません',
             'posui.bscan.typed_hint': 'スキャンだった場合はもう一度スキャン',
             'posui.bscan.search_code': 'このコードで商品を検索',
-            'posui.bscan.same_code':
-                '同じコード {code} をもう一度読み取り · 同じ 1 点として扱いました',
-            'posui.bscan.same_code_hint': '同じ商品の 2 点目なら「+1」でカートに追加してください',
+            'posui.bscan.same_code': '{code} がまだスキャン枠内にあります',
+            'posui.bscan.same_code_hint': '2 点目は最初の商品を外して再スキャン、または「+1」',
             'posui.bscan.add_one': '+1 · 2 点目です',
             'posui.bscan.create_where':
                 'オーナーに管理画面(商品 → 商品を追加)でこのバーコードを「バーコード」欄に登録してもらえば、次回からスキャンで売れます',

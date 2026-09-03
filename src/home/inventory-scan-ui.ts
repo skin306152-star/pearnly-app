@@ -150,7 +150,7 @@ export function replaceFail(el: HTMLElement | null, code: string, html: string):
  * dup 那一行是唯一的例外:它说的是【那一箱】可能没进单,而这个码后来又真记上一件,记的是
  * 【再一箱】—— 拿后者销前者等于把没进单的那箱悄悄抹掉,屏上于是跟全都收上了一模一样。
  * 真浏览器实测(1.2s 与 2.0s 空档交替、无人触碰、14.1 秒):不加这条例外时那行被自动抹掉
- * 2 次,收货单最后 3 件而柜台上过了 6 箱。所以它只有店员销得掉 —— 点「是第二件 · 加 1」
+ * 2 次,收货单最后 3 件而柜台上过了 6 箱。所以它只有店员销得掉 —— 点「确实是第二件 · +1」
  * (走 dropFail)或点「知道了」。收银台同一招(static/pos/pos-scan.js 的 resolveFail)。
  */
 export function resolveFail(el: HTMLElement | null, code: string): void {

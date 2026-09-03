@@ -10,7 +10,9 @@
 // 用法: node scripts/build-home-js.mjs
 
 import { transformSync } from 'esbuild';
-import { readSource, writeDist } from './build-lib.mjs';
+import fs from 'fs';
+import path from 'path';
+import { ROOT, readSource, writeDist } from './build-lib.mjs';
 
 // 扫码地基的常驻层:条码枪楔子(枪可能在页面刚开就被扫,必须首屏挂上)+ 懒加载门面
 // (首屏只答「能不能扫」,真要扫才拉 dist/scan.js)。两个文件零依赖、不碰 DOM 结构,
@@ -27,6 +29,7 @@ const BUNDLES = [
     {
         out: 'static/dist/scan.js',
         files: [
+            'scan/scan-wasm-shim.js',
             'scan/scan-zxing-shim.js',
             'scan/scan-errors.js',
             'scan/scan-track.js',
@@ -453,3 +456,16 @@ writeDist(
             keepNames: true,
         }).code.replace(/\/\/#\s*sourceMappingURL=\S*\s*$/, '')
 );
+
+// ── 第三方:Barcode Detection API ponyfill + ZXing-C++ reader WASM(MIT)────
+const WASM_VENDOR = 'static/vendor/barcode-detector';
+const WASM_BANNER =
+    '/*! barcode-detector 3.2.2 + zxing-wasm 3.1.3 | MIT |' +
+    ' https://github.com/Sec-ant/barcode-detector | LICENSE: static/vendor/barcode-detector/ */\n';
+writeDist(
+    'static/dist/barcode-detector.js',
+    WASM_BANNER + readSource(`${WASM_VENDOR}/ponyfill.js`)
+);
+const wasmOut = path.join(ROOT, 'static/dist/zxing_reader.wasm');
+fs.copyFileSync(path.join(ROOT, WASM_VENDOR, 'zxing_reader.wasm'), wasmOut);
+console.log(`✅ static/dist/zxing_reader.wasm · ${fs.statSync(wasmOut).size} 字节`);

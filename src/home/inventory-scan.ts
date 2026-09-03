@@ -32,6 +32,7 @@ import {
     cameraBlockedReason,
     cameraRunning,
     openCamera,
+    rejectCameraCode,
     releaseCamera,
     retryCamera,
     stopCamera,
@@ -251,6 +252,7 @@ async function lookup(code: string): Promise<void> {
         return;
     }
     if (resp.status === 404) {
+        rejectCameraCode(code);
         failCode(code, notFoundHtml(code));
         return;
     }

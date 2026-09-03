@@ -11,6 +11,7 @@ interface CameraHandle {
     start: () => Promise<boolean>;
     retry: () => Promise<boolean>;
     destroy: () => void;
+    reject: (code: string) => void;
     cropRatio: () => { width: number; height: number };
 }
 interface CameraApi {
@@ -144,6 +145,10 @@ export function stopCamera(host: CamHost): void {
 export function retryCamera(host: CamHost): void {
     if (cam) void cam.retry();
     else void openCamera(host);
+}
+
+export function rejectCameraCode(code: string): void {
+    if (cam) cam.reject(code);
 }
 
 /** 只放硬件,不动 DOM:关弹窗时整块 DOM 本来就要被清掉,但相机灯必须当场灭。 */

@@ -125,7 +125,14 @@
             cand = Object.create(null);
         }
 
-        return { sample: sample, reset: reset };
+        // 调用方查库确认这个码无效时撤销信任。否则一次稳定误读会进入 known，之后每次单帧
+        // 都直接放行。seen 刻意保留到它真的离开画面，避免仍举着的误码立刻再次查库。
+        function reject(code) {
+            delete cand[code];
+            delete known[code];
+        }
+
+        return { sample: sample, reset: reset, reject: reject };
     }
 
     var api = { createTracker: createTracker };

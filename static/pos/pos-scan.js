@@ -185,6 +185,7 @@
     // 混成一句「找不到商品」,店员就会对着一件本来能卖的货反复扫。
     function onMiss(code, e) {
         const notFound = !!e && e.code === 'pos.product_not_found';
+        if (notFound && cam && typeof cam.reject === 'function') cam.reject(code);
         if (notFound && e.detail === 'no_catalog') {
             FAILS.push({ msgKey: 'posui.bscan.offline_nocatalog', code: code });
             return;

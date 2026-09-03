@@ -28,7 +28,13 @@ DIST = PROJECT_ROOT / "static" / "dist"
 BUILD_SCRIPT = PROJECT_ROOT / "scripts" / "build-home-js.mjs"
 
 RESIDENT = ("scan-loader.js", "scan-wedge.js")  # 必须首屏就在(枪可能一开页面就被扫)
-LAZY = ("scan-camera.js", "scan-errors.js", "scan-track.js", "scan-zxing-shim.js")  # 点了扫码才拉
+LAZY = (
+    "scan-camera.js",
+    "scan-errors.js",
+    "scan-track.js",
+    "scan-wasm-shim.js",
+    "scan-zxing-shim.js",
+)  # 点了扫码才拉
 SCAN_SOURCES = RESIDENT + LAZY
 FIRST_PAINT_BUNDLES = ("pos.js", "pre.js")
 
@@ -93,6 +99,7 @@ class BuildProductTests(unittest.TestCase):
     def test_scan_product_carries_camera_engine_not_the_library(self):
         code = _read(DIST / "scan.js")
         self.assertIn("PearnlyScanCamera", code)
+        self.assertIn("PearnlyScanWasm", code)
         self.assertIn("PearnlyScanZXing", code)
         # ZXing 本体必须留在自己那个产物里 —— 混进来 scan.js 就从 7KB 变成 350KB,
         # 「原生 BarcodeDetector 能用时一个字节都不拉 ZXing」的承诺随之作废。
@@ -117,6 +124,7 @@ class BundleWiringTests(unittest.TestCase):
         for bundle in FIRST_PAINT_BUNDLES:
             code = _read(DIST / bundle)
             self.assertNotIn("PearnlyScanZXing", code, f"dist/{bundle} 把摄像头解码层打进了首屏")
+            self.assertNotIn("PearnlyScanWasm", code, f"dist/{bundle} 把 WASM 解码层打进了首屏")
             self.assertNotIn("HTMLCanvasElementLuminanceSource", code)
 
     def test_lazy_layer_declared_only_in_the_lazy_product(self):
@@ -144,7 +152,12 @@ class BundleWiringTests(unittest.TestCase):
     def test_lazy_products_guarded_by_cachebust_gate(self):
         # 懒加载产物不写在 HTML 里,漏进 CACHE_BUST_DIRS 就永远报绿(已犯三次)。
         gate = _read(PROJECT_ROOT / "scripts" / "check_cachebust.py")
-        for name in ("static/dist/scan.js", "static/dist/zxing.js"):
+        for name in (
+            "static/dist/scan.js",
+            "static/dist/barcode-detector.js",
+            "static/dist/zxing_reader.wasm",
+            "static/dist/zxing.js",
+        ):
             self.assertIn(name, gate, f"{name} 没进 check_cachebust 的清单")
 
 

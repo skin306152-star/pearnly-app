@@ -3,7 +3,7 @@
  *
  * 与 _pos_scan_smoke.cjs 的分工:那个是施工者自己的回归脚本,这个是验收脚本,专挑它没验到的
  * 五处 —— 真被拒权限、超时的重试入口、解码器拉不下来的重试入口、iOS 回落真的去拉了
- * dist/zxing.js、关层后相机轨道真的 ended。另有一条硬规矩上的不同:
+ * 同源 WASM、关层后相机轨道真的 ended。另有一条硬规矩上的不同:
  *
  *   本脚本一个字的文案都不注入。期望值全部现场从页面里的真 window.POS_I18N 取(那是
  *   static/pos/pos-i18n.js 的真产物),再自己做 {code}/{n}/{name} 代入。测试自带一份文案
@@ -30,7 +30,12 @@ const SHOTS = path.resolve(
 );
 const CODE = '8850999320014'; // 假摄像头画面里那张真 EAN-13(泰国 GS1 前缀 885)
 const BOTTLE = '8850999320007'; // 同商品的瓶码 · 用来证明扫箱码不是碰巧对上默认单位
-const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' };
+const MIME = {
+    '.js': 'text/javascript',
+    '.css': 'text/css',
+    '.html': 'text/html',
+    '.wasm': 'application/wasm',
+};
 const PHONE = { width: 390, height: 780 };
 const DESKTOP = { width: 1280, height: 800 };
 const FAKE_CAM = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'];
@@ -169,12 +174,15 @@ async function cameraToCart(browser, origin, viewport, tag) {
     await page.addInitScript(seed, 'th');
     await page.addInitScript(instrument);
     await routeBarcode(page, 'hit');
-    const zxingHits = [];
+    const fallbackHits = [];
     page.on('request', (r) => {
-        if (r.url().indexOf('/static/dist/zxing.js') >= 0) zxingHits.push(r.url());
+        if (/barcode-detector\.js|zxing_reader\.wasm|\/zxing\.js/.test(r.url())) {
+            fallbackHits.push(r.url());
+        }
     });
     await login(page, origin);
     const th = await dict(page, 'th');
+    const native = await page.evaluate(() => 'BarcodeDetector' in window);
 
     await page.click('#main-scan-btn');
     await page.waitForSelector('#bscan-mask.show', { timeout: 5000 });
@@ -279,7 +287,7 @@ async function cameraToCart(browser, origin, viewport, tag) {
             closed.trackStates.every((s) => s === 'ended') &&
             closed.grand === '350.00' && // 箱价 · 不是默认瓶价 15
             closed.lines.join('').indexOf('โค้ก 325ml') >= 0 &&
-            zxingHits.length > 0,
+            (native || fallbackHits.length > 0),
         starting,
         mask,
         video,
@@ -287,7 +295,8 @@ async function cameraToCart(browser, origin, viewport, tag) {
         bar,
         layout,
         closed,
-        zxingHits,
+        native,
+        fallbackHits,
     };
 }
 
@@ -534,13 +543,21 @@ async function decoderBlocked(browser, origin) {
     const page = await browser.newPage({ viewport: PHONE });
     await page.addInitScript(seed, 'th');
     await routeBarcode(page, 'hit');
-    await page.route('**/static/dist/zxing.js*', (r) => r.abort('failed'));
+    const blocked = [
+        '**/static/dist/barcode-detector.js*',
+        '**/static/dist/zxing_reader.wasm*',
+        '**/static/dist/zxing.js*',
+    ];
+    for (const pattern of blocked) await page.route(pattern, (r) => r.abort('failed'));
     await login(page, origin);
+    await page.evaluate(() => {
+        delete window.BarcodeDetector;
+    });
     const th = await dict(page, 'th');
     await page.click('#main-scan-btn');
     const card = await errorCard(page, 'cam-07-decoder-blocked-retry.png');
     const retry = card.acts.find((a) => a.label === th['posui.retry']);
-    await page.unroute('**/static/dist/zxing.js*');
+    for (const pattern of blocked) await page.unroute(pattern);
     let recovered = null;
     if (retry) {
         await clickAct(page, th['posui.retry']);
@@ -577,7 +594,13 @@ async function iosFallback(browser, origin) {
     await page.addInitScript(seed, 'th');
     const reqs = [];
     page.on('request', (r) => {
-        if (/\/static\/dist\/(zxing|scan)\.js/.test(r.url())) reqs.push(r.url());
+        if (
+            /\/static\/dist\/(scan|barcode-detector)\.js|\/static\/dist\/zxing_reader\.wasm/.test(
+                r.url()
+            )
+        ) {
+            reqs.push(r.url());
+        }
     });
     await routeBarcode(page, 'hit');
     await login(page, origin);
@@ -594,14 +617,14 @@ async function iosFallback(browser, origin) {
     await page.screenshot({ path: path.join(SHOTS, 'cam-09-ios-zxing-fallback.png') });
     const decoded = await page.evaluate(() => ({
         grand: document.getElementById('cart-grand').textContent,
-        engine: !!window.ZXing && !!window.PearnlyScanZXing,
+        engine: !!window.BarcodeDetectionAPI && !!window.PearnlyScanWasm,
     }));
     await page.close();
-    const zx = reqs.filter((u) => u.indexOf('zxing.js') >= 0);
+    const detector = reqs.find((u) => u.indexOf('barcode-detector.js') >= 0);
     return {
         ok:
-            zx.length > 0 &&
-            /[?&]v=/.test(zx[0]) &&
+            !!detector &&
+            /[?&]v=/.test(detector) &&
             decoded.engine &&
             decoded.grand === '350.00' &&
             reqs.some((u) => u.indexOf('scan.js') >= 0),
@@ -627,7 +650,7 @@ async function nativePathSkipsZxing(browser, origin) {
     }, CODE);
     const reqs = [];
     page.on('request', (r) => {
-        if (r.url().indexOf('zxing.js') >= 0) reqs.push(r.url());
+        if (/barcode-detector\.js|zxing_reader\.wasm|\/zxing\.js/.test(r.url())) reqs.push(r.url());
     });
     await routeBarcode(page, 'hit');
     await login(page, origin);

@@ -1,8 +1,8 @@
 /*
  * Pearnly · scan-loader.js · 扫码引擎的常驻门面(首屏这层只有它和 scan-wedge.js)
  *
- * 为什么拆出这么薄一层:摄像头解码那套(scan-camera + scan-zxing-shim → static/dist/scan.js)
- * 和 ZXing 兜底(static/dist/zxing.js)都是「店员真的点了扫码」才用得上的东西,压进首屏
+ * 为什么拆出这么薄一层:摄像头解码那套(scan-camera + shim → static/dist/scan.js)
+ * 和 WASM 兜底都是「店员真的点了扫码」才用得上的东西,压进首屏
  * bundle 等于让每次开机都为一个未必会用到的功能付流量。但「能不能扫」这个判断必须在首屏
  * 就能回答 —— 按钮显不显示、显示了点下去该说什么,都靠它。
  *
@@ -94,6 +94,7 @@
 
     var shell = {
         assetVersion: assetVersion,
+        assetUrl: versioned,
         loadScript: loadScript,
         ensureLoaded: ensureLoaded,
         isSupported: isSupported,

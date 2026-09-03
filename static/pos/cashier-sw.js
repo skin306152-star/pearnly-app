@@ -9,15 +9,20 @@
  */
 // 版本号跟 pos.html 里 dist/pos.js 的 ?v= 保持一致(同 pos-sw.js):/cashier 是收银台现在的家,
 // 外壳 cache-first,不换缓存名就等于在用的机器永远拿旧 pos.html —— 新加的扫码层在店里压根不存在。
-const V = '12060014';
+const V = '12060015';
 // 前缀 = 「这一族缓存是我的」的唯一凭据(见 dropStaleCaches)。CACHE 由它拼出来,两处不分家。
 const PREFIX = 'pearnly-cashier-v';
 const CACHE = PREFIX + V;
 const CORE = ['/cashier'];
-// 扫码那两个产物不写在 HTML 里,是 scan-loader.js 运行时现拼 URL 拉的(?v 抠自页面上 pos.js
+// 扫码产物不写在 HTML 里,是 scan-loader.js 运行时现拼 URL 拉的(?v 抠自页面上 pos.js
 // 的 ?v,所以这里跟 CACHE 共用同一个 V,漂不开)。它们既得进 install 清单,也得过 isCashierAsset
 // 那道门 —— 少任何一样,断网时缓存里永远不会有解码器:还能卖货,却扫不了码。
-const SCAN = ['/static/dist/scan.js', '/static/dist/zxing.js'];
+const SCAN = [
+    '/static/dist/scan.js',
+    '/static/dist/barcode-detector.js',
+    '/static/dist/zxing_reader.wasm',
+    '/static/dist/zxing.js',
+];
 const SCAN_URLS = SCAN.map((p) => p + '?v=' + V);
 
 function isCashierAsset(pathname) {

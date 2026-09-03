@@ -10,17 +10,8 @@
  * 产物里的 scan-errors.js,「每拍解码结果 → 扫描事件」的裁决(在场去重 / 新码多帧确认 /
  * 压制告警)在 scan-track.js,两个都排在本文件之前。
  *
- * 与 Odoo(addons/web/.../barcode_video_scanner.js)的五处刻意不同,都是店员会当场骂人的地方:
- *  1. 它等视频就绪是 `while (!ready) await delay(10)`(源码自带 FIXME)→ 这里 startTimeoutMs
- *     到点就报 timeout,不会转着圈死等。
- *  2. 它报错只丢一个通知、文案是拼英文 message → 这里按 code 分档(权限/没相机/被占用/超时/
- *     解码器拉不下来),每档一个 i18n 键。
- *  3. 它在非 HTTPS 下让扫码按钮静默消失 → insecure_context 是一档明确的错误码,调用方拿
- *     unsupportedReason() 在首屏就能说清「为什么这里没有扫码」。
- *  4. 它原生那条路解全帧再按 boundingBox 过滤取景框 → 这里两条路都只把取景框那块像素画进
- *     canvas 再解,手机上少解掉一多半像素。
- *  5. 它解出一帧就记(单帧即报)→ 这里新码要多帧确认才算数:解码器解糊帧会吐出校验位
- *     恰好合法的错码(真机实测,详见 scan-track.js 头注),单帧即报就是把错码卖给客人。
+ * 跟常见实现相比，这里不死等出帧、不静默隐藏错误、只解取景框；新码还要多帧确认，
+ * 避免糊帧吐出的校验位合法误码直接进入商品、入库或购物车。
  */
 (function (root) {
     'use strict';
@@ -47,6 +38,8 @@
 
     var DEFAULTS = {
         facingMode: 'environment',
+        idealWidth: 1920,
+        idealHeight: 1080,
         // 取景框占画面的比例。条码是宽扁的,竖直方向给太多只是多解无用像素。
         cropRatio: { width: 0.9, height: 0.5 },
         // 常态采样间隔:没有码在跟踪、或跟踪中的码这一拍解出来了 —— 不急,省电。
@@ -83,13 +76,13 @@
         dupNoticeMisses: 2,
         // 新码多帧确认(反 ZXing 糊帧误读 · 详见 scan-track.js 头注):confirmWindowMs 内同值
         // 解出 ≥confirmHits 次才记第一件;认过的码免投票 → 去重地板时序一毫秒不动。
-        confirmHits: 2,
+        confirmHits: 3,
         confirmWindowMs: 3000,
         // 拿到 stream 之后到画面真的出帧的超时,包住 play()(为什么必须包住:见 cameraReady)。
         startTimeoutMs: 8000,
         // 权限弹窗是人在操作,给足 30s;再久就是卡住了,不能永远停在「正在打开相机」。
         grantTimeoutMs: 30000,
-        // 解码器(dist/zxing.js ~340KB)下载超时,跟相机那 8s 分开:泰国移动网络上光下载就好
+        // 解码器(WASM 主路,旧 ZXing JS 兜底)下载超时,跟相机那 8s 分开:泰国移动网络上光下载就好
         // 几秒,合用一把尺子会把「网慢」误判成「相机坏」。
         decoderTimeoutMs: 20000,
     };
@@ -126,14 +119,23 @@
         );
     }
 
+    function wasmDetector() {
+        var wasm = root.PearnlyScanWasm;
+        if (!wasm || typeof wasm.load !== 'function')
+            return Promise.reject(new Error('WASM shim missing'));
+        return wasm.load().then(function (Ctor) {
+            return new Ctor({ formats: RETAIL_FORMATS });
+        });
+    }
+
     // 原生优先(安卓 Chrome 上跑在 native 里,比 ZXing 省一大截电);建不起来时仍回落 ZXing,别卡死。
     function makeDetector() {
         if ('BarcodeDetector' in root) {
             return nativeDetector().catch(function () {
-                return zxingDetector();
+                return wasmDetector().catch(zxingDetector);
             });
         }
-        return zxingDetector();
+        return wasmDetector().catch(zxingDetector);
     }
 
     // GTIN-14 判真:恰 14 位数字且 GS1 mod10 校验位对(从左起奇数位 ×3、偶数位 ×1)。
@@ -342,7 +344,11 @@
 
         function openStream(token) {
             var granted = root.navigator.mediaDevices.getUserMedia({
-                video: { facingMode: cfg.facingMode },
+                video: {
+                    facingMode: { ideal: cfg.facingMode },
+                    width: { ideal: cfg.idealWidth },
+                    height: { ideal: cfg.idealHeight },
+                },
                 audio: false,
             });
             return withTimeout(granted, cfg.grantTimeoutMs, 'timeout').then(
@@ -352,6 +358,22 @@
                         return null;
                     }
                     stream = s;
+                    var tracks = s.getVideoTracks ? s.getVideoTracks() : [];
+                    var cameraTrack = tracks[0];
+                    try {
+                        if (
+                            cameraTrack &&
+                            cameraTrack.getCapabilities &&
+                            cameraTrack.applyConstraints
+                        ) {
+                            var caps = cameraTrack.getCapabilities();
+                            if (caps.focusMode && caps.focusMode.indexOf('continuous') >= 0) {
+                                cameraTrack
+                                    .applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+                                    .catch(function () {});
+                            }
+                        }
+                    } catch {}
                     // 轨道自己死掉不在 start/stop/destroy/onError 这四条路里 —— 没人盯着它,
                     // 相机被收走之后屏上会一直说在扫(见 scan-errors.js 的 watchTracks)。
                     watch = shell.watchTracks(s, function () {
@@ -438,6 +460,9 @@
             retry: start,
             stop: stop,
             destroy: destroy,
+            reject: function (code) {
+                tracker.reject(String(code || '').trim());
+            },
             video: video,
             isRunning: function () {
                 return state === 'scanning';

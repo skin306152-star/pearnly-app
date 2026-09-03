@@ -8,15 +8,20 @@
  */
 // 版本号跟 pos.html 里 dist/pos.js 的 ?v= 保持一致:外壳 bundle 一变(本次并入扫码常驻层)
 // 就换缓存名,否则离线缓存里那份旧 bundle 永远不会被换掉,店里那台机器扫码功能压根不存在。
-const V = '12060014';
+const V = '12060015';
 // 前缀 = 「这一族缓存是我的」的唯一凭据(见 dropStaleCaches)。CACHE 由它拼出来,两处不分家。
 const PREFIX = 'pearnly-pos-v';
 const CACHE = PREFIX + V;
 const SHELL = ['/pos'];
-// 扫码那两个产物不写在 HTML 里,是 scan-loader.js 运行时现拼 URL 拉的(?v 抠自页面上 pos.js
+// 扫码产物不写在 HTML 里,是 scan-loader.js 运行时现拼 URL 拉的(?v 抠自页面上 pos.js
 // 的 ?v,所以这里跟 CACHE 共用同一个 V,漂不开)。不预缓存 = 断网还能卖货却扫不了码,而
 // 离线可用正是这台机器存在的理由。缓存按完整 URL 匹配:少了 ?v 就是另一条记录,等于没缓存。
-const SCAN = ['/static/dist/scan.js?v=' + V, '/static/dist/zxing.js?v=' + V];
+const SCAN = [
+    '/static/dist/scan.js?v=' + V,
+    '/static/dist/barcode-detector.js?v=' + V,
+    '/static/dist/zxing_reader.wasm?v=' + V,
+    '/static/dist/zxing.js?v=' + V,
+];
 
 // 外壳没落地就不许上位:activate 会删掉所有别名缓存,而这一版缓存是空的。部署重启那十几秒
 // nginx 对 /pos 回 502,恰好开着页面的那台机器就会被 catch 里的 skipWaiting 推上位 —— 旧缓存

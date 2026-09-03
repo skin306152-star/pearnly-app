@@ -8,7 +8,7 @@ static/pos/pos-sw.js = 还留在 /pos 的老设备)。真 node 跑 install / act
 它往假 Cache 里放了什么 —— 不是 grep 源码里有没有出现 'scan.js'。
 
 钉死六条:
-  1. 断网还能卖货却扫不了码 = 半个功能。解码器那两个产物(dist/scan.js、dist/zxing.js)
+  1. 断网还能卖货却扫不了码 = 半个功能。扫码引擎与解码器产物
      必须跟外壳一起进预缓存。
   2. cashier-sw 的 fetch 是白名单式的:解码器不在名单里,连联网那次的顺手回填都没有,
      缓存里永远不会有它们。预缓存和白名单少任何一样,离线扫码都是零。
@@ -33,7 +33,12 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 POS_DIR = PROJECT_ROOT / "static" / "pos"
-SCAN_PRODUCTS = ("/static/dist/scan.js", "/static/dist/zxing.js")
+SCAN_PRODUCTS = (
+    "/static/dist/scan.js",
+    "/static/dist/barcode-detector.js",
+    "/static/dist/zxing_reader.wasm",
+    "/static/dist/zxing.js",
+)
 
 # 文件 → (外壳 URL, 缓存名前缀)。/cashier 是收银台现在的家;/pos 留给还没迁的老设备。
 WORKERS = {
@@ -108,7 +113,13 @@ async function run(src, failing, existingKeys) {
     // 「新缓存空着就把旧缓存清光」,不能只靠 install 那一道。
     await fire('activate');
     // fetch 那条路:SW 接管了才有机会 cache-first / 联网回填。没接管 = 这个 URL 永远进不了缓存。
-    for (const path of ['/static/dist/scan.js', '/static/dist/zxing.js', '/api/pos/sales']) {
+    for (const path of [
+        '/static/dist/scan.js',
+        '/static/dist/barcode-detector.js',
+        '/static/dist/zxing_reader.wasm',
+        '/static/dist/zxing.js',
+        '/api/pos/sales',
+    ]) {
         let taken = false;
         for (const fn of listeners.fetch || []) {
             fn({

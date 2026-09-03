@@ -23,7 +23,12 @@
     "test_no_two_entries_watch_the_same_screenshots 硬拦;认不到任何图也照红(通配写偏一个",
     "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
   ],
-  "stale_ack": {},
+  "stale_ack": {
+    "_erp_cowork_split_verify.cjs": {
+      "why": "本批只改 POS 与库存扫码，ERP/Cowork 入口未受影响；当前未启本地 8765 应用",
+      "until": "2026-09-04"
+    }
+  },
   "scripts": {
     "_pos_vat_summary_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_vat_summary",

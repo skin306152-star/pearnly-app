@@ -64,11 +64,7 @@ async def erp_endpoints_list(request: Request, compact: bool = False):
 
 @router.post("/api/erp/endpoints")
 async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
-    """v118.34.13 (Zihao 2026-05-19 拍板) · 加 try/except + 500 现场记录 +
-    mrerp 凭据先 Fernet 加密再存盘。之前 wizard 把 plaintext 塞进
-    username_enc/password_enc 字段名(假签名)· DB 存的是明文 ·
-    回头 test-connection 解密就 InvalidToken。现在路由识别 mrerp ·
-    走 kms_helper.encrypt_str 转 ciphertext 再落地。"""
+    """Create an endpoint after validation, encryption and identity reuse."""
     user = get_current_user_from_request(request)
     require_erp_portal(user, also_allowed=(DMS,))  # DMS 录入工作台连接向导建端点 → 窄 allowlist
     _check_push_access(user)
@@ -76,20 +72,6 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
     p = _plan_permissions(user.get("plan", "free"))
 
     try:
-        # v0.8 · 数量限制
-        ep_limit = p.get("endpoints_limit", 1)
-        if ep_limit != -1:
-            existing = db.list_erp_endpoints(user["id"])
-            if len(existing) >= ep_limit:
-                raise HTTPException(
-                    403,
-                    detail={
-                        "code": "erp.endpoint_limit_reached",
-                        "limit": ep_limit,
-                    },
-                )
-
-        # v0.8 · 自动推送权限
         if req.auto_push and not p.get("can_auto_push_erp"):
             raise HTTPException(403, detail="erp.auto_push_plus_required")
 
@@ -153,6 +135,24 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
                 raise HTTPException(
                     500,
                     detail=f"erp.encrypt_failed: {type(e).__name__}",
+                )
+
+        reusable_id = db.find_reusable_erp_endpoint(user["id"], req.adapter, config)
+        if reusable_id:
+            endpoint = db.get_erp_endpoint(user["id"], reusable_id)
+            target_readiness.clear_probe_cache()
+            return _strip_endpoint_for_response(endpoint) if endpoint else {"id": reusable_id}
+
+        ep_limit = p.get("endpoints_limit", 1)
+        if ep_limit != -1:
+            existing = db.list_erp_endpoints(user["id"])
+            if len(existing) >= ep_limit:
+                raise HTTPException(
+                    403,
+                    detail={
+                        "code": "erp.endpoint_limit_reached",
+                        "limit": ep_limit,
+                    },
                 )
 
         # DMS 防误推铁律(2026-05-31):mrerp_dms endpoint 的 auto_push 必须 false。

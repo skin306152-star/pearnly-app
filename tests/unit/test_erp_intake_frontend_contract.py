@@ -103,6 +103,17 @@ def test_shared_express_card_uses_safe_projection_and_managed_lifecycle():
     assert "operation_id: operationId()" in card
 
 
+def test_erp_cards_do_not_turn_an_unknown_load_state_into_create_mode():
+    card = read("src/home/dms-intake-erp-cards.ts")
+    push = read("src/home/dms-intake-erp-push.ts")
+
+    assert "card.dataset.erpLoaded = 'true'" in card
+    assert "card.dataset.erpLoaded !== 'true'" in card
+    assert "fetchErpEndpoints(false, [], true)" in card
+    assert "if (!r.ok) throw new Error" in push
+    assert "if (failOnError) throw error" in push
+
+
 def test_erp_target_detection_uses_compact_cached_readiness_before_ocr_and_push():
     push = read("src/home/dms-intake-erp-push.ts")
     invoice = read("src/home/dms-intake-invoice.ts")

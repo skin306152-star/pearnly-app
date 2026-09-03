@@ -284,8 +284,14 @@ def owner_endpoint_options(
     with db.get_cursor() as cur:
         cur.execute(
             """
-            SELECT ep.id, ep.name, ep.adapter, ep.enabled, ep.is_default,
+            SELECT ep.id, ep.name, ep.adapter, ep.config, ep.enabled, ep.is_default,
                    ep.binding_generation,
+                   ARRAY(
+                       SELECT wc.id::text FROM workspace_clients wc
+                       WHERE wc.erp_endpoint_id::text = ep.id::text
+                         AND wc.is_active = TRUE
+                       ORDER BY wc.id
+                   ) AS _workspace_binding_ids,
                    CASE WHEN ep.binding_generation > 0 THEN 'workspace' ELSE 'owner' END AS scope
             FROM erp_endpoints ep
             WHERE ep.enabled = TRUE
@@ -301,6 +307,9 @@ def owner_endpoint_options(
             (owner_id, tenant_id, int(workspace_client_id)),
         )
         rows = [dict(row) for row in cur.fetchall()]
+    from services.erp.endpoint_identity import deduplicate_legacy_endpoints
+
+    rows = deduplicate_legacy_endpoints(rows)
     return [
         {
             "id": str(row["id"]),

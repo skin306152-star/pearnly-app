@@ -24,6 +24,12 @@ from services.erp.push_log_queries import (  # noqa: F401,E402
     get_push_stats_today,
 )
 from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
+from services.erp.endpoint_identity import (
+    advisory_lock_key,
+    deduplicate_legacy_endpoints,
+    matching_mrerp_endpoint,
+    mrerp_credential_identity,
+)
 from services.erp.push_dedup_store import has_recent_successful_push  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -37,17 +43,28 @@ def list_erp_endpoints(user_id: str, auto_push_only: bool = False) -> List[Dict[
             #   用本函数 auto_push_only=True 取端点)拿不到 user_id → tenant_id None → mappings 空
             #   → 误报 ERR_NO_CUSTOMER_MAPPING(手动推送走 get_erp_endpoint 含 user_id 故正常)。
             sql = """
-                SELECT id, name, adapter, config, is_default, auto_push, enabled,
-                       last_used_at, last_status, success_count, failure_count,
-                       created_at, updated_at, user_id
-                FROM erp_endpoints
+                SELECT ep.id, ep.name, ep.adapter, ep.config, ep.is_default, ep.auto_push,
+                       ep.enabled, ep.last_used_at, ep.last_status, ep.success_count,
+                       ep.failure_count, ep.created_at, ep.updated_at, ep.user_id,
+                       ARRAY(
+                           SELECT wc.id::text FROM workspace_clients wc
+                           WHERE wc.erp_endpoint_id::text = ep.id::text
+                             AND wc.is_active = TRUE
+                           ORDER BY wc.id
+                       ) AS _workspace_binding_ids
+                FROM erp_endpoints ep
                 WHERE user_id = %s AND binding_generation = 0
             """
-            if auto_push_only:
-                sql += " AND auto_push = TRUE AND enabled = TRUE"
-            sql += " ORDER BY is_default DESC, created_at ASC"
+            sql += " ORDER BY ep.is_default DESC, ep.created_at ASC"
             cur.execute(sql, (user_id,))
-            return [dict(r) for r in cur.fetchall()]
+            endpoints = deduplicate_legacy_endpoints([dict(r) for r in cur.fetchall()])
+            if auto_push_only:
+                endpoints = [
+                    endpoint
+                    for endpoint in endpoints
+                    if endpoint.get("auto_push") is True and endpoint.get("enabled") is True
+                ]
+            return endpoints
     except Exception as e:
         logger.error(f"list_erp_endpoints failed: {e}")
         return []
@@ -76,23 +93,10 @@ def get_erp_endpoint(user_id: str, endpoint_id: str) -> Optional[Dict[str, Any]]
 
 def get_default_erp_endpoint(user_id: str) -> Optional[Dict[str, Any]]:
     """拿用户默认且启用的端点"""
-    try:
-        with db.get_cursor_rls(user_id=user_id) as cur:
-            cur.execute(
-                """
-                SELECT id, name, adapter, config, is_default, auto_push, enabled, user_id
-                FROM erp_endpoints
-                WHERE user_id = %s AND enabled = true AND binding_generation = 0
-                ORDER BY is_default DESC, created_at ASC
-                LIMIT 1
-            """,
-                (user_id,),
-            )
-            row = cur.fetchone()
-            return dict(row) if row else None
-    except Exception as e:
-        logger.error(f"get_default_erp_endpoint failed: {e}")
-        return None
+    endpoints = [
+        endpoint for endpoint in list_erp_endpoints(user_id) if endpoint.get("enabled") is not False
+    ]
+    return endpoints[0] if endpoints else None
 
 
 # v118.34.13 · 暴露 create_erp_endpoint 失败时的具体 DB 错误。
@@ -111,6 +115,43 @@ def _existing_express_id(cur, user_id: str) -> Optional[str]:
     )
     row = cur.fetchone()
     return str(row["id"]) if row else None
+
+
+def _matching_mrerp_id(cur, user_id: str, config: Dict[str, Any]) -> Optional[str]:
+    cur.execute(
+        """
+        SELECT ep.id, ep.adapter, ep.config, ep.is_default, ep.success_count,
+               ep.failure_count, ep.created_at,
+               ARRAY(
+                   SELECT wc.id::text FROM workspace_clients wc
+                   WHERE wc.erp_endpoint_id::text = ep.id::text
+                     AND wc.is_active = TRUE
+                   ORDER BY wc.id
+               ) AS _workspace_binding_ids
+        FROM erp_endpoints ep
+        WHERE ep.user_id = %s AND ep.adapter = 'mrerp'
+          AND ep.binding_generation = 0
+        ORDER BY ep.created_at, ep.id
+        """,
+        (user_id,),
+    )
+    endpoint = matching_mrerp_endpoint([dict(row) for row in cur.fetchall()], config)
+    return str(endpoint["id"]) if endpoint else None
+
+
+def find_reusable_erp_endpoint(user_id: str, adapter: str, config: Dict[str, Any]) -> Optional[str]:
+    """Return an existing singleton/identity-equivalent endpoint, if any."""
+    normalized = (adapter or "").strip().lower()
+    if normalized not in {"express", "mrerp"}:
+        return None
+    try:
+        with db.get_cursor_rls(user_id=user_id) as cur:
+            if normalized == "express":
+                return _existing_express_id(cur, user_id)
+            return _matching_mrerp_id(cur, user_id, config)
+    except Exception:
+        logger.exception("find_reusable_erp_endpoint failed")
+        return None
 
 
 def _disable_other_auto_push(cur, user_id: str, keep_endpoint_id) -> None:
@@ -135,11 +176,19 @@ def create_erp_endpoint_with_cursor(
 ) -> Optional[str]:
     import json as _json
 
-    is_express = (adapter or "").strip().lower() == "express"
+    normalized = (adapter or "").strip().lower()
+    is_express = normalized == "express"
     if is_express:
         existing = _existing_express_id(cur, user_id)
         if existing:
             return existing
+    if normalized == "mrerp":
+        identity = mrerp_credential_identity(config)
+        if identity is not None:
+            cur.execute("SELECT pg_advisory_xact_lock(%s)", (advisory_lock_key(user_id, identity),))
+            existing = _matching_mrerp_id(cur, user_id, config)
+            if existing:
+                return existing
     if is_default:
         cur.execute(
             "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s "
@@ -173,7 +222,8 @@ def create_erp_endpoint(
     import traceback as _tb
 
     global _last_create_endpoint_error
-    is_express = (adapter or "").strip().lower() == "express"
+    normalized = (adapter or "").strip().lower()
+    is_reusable = normalized in {"express", "mrerp"}
     try:
         with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
             endpoint_id = create_erp_endpoint_with_cursor(
@@ -188,11 +238,10 @@ def create_erp_endpoint(
             _last_create_endpoint_error = None
             return endpoint_id
     except Exception as e:
-        # 并发越过上面的查重后撞唯一索引 → 复用已存在的 express,不当失败。
-        if is_express:
+        # A concurrent retry may have committed the same logical connection.
+        if is_reusable:
             try:
-                with db.get_cursor_rls(user_id=user_id) as cur:
-                    existing = _existing_express_id(cur, user_id)
+                existing = find_reusable_erp_endpoint(user_id, normalized, config)
                 if existing:
                     _last_create_endpoint_error = None
                     return existing

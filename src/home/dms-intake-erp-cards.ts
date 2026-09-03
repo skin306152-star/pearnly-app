@@ -91,6 +91,7 @@ function cardHtml(def: ErpCardDef): string {
 // 依端点状态填充单张卡的状态徽章 + 动作按钮。
 function fillCard(card: HTMLElement, ep: EpRec | null): void {
     (card as unknown as { _ep: EpRec | null })._ep = ep;
+    card.dataset.erpLoaded = 'true';
     const st = card.querySelector<HTMLElement>('[data-erp-status]');
     const acts = card.querySelector<HTMLElement>('[data-erp-acts]');
     const enabled = isEnabled(ep);
@@ -181,28 +182,22 @@ function bindClicks(zone: HTMLElement): void {
         }
         if (target.closest('[data-erp-config]')) {
             e.preventDefault();
+            if (card.dataset.erpLoaded !== 'true') return;
             openWizardFor(card.dataset.erp || '', (card as unknown as { _ep?: unknown })._ep);
         }
     });
 }
 
-// keepOnError:轮询拉不到时保持上一次渲染 —— 否则网络抖一下卡片就闪「未连接」。
-// 首次渲染仍按未连接落地,不把「没拉到」装成「检查连接中」永远转下去。
-async function loadStatus(
-    zone: HTMLElement,
-    defs: ErpCardDef[],
-    keepOnError = false
-): Promise<void> {
+// 拉取失败时保留当前状态。首次失败继续显示检查中且不开放配置入口，避免把
+// “连接状态未知”误当成“尚未连接”，从而让用户再建一条同凭据连接。
+async function loadStatus(zone: HTMLElement, defs: ErpCardDef[]): Promise<void> {
     let items: EpRec[] | null = null;
     try {
-        items = (await fetchErpEndpoints()) as EpRec[];
+        items = (await fetchErpEndpoints(false, [], true)) as EpRec[];
     } catch {
-        /* 网络抖动 → 下面按 keepOnError 决定保持还是落未连接 */
+        return;
     }
-    if (!items) {
-        if (keepOnError) return;
-        items = [];
-    }
+    if (!items) return;
     const list = items;
     defs.forEach((def) => {
         const card = zone.querySelector<HTMLElement>(`[data-erp="${def.adapter}"]`);
@@ -251,12 +246,12 @@ export function renderDxErpCards(task: string): void {
         `<div class="dx-erp-row">${defs.map(cardHtml).join('')}</div>`;
     bindClicks(zone);
     void loadStatus(zone, defs);
-    startAgentPolling(zone, () => void loadStatus(zone, defs, true));
+    startAgentPolling(zone, () => void loadStatus(zone, defs));
 }
 
 window.addEventListener('pearnly:erp-endpoints-changed', () => {
     const zone = document.getElementById('dx-erp-cards');
     if (!zone) return;
     const defs = TASK_CARDS[zone.dataset.erpTask || ''] || [];
-    if (defs.length) void loadStatus(zone, defs, true);
+    if (defs.length) void loadStatus(zone, defs);
 });

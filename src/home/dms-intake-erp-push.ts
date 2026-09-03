@@ -93,10 +93,12 @@ async function probeEndpoint(endpoint: ErpEndpoint): Promise<ErpEndpoint> {
 // 拉取并检测全部 ERP 端点。不可用端点保留给界面说明原因，但不能被选择或推送。
 export async function fetchErpEndpoints(
     _refresh = false,
-    previous: ErpEndpoint[] = []
+    previous: ErpEndpoint[] = [],
+    failOnError = false
 ): Promise<ErpEndpoint[]> {
     try {
         const r = await fetch('/api/erp/endpoints?compact=true', { headers: authHeaders() });
+        if (!r.ok) throw new Error(`http_${r.status}`);
         const d = (await r.json().catch(() => ({}))) as { items?: ErpEndpoint[] };
         const endpoints = (d.items || []).filter(
             (e) => (e.adapter || '').toLowerCase() !== 'mrerp_dms'
@@ -105,7 +107,8 @@ export async function fetchErpEndpoints(
         return probed
             .map(seedEndpointAccountChoice)
             .map((endpoint) => preserveAccountSelection(endpoint, previous));
-    } catch {
+    } catch (error) {
+        if (failOnError) throw error;
         return [];
     }
 }

@@ -1123,6 +1123,7 @@ test('ERP step four keeps MR.ERP as one account selector inside the target card'
     const card = page.locator('.dx-erp', {
         has: page.locator('.dx-erp-head[data-iv-erp="mrerp-1"]'),
     });
+    await expect(page.locator('.dx-erp-head[data-iv-erp]')).toHaveCount(1);
     await expect(card.locator('[data-erp-root-select]')).toHaveCount(0);
     await expect(card.locator(':scope > .dx-erp-fields.single')).toHaveCount(1);
     await expect(card.locator('[data-erp-account-select="mrerp-1"]')).toHaveValue('15:2');
@@ -1130,6 +1131,12 @@ test('ERP step four keeps MR.ERP as one account selector inside the target card'
     expect(state.erpProjectionReads).toBe(0);
     expect(state.erpProjectionRefreshes).toBe(0);
     expect(state.erpTestConnectionReads).toBe(0);
+    await revealShell(page);
+    await page.screenshot({
+        path: path.join(OUT, 'mrerp-single-target.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
 });
 
 test('ERP review save failure does not create a formal document', async ({ page }) => {

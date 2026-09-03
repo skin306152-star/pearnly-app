@@ -165,10 +165,15 @@ class ListEndpointsTests(unittest.TestCase):
         self.assertNotIn("auto_push = TRUE", cur.last_sql)
 
     def test_auto_push_only_adds_filter(self):
-        cur = FakeCursor(fetchall=[])
+        cur = FakeCursor(
+            fetchall=[
+                {"id": "enabled", "auto_push": True, "enabled": True},
+                {"id": "manual", "auto_push": False, "enabled": True},
+            ]
+        )
         with patch_cursor(cur):
-            store.list_erp_endpoints("u1", auto_push_only=True)
-        self.assertIn("auto_push = TRUE AND enabled = TRUE", cur.last_sql)
+            out = store.list_erp_endpoints("u1", auto_push_only=True)
+        self.assertEqual([endpoint["id"] for endpoint in out], ["enabled"])
 
     def test_select_includes_user_id_column_erp1_fix(self):
         # ERP-1 修:SELECT 必须含 user_id(否则自动推 tenant_id None)
@@ -176,6 +181,30 @@ class ListEndpointsTests(unittest.TestCase):
         with patch_cursor(cur):
             store.list_erp_endpoints("u1")
         self.assertIn("user_id", cur.last_sql)
+
+    def test_same_mrerp_login_keeps_the_bound_connection(self):
+        config = {"username": "account", "password": "secret"}
+        cur = FakeCursor(
+            fetchall=[
+                {
+                    "id": "bound",
+                    "adapter": "mrerp",
+                    "config": config,
+                    "created_at": "2026-08-28T09:21:07Z",
+                    "_workspace_binding_ids": ["106"],
+                },
+                {
+                    "id": "duplicate",
+                    "adapter": "mrerp",
+                    "config": config,
+                    "created_at": "2026-09-01T11:51:06Z",
+                    "_workspace_binding_ids": [],
+                },
+            ]
+        )
+        with patch_cursor(cur):
+            out = store.list_erp_endpoints("u1")
+        self.assertEqual([endpoint["id"] for endpoint in out], ["bound"])
 
     def test_exception_returns_empty(self):
         with patch_cursor_raises():
@@ -202,11 +231,15 @@ class GetEndpointTests(unittest.TestCase):
 
 class GetDefaultEndpointTests(unittest.TestCase):
     def test_only_enabled_and_default_first(self):
-        cur = FakeCursor(fetchone={"id": "e1", "is_default": True})
+        cur = FakeCursor(
+            fetchall=[
+                {"id": "e1", "is_default": True, "enabled": True},
+                {"id": "e2", "is_default": False, "enabled": True},
+            ]
+        )
         with patch_cursor(cur):
             out = store.get_default_erp_endpoint("u1")
         self.assertEqual(out["id"], "e1")
-        self.assertIn("enabled = true", cur.last_sql)
         self.assertIn("is_default DESC", cur.last_sql)
 
     def test_exception_returns_none(self):

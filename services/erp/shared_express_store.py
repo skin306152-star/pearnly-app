@@ -14,6 +14,7 @@ from fastapi import HTTPException, Request
 from core import db
 from services.authz.resolver import resolve
 from services.erp.express_target_projection import normalize_express_account_key
+from services.erp.endpoint_identity import deduplicate_legacy_endpoints
 from services.erp.shared_express_profile import profile_key
 from services.erp.shared_express_schema import enable_shared_express_select
 
@@ -99,7 +100,13 @@ def fetch_visible_endpoint_rows(
                created_at, updated_at, user_id, tenant_id,
                workspace_client_id, shared_scope, binding_generation,
                bound_account_set, bound_profile_key, live_account_set,
-               live_profile_key, agent_last_seen_at, agent_version, revoked_at
+               live_profile_key, agent_last_seen_at, agent_version, revoked_at,
+               ARRAY(
+                   SELECT wc.id::text FROM workspace_clients wc
+                   WHERE wc.erp_endpoint_id::text = erp_endpoints.id::text
+                     AND wc.is_active = TRUE
+                   ORDER BY wc.id
+               ) AS _workspace_binding_ids
         FROM erp_endpoints
         WHERE ((
             user_id = %s
@@ -120,7 +127,8 @@ def fetch_visible_endpoint_rows(
         """,
         tuple(params),
     )
-    return [dict(row) for row in cur.fetchall()]
+    rows = [dict(row) for row in cur.fetchall()]
+    return rows if endpoint_id else deduplicate_legacy_endpoints(rows)
 
 
 def list_visible_endpoints(

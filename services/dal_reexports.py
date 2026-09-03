@@ -74,6 +74,7 @@ _REEXPORTS = {
         "list_erp_endpoints",
         "get_erp_endpoint",
         "get_default_erp_endpoint",
+        "find_reusable_erp_endpoint",
         "create_erp_endpoint",
         "update_erp_endpoint",
         "delete_erp_endpoint",

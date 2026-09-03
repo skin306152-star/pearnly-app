@@ -23,21 +23,23 @@ class ScanFeedbackTests(unittest.TestCase):
     def test_success_uses_short_beep_and_supported_haptic(self):
         got = _run_node(f"""
             const calls = [];
-            class Param {{
-                setValueAtTime(value) {{ calls.push(['set', value]); }}
-                exponentialRampToValueAtTime(value) {{ calls.push(['ramp', value]); }}
-            }}
+            let samples = null;
             class AudioContext {{
-                constructor() {{ this.state = 'running'; this.currentTime = 1; this.destination = {{}}; }}
-                createOscillator() {{
+                constructor() {{
+                    this.state = 'running'; this.currentTime = 1; this.destination = {{}};
+                    this.sampleRate = 48000;
+                }}
+                createBuffer(channels, length, rate) {{
+                    calls.push(['buffer', channels, length, rate]);
+                    samples = new Float32Array(length);
+                    return {{ duration: length / rate, getChannelData: () => samples }};
+                }}
+                createBufferSource() {{
                     return {{
-                        type: '', frequency: new Param(),
-                        connect: () => calls.push(['osc-connect']),
+                        buffer: null,
+                        connect: () => calls.push(['source-connect']),
                         start: () => calls.push(['start']), stop: () => calls.push(['stop']),
                     }};
-                }}
-                createGain() {{
-                    return {{ gain: new Param(), connect: () => calls.push(['gain-connect']) }};
                 }}
             }}
             global.AudioContext = AudioContext;
@@ -48,13 +50,22 @@ class ScanFeedbackTests(unittest.TestCase):
             const feedback = require({_js_path(FEEDBACK)});
             const armed = feedback.arm();
             Promise.resolve(feedback.success()).then(() => {{
-                process.stdout.write(JSON.stringify({{ armed, calls }}));
+                let crossings = 0;
+                for (let i = 1; i < samples.length; i++) {{
+                    if (samples[i - 1] <= 0 && samples[i] > 0) crossings += 1;
+                }}
+                const active = samples.filter((v) => Math.abs(v) > 0.0001).length;
+                process.stdout.write(JSON.stringify({{ armed, calls, crossings, active }}));
             }});
             """)
         self.assertTrue(got["armed"])
         self.assertIn(["vibrate", 60], got["calls"])
+        self.assertIn(["buffer", 1, 4800, 48000], got["calls"])
         self.assertIn(["start"], got["calls"])
         self.assertIn(["stop"], got["calls"])
+        self.assertGreater(got["active"], 3500)
+        self.assertGreater(got["crossings"], 185)
+        self.assertLess(got["crossings"], 200)
 
     def test_feedback_is_armed_in_all_three_camera_entrypoints(self):
         product = (PROJECT_ROOT / "src/home/sales-products-scan-cam.ts").read_text()

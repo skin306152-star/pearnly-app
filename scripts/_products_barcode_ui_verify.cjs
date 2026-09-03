@@ -88,26 +88,24 @@ async function boot(browser, origin) {
         localStorage.setItem('mrpilot_token', 'tok');
         localStorage.setItem('mrpilot_lang', lang); // 真语言键 · 写别的键 = 语言压根没切
         window.__scanFeedback = { starts: 0, stops: 0, vibrates: [] };
-        class Param {
-            setValueAtTime() {}
-            exponentialRampToValueAtTime() {}
-        }
         class ScanAudioContext {
             constructor() {
                 this.state = 'running';
                 this.currentTime = 1;
                 this.destination = {};
+                this.sampleRate = 48000;
             }
-            createOscillator() {
+            createBuffer(channels, length, rate) {
+                const samples = new Float32Array(length);
+                return { duration: length / rate, getChannelData: () => samples };
+            }
+            createBufferSource() {
                 return {
-                    frequency: new Param(),
+                    buffer: null,
                     connect() {},
                     start: () => (window.__scanFeedback.starts += 1),
                     stop: () => (window.__scanFeedback.stops += 1),
                 };
-            }
-            createGain() {
-                return { gain: new Param(), connect() {} };
             }
         }
         window.AudioContext = ScanAudioContext;

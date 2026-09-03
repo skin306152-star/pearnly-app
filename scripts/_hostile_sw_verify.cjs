@@ -8,6 +8,7 @@
  *                     老缓存原样留着,断网仍能开 /cashier;恢复 200 后再更新才换代
  *   s2 twoScopes      老设备的 /pos 外壳先装好,再开 /cashier(产品里 pos.js 就是这么注册的)
  *                     —— 两个作用域「互不干扰」是不是真的
+ *   s4 freshNavigation 联网重开 /cashier 必须拿到新外壳;断网才回落刚缓存的新外壳
  *
  * 真的东西:static/pos/cashier-sw.js 与 static/pos/pos-sw.js 是本仓真文件,由真
  * navigator.serviceWorker.register 装进真浏览器;缓存与断网都是浏览器自己的。上一版 SW 用
@@ -48,7 +49,13 @@ function swAt(src, version) {
 const SHELL = (marker) => `<!doctype html><meta charset="utf-8"><title>${marker}</title>
 <body><h1 id="m">${marker}</h1></body>`;
 
-const state = { cashierV: OLD_V, posV: NEW_V, shell: 200, posShell: 200 };
+const state = {
+    cashierV: OLD_V,
+    posV: NEW_V,
+    shell: 200,
+    posShell: 200,
+    cashierMarker: 'CASHIER-SHELL',
+};
 
 function serve() {
     const server = http.createServer((req, res) => {
@@ -62,7 +69,7 @@ function serve() {
         if (url === '/pos-sw.js') return send(200, 'text/javascript', swAt(POS_SW, state.posV));
         if (url === '/cashier') {
             if (state.shell !== 200) return send(state.shell, 'text/html', 'deploying');
-            return send(200, 'text/html', SHELL('CASHIER-SHELL'));
+            return send(200, 'text/html', SHELL(state.cashierMarker));
         }
         if (url === '/pos') {
             if (state.posShell !== 200) return send(state.posShell, 'text/html', 'deploying');
@@ -315,10 +322,34 @@ async function posVisitEatsCashier(browser, origin) {
     };
 }
 
+// ── s4 · 联网导航先问服务器,断网才回落缓存 ───────────────────────────────
+async function freshNavigation(browser, origin) {
+    const ctx = await browser.newContext({ baseURL: origin });
+    const page = await ctx.newPage();
+    state.cashierV = NEW_V;
+    state.shell = 200;
+    state.cashierMarker = 'CASHIER-OLD';
+    await gotoText(page, `${origin}/cashier`);
+    await registerSw(page, '/cashier-sw.js', '/cashier');
+    await page.waitForTimeout(1200);
+
+    state.cashierMarker = 'CASHIER-NEW';
+    const online = await gotoText(page, `${origin}/cashier`);
+    await ctx.setOffline(true);
+    const offline = await gotoText(page, `${origin}/cashier`);
+    await shot(page, 's4-current-shell-offline.png');
+    await ctx.setOffline(false);
+    await page.close();
+    await ctx.close();
+    state.cashierMarker = 'CASHIER-SHELL';
+    return { ok: online === 'CASHIER-NEW' && offline === 'CASHIER-NEW', online, offline };
+}
+
 const CASES = [
     ['s1_deployWindow', deployWindow],
     ['s2_twoScopes', twoScopes],
     ['s3_posVisitEatsCashier', posVisitEatsCashier],
+    ['s4_freshNavigation', freshNavigation],
 ];
 
 (async () => {

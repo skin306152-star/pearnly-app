@@ -323,6 +323,11 @@ class SwRegistrationFingerprintTests(unittest.TestCase):
             hits = re.findall(r"\?v=\d[\w.-]*", path.read_text(encoding="utf-8"))
             self.assertEqual(hits, [], f"{path.name} 里写死了资源指纹 {hits}")
 
+    def test_cashier_registration_explicitly_checks_for_updates(self):
+        src = (POS_DIR / "pos.js").read_text(encoding="utf-8")
+        self.assertIn("updateViaCache: 'none'", src)
+        self.assertIn(".then((registration) => registration.update())", src)
+
 
 if __name__ == "__main__":
     unittest.main()

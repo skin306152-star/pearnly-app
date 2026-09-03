@@ -3,21 +3,21 @@
     "ok": true,
     "reg": {
       "ok": true,
-      "scope": "http://127.0.0.1:52549/cashier"
+      "scope": "http://127.0.0.1:62149/cashier"
     },
     "beforeKeys": [
-      "pearnly-cashier-v12060013"
+      "pearnly-cashier-v12060016"
     ],
     "beforeShell": true,
     "offlineBefore": "CASHIER-SHELL",
     "midKeys": [
-      "pearnly-cashier-v12060013",
-      "pearnly-cashier-v12060014"
+      "pearnly-cashier-v12060016",
+      "pearnly-cashier-v12060017"
     ],
     "midShell": true,
     "offlineMid": "CASHIER-SHELL",
     "afterKeys": [
-      "pearnly-cashier-v12060014"
+      "pearnly-cashier-v12060017"
     ],
     "afterShell": true,
     "offlineAfter": "CASHIER-SHELL"
@@ -26,20 +26,20 @@
     "ok": true,
     "posReg": {
       "ok": true,
-      "scope": "http://127.0.0.1:52549/pos"
+      "scope": "http://127.0.0.1:62149/pos"
     },
     "cashReg": {
       "ok": true,
-      "scope": "http://127.0.0.1:52549/cashier"
+      "scope": "http://127.0.0.1:62149/cashier"
     },
     "afterPos": [
-      "pearnly-pos-v12060014"
+      "pearnly-pos-v12060017"
     ],
     "posShellCached": true,
     "posOfflineBefore": "POS-SHELL",
     "afterCash": [
-      "pearnly-pos-v12060014",
-      "pearnly-cashier-v12060014"
+      "pearnly-pos-v12060017",
+      "pearnly-cashier-v12060017"
     ],
     "posStillCached": true,
     "posOfflineAfter": "POS-SHELL"
@@ -47,14 +47,19 @@
   "s3_posVisitEatsCashier": {
     "ok": true,
     "beforeKeys": [
-      "pearnly-cashier-v12060014"
+      "pearnly-cashier-v12060017"
     ],
     "cashOfflineBefore": "CASHIER-SHELL",
     "afterKeys": [
-      "pearnly-cashier-v12060014",
-      "pearnly-pos-v12060014"
+      "pearnly-cashier-v12060017",
+      "pearnly-pos-v12060017"
     ],
     "cashStillCached": true,
     "cashOfflineAfter": "CASHIER-SHELL"
+  },
+  "s4_freshNavigation": {
+    "ok": true,
+    "online": "CASHIER-NEW",
+    "offline": "CASHIER-NEW"
   }
 }

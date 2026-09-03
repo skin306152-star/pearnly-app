@@ -176,6 +176,7 @@
       "covers": [
         "static/pos/pos-scan.js",
         "static/pos/pos-scan-fails.js",
+        "static/scan/scan-feedback.js",
         "static/scan/scan-camera.js",
         "static/scan/scan-track.js",
         "static/pos/pos.html"
@@ -183,6 +184,7 @@
       "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
       "only_e2e": [
         "真 ZXing 从假摄像头画面里解出真 EAN-13 → 真进购物车:桌面 Chromium 没有原生 BarcodeDetector,走的是真解码器",
+        "销售取景框接受商品的同一刻只触发一次 2.45kHz 成功音与一次受支持设备振动:要跨真 POS bundle、扫码引擎与接受回调",
         "#bscan-* 那几个真节点的显隐与文案:单测里这层 DOM 不存在",
         "失败清单画在取景层(z=60)之上、点得到:靠 elementFromPoint 在真排版下问「这一点点到的是谁」"
       ]

@@ -516,7 +516,11 @@
                 .catch(() => {});
             const swV = (window.PearnlyScanCamera && window.PearnlyScanCamera.assetVersion()) || '';
             navigator.serviceWorker
-                .register('/cashier-sw.js' + (swV ? '?v=' + swV : ''), { scope: '/cashier' })
+                .register('/cashier-sw.js' + (swV ? '?v=' + swV : ''), {
+                    scope: '/cashier',
+                    updateViaCache: 'none',
+                })
+                .then((registration) => registration.update())
                 .catch(() => {});
         }
         tick();

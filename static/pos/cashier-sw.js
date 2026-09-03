@@ -3,13 +3,14 @@
  *
  * 与老 pos-sw.js(scope /pos · 老设备用)同款策略,只是作用域/缓存指向 /cashier:
  *  - /api/*  : 不拦,放行让其自然失败 → 前端走 IndexedDB outbox(pos-offline.js)。
- *  - 其余同源 GET(外壳/静态): cache-first + 联网回填;离线导航回落已缓存的 /cashier。
+ *  - /cashier 导航:network-first,离线时回落已缓存外壳,避免联网机器继续跑旧收银台。
+ *  - 其余同源 GET(静态):cache-first + 联网回填。
  * 缓存名带版本号,改外壳 bump 即可让旧缓存失效(对齐 ?v= 缓存破)。
  * 独立于 /pos 旧 SW:老收银设备的 /pos SW 原样不动,两作用域互不干扰。
  */
 // 版本号跟 pos.html 里 dist/pos.js 的 ?v= 保持一致(同 pos-sw.js):/cashier 是收银台现在的家,
-// 外壳 cache-first,不换缓存名就等于在用的机器永远拿旧 pos.html —— 新加的扫码层在店里压根不存在。
-const V = '12060016';
+// 不换缓存名就等于离线时仍回落旧 pos.html —— 新加的扫码层在店里压根不存在。
+const V = '12060017';
 // 前缀 = 「这一族缓存是我的」的唯一凭据(见 dropStaleCaches)。CACHE 由它拼出来,两处不分家。
 const PREFIX = 'pearnly-cashier-v';
 const CACHE = PREFIX + V;
@@ -90,6 +91,24 @@ self.addEventListener('fetch', (e) => {
     const url = new URL(req.url);
     if (url.origin !== self.location.origin) return;
     if (!isCashierAsset(url.pathname)) return;
+    if (url.pathname === '/cashier' || url.pathname.startsWith('/cashier/')) {
+        e.respondWith(
+            fetch(req)
+                .then((res) => {
+                    if (!res || !res.ok) throw new Error('cashier shell unavailable');
+                    const copy = res.clone();
+                    return caches
+                        .open(CACHE)
+                        .then((c) => c.put(req, copy))
+                        .then(
+                            () => res,
+                            () => res
+                        );
+                })
+                .catch(() => caches.match(req).then((cached) => cached || caches.match('/cashier')))
+        );
+        return;
+    }
     e.respondWith(
         caches.match(req).then(
             (cached) =>

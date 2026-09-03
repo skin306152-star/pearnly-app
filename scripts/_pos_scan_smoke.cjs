@@ -33,6 +33,40 @@ function seed() {
     localStorage.setItem('mrpilot_lang', 'th');
 }
 
+function instrumentFeedback() {
+    window.__scanFeedback = { starts: 0, stops: 0, vibrates: [], buffer: null };
+    window.__scanSamples = null;
+    class ScanAudioContext {
+        constructor() {
+            this.state = 'running';
+            this.currentTime = 1;
+            this.destination = {};
+            this.sampleRate = 48000;
+        }
+        createBuffer(channels, length, rate) {
+            window.__scanSamples = new Float32Array(length);
+            window.__scanFeedback.buffer = { channels, length, rate };
+            return {
+                duration: length / rate,
+                getChannelData: () => window.__scanSamples,
+            };
+        }
+        createBufferSource() {
+            return {
+                buffer: null,
+                connect() {},
+                start: () => (window.__scanFeedback.starts += 1),
+                stop: () => (window.__scanFeedback.stops += 1),
+            };
+        }
+    }
+    window.AudioContext = ScanAudioContext;
+    Object.defineProperty(navigator, 'vibrate', {
+        configurable: true,
+        value: (duration) => window.__scanFeedback.vibrates.push(duration),
+    });
+}
+
 // 期望文案现场从页面里的真 window.POS_I18N 取。脚本自带一份副本再注进去 = 拿自己比自己,
 // 漏译永远照不出来;顺带把「语言到底切没切」一起验了(切没切成,下面所有文案断言都无意义)。
 async function dict(page) {
@@ -107,6 +141,7 @@ const text = (page, sel) => page.textContent(sel);
 async function liveHit(browser, origin, viewport, tag) {
     const page = await browser.newPage({ viewport });
     await page.addInitScript(seed);
+    await page.addInitScript(instrumentFeedback);
     await routeBarcode(page, 'hit');
     await login(page, origin);
     const th = await dict(page);
@@ -156,6 +191,11 @@ async function liveHit(browser, origin, viewport, tag) {
         };
         const cs = getComputedStyle(f);
         const done = document.getElementById('bscan-done');
+        let crossings = 0;
+        const samples = window.__scanSamples || [];
+        for (let i = 1; i < samples.length; i++) {
+            if (samples[i - 1] <= 0 && samples[i] > 0) crossings += 1;
+        }
         return {
             videoW: v.videoWidth,
             playing: v.readyState >= 2,
@@ -186,6 +226,11 @@ async function liveHit(browser, origin, viewport, tag) {
 
             count: document.getElementById('bscan-count').textContent,
             last: document.getElementById('bscan-last').textContent,
+            feedback: {
+                ...window.__scanFeedback,
+                crossings,
+                active: [...samples].filter((v) => Math.abs(v) > 0.0001).length,
+            },
         };
     });
 
@@ -218,6 +263,14 @@ async function liveHit(browser, origin, viewport, tag) {
         live.doneLabel === th.copy['posui.bscan.done'] &&
         live.count === th.copy['posui.bscan.count'].replace('{n}', '1') &&
         live.last === th.copy['posui.bscan.added'].replace('{name}', 'โค้ก 325ml') &&
+        live.feedback.starts === 1 &&
+        live.feedback.stops === 1 &&
+        live.feedback.vibrates.join(',') === '60' &&
+        live.feedback.buffer.channels === 1 &&
+        live.feedback.buffer.length === 4800 &&
+        live.feedback.crossings > 185 &&
+        live.feedback.crossings < 200 &&
+        live.feedback.active > 3500 &&
         closed.hidden &&
         closed.tracks === 0 && // destroy() 把自建的 video 摘掉了
         closed.grand === '350.00'; // 扫箱码 = 箱价,不是默认瓶价 15

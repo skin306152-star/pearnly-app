@@ -3,9 +3,34 @@
     'use strict';
 
     var context = null;
+    var successBuffer = null;
+    var BEEP_LEAD_IN = 0.008;
+    var BEEP_DURATION = 0.078;
+    var BEEP_TOTAL = 0.1;
+    var BEEP_FREQUENCY = 2450;
 
     function audioCtor() {
         return root && (root.AudioContext || root.webkitAudioContext);
+    }
+
+    function buildSuccessBuffer() {
+        if (!context || typeof context.createBuffer !== 'function') return null;
+        var rate = context.sampleRate || 48000;
+        var buffer = context.createBuffer(1, Math.round(rate * BEEP_TOTAL), rate);
+        var samples = buffer.getChannelData(0);
+        var attack = 0.0015;
+        var release = Math.min(0.022, BEEP_DURATION * 0.4);
+        for (var i = 0; i < samples.length; i++) {
+            var t = i / rate - BEEP_LEAD_IN;
+            if (t < 0 || t > BEEP_DURATION) continue;
+            var envelope;
+            if (t < attack) envelope = t / attack;
+            else if (t > BEEP_DURATION - release) envelope = (BEEP_DURATION - t) / release;
+            else envelope = Math.exp((-2.4 * (t - attack)) / BEEP_DURATION);
+            var phase = 2 * Math.PI * BEEP_FREQUENCY * t;
+            samples[i] = (Math.sin(phase) + Math.sin(phase * 2) * 0.32) * envelope * 0.5;
+        }
+        return buffer;
     }
 
     function arm() {
@@ -13,6 +38,7 @@
         if (!Ctor) return false;
         try {
             if (!context || context.state === 'closed') context = new Ctor();
+            if (!successBuffer) successBuffer = buildSuccessBuffer();
             if (context.state === 'suspended' && context.resume) {
                 var resumed = context.resume();
                 if (resumed && resumed.catch) resumed.catch(function () {});
@@ -27,18 +53,13 @@
         if (!context || context.state === 'closed') return false;
         function play() {
             try {
-                var start = context.currentTime;
-                var oscillator = context.createOscillator();
-                var gain = context.createGain();
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(960, start);
-                gain.gain.setValueAtTime(0.0001, start);
-                gain.gain.exponentialRampToValueAtTime(0.1, start + 0.004);
-                gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.075);
-                oscillator.connect(gain);
-                gain.connect(context.destination);
-                oscillator.start(start);
-                oscillator.stop(start + 0.08);
+                if (!successBuffer) successBuffer = buildSuccessBuffer();
+                if (!successBuffer) return false;
+                var source = context.createBufferSource();
+                source.buffer = successBuffer;
+                source.connect(context.destination);
+                source.start(context.currentTime);
+                source.stop(context.currentTime + successBuffer.duration);
                 return true;
             } catch {
                 return false;

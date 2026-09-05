@@ -12,7 +12,7 @@ description: 部署前读 Cloud Run 部署正本和迁移状态；本地风险�
 - Pearnly 应用迁往 GCP `pearnly` / `asia-southeast1`；ERPNext 在独立仓库/项目，不随此发布修改。
 - 在本任务隔离 worktree 验证、提交精确候选 SHA；不要自动切走任务分支。
 - 前端改动仍需 dist 同提交与缓存版本更新；本地风险分层检查和 pre-push 闸保留。
-- 使用账本登记的当前 Cloud Run workflow，经 GitHub WIF 构建/推送 Artifact Registry 镜像，发布精确镜像 digest。不要 dispatch 旧 `manual-deploy.yml` 或调用旧 `/internal/deploy/manual` 来发布 Cloud Run。
+- 当前 `.github/workflows/manual-deploy.yml` 已改为 Cloud Run 发布：经 GitHub WIF 构建/推送 Artifact Registry 镜像，发布精确镜像 digest。同名文件的历史 VM 版本已退役，不得恢复该历史版本或调用旧 `/internal/deploy/manual` 来发布 Cloud Run。
 
 ## 2. 验证实际生效
 

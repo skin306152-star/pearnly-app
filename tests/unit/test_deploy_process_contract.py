@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """部署流程文档契约(2026-08-27 · 防换窗口回退旧部署流程)。
 
-锁住 6 份活跃执行文档的部署口径,防止新窗口无意中恢复已废弃的流程:
+锁住当前 Cloud Run 部署入口与保留的历史操作文档口径,防止新窗口无意中恢复已废弃的流程:
   · 禁止旧东京 IP 45.76.53.194 作为可执行 SSH 目标(历史警告语境放行)
   · 禁止可复制的 webhook active=true 复启命令(历史说明放行)
   · 禁止不带参数的 git-deploy.sh 调用(必须带 SHA)
-  · 要求 canonical 流程关键字存在(pearnly-prod / rev-parse HEAD / github.sha)
+  · 当前入口必须指向迁移状态与 Cloud Run 正本，保留候选镜像、readiness、流量回读门槛
+  · 历史 VM 手册仍保留精确 SHA 与旧主机诊断约束，不反向要求新发布使用 SSH
 
 扫描范围仅限活跃文档;archive/history/legacy 路径自动跳过。
 """
@@ -19,6 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_DOCS = {
     "SKILL.md": REPO_ROOT / ".claude" / "skills" / "deploy-release" / "SKILL.md",
     "RUNBOOK.md": REPO_ROOT / "docs" / "RUNBOOK.md",
+    "CLOUD_RUN.md": REPO_ROOT / "docs" / "deployment" / "CLOUD_RUN.md",
     "TASK_MODES.md": REPO_ROOT / "docs" / "agent" / "TASK_MODES.md",
     "ACCEPTANCE_PLAYBOOKS.md": REPO_ROOT / "docs" / "agent" / "ACCEPTANCE_PLAYBOOKS.md",
     "AGENTS.md": REPO_ROOT / "AGENTS.md",
@@ -114,9 +116,22 @@ class DeployProcessContractTests(unittest.TestCase):
 
     # ── 4. canonical 流程关键字必须存在 ───────────────────────────
 
-    def test_skill_md_has_pearnly_prod_alias(self):
+    def test_skill_uses_current_cloud_run_workflow_and_retains_release_gates(self):
         text = self.docs["SKILL.md"]
-        self.assertIn("pearnly-prod", text)
+        for required in (
+            "docs/deployment/MIGRATION_STATUS.md",
+            "docs/deployment/CLOUD_RUN.md",
+            ".github/workflows/manual-deploy.yml",
+            "GitHub WIF",
+            "Artifact Registry",
+            "镜像 digest",
+            "readiness",
+            "流量",
+            "真机",
+        ):
+            self.assertIn(required, text)
+        self.assertIn("同名文件的历史 VM 版本已退役", text)
+        self.assertNotRegex(text, r"gh\s+api[^\n]*/internal/deploy/manual")
 
     def test_runbook_has_sha_verification(self):
         text = self.docs["RUNBOOK.md"]
@@ -134,9 +149,28 @@ class DeployProcessContractTests(unittest.TestCase):
 
     def test_agents_md_has_canonical_deploy_chain(self):
         text = self.docs["AGENTS.md"]
-        self.assertIn("git push origin master", text)
-        self.assertIn("deploy job", text)
-        self.assertIn("TARGET_SHA", text)
+        for required in (
+            "docs/deployment/MIGRATION_STATUS.md",
+            "docs/deployment/CLOUD_RUN.md",
+            "Cloud Run",
+            "Supabase",
+            "ERPNext",
+            "revision/digest/流量回读",
+        ):
+            self.assertIn(required, text)
+        canonical = self.docs["CLOUD_RUN.md"]
+        for required in (
+            "GitHub",
+            "Workload Identity Federation",
+            "完整 commit SHA",
+            "镜像 digest",
+            "readiness",
+            "再切换流量",
+            "Worker",
+            "Web",
+        ):
+            self.assertIn(required, canonical)
+        self.assertIn("历史 Vultr 单机运维手册", self.docs["RUNBOOK.md"])
 
     def test_claude_md_references_deploy_skill(self):
         text = self.docs["CLAUDE.md"]

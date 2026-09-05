@@ -90,7 +90,14 @@ class ReleaseGateTests(unittest.TestCase):
                 }
             }
         }
-        job = module.render_job(service)["spec"]["template"]["spec"]
+        rendered = module.render_job(service)
+        execution = rendered["spec"]["template"]
+        self.assertEqual(
+            execution["metadata"]["annotations"]["run.googleapis.com/execution-environment"],
+            "gen2",
+        )
+        job = execution["spec"]
+        self.assertNotIn("metadata", job["template"])
         self.assertEqual((job["taskCount"], job["parallelism"]), (1, 1))
         task = job["template"]["spec"]
         self.assertEqual(task["maxRetries"], 0)

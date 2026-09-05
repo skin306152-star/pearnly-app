@@ -67,13 +67,13 @@ def spawn(handler: str, function, *args, _legacy_spawn=None, **kwargs):
         return enqueue(handler, *args, **kwargs)
     if _legacy_spawn is not None:
         return _legacy_spawn(function(*args, **kwargs))
-    return asyncio.get_running_loop().create_task(function(*args, **kwargs))
+    return asyncio.create_task(function(*args, **kwargs))
 
 
 def spawn_sync(handler: str, function, *args, **kwargs):
     if enabled():
         return enqueue(handler, *args, **kwargs)
-    return asyncio.get_running_loop().create_task(asyncio.to_thread(function, *args, **kwargs))
+    return asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
 
 
 def wake_queue(name: str) -> None:

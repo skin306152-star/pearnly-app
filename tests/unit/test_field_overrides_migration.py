@@ -36,7 +36,7 @@ class FieldOverridesMigrationContractTests(unittest.TestCase):
         with open(os.path.join(ROOT, "services", "startup.py"), "r", encoding="utf-8") as f:
             cls.startup_src = f.read()
 
-    # 4 模块表 · 必须全覆盖
+    # Archived migration002 retains its historical spelling. Runtime schema uses the real tables.
     EXPECTED_TABLES = ("ocr_history", "reconciliation_row", "gl_vat_tasks", "bank_recon_v2_tasks")
 
     def test_alembic_002_file_present_and_revision_chain_correct(self):
@@ -107,8 +107,19 @@ class FieldOverridesMigrationContractTests(unittest.TestCase):
             "ensure_field_overrides_columns function missing in services/db_migrations/field_overrides.py",
         )
         # TARGET_TABLES 必须含 4 个
-        for table in self.EXPECTED_TABLES:
+        current_tables = ("ocr_history", "reconciliation_row", "gl_vat_task", "bank_recon_v2_task")
+        for table in current_tables:
             self.assertIn(f'"{table}"', self.service_src, f"TARGET_TABLES must include {table}")
+        for obsolete in ("gl_vat_tasks", "bank_recon_v2_tasks"):
+            self.assertNotIn(f'"{obsolete}"', self.service_src)
+        for filename, table in (
+            ("gl_vat_store.py", "gl_vat_task"),
+            ("bank_recon_v2_store.py", "bank_recon_v2_task"),
+        ):
+            with open(
+                os.path.join(ROOT, "services", "recon", filename), encoding="utf-8"
+            ) as source:
+                self.assertIn(f"CREATE TABLE IF NOT EXISTS {table} (", source.read())
         # ALTER TABLE + ADD COLUMN IF NOT EXISTS field_overrides JSONB
         self.assertIn(
             "ADD COLUMN IF NOT EXISTS field_overrides JSONB",

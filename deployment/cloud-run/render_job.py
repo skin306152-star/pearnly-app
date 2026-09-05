@@ -22,16 +22,14 @@ def render_job(service):
         "metadata": {"name": "pearnly-schema"},
         "spec": {
             "template": {
+                "metadata": {"annotations": {"run.googleapis.com/execution-environment": "gen2"}},
                 "spec": {
                     "taskCount": 1,
                     "parallelism": 1,
                     "template": {
-                        "metadata": {
-                            "annotations": {"run.googleapis.com/execution-environment": "gen2"}
-                        },
                         "spec": spec,
                     },
-                }
+                },
             }
         },
     }

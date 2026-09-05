@@ -74,6 +74,11 @@ class OcrDocumentWorkspacePersistTests(unittest.TestCase):
                 persist._workspace, "resolve_batch", return_value=[decision]
             ) as resolve,
             mock.patch("asyncio.create_task", side_effect=close_task),
+            mock.patch.object(
+                persist.history_postprocess.cloud_dispatch,
+                "spawn",
+                wraps=persist.history_postprocess.cloud_dispatch.spawn,
+            ) as dispatch,
         ):
             result = persist.persist_invoices(
                 result={"pages": [{"fields": fields}], "page_count": 1, "elapsed_ms": 15},
@@ -115,6 +120,12 @@ class OcrDocumentWorkspacePersistTests(unittest.TestCase):
             ],
         )
         self.assertEqual(len(created_tasks), 1)
+        dispatch.assert_called_once()
+        self.assertEqual(dispatch.call_args.args[0], "ocr.exception_checks")
+        self.assertEqual(dispatch.call_args.kwargs["history_id"], "history-b")
+        self.assertEqual(dispatch.call_args.kwargs["user_id"], "user-1")
+        self.assertEqual(dispatch.call_args.kwargs["tenant_id"], "tenant-1")
+        self.assertEqual(dispatch.call_args.kwargs["fields"], fields)
 
     def test_no_direction_existing_match_is_written_directly_to_workspace(self):
         fields = {"seller_name": "Known Company", "invoice_number": "INV-1"}

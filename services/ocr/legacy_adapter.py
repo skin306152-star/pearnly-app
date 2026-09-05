@@ -103,6 +103,7 @@ def _page_to_legacy(
         "_confidence_band": str(p.confidence_band),
         "_final_confidence": float(p.final_confidence),
         "_validation_warnings": list(p.validation_warnings),
+        "_extraction_audit": p.extraction_audit,
     }
     # 溯源随 fields 走(回导专有)· 不加 _ 前缀:HTTP 出口净化会剥 _ 键,而前端复核屏
     # 要按方向决定「名称/税号」取买方还是卖方。普通扫描件两者皆空 → 不写这两个键,

@@ -83,10 +83,14 @@ EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     "ocr.direct35.flash_lite": Route("gemini-3.5-flash", "asia-southeast1"),
     "ocr.direct35.fallback": Route("gemini-3.5-flash", "asia-southeast1"),
     "ocr.direct35.escalate": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.economy.flash": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.economy.flash": Route("gemini-3.8-flash", "global"),
     "ocr.economy.flash_lite": Route("gemini-3.1-flash-lite", "global"),
-    "ocr.economy.fallback": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.economy.escalate": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.economy.fallback": Route("gemini-3.8-flash", "global"),
+    "ocr.economy.escalate": Route("gemini-3.8-flash", "global"),
+    "ocr.enterprise.flash": Route("gemini-3.8-flash", "global", "vertex"),
+    "ocr.enterprise.flash_lite": Route("gemini-3.8-flash", "global", "vertex"),
+    "ocr.enterprise.fallback": Route("gemini-3.8-flash", "global", "vertex"),
+    "ocr.enterprise.escalate": Route("gemini-3.8-flash", "global", "vertex"),
     # 自部署档:后端整体切 selfhost,四档统一映射到同一 VLM(SELFHOST_OCR_MODEL),无 Vertex 区域。
     "ocr.selfhost.flash": Route(_SELFHOST_UNSET, "", "selfhost"),
     "ocr.selfhost.flash_lite": Route(_SELFHOST_UNSET, "", "selfhost"),
@@ -117,7 +121,7 @@ def resolve_routes() -> "OrderedDict[str, Route]":
     routes["taxops.intent"] = Route(taxops_intent_model(), "", "openai")
     for mode in engine_policy.CONCRETE_MODES:
         backend = engine_policy.MODE_BACKENDS.get(mode)
-        if backend:
+        if backend and backend != "vertex":
             # 后端覆盖档(selfhost/qwen):不走 Gemini 档位解析,档位→模型由该 provider 的
             # model_for_tier 公约解析,无 Vertex 区域。selfhost 四档同映射到同一个 VLM
             # (运维 env 定);qwen 读取臂(flash/flash_lite)与升级臂(fallback/escalate)分模型。
@@ -131,7 +135,12 @@ def resolve_routes() -> "OrderedDict[str, Route]":
         token = gemini_models.set_model_override(engine_policy.MODE_MODEL_MAPS[mode])
         try:
             for tier in _OCR_TIERS:
-                routes[f"ocr.{mode}.{tier}"] = _route(getattr(gemini_models, tier)())
+                model = getattr(gemini_models, tier)()
+                routes[f"ocr.{mode}.{tier}"] = (
+                    Route(model, _location_for_model(model), "vertex")
+                    if backend == "vertex"
+                    else _route(model)
+                )
         finally:
             gemini_models.reset_model_override(token)
     return routes

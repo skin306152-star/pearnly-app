@@ -163,6 +163,14 @@ def _parse_bank_statement_impl(
     # interbank-transfer counterparty names); it overrides detected codes below.
     fn_bank = _bank_from_filename(filename)
 
+    from services.recon.enterprise_adapter import try_parse as enterprise_parse
+
+    enterprise_result = enterprise_parse(file_bytes, filename, "bank")
+    if enterprise_result is not None:
+        if fn_bank and enterprise_result.get("ok"):
+            enterprise_result["bank_code"] = fn_bank
+        return enterprise_result  # including failure: never silently enter the old prompt path
+
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     if ext != "pdf":
         result = _parse_bank_stmt_via_pipeline(file_bytes, filename, tenant_id=tenant_id)
@@ -432,6 +440,11 @@ def _parse_gl_impl(
     import os as _os
 
     ext = (filename or "").lower().rsplit(".", 1)[-1]
+    from services.recon.enterprise_adapter import try_parse as enterprise_parse
+
+    enterprise_result = enterprise_parse(file_bytes, filename, "gl", account_code=account_code)
+    if enterprise_result is not None:
+        return enterprise_result
     if ext in ("xlsx", "xls", "xlsm"):
         result = parse_gl_excel(file_bytes, filename, account_code, tenant_id=tenant_id)
     elif ext in ("csv", "tsv"):

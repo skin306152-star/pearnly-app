@@ -9,7 +9,7 @@ they emit. Extracted verbatim from bank_recon_v2.py.
 
 import re
 from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 from services.recon.bank_stmt_legacy_fields import (
     _looks_like_outflow,
@@ -63,6 +63,8 @@ class ParsedStatement:
     transactions: List[BankTransaction]
     pages: int
     parse_method: str  # "text_layer" / "gemini_vision"
+    needs_review: bool = False
+    extraction_audit: List[Dict[str, Any]] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, Any]:
         d = asdict(self)

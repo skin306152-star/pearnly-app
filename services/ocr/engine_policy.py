@@ -53,10 +53,17 @@ _retired_warned = False
 # 唯一收益是输出降价约 ฿15/月,却在银行长表上把断点从 2 抬到 7——不值,故留在 3.5。
 MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
     "direct35": {},
+    "enterprise": {
+        "flash": "gemini-3.8-flash",
+        "flash_lite": "gemini-3.8-flash",
+        "fallback": "gemini-3.8-flash",
+        "escalate": "gemini-3.8-flash",
+    },
     "economy": {
+        "flash": "gemini-3.8-flash",
         "flash_lite": "gemini-3.1-flash-lite",
-        "fallback": "gemini-3.5-flash",
-        "escalate": "gemini-3.5-flash",
+        "fallback": "gemini-3.8-flash",
+        "escalate": "gemini-3.8-flash",
     },
     # 自部署档:不动 Gemini 档位(空覆写),改把整条 LLM 后端切到 selfhost provider
     # (OpenAI 兼容端点·env SELFHOST_OCR_*)。选中即全管线(直读/Vision 回落)打自托管机。
@@ -106,7 +113,7 @@ PARTIAL_MODES: frozenset = frozenset()
 
 # mode → LLM 后端覆盖(未列 = 跟全局 OCR_LLM_BACKEND)。engine_context 进入时按档钉后端,
 # 经 backends.override_backend 下发,get_provider/transport 消费——档位与后端单点同源。
-MODE_BACKENDS: Dict[str, str] = {"selfhost": "selfhost", "qwen": "qwen"}
+MODE_BACKENDS: Dict[str, str] = {"selfhost": "selfhost", "qwen": "qwen", "enterprise": "vertex"}
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "mode": "economy",
@@ -119,13 +126,22 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "exempt": "economy",
     },
     # task → mode 覆写(空 = 跟全局)。task 名与 services/ocr/contracts.OCR_TASKS 一致。
-    # 银行对账单钉 direct35(直通档=吃 env 默认):不跟全局走,全局切 economy 也不影响
-    # 银行逐行读取(轻量档读长表整页读崩,见 MODE_MODEL_MAPS 上方实测数)。
-    "overrides_by_task": {"bank_statement": "direct35"},
+    # Financial tasks use the frozen Enterprise adapter; specialty tasks use 3.8 LOW.
+    # Invoices retain the economy first-read and hard-gate upgrade path.
+    "overrides_by_task": {
+        "bank_statement": "enterprise",
+        "gl_ledger": "enterprise",
+        "vat_report": "enterprise",
+        "vat_report_csv": "enterprise",
+        "salesvat": "enterprise",
+        "fileconv_ocr": "enterprise",
+        "id_card": "enterprise",
+    },
 }
 
 # 当前请求生效的 mode(成本台账/日志读它;不在 engine_context 内 = 空串)
 _ACTIVE_MODE: ContextVar[str] = ContextVar("ocr_engine_mode", default="")
+_ACTIVE_SELECTION: ContextVar[Optional[tuple]] = ContextVar("ocr_engine_selection", default=None)
 
 
 def _warn_retired_keys(value: Dict[str, Any]) -> None:
@@ -205,17 +221,23 @@ def engine_context(
     已在生效域内(如 recognize/core 带套餐包过、日后又迁进 controller)则原样透传,
     不许内层无套餐的 resolve 覆盖外层带套餐的结果。"""
     active = _ACTIVE_MODE.get()
-    if active:
+    selection = _ACTIVE_SELECTION.get()
+    if active and selection and selection[0] == task:
         yield active
         return
+    if selection:
+        plan_code = plan_code if plan_code is not None else selection[1]
+        is_exempt = is_exempt or selection[2]
     mode = resolve_mode(task, plan_code=plan_code, is_exempt=is_exempt)
     token = gemini_models.set_model_override(MODE_MODEL_MAPS.get(mode))
     backend = MODE_BACKENDS.get(mode)
     backend_token = backends.set_backend_override(backend) if backend else None
     mode_token = _ACTIVE_MODE.set(mode)
+    selection_token = _ACTIVE_SELECTION.set((task, plan_code, is_exempt))
     try:
         yield mode
     finally:
+        _ACTIVE_SELECTION.reset(selection_token)
         _ACTIVE_MODE.reset(mode_token)
         if backend_token is not None:
             backends.reset_backend_override(backend_token)

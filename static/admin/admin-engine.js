@@ -11,7 +11,7 @@
     'use strict';
 
     const TIERS = [
-        { mode: 'direct35', code: 'A' },
+        { mode: 'enterprise', code: 'A' },
         { mode: 'economy', code: 'B' },
         { mode: 'qwen', code: 'C' },
         { mode: 'selfhost', code: 'D' },
@@ -37,6 +37,7 @@
     let D = null; // {fetch, t, esc, fmt, toast}
     let policy = null;
     let options = null;
+    let runtime = null;
     let bound = false;
 
     function _t(k) {
@@ -94,6 +95,7 @@
                 D.esc(m) +
                 '"' +
                 (m === current ? ' selected' : '') +
+                (_isPartial(m) ? ' disabled' : '') +
                 '>' +
                 D.esc(_label('adm-eng-opt-', m)) +
                 '</option>';
@@ -108,12 +110,26 @@
 
     function _tierCard(tier) {
         const on = policy.mode === tier.mode;
+        const facts = (runtime && runtime.tiers && runtime.tiers[tier.mode]) || {};
+        const models = Object.entries(facts.models || {}).map(function (entry) {
+            const m = entry[1];
+            return (
+                entry[0] +
+                ': ' +
+                m.model +
+                ' / ' +
+                m.backend +
+                (m.location ? ' @' + m.location : '') +
+                (m.thinking ? ' ' + m.thinking : '')
+            );
+        });
+        if (facts.document_ocr) models.unshift('Document AI: ' + facts.document_ocr.version);
         const metrics = METRIC_KEYS.map(function (k) {
             return (
                 '<span class="eng-tier-metric"><span class="eng-tier-metric-k">' +
                 D.esc(_t('adm-eng-tier-lab-' + k)) +
                 '</span><span class="eng-tier-metric-v">' +
-                D.esc(_t('adm-eng-tier-' + tier.mode + '-' + k)) +
+                D.esc((facts.metrics && facts.metrics[k]) || '—') +
                 '</span></span>'
             );
         }).join('');
@@ -126,6 +142,7 @@
             tier.mode +
             '"' +
             (on ? ' checked' : '') +
+            (_isPartial(tier.mode) ? ' disabled' : '') +
             ' /><span class="eng-tier-head"><span class="eng-tier-code">' +
             tier.code +
             '</span><span class="eng-tier-name">' +
@@ -135,11 +152,11 @@
                 ? '<span class="eng-tier-live">' + D.esc(_t('adm-eng-tier-live')) + '</span>'
                 : '') +
             '</span><code class="eng-tier-models">' +
-            D.esc(_t('adm-eng-tier-' + tier.mode + '-models')) +
+            D.esc(models.join(' · ') || '—') +
             '</code><span class="eng-tier-metrics">' +
             metrics +
             '</span><span class="eng-tier-note">' +
-            D.esc(_t('adm-eng-tier-' + tier.mode + '-note')) +
+            D.esc(_t('adm-eng-runtime-note')) +
             '</span>' +
             (_isPartial(tier.mode)
                 ? '<span class="eng-tier-partial" data-eng-partial="' +
@@ -175,6 +192,15 @@
                     D.esc(_t(labelPrefix + k)) +
                     '</span>' +
                     _modeSelect(cls, modes, withEmpty, current(k)) +
+                    (cls === 'eng-task-sel' && runtime && runtime.task_modes
+                        ? '<small>' +
+                          D.esc(
+                              _t('adm-eng-effective') +
+                                  ' ' +
+                                  _label('adm-eng-opt-', runtime.task_modes[k])
+                          ) +
+                          '</small>'
+                        : '') +
                     '</label>'
                 );
             })
@@ -259,7 +285,7 @@
         try {
             const r = await D.fetch('/api/admin/ocr-engine', { method: 'POST', body: body });
             policy = r.policy || body;
-            _renderPolicy();
+            await _loadPolicy();
             D.toast(_t('adm-eng-saved-toast'), 'success');
         } catch (e) {
             D.toast(_saveErrorText(e), 'error');
@@ -286,6 +312,7 @@
             const d = await D.fetch('/api/admin/ocr-engine');
             policy = d.policy || {};
             options = d.options || {};
+            runtime = d.runtime || null;
             _renderPolicy();
             const saved = document.getElementById('adm-eng-saved');
             if (saved)

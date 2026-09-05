@@ -1,17 +1,8 @@
 # -*- coding: utf-8 -*-
-"""扫描件/图片 → ConvertResult 的 OCR 桥(K1c)。
+"""Image/PDF OCR bridge preserving ledger validation and ConvertResult contracts.
 
-缝点唯一:convert.py 的 no_text_layer 分支与图片入口把件交到这里,走 multimodal 直吐
-结构化行(bank_statement 图片已在生产走通此范式),再复用 K1a 的守恒校验(validate_ledger)
-出同一份 ConvertResult 契约。convert_pages 纯函数核心与既有 status 语义不动。
-
-命门 —— 截断硬闸:模型输出被 max_output_tokens 截断时,JSON 在网关侧解析失败收敛为
-outcome.ok=False / error_kind='parse'(见 providers/*._gen_json)。本桥据此结构化拒绝
-(STATUS_OCR_INCOMPLETE),绝不把半截行集当成功出件 —— 截断尾行会让余额链假自洽,比诚实
-拒绝更危险。第二道网:文档印刷期末余额/页脚合计与解析结果对照,不一致进 issues。
-
-契约禁区:OCR 管线本体(pipeline/controller/direct_read)一行不改,只消费网关(transport
-.multimodal_to_json)与 schema(layer2_structure 的 _DOC_PROMPTS/_DOC_SCHEMAS)。
+Enterprise bank/GL uses the frozen financial pipeline. Other grids keep their
+specialized schema. Truncated or unavailable OCR never returns a partial success.
 """
 
 from __future__ import annotations
@@ -136,27 +127,7 @@ def _default_provider_call(
         attribution.reset_attribution(token)
 
 
-def _rasterize_pdf(pdf_bytes: bytes) -> Optional[List[bytes]]:
-    """扫描件 PDF 逐页栅格化为 PNG(消费 PyMuPDF,不碰 OCR 管线)。失败返回 None。"""
-    try:
-        import fitz  # PyMuPDF
-    except ImportError:  # pragma: no cover
-        logger.error("ocr_bridge: PyMuPDF (fitz) 未安装 · 无法栅格化扫描件")
-        return None
-    doc = None
-    try:
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        matrix = fitz.Matrix(_RENDER_DPI / 72.0, _RENDER_DPI / 72.0)
-        return [
-            doc.load_page(i).get_pixmap(matrix=matrix, alpha=False).tobytes("png")
-            for i in range(doc.page_count)
-        ]
-    except Exception as e:  # noqa: BLE001
-        logger.info("ocr_bridge: 扫描件栅格化失败 · %s: %s", type(e).__name__, e)
-        return None
-    finally:
-        if doc is not None:
-            doc.close()
+from services.fileconv.ocr_images import rasterize_pdf as _rasterize_pdf
 
 
 # ── Decimal 转换(禁 float 中转;OCR 侧 entries 值是 str)──────────────────────
@@ -362,17 +333,32 @@ def convert_images(
     provider_call: Optional[ProviderCall] = None,
     plan_code: Optional[str] = None,
     is_exempt: bool = False,
+    _pdf_bytes: Optional[bytes] = None,
 ) -> ConvertResult:
     """Run image OCR under the Earn-selected fileconv engine."""
     if provider_call is not None:
         return _convert_images_active(images, source_name, tenant_id, api_key, provider_call)
 
     from services.ocr.engine_policy import engine_context
+    from services.cost.usage_context import usage_context
+    from services.ai_gateway.attribution import set_attribution, reset_attribution
 
-    with engine_context(TASK_FILECONV_OCR, plan_code=plan_code, is_exempt=is_exempt):
-        return _convert_images_active(
-            images, source_name, tenant_id, api_key, _default_provider_call
-        )
+    token = set_attribution(TASK_FILECONV_OCR, tenant_id=tenant_id)
+    try:
+        with (
+            engine_context(TASK_FILECONV_OCR, plan_code=plan_code, is_exempt=is_exempt),
+            usage_context("fileconv", pages=len(images)),
+        ):
+            return _convert_images_active(
+                images,
+                source_name,
+                tenant_id,
+                api_key,
+                _default_provider_call,
+                pdf_bytes=_pdf_bytes,
+            )
+    finally:
+        reset_attribution(token)
 
 
 def _convert_images_active(
@@ -381,6 +367,8 @@ def _convert_images_active(
     tenant_id: Optional[str],
     api_key: Optional[str],
     provider_call: ProviderCall,
+    *,
+    pdf_bytes: Optional[bytes] = None,
 ) -> ConvertResult:
     """一批页图(单图=一页)→ ConvertResult。分类 → 逐页直吐 → 适配 → 守恒校验。"""
     if not images:
@@ -392,10 +380,22 @@ def _convert_images_active(
         return _convert_generic(images, source_name, ocr_doc_type, call, tenant_id, api_key)
 
     is_gl = ocr_doc_type == "general_ledger"
+    from services.ocr.enterprise_pipeline import category_for, run as enterprise_run
+
+    candidate = None
+    if category_for(ocr_doc_type):
+        try:
+            candidate = enterprise_run(images, "gl" if is_gl else "bank", pdf=pdf_bytes)
+        except Exception:
+            return _reject(STATUS_OCR_UNAVAILABLE, source_name, "Enterprise OCR 引擎不可用")
     rows: List[LedgerRow] = []
     first_doc = last_doc = None
-    for image_bytes in images:
-        page = _read_page(image_bytes, ocr_doc_type, call, tenant_id, api_key)
+    for index, image_bytes in enumerate(images):
+        page = (
+            _PageOutcome(True, document=candidate.pages[index].document)
+            if candidate
+            else _read_page(image_bytes, ocr_doc_type, call, tenant_id, api_key)
+        )
         if not page.ok:
             if page.incomplete:
                 return _reject(STATUS_OCR_INCOMPLETE, source_name, "OCR 输出截断/不完整,拒绝出件")
@@ -411,6 +411,17 @@ def _convert_images_active(
     stats = validate_mod.ledger_stats(rows, opening)
     stats["engine"] = "ocr_image_direct"
     stats["pages"] = len(images)
+    if candidate:
+        stats.update(
+            engine=candidate.engine,
+            extraction_audit=[p.extraction_audit for p in candidate.pages],
+            estimated_cost_thb=candidate.estimated_cost_thb,
+            elapsed_ms=candidate.elapsed_ms,
+        )
+        if any(p.needs_manual_review for p in candidate.pages):
+            issues.append(
+                Issue(kind="ocr_review", line_no=0, message="OCR 待复核 / ต้องตรวจสอบผล OCR")
+            )
     table = Table(
         name="GL Ledger" if is_gl else "Bank Statement",
         columns=LEDGER_COLUMNS,
@@ -426,31 +437,7 @@ def _convert_images_active(
     )
 
 
-def _convert_generic(
-    images: List[bytes], source_name: str, ocr_doc_type: str, call, tenant_id, api_key
-) -> ConvertResult:
-    """非台账/流水类:忠实抽网格,不假装能勾稽任意表(issues 为空 = 无守恒可判,诚实)。"""
-    headers: List[str] = []
-    grid: List[List] = []
-    for image_bytes in images:
-        page = _read_page(image_bytes, "generic_table", call, tenant_id, api_key)
-        if not page.ok:
-            status = STATUS_OCR_INCOMPLETE if page.incomplete else STATUS_OCR_UNAVAILABLE
-            return _reject(status, source_name, "OCR 未能读出可用网格")
-        doc = page.document
-        if not headers and doc.headers:
-            headers = list(doc.headers)
-        for row in doc.rows:
-            grid.append([row.get(h, "") for h in headers] if headers else list(row.values()))
-    table = Table(name="Table", columns=headers or ["col1"], rows=grid)
-    return ConvertResult(
-        doc_type=_DOC_TYPE_TO_FILECONV.get(ocr_doc_type, GENERIC_TABLE),
-        status=STATUS_OK,
-        source_name=source_name,
-        tables=[table],
-        issues=[],
-        stats={"row_count": len(grid), "engine": "ocr_image_direct", "pages": len(images)},
-    )
+from services.fileconv.ocr_generic import convert_generic as _convert_generic
 
 
 def convert_image(
@@ -486,7 +473,11 @@ def convert_scanned_pdf(
     is_exempt: bool = False,
 ) -> ConvertResult:
     """无文字层 PDF(扫描件)→ 逐页栅格化 → OCR → ConvertResult。栅格化失败诚实拒绝。"""
-    pages = _rasterize_pdf(pdf_bytes)
+    from services.ocr.engine_policy import engine_context, active_mode
+
+    with engine_context(TASK_FILECONV_OCR, plan_code=plan_code, is_exempt=is_exempt):
+        enterprise_selected = active_mode() == "enterprise" and provider_call is None
+    pages = _rasterize_pdf(pdf_bytes, dpi=200) if enterprise_selected else _rasterize_pdf(pdf_bytes)
     if not pages:
         return _reject(STATUS_OCR_UNAVAILABLE, source_name, "扫描件无法栅格化(疑损坏 PDF)")
     return convert_images(
@@ -497,4 +488,5 @@ def convert_scanned_pdf(
         provider_call=provider_call,
         plan_code=plan_code,
         is_exempt=is_exempt,
+        _pdf_bytes=pdf_bytes,
     )

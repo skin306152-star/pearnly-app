@@ -189,6 +189,10 @@ def _parse_gl_impl(file_bytes: bytes, filename: str, revenue_prefix: str = "4") 
     if ext in ("xlsx", "xls"):
         return parse_gl_excel(file_bytes, revenue_prefix)
     if ext == "pdf":
+        from services.ocr.enterprise_pipeline import category_for
+
+        if category_for("general_ledger") is not None:
+            return _parse_gl_via_pipeline(file_bytes, filename, revenue_prefix)
         # 2026-05-21: PDF GL defaults to the new pipeline so description-column
         # numbers (e.g. 6091) can't leak into debit/credit. Set
         # OCR_PDF_GL_LEGACY=true to opt back into the older Gemini-Vision
@@ -222,6 +226,7 @@ def _parse_gl_via_pipeline(file_bytes: bytes, filename: str, revenue_prefix: str
     try:
         from services.ocr.pipeline import (
             run_on_image_bytes as _run_image,
+            run_on_pdf_bytes as _run_pdf,
             run_on_table_bytes as _run_table,
             IMAGE_EXTENSIONS,
             TABLE_EXTENSIONS,
@@ -232,7 +237,9 @@ def _parse_gl_via_pipeline(file_bytes: bytes, filename: str, revenue_prefix: str
 
     ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
     try:
-        if ext_dot in IMAGE_EXTENSIONS:
+        if ext_dot == ".pdf":
+            pr = _run_pdf(file_bytes, document_type="general_ledger")
+        elif ext_dot in IMAGE_EXTENSIONS:
             pr = _run_image(file_bytes, document_type="general_ledger")
         elif ext_dot in TABLE_EXTENSIONS:
             pr = _run_table(file_bytes, filename=filename or "gl", document_type="general_ledger")
@@ -258,6 +265,9 @@ def _parse_gl_via_pipeline(file_bytes: bytes, filename: str, revenue_prefix: str
         "parser_version": f"{PARSER_VERSION}+pipeline_v1",
         "needs_review": legacy.get("_needs_review", False),
         "validation_warnings": warnings,
+        "extraction_audit": [p.extraction_audit for p in pr.pages],
+        "estimated_cost_thb": pr.estimated_cost_thb,
+        "page_count": pr.page_count,
     }
 
 

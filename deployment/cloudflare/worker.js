@@ -1,3 +1,4 @@
+/* global URL, Response, Headers, Request, fetch */
 const ORIGIN = 'https://pearnly-web-112074003592.asia-southeast1.run.app';
 
 export default {

@@ -55,7 +55,8 @@ class _BaseEscalationTest(unittest.TestCase):
 
 class IdCardEscalationTests(_BaseEscalationTest):
     def _run(self, results):
-        with self._patched(results):
+        # Explicit legacy ladder; task defaults now select Enterprise/3.8.
+        with self._patched(results), mock.patch.dict("os.environ", {"OCR_ENGINE_MODE": "direct35"}):
             return id_card_extract.extract_thai_id_card(b"\xff\xd8\xffXfakejpg", api_key="k")
 
     def test_first_read_no_id_escalates_to_fallback(self):

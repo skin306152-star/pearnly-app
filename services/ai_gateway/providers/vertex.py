@@ -28,13 +28,15 @@ def _location() -> str:
 # 2.5→404、3.1-lite→空 JSON、3.6-flash→404 @asia-se1 与 us-central1)。
 # 新模型先上 global 是 Google 的常态而非例外——换模型前跑 scripts/probe_vertex_regions.py,
 # 漏登记这里 = 该档全线 404。
-_GLOBAL_ONLY_PREFIXES = ("gemini-2.5", "gemini-3.1", "gemini-3.6")
+_GLOBAL_ONLY_PREFIXES = ("gemini-2.5", "gemini-3.1", "gemini-3.6", "gemini-3.8")
 
 
 def _location_for_model(model: str) -> str:
     """按模型选区域:global-only 档走 global,其余(embedding 等)留就近区域(默认 asia-se1)。
     VERTEX_LOCATION_25 覆写这批 global-only 档的区域(名字沿用 2.5 时代,含义=global-only 档)。"""
     m = (model or "").lower()
+    if m.startswith("gemini-3.8"):
+        return "global"  # frozen OCR evaluation contract, not the legacy 2.5 override
     if m.startswith(_GLOBAL_ONLY_PREFIXES):
         return os.environ.get("VERTEX_LOCATION_25", "global").strip() or "global"
     return _location()
@@ -122,6 +124,8 @@ def _config(temperature, max_tokens, response_mime, *, structured_vision_model="
     if structured_vision_model:
         if structured_vision_model.lower().startswith("gemini-2.5"):
             thinking = types.ThinkingConfig(thinking_budget=0)
+        elif structured_vision_model.lower().startswith("gemini-3.8"):
+            thinking = types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)
         else:
             thinking = types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)
         kw["thinking_config"] = thinking
@@ -134,7 +138,8 @@ def _usage(resp) -> Tuple[int, int]:
         if u is not None:
             return (
                 int(getattr(u, "prompt_token_count", 0) or 0),
-                int(getattr(u, "candidates_token_count", 0) or 0),
+                int(getattr(u, "candidates_token_count", 0) or 0)
+                + int(getattr(u, "thoughts_token_count", 0) or 0),
             )
     except Exception:
         pass
@@ -155,26 +160,35 @@ def _gen_json(contents, *, model_name, config, max_retries):
 
     client = _client(_location_for_model(model_name))
     last_raw = ""
-    last_it = last_ot = 0
+    total_it = total_ot = 0
     for attempt in range(max_retries + 1):
         try:
             resp = client.models.generate_content(
                 model=model_name, contents=contents, config=config
             )
         except Exception as e:  # noqa: BLE001
-            return ProviderOutcome(ok=False, error_kind=_error_kind(e), model=model_name)
+            return ProviderOutcome(
+                ok=False,
+                error_kind=_error_kind(e),
+                model=model_name,
+                input_tokens=total_it,
+                output_tokens=total_ot,
+            )
         raw = _safe_text(resp)
         it, ot = _usage(resp)
-        last_it, last_ot = it, ot
-        if raw:
+        total_it += it
+        total_ot += ot
+        candidates = getattr(resp, "candidates", None) or []
+        finish = str(getattr(candidates[0], "finish_reason", "")) if candidates else ""
+        if raw and "MAX_TOKENS" not in finish:
             last_raw = raw
             try:
                 return ProviderOutcome(
                     ok=True,
                     data=_parse_json(raw),
                     model=model_name,
-                    input_tokens=it,
-                    output_tokens=ot,
+                    input_tokens=total_it,
+                    output_tokens=total_ot,
                 )
             except Exception:  # noqa: BLE001
                 pass
@@ -185,8 +199,8 @@ def _gen_json(contents, *, model_name, config, max_retries):
         ok=False,
         error_kind="parse",
         model=model_name,
-        input_tokens=last_it,
-        output_tokens=last_ot,
+        input_tokens=total_it,
+        output_tokens=total_ot,
         raw=last_raw,
     )
 
@@ -206,7 +220,12 @@ def text_to_json(
     return _gen_json(
         prompt,
         model_name=model_name,
-        config=_config(temperature, max_tokens, response_mime),
+        config=_config(
+            temperature,
+            max_tokens,
+            response_mime,
+            structured_vision_model=model_name if model_name.startswith("gemini-3.8") else "",
+        ),
         max_retries=max_retries,
     )
 

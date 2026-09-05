@@ -61,6 +61,7 @@ def _parse_vat_via_pipeline(
     try:
         from services.ocr.pipeline import (
             run_on_image_bytes as _run_image,
+            run_on_pdf_bytes as _run_pdf,
             run_on_table_bytes as _run_table,
             IMAGE_EXTENSIONS,
             TABLE_EXTENSIONS,
@@ -71,7 +72,9 @@ def _parse_vat_via_pipeline(
 
     ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
     try:
-        if ext_dot in IMAGE_EXTENSIONS:
+        if ext_dot == ".pdf":
+            pr = _run_pdf(file_bytes, api_key=api_key, document_type="vat_report")
+        elif ext_dot in IMAGE_EXTENSIONS:
             pr = _run_image(file_bytes, api_key=api_key, document_type="vat_report")
         elif ext_dot in TABLE_EXTENSIONS:
             pr = _run_table(
@@ -90,7 +93,9 @@ def _parse_vat_via_pipeline(
         for e in doc.get("entries") or []:
             row_no += 1
             invoice_no = str(e.get("invoice_no") or "").strip()
-            if not re.search(r"[A-Za-z0-9]{2,}", invoice_no):
+            if not pr.engine.startswith("enterprise-") and not re.search(
+                r"[A-Za-z0-9]{2,}", invoice_no
+            ):
                 continue  # skip rows without a real invoice number
             parsed = {
                 "row_no": (
@@ -116,10 +121,13 @@ def _parse_vat_via_pipeline(
         "rows": rows,
         "row_count": len(rows),
         "meta": {},
-        "warnings": [],
+        "warnings": [warning for p in pr.pages for warning in p.validation_warnings],
         "parser_version": PARSER_VERSION,
-        "method": "pipeline_v1",
+        "method": pr.engine,
         "needs_review": legacy.get("_needs_review", False),
+        "extraction_audit": [p.extraction_audit for p in pr.pages],
+        "estimated_cost_thb": pr.estimated_cost_thb,
+        "page_count": pr.page_count,
     }
 
 
@@ -165,6 +173,11 @@ def _parse_vat_report_impl(
     file_bytes: bytes, filename: str, api_key: Optional[str] = None
 ) -> Dict[str, Any]:
     ext = (filename or "").lower().rsplit(".", 1)[-1]
+    from services.ocr.enterprise_pipeline import category_for
+
+    enterprise = category_for("vat_report") is not None
+    if enterprise and ext in ("jpg", "jpeg", "png", "webp", "tiff", "tif", "bmp", "gif"):
+        return _parse_vat_via_pipeline(file_bytes, filename, api_key=api_key)
 
     if ext in ("xlsx", "xls"):
         result = parse_excel(file_bytes)
@@ -198,6 +211,8 @@ def _parse_vat_report_impl(
                 }
             else:
                 logger.info(f"[vat] 文字行 regex 也只 {len(regex_cleaned)} 行 · 回退 Gemini")
+                if enterprise:
+                    return _parse_vat_via_pipeline(file_bytes, filename, api_key=api_key)
                 result = parse_with_gemini_paged(file_bytes, api_key=api_key)
     elif ext in ("jpg", "jpeg", "png", "webp"):
         # v118.32.4.5 · 大图预压缩 + 必要时上下分块(防 Gemini 504)

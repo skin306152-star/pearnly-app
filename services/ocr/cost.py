@@ -24,6 +24,7 @@ COST_VISION_PER_PAGE_USD = 0.00150
 # 换模型省不省钱要按这里重算,别拿 token 数当钱数(2026-07-03 血泪)。
 # 3.6 那天试过又退回(见 gemini_models 文件头),两个价都留着:主力是 3.5,历史行照样算得对。
 MODEL_PRICES_PER_M_USD = {
+    "gemini-3.8-flash": (0.75, 3.75),
     "gemini-3.6-flash": (1.50, 7.50),
     "gemini-3.5-flash": (1.50, 9.00),
     "gemini-3.1-flash-lite": (0.25, 1.50),

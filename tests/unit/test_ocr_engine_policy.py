@@ -70,7 +70,7 @@ class ResolveModeTests(unittest.TestCase):
             with mock.patch.object(
                 ep, "MODE_UNSUPPORTED_TASKS", {"qwen": frozenset({"vat_report"})}
             ):
-                by_global = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
+                by_global = {**ep.DEFAULT_CONFIG, "mode": "qwen", "overrides_by_task": {}}
                 self.assertEqual(ep.resolve_mode("vat_report", config=by_global), "economy")
                 self.assertEqual(ep.resolve_mode("invoice", config=by_global), "qwen")
                 by_task = {**ep.DEFAULT_CONFIG, "overrides_by_task": {"vat_report": "qwen"}}
@@ -80,7 +80,7 @@ class ResolveModeTests(unittest.TestCase):
         # qwen 档的 VAT csv 支路(policy_task=vat_report_csv)是能力盲区(30K 截断 + 长
         # entries 生成超时,2026-08-13 bench 2/2):全局切 qwen 与任务钉 qwen 同判,一律回 fail-safe。
         with mock.patch.dict("os.environ", _ENV_CLEAR):
-            by_global = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
+            by_global = {**ep.DEFAULT_CONFIG, "mode": "qwen", "overrides_by_task": {}}
             self.assertEqual(ep.resolve_mode("vat_report_csv", config=by_global), "economy")
             by_task = {**ep.DEFAULT_CONFIG, "overrides_by_task": {"vat_report_csv": "qwen"}}
             self.assertEqual(ep.resolve_mode("vat_report_csv", config=by_task), "economy")
@@ -96,21 +96,21 @@ class ResolveModeTests(unittest.TestCase):
     def test_vat_report_pdf_branch_keeps_qwen(self):
         # 盲区只钉 csv 支路:PDF/图片/Excel 支路(task=vat_report)qwen 实弹 84/84 是赢线,照走 qwen。
         with mock.patch.dict("os.environ", _ENV_CLEAR):
-            cfg = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
+            cfg = {**ep.DEFAULT_CONFIG, "mode": "qwen", "overrides_by_task": {}}
             self.assertEqual(ep.resolve_mode("vat_report", config=cfg), "qwen")
 
     def test_vat_report_csv_unaffected_on_other_modes(self):
         # 盲区是 qwen 档专属:其余档(economy/direct35/selfhost)解析 csv 支路不受影响。
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             for m in ("economy", "direct35", "selfhost"):
-                cfg = {**ep.DEFAULT_CONFIG, "mode": m}
+                cfg = {**ep.DEFAULT_CONFIG, "mode": m, "overrides_by_task": {}}
                 self.assertEqual(ep.resolve_mode("vat_report_csv", config=cfg), m)
 
     def test_vat_report_back_on_qwen_after_pdf_part_fix(self):
         # 2026-08-13 根因修复(http_common:PDF 逐页转图再进 image_url)后,
         # vat_report 车道重新接 qwen,不再被盲区注册表劫回现役档。
         with mock.patch.dict("os.environ", _ENV_CLEAR):
-            cfg = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
+            cfg = {**ep.DEFAULT_CONFIG, "mode": "qwen", "overrides_by_task": {}}
             self.assertEqual(ep.resolve_mode("vat_report", config=cfg), "qwen")
 
     def test_retired_account_key_ignored_on_load(self):
@@ -144,15 +144,15 @@ class ResolveModeTests(unittest.TestCase):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             for global_mode in ("economy", "selfhost"):
                 cfg = {**ep.DEFAULT_CONFIG, "mode": global_mode}
-                self.assertEqual(ep.resolve_mode("bank_statement", config=cfg), "direct35")
+                self.assertEqual(ep.resolve_mode("bank_statement", config=cfg), "enterprise")
             self.assertEqual(ep.resolve_mode("invoice", config=cfg), "selfhost")
 
     def test_bank_reads_with_env_default_not_lite(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             with mock.patch.object(ep, "load_config", return_value=dict(ep.DEFAULT_CONFIG)):
                 with ep.engine_context("bank_statement") as mode:
-                    self.assertEqual(mode, "direct35")
-                    self.assertEqual(gemini_models.flash_lite(), "gemini-3.5-flash")
+                    self.assertEqual(mode, "enterprise")
+                    self.assertEqual(gemini_models.flash_lite(), "gemini-3.8-flash")
 
     def test_load_config_failsafe_on_store_error(self):
         with mock.patch(
@@ -171,11 +171,11 @@ class EngineContextTests(unittest.TestCase):
                 with ep.engine_context("invoice") as mode:
                     self.assertEqual(mode, "economy")
                     self.assertEqual(ep.active_mode(), "economy")
-                    # L2 读取臂 = 3.1-lite;兜底/升级臂 = 3.5;flash 档已弃,留 env 默认不覆写
+                    # B 首读保持 3.1-lite，所有升级臂固定 3.8，不受旧 3.5 env 残留影响。
                     self.assertEqual(gemini_models.flash_lite(), "gemini-3.1-flash-lite")
-                    self.assertEqual(gemini_models.fallback(), "gemini-3.5-flash")
-                    self.assertEqual(gemini_models.escalate(), "gemini-3.5-flash")
-                    self.assertEqual(gemini_models.flash(), "gemini-3.5-flash")
+                    self.assertEqual(gemini_models.fallback(), "gemini-3.8-flash")
+                    self.assertEqual(gemini_models.escalate(), "gemini-3.8-flash")
+                    self.assertEqual(gemini_models.flash(), "gemini-3.8-flash")
             self.assertEqual(gemini_models.flash(), before)
             self.assertEqual(ep.active_mode(), "")
 
@@ -222,6 +222,19 @@ class EngineContextTests(unittest.TestCase):
             with mock.patch.object(ep, "load_config", return_value=cfg):
                 with ep.engine_context("invoice"):
                     self.assertEqual(gemini_models.brain(), "gemini-2.5-flash")
+
+    def test_nested_financial_task_switches_and_restores_invoice_mode(self):
+        with (
+            mock.patch.dict("os.environ", _ENV_CLEAR),
+            mock.patch.object(ep, "load_config", return_value=ep.DEFAULT_CONFIG),
+        ):
+            with ep.engine_context("invoice"):
+                self.assertEqual(gemini_models.flash_lite(), "gemini-3.1-flash-lite")
+                with ep.engine_context("bank_statement") as mode:
+                    self.assertEqual(mode, "enterprise")
+                    self.assertEqual(gemini_models.flash_lite(), "gemini-3.8-flash")
+                self.assertEqual(ep.active_mode(), "economy")
+                self.assertEqual(gemini_models.flash_lite(), "gemini-3.1-flash-lite")
 
 
 def _page(chain, l2i=0, l2o=0, l3i=0, l3o=0, l2_model="", l3_model=""):

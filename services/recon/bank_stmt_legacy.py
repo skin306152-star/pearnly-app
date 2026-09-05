@@ -64,6 +64,11 @@ def parsed_from_pipeline_legacy(legacy_dict: Dict[str, Any], filename: str) -> P
     # in pages[0].document for bank_statement uploads.
     first_doc = (pages[0] or {}).get("document") or {}
     entries = first_doc.get("entries") or []
+    enterprise = str(legacy_dict.get("engine") or "").startswith("enterprise-")
+    last_doc = first_doc
+    if enterprise:
+        entries = [e for p in pages for e in (p.get("document") or {}).get("entries", [])]
+        last_doc = (pages[-1] or {}).get("document") or {}
 
     bank_name = (first_doc.get("bank_name") or "").lower()
     bank_code = "OTHER"
@@ -130,15 +135,15 @@ def parsed_from_pipeline_legacy(legacy_dict: Dict[str, Any], filename: str) -> P
             else None
         ),
         closing_balance=(
-            _to_float(first_doc.get("closing_balance"))
-            if first_doc.get("closing_balance")
-            else None
+            _to_float(last_doc.get("closing_balance")) if last_doc.get("closing_balance") else None
         ),
         total_inflow=total_in,
         total_outflow=total_out,
         transactions=transactions,
         pages=int(legacy_dict.get("page_count") or 1),
-        parse_method="pipeline_v1_table",
+        parse_method=legacy_dict.get("engine") if enterprise else "pipeline_v1_table",
+        needs_review=bool(legacy_dict.get("_needs_review")),
+        extraction_audit=[p.get("_extraction_audit", {}) for p in pages] if enterprise else [],
     )
 
 

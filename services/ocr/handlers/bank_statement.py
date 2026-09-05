@@ -28,6 +28,7 @@ def _legacy_parsed_statement(req: OcrRequest):
         PDF_EXTENSIONS,
         TABLE_EXTENSIONS,
         run_on_image_bytes,
+        run_on_pdf_bytes,
         run_on_table_bytes,
     )
     from services.recon import bank_recon_v2
@@ -35,8 +36,12 @@ def _legacy_parsed_statement(req: OcrRequest):
     name = (req.filename or "").lower()
     ext = "." + name.rsplit(".", 1)[-1] if "." in name else ""
     if ext in PDF_EXTENSIONS:
-        return bank_recon_v2.parse_statement_pdf(req.file_bytes, req.filename)
-    if ext in IMAGE_EXTENSIONS:
+        from services.ocr.enterprise_pipeline import category_for
+
+        if category_for("bank_statement") is None:
+            return bank_recon_v2.parse_statement_pdf(req.file_bytes, req.filename)
+        pr = run_on_pdf_bytes(req.file_bytes, api_key=req.api_key, document_type="bank_statement")
+    elif ext in IMAGE_EXTENSIONS:
         pr = run_on_image_bytes(req.file_bytes, api_key=req.api_key, document_type="bank_statement")
     elif ext in TABLE_EXTENSIONS:
         pr = run_on_table_bytes(

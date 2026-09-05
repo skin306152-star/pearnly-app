@@ -111,8 +111,9 @@ def set_usage_context(
     doc = (doc_type or "").strip() or None
     slot = outer.get("_page_slot")
     clean_pages = _clean_pages(pages)
-    # 外层已有待取页数就保留它,否则本次传了页数才开新 slot(同一份票的页数只落一行)。
-    if clean_pages and (slot is None or slot.pages is None):
+    # A consumed slot still belongs to this document. Replacing it in an
+    # inner fallback call would count the same pages a second time.
+    if clean_pages and slot is None:
         slot = _PageSlot(clean_pages)
     merged = {
         "entry_point": outer.get("entry_point") or _clean_entry(entry_point),

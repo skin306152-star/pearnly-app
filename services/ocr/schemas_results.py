@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """OCR schemas · 各层结果包装(Layer2/Layer3/Pipeline 页结果与汇总)(REFACTOR-WA · R20 拆 · 0 逻辑改)。"""
 
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 from services.ocr.schemas_layer1 import BusinessDocumentType
@@ -109,6 +109,10 @@ class PipelinePageResult(BaseModel):
     """
 
     page_number: int = Field(..., ge=1)
+    extraction_audit: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="local reconstruction provenance and inferred-value audit; never sent as a prompt",
+    )
     invoice: ThaiInvoice = Field(..., description="final invoice, from L2 or L3")
     document_type: BusinessDocumentType = Field(default="invoice")
     document: Optional[NonInvoiceDocument] = Field(

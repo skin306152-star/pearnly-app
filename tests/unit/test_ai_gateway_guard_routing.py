@@ -55,6 +55,7 @@ class GuardRoutingTests(unittest.TestCase):
         ladder = {"OCR_FLASHLITE_MODEL": "gemini-2.5-flash-lite"}  # 与主力档区分开才能验首读档
         with (
             mock.patch.dict("os.environ", ladder),
+            mock.patch.dict("os.environ", {"OCR_ENGINE_MODE": "direct35"}),
             mock.patch("services.ai_gateway.transport.multimodal_to_json", fake_mm),
         ):
             out = id_card_extract.extract_thai_id_card(b"\xff\xd8\xff\x00fake-jpeg", api_key="k")

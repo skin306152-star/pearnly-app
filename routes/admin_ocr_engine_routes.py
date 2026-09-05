@@ -58,9 +58,13 @@ def _reject_partial_mode(mode: str) -> None:
 @router.get("/api/admin/ocr-engine")
 async def get_ocr_engine_policy(request: Request):
     _require_super_admin(request)
+    from services.ocr.admin_runtime import snapshot
+
     row = store.get_setting(SETTING_KEY)
+    config = load_config()
     return {
-        "policy": load_config(),
+        "policy": config,
+        "runtime": snapshot(config),
         "updated_at": (row["updated_at"].isoformat() if row and row.get("updated_at") else None),
         "options": {
             "modes": list(MODES),

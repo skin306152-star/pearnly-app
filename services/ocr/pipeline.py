@@ -1,43 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-services/ocr/pipeline.py
+"""OCR orchestration for images, PDFs and native structured documents.
 
-Pipeline: orchestrate layer 1 + layer 2 + layer 3 for a complete OCR task.
-
-What the pipeline does per page:
-    1. Renders the page to PNG bytes (PDF input) / takes image bytes (image input)
-    2. Runs layer 1 (Vision API): OCR text + word-level confidence + bboxes
-    3. Runs layer 2 (Flash-Lite): text -> ThaiInvoice fields
-    4. Evaluates trigger conditions (see _evaluate_triggers)
-    5. Runs layer 3 (Flash visual fallback) ONLY for triggered pages
-    6. Returns a unified PipelinePageResult per page + aggregate cost / latency
-
-Trigger conditions (any one fires layer 3):
-    - layer 1 page avg_confidence < CONFIDENCE_THRESHOLD (default 0.85)
-    - layer 2 missing critical fields (invoice_number / total_amount)
-    - amount math fails: |subtotal + vat - total_amount| > AMOUNT_TOLERANCE_THB
-    - tax_id format invalid (non-empty but not 13 digits)
-    - exception: `is_not_invoice=True` short-circuits — never trigger L3
-
-Cost accounting (Gemini pricing as of 2026; updated to THB via THB_PER_USD):
-    - Vision DOCUMENT_TEXT_DETECTION: $0.00150 / page (1000 free/month, ignored here)
-    - Flash-Lite: $0.10/M input, $0.40/M output
-    - Flash:      $0.30/M input, $2.50/M output
-
-Public API:
-    run_on_path(path, ...)         -> PipelineResult
-    run_on_pdf_bytes(bytes, ...)   -> PipelineResult
-    run_on_image_bytes(bytes, ...) -> PipelineResult
-
-Env (all optional):
-    OCR_PIPELINE_CONF_THRESHOLD   default 0.85
-    OCR_PIPELINE_AMOUNT_TOL       default 0.5 (THB)
-    OCR_PIPELINE_THB_PER_USD      default 35
-    GOOGLE_APPLICATION_CREDENTIALS (required, for layer 1 / Vision)
-    GOOGLE_API_KEY or GEMINI_API_KEY (required, for layers 2 + 3)
-
-This module does NOT integrate with app.py. The integration (single
-feature-flag swap of the 4 OCR entry points) is migration-plan step.
+Enterprise financial tasks enter the frozen pipeline first. Invoice tasks retain
+native text extraction, direct reading and triggered visual fallback.
 """
 
 from __future__ import annotations
@@ -48,7 +13,7 @@ import time
 from pathlib import Path
 from typing import List, Optional, Union
 
-from . import direct_read
+from . import direct_read, enterprise_pipeline
 from .layer1_base import Layer1TransientError
 from .layer1_vision import (
     Layer1PDFError,
@@ -289,7 +254,8 @@ def run_on_pdf_bytes(
     # If hit, we'll use these Page objects as layer 1 result, skipping Vision.
     # If miss, layer1_pages_override stays None and we run Vision normally.
     layer1_pages_override: Optional[List[Page]] = None
-    if enable_text_path:
+    enterprise_category = enterprise_pipeline.category_for(document_type)
+    if enable_text_path and enterprise_category is None:
         try:
             text_l1 = _try_text_extract(pdf_bytes, max_pages=max_pages)
             if text_l1 is not None:
@@ -313,6 +279,8 @@ def run_on_pdf_bytes(
             raise Layer1PDFError("pipeline: PDF has 0 pages")
         process = min(total, max_pages)
         if total > max_pages:
+            if enterprise_category:
+                raise Layer1PDFError("Enterprise OCR refuses a partially processed PDF")
             logger.warning("pipeline: PDF has %d pages, processing first %d", total, max_pages)
         matrix = fitz.Matrix(dpi / 72.0, dpi / 72.0)
         for i in range(process):
@@ -326,6 +294,9 @@ def run_on_pdf_bytes(
                 ) from e
     finally:
         doc.close()
+
+    if enterprise_category:
+        return enterprise_pipeline.run(page_image_bytes_list, enterprise_category, pdf=pdf_bytes)
 
     # Defensive: if text_path returned a different page count than render
     # (rare — implies pypdf and fitz disagree about page count), drop the
@@ -415,6 +386,9 @@ def run_on_image_bytes(
 
     t0 = time.time()
     # image-direct 直读(2026-07-05 S2 分流):单图默认跳过 Vision,原图直喂多模态。
+    enterprise_category = enterprise_pipeline.category_for(document_type)
+    if enterprise_category:
+        return enterprise_pipeline.run([image_bytes], enterprise_category)
     engine = "pipeline_v1"
     if direct_read.enabled() and direct_read.route_direct(1, document_type):
         try:

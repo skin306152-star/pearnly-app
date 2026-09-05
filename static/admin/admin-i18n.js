@@ -227,7 +227,12 @@
             'adm-pos-reset-done': '已重置',
             'adm-pos-reset-fail': '重置失败(仅发放制账号可重置 · 该账号不在范围内)',
             'adm-eng-title': 'OCR 档位与成本',
-            'adm-eng-sub': '四个档位的实测能力 · 每个入口的真实每页成本 · 定价前先看这页',
+            'adm-eng-sub': '当前服务的模型配置 · 分入口成本估算 · 不以历史跑分代替当前版本表现',
+            'adm-eng-runtime-note':
+                '模型来自当前服务配置，不代表 Worker 已验收。未完成当前版本实测的指标显示 —；实际调用与成本见下方账本。',
+            'adm-eng-tier-enterprise-name': 'Enterprise 财务长表',
+            'adm-eng-opt-enterprise': 'A · Enterprise 财务长表',
+            'adm-eng-effective': '当前生效：',
             'adm-eng-tier-title': '引擎档位',
             'adm-eng-tier-hint': '选中即全局生效 · 银行对账单不跟全局(在下方任务覆写里单独钉档)',
             'adm-eng-tier-live': '现役',
@@ -235,7 +240,7 @@
             'adm-eng-tier-lab-quality': '质量分',
             'adm-eng-tier-lab-speed': '中位速度',
             'adm-eng-tier-foot':
-                '成本 / 质量 / 速度均来自 2026-08-11 金标实测:10 张真票、51 个字段格逐格对答案。',
+                '成本按付费单价估算，不扣免费额度和赠金。下方 P50 为单次供应商调用延迟，不是整份文件的端到端速度。',
             'adm-eng-tier-direct35-name': '直通',
             'adm-eng-tier-direct35-models': '全档 gemini-3.5-flash',
             'adm-eng-tier-direct35-cost': '฿0.50 普票 · ฿2.20 银行',
@@ -264,10 +269,10 @@
             'adm-eng-tier-selfhost-speed': '—',
             'adm-eng-tier-selfhost-note':
                 '数据不出门。还没跑过金标,三项都没有实测值,别拿别的档的数字替它。',
-            'adm-eng-partial-note': '能力未齐 · 暂不可启用,补齐单据分类后开放',
+            'adm-eng-partial-note': '入口适配与验收未完成 · 暂不可启用',
             'adm-eng-tier-auto-name': '自动 · 按套餐表选档',
             'adm-eng-tier-auto-note': '选它以后,每个租户按下面的套餐默认档走',
-            'adm-eng-opt-direct35': 'A · 直通',
+            'adm-eng-opt-direct35': '旧直通（兼容配置）',
             'adm-eng-opt-economy': 'B · 经济',
             'adm-eng-opt-qwen': 'C · Qwen',
             'adm-eng-opt-selfhost': 'D · 自部署',
@@ -280,7 +285,7 @@
             'adm-eng-plan-exempt': '计费豁免(内部)',
             'adm-eng-task-title': '任务级覆写(优先于全局)',
             'adm-eng-task-hint':
-                '银行对账单钉在直通档:轻量档读长表会整页读崩(实测余额链断点 3.5=2 / 3.1-lite=40)。',
+                '按任务选择入口策略；实际生效档包含任务覆写和运行环境设置。财务长表不叠加 3.1。',
             'adm-eng-task-invoice': '发票识别',
             'adm-eng-task-id_card': '身份证',
             'adm-eng-task-bank_statement': '银行对账单',
@@ -320,7 +325,7 @@
             'adm-eng-col-pages': '页数',
             'adm-eng-col-perpage': '每页成本',
             'adm-eng-col-cost': '总成本',
-            'adm-eng-col-p50': 'P50 延迟',
+            'adm-eng-col-p50': '调用 P50（非整件）',
             'adm-eng-col-models': '模型',
             'adm-eng-unattributed': '未归因',
             'adm-eng-unattributed-hint':
@@ -869,7 +874,12 @@
                 'รีเซ็ตไม่สำเร็จ (รีเซ็ตได้เฉพาะบัญชีที่ออกให้เท่านั้น · บัญชีนี้ไม่อยู่ในขอบเขต)',
             'adm-eng-title': 'ระดับ OCR และต้นทุน',
             'adm-eng-sub':
-                'ความสามารถจริงของ 4 ระดับ · ต้นทุนต่อหน้าจริงของแต่ละช่องทาง · ดูหน้านี้ก่อนตั้งราคา',
+                'การตั้งค่าโมเดลของบริการนี้ · ต้นทุนประมาณการแยกช่องทาง · ไม่ใช้ผลทดสอบเก่าแทนเวอร์ชันปัจจุบัน',
+            'adm-eng-runtime-note':
+                'โมเดลมาจากการตั้งค่าบริการนี้ ไม่ใช่ผลตรวจรับ Worker ค่าที่ยังไม่ทดสอบเวอร์ชันปัจจุบันแสดง — ดูการเรียกจริงและต้นทุนด้านล่าง',
+            'adm-eng-tier-enterprise-name': 'Enterprise ตารางการเงิน',
+            'adm-eng-opt-enterprise': 'A · Enterprise ตารางการเงิน',
+            'adm-eng-effective': 'มีผลอยู่:',
             'adm-eng-tier-title': 'ระดับเครื่องยนต์',
             'adm-eng-tier-hint':
                 'เลือกแล้วมีผลทั้งระบบ · สเตทเมนต์ธนาคารไม่ตามโหมดหลัก (ตรึงแยกในกำหนดตามงานด้านล่าง)',
@@ -878,7 +888,7 @@
             'adm-eng-tier-lab-quality': 'คะแนนคุณภาพ',
             'adm-eng-tier-lab-speed': 'ความเร็วมัธยฐาน',
             'adm-eng-tier-foot':
-                'ต้นทุน / คุณภาพ / ความเร็ว มาจากการวัดจริงวันที่ 2026-08-11: ใบจริง 10 ใบ ตรวจทีละช่อง 51 ช่อง',
+                'ต้นทุนประมาณตามราคาแบบชำระเงิน ไม่หักโควตาฟรีหรือเครดิต P50 ด้านล่างเป็นเวลาต่อการเรียกผู้ให้บริการ ไม่ใช่เวลาทั้งเอกสาร',
             'adm-eng-tier-direct35-name': 'ผ่านตรง',
             'adm-eng-tier-direct35-models': 'ทุกชั้นใช้ gemini-3.5-flash',
             'adm-eng-tier-direct35-cost': '฿0.50 ใบทั่วไป · ฿2.20 ธนาคาร',
@@ -909,11 +919,10 @@
             'adm-eng-tier-selfhost-speed': '—',
             'adm-eng-tier-selfhost-note':
                 'ข้อมูลไม่ออกนอกบ้าน · ยังไม่ได้วัดมาตรฐานทอง ทั้งสามค่าจึงยังไม่มี อย่าเอาตัวเลขของระดับอื่นมาแทน',
-            'adm-eng-partial-note':
-                'ความสามารถยังไม่ครบ · ยังเปิดใช้ไม่ได้ จะเปิดเมื่อจำแนกประเภทเอกสารครบ',
+            'adm-eng-partial-note': 'การเชื่อมต่อช่องทางและการตรวจรับยังไม่ครบ · ยังเปิดใช้ไม่ได้',
             'adm-eng-tier-auto-name': 'อัตโนมัติ · เลือกตามตารางแพ็กเกจ',
             'adm-eng-tier-auto-note': 'เลือกแล้ว แต่ละผู้เช่าจะใช้ค่าเริ่มต้นตามแพ็กเกจด้านล่าง',
-            'adm-eng-opt-direct35': 'A · ผ่านตรง',
+            'adm-eng-opt-direct35': 'ผ่านตรงเดิม (รองรับการตั้งค่าเดิม)',
             'adm-eng-opt-economy': 'B · ประหยัด',
             'adm-eng-opt-qwen': 'C · Qwen',
             'adm-eng-opt-selfhost': 'D · เซิร์ฟเวอร์ตนเอง',
@@ -926,7 +935,7 @@
             'adm-eng-plan-exempt': 'ยกเว้นค่าใช้จ่าย (ภายใน)',
             'adm-eng-task-title': 'กำหนดตามงาน (สำคัญกว่าโหมดหลัก)',
             'adm-eng-task-hint':
-                'สเตทเมนต์ธนาคารตรึงไว้ที่ผ่านตรง: ระดับเบาอ่านตารางยาวแล้วพังทั้งหน้า (จุดขาดของยอดคงเหลือ 3.5=2 / 3.1-lite=40)',
+                'เลือกตามประเภทงาน โหมดที่ใช้จริงรวมค่ากำหนดตามงานและสภาพแวดล้อม ตารางการเงินยาวไม่เพิ่มขั้นตอน 3.1',
             'adm-eng-task-invoice': 'อ่านใบกำกับ',
             'adm-eng-task-id_card': 'บัตรประชาชน',
             'adm-eng-task-bank_statement': 'สเตทเมนต์ธนาคาร',
@@ -969,7 +978,7 @@
             'adm-eng-col-pages': 'หน้า',
             'adm-eng-col-perpage': 'ต้นทุน/หน้า',
             'adm-eng-col-cost': 'ต้นทุนรวม',
-            'adm-eng-col-p50': 'ความหน่วง P50',
+            'adm-eng-col-p50': 'P50 ต่อการเรียก (ไม่ใช่ทั้งเอกสาร)',
             'adm-eng-col-models': 'โมเดล',
             'adm-eng-unattributed': 'ไม่ระบุที่มา',
             'adm-eng-unattributed-hint':

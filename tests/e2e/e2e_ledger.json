@@ -24,6 +24,10 @@
     "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
   ],
   "stale_ack": {
+    "_erp_admin_invite_verify.cjs": {
+      "why": "OCR 重构只改共享后台缓存键与 OCR 文案，未改 ERP 邀请行为；OCR 页中泰语真实浏览器已验证，按用户要求不扩大到邀请测试",
+      "until": "2026-09-06"
+    },
     "_erp_cowork_split_verify.cjs": {
       "why": "本批只改 POS 与库存扫码，ERP/Cowork 入口未受影响；当前未启本地 8765 应用",
       "until": "2026-09-04"

@@ -1,45 +1,11 @@
-<!--
-  Pearnly PR 模板 · 整顿期(REFACTOR）协作用
-  权威规则:CLAUDE.md/CLAUDE.md(铁律)· CLAUDE.md/REFACTOR_MASTER_PLAN.md(整顿主计划)
--->
+## 改动与原因
 
-## 改了什么 / 为什么
+<!-- 描述触发场景和行为变化；有关任务时附链接。开发规则见 AGENTS.md。 -->
 
-<!-- 1-3 句:这个 PR 做了什么,以及为什么要做(说清 why,不只是 what)。 -->
+## 验证
 
+<!-- 写明本次影响面、运行的检查及结果；引用浏览器/集成证据，并说明未覆盖部分。无需复制不适用的全套清单。 -->
 
+## 发布或迁移影响
 
-**关联任务**:REFACTOR-<task-id>  <!-- 整顿期 commit / PR 必含 task ID(铁律 #20)。紧急 BUG 用 hotfix: · 纯文档用 docs: -->
-
----
-
-## 6 道守门(本机全绿才提交 · CI 也跑)
-
-- [ ] `npm run format:check` → 全绿(prettier 格式)
-- [ ] `python -m unittest discover -s tests/unit -p "test_*.py"` → all OK(全量单测)
-- [ ] `python scripts/check_imports.py --quiet` → EXIT 0
-- [ ] `python scripts/check_i18n.py --strict` → 0 missing 0 extra(4 语完整)
-- [ ] `node --check <changed.js>` → 各改动 JS 都过(改了 JS 时)
-- [ ] `npm run build` → 构建通过(改了前端时)
-- [ ] (按需 E2E)`npx playwright test` → 改了 login.html / 顶栏 / 4 语切换 / 核心路径时必跑
-
----
-
-## 巨石 / 敏感路径自检(铁律 #16 / #17 / #21 / #23)
-
-- [ ] **没往巨石加新东西**:新路由进 `*_routes.py`(不进 `app.py`)· 新前端业务逻辑进 `src/home/*`(不进 `home.js`)· 新 CSS 独立(不进 `home.css`)· 新业务 SQL 进 `services/`、新 schema 走 Alembic(不进 `db.py` / 不加 `ensure_*`)
-  - [ ] 若**确实暂塞**了巨石 → 已在 commit message 透明说明原因 + 迁出 deadline,并登记 `TECH_DEBT.md`
-- [ ] **是否触碰敏感 / 高敏路径**(登录 / 注册 / 计费 / 配额 / OCR 热路径 / auth / RLS / DB schema / git-deploy):
-  - [ ] 否
-  - [ ] 是 → 已先口头跟 Zihao 汇报方案 · 由 Zihao 在场 review(不进自动并行批处理)
-- [ ] **删/改了后端返回字段** → 已同步改对应 Pydantic `response_model`,删字段先 `Optional + default None`(铁律 #15)
-- [ ] **每拆一个模块 / 每修一个真 bug** → 已带一个守门测试(铁律 #21.7 / 硬门槛 #4)
-- [ ] 改动文件数 > 30(重构级)→ 已请 Zihao 先 review(铁律 #16 红线)
-
----
-
-## 测试 / 验证
-
-<!-- 怎么验证这个改动是对的(本机 / curl / 真站点 / 截图)。整顿期改 bug 须端到端测到 PASS(铁律 #25)。 -->
-
-
+<!-- 如有，说明候选版本、兼容性、数据迁移与恢复要求。普通文档/开发工具修改可写“不涉及”。 -->

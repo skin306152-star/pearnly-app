@@ -1,7 +1,7 @@
 # 🔀 3 窗口并行 Loop 派工(PARALLEL_LOOP_DISPATCH)
 
 > **怎么用**:开 3 个新 Claude Code 窗口(确认 Opus 4.8)→ 每个窗口粘对应的「Loop 指令」整段 → Shift+Tab 切 auto-accept → 各自跑。
-> **上级权威**:`docs/refactor/adr-011-parallel-loop-strategy.md`(分工 + 文件 ownership + 协调机制)· `CLAUDE.md/CLAUDE.md` 铁律 #26(自主 loop 高敏例外)。
+> **上级权威**:`docs/refactor/adr-011-parallel-loop-strategy.md`(分工 + 文件 ownership + 协调机制)· `AGENTS.md` 铁律 #26(自主 loop 高敏例外)。
 > **跟 `AUTONOMOUS_LOOP.md` 的区别**:那份是**单窗口**跑全部(B/C 全含高敏,会自我串行);本份是**3 窗口并行**,按文件 ownership 切 A/B/C 互不撞车,速度 ≈ 2.5x。
 > 最后更新:2026-05-29(Opus 4.8 1M · 守门 6 道 · 全自主含高敏 + E2E 闸 + 自动回滚)
 
@@ -13,7 +13,7 @@
 |---|---|---|---|
 | **A 后端** | `app.py` `db.py` `*_routes.py` `services/**/*.py` | `home.*` `src/home/**` `tests/visual/` | B2 db.py 819→<500 + B1 app.py 3286→<500 |
 | **B 前端** | `home.js` `home.html` `home.css` `src/home/**` `src/main.js` `vite.config.*` | `*.py` `services/` | C1 home.js 6190→<200 + C3 home.html 4410→<1000 |
-| **C 文档测试** | `docs/**` `CLAUDE.md/*.md` `.github/` `scripts/*.py` `tests/integration/*` `tests/visual/*` `README.md` `CONTRIBUTING.md` | 所有业务代码(.py 业务 / .js / .html / .css / vite.config / package.json) | 文档冲突长尾扫荡 → D3/D4 测试 → 覆盖率棘轮 |
+| **C 文档测试** | `docs/**` `docs/project/*.md` `.github/` `scripts/*.py` `tests/integration/*` `tests/visual/*` `README.md` `CONTRIBUTING.md` | 所有业务代码(.py 业务 / .js / .html / .css / vite.config / package.json) | 文档冲突长尾扫荡 → D3/D4 测试 → 覆盖率棘轮 |
 
 **唯一可能冲突边界**:`tests/unit/test_*_contract.py`(A 抽 service 时加契约测试)· 靠文件名唯一 + `git pull --rebase` 解。
 
@@ -37,10 +37,9 @@
 【全自主含高敏·安全网保留】Zihao已确认"没有高敏·全部跑完"。但保留安全网:① 高敏块(钱/登录/auth/RLS/OCR)只做纯结构性挪代码·0逻辑改 ② 推送后用环境变量测试账号跑真账号E2E(登录+受影响流程·只动测试账号台账绝不碰mrerp真余额) ③ CI红或E2E红→立刻git revert HEAD+单独push再重做·绝不留红在master。
 
 【每轮】
-1. 读 CLAUDE.md/CLAUDE.md(28铁律)+ STATE_PEARNLY.md头部 + REFACTOR_MASTER_PLAN.md进度看板 + docs/refactor/BATCH_STRATEGY.md。git branch--show-current确认master(铁律#14)。
+1. 读 AGENTS.md(28铁律)+ STATE_PEARNLY.md头部 + REFACTOR_MASTER_PLAN.md进度看板 + docs/refactor/BATCH_STRATEGY.md。git branch--show-current确认master(铁律#14)。
 2. 抽前必re-grep真实行号。copy-out新文件→接线→删巨石。
 3. 跑6道守门全绿:npm run format:check / 全量python -m unittest discover -s tests/unit / python scripts/check_imports.py --quiet / python scripts/check_i18n.py --strict / node --check <改的.js> / npm run build(改前端才需·后端可跳)。每域带契约测试。
-4. commit(message含·REFACTOR-WA-B2或WA-B1 + Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>) → git pull --rebase origin master → git push origin master(C档位不问)。
 5. gh run watch盯CI真绿;高敏块还跑真账号E2E。红了revert+重做到真绿。
 6. 更新STATE_PEARNLY.md头部"窗口A当前task"+主计划进度看板+BATCH_STRATEGY §10。
 一直循环别停下问我。
@@ -66,10 +65,9 @@
 【删home.*大块铁律】必须node split('\n')/join('\n')保CRLF + 删前cp备份 + 删后字节校验(行数对+无\r的行=0)。禁用sed/python盲写。
 
 【每轮】
-1. 读 CLAUDE.md/CLAUDE.md(28铁律)+ STATE_PEARNLY.md头部 + REFACTOR_MASTER_PLAN.md进度看板 + BATCH_STRATEGY.md §10/§13。git branch--show-current确认master。
+1. 读 AGENTS.md(28铁律)+ STATE_PEARNLY.md头部 + REFACTOR_MASTER_PLAN.md进度看板 + BATCH_STRATEGY.md §10/§13。git branch--show-current确认master。
 2. 抽前必re-grep真实行号。copy-out→接线(src/main.js import)→自底向上按行号删+字节校验。
 3. 跑6道守门全绿:npm run format:check / 全量unittest / check_imports / check_i18n / node --check <改的.js> / npm run build。带渲染/契约测试(module入口函数能渲染·0报错)。
-4. commit(message含·REFACTOR-WB-C1或WB-C3 + Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>) → git pull --rebase origin master → git push origin master。
 5. gh run watch盯CI真绿 + 生产E2E。红了revert+重做。
 6. 更新STATE头部"窗口B当前task"+主计划进度看板+BATCH_STRATEGY §10/§13。
 一直循环别停下问我。
@@ -82,11 +80,11 @@
 ```
 /loop 自主整顿 · 窗口C文档测试 · 0业务代码 · 无人值守 · 你是Opus 4.8(1M context)别等我:
 
-【铁律·只碰这些文件】docs/**/*.md / CLAUDE.md/*.md / .github/ / scripts/*.py / tests/integration/* / tests/visual/* / README.md / CONTRIBUTING.md。绝不碰任何业务代码(.py业务/.js/.html/.css/vite.config/package.json)。越界=立刻停下开PR等Zihao。
+【铁律·只碰这些文件】docs/**/*.md / docs/project/*.md / .github/ / scripts/*.py / tests/integration/* / tests/visual/* / README.md / CONTRIBUTING.md。绝不碰任何业务代码(.py业务/.js/.html/.css/vite.config/package.json)。越界=立刻停下开PR等Zihao。
 
 【4.8能力榨干】文档一致性扫荡用1M context把所有相关文档一次性读进来对照·"修一类不修一处"(铁律#1)grep全项目同类不一致一次性全改。
 
-【第一轮先做·文档冲突长尾扫荡】主控窗口已修两份必读宪法(CLAUDE.md/CLAUDE.md + REFACTOR_MASTER_PLAN.md · commit 6f98d33)。你扫剩余二级文档的同类不一致全改齐:
+【第一轮先做·文档冲突长尾扫荡】主控窗口已修两份必读宪法(AGENTS.md + REFACTOR_MASTER_PLAN.md · commit 6f98d33)。你扫剩余二级文档的同类不一致全改齐:
 - "5道守门"→"6道守门"(format:check+全量unit+imports+i18n+node--check+build·E2E按需):RUNBOOK.md / ONBOARDING.md / docs/ONBOARDING.md / BATCH_STRATEGY.md / adr-008 / TASK_MODES.md / BATCH_AGENT_DISPATCH_TEMPLATE.md / .github/PULL_REQUEST_TEMPLATE.md
 - 署名"Opus 4.7"→"4.8":只改前瞻性模板(BATCH_STRATEGY/ONBOARDING/dispatch等commit模板);⚠️史实签名不改(docs/audits/*日期签名 / WINDOW_C_COMPLETE完成签名 / STATE过往会话日志 / erp-out-of-box起草署名)。
 - 铁律计数 17/20→28:docs/README.md(17→28)等。
@@ -98,10 +96,9 @@
 - 纯新增文件·绝不改业务代码。
 
 【每轮】
-1. 读 CLAUDE.md/CLAUDE.md(28铁律)+ STATE头部 + REFACTOR_MASTER_PLAN.md进度看板。git branch确认master。
+1. 读 AGENTS.md(28铁律)+ STATE头部 + REFACTOR_MASTER_PLAN.md进度看板。git branch确认master。
 2. 干活·字节级LF无BOM。
 3. 跑6道守门全绿(改测试跑全量unittest+playwright;纯docs可跳build)。
-4. commit(message含·REFACTOR-WC-* + Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>) → git pull --rebase origin master → git push origin master。
 5. gh run watch盯CI真绿。红了revert+重做。
 6. 更新STATE头部"窗口C当前task"+主计划进度看板。
 一直循环别停下问我。

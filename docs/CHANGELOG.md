@@ -167,8 +167,8 @@ git cliff --tag v1.0.0 -o RELEASE.md
 
 | 文件 | 角色 | 是否手维护 |
 |---|---|---|
-| `CLAUDE.md/STATE_PEARNLY.md` | 当前状态 + 接力提示 | ✅ 每窗口手更新(铁律 #19) |
-| `CLAUDE.md/REFACTOR_MASTER_PLAN.md` | 整顿主计划 + 进度看板 | ✅ 每完成 task 手更新 |
+| `docs/project/STATE_PEARNLY.md` | 当前状态 + 接力提示 | ✅ 每窗口手更新(铁律 #19) |
+| `docs/project/REFACTOR_MASTER_PLAN.md` | 整顿主计划 + 进度看板 | ✅ 每完成 task 手更新 |
 | `docs/CHANGELOG.md`(本文)| 方案说明 | ✅ 偶尔更新 |
 | `docs/CHANGELOG.md.generated`(未来)| git-cliff 自动生成 | ❌ 不手改 · 改 cliff.toml |
 | GitHub Release notes(未来)| 每个 tag 出 | ❌ 自动 |
@@ -188,5 +188,5 @@ git cliff --tag v1.0.0 -o RELEASE.md
 
 - git-cliff 文档:https://git-cliff.org/docs/
 - Conventional Commits:https://www.conventionalcommits.org/
-- 铁律 #20(commit message 必含 REFACTOR-id):`CLAUDE.md/CLAUDE.md`
+- 铁律 #20(commit message 必含 REFACTOR-id):`AGENTS.md`
 - ADR-010(防屎山 4 件套):`docs/refactor/adr-010-anti-bigfile-mechanism.md`

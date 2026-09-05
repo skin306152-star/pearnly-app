@@ -1,6 +1,6 @@
 # 10 · 主项目约束 + 守门闸(迁回不脱轨的权威清单)
 
-> 实扫主项目得出(2026-06-04)。迁回写代码前**逐条对照**。源头:`CLAUDE.md/CLAUDE.md`(28+ 铁律)、
+> 实扫主项目得出(2026-06-04)。迁回写代码前**逐条对照**。源头:`AGENTS.md`(28+ 铁律)、
 > `docs/ENGINEERING_STANDARD.md`(Definition of Done)、`scripts/git-hooks/pre-push`、`.github/workflows/ci.yml`。
 
 ## 一、守门闸真相(不是 3-4 道 · 是两个执行点 + 9 脚本)
@@ -60,7 +60,7 @@
 |---|---|
 | **i18n 4 语** | **zh/en/th/ja 全齐**(对外功能)· `check_i18n --strict` 0 缺失 · 默认 th · 见 `docs/07` |
 | **UI 先设计后做** | 所有界面先出稿 + Zihao 定稿才实现(死规则 · 见 README/`docs/06`) |
-| 设计系统 | 遵 `CLAUDE.md/DESIGN_SYSTEM.md`(20 节视觉契约)· 对照清单见 `docs/06` §设计系统对照 |
+| 设计系统 | 遵 `docs/project/DESIGN_SYSTEM.md`(20 节视觉契约)· 对照清单见 `docs/06` §设计系统对照 |
 | 主按钮 | `.btn-primary` = **品牌蓝 `#2563EB`**(走 `static/home-38-buttons.css` · 权威)· DESIGN_SYSTEM §2.1 `#1a365d` 是旧值 |
 | token | 直接用 `home.css :root`(`--accent/--bg/--card/--line/--ink*/--success/--warn/--danger`)· 钱/票号套 `--font-mono` |
 | 梯度 | 字号 13/12/11/14px · 圆角 input6-8/card10-12/modal12/pill999 · 按钮 min-height 40px |
@@ -76,7 +76,6 @@
 - **开票属高敏**(钱/合规):取连号、开出不可改、生成税务凭证 = 类计费/关键路径 →
   **先报方案再动 · Zihao 在场 · 真账号 E2E 验**(铁律 #16/#26)· **不走无人值守自动合并**。
 - 开工前 `git branch --show-current` 确认在 **master**(铁律 #14)。
-- commit:**Conventional Commits + `Co-Authored-By: Claude Opus 4.8`**(整顿期才加 `· REFACTOR-<id>`;
   本模块是新功能 · 整顿收官后做 · 用普通 Conventional Commits + 模块 task id)。
 - `release_notes` 横幅已退役;用户可见变化仍须走产品内四语文案与提示位。
 - 验收:真浏览器 isVisible+getComputedStyle+截图(grep 类名不算)· 跑对应验收剧本。
@@ -85,8 +84,8 @@
 
 | 既有 PRD | 覆盖什么 | 与本沙盒关系 |
 |---|---|---|
-| `CLAUDE.md/MODULE_EXPENSE_PRD_v2.md` | **进项/凭证中心**(Expense Center)· 明确"Paypers 一比一+超越"· LINE/OCR/代收据/PV/4语/多客户 | 客户的 Paypers 截图(รายจ่าย=支出)**归这份**·本沙盒不重做进项 |
-| `CLAUDE.md/MODULE_SALE_VAT_RECON_PRD.md` | **销项税对账**(把客户 VAT 报告 ↔ 已归档发票逐行核对)· 进 `reconcile/sale-vat` | 是"对账"·**不是开票**·本沙盒补的是"开票" |
+| `docs/project/MODULE_EXPENSE_PRD_v2.md` | **进项/凭证中心**(Expense Center)· 明确"Paypers 一比一+超越"· LINE/OCR/代收据/PV/4语/多客户 | 客户的 Paypers 截图(รายจ่าย=支出)**归这份**·本沙盒不重做进项 |
+| `docs/project/MODULE_SALE_VAT_RECON_PRD.md` | **销项税对账**(把客户 VAT 报告 ↔ 已归档发票逐行核对)· 进 `reconcile/sale-vat` | 是"对账"·**不是开票**·本沙盒补的是"开票" |
 | **本沙盒** | **销项开票**(自己给客户开 ใบกำกับภาษี/ใบเสร็จ · POS 4 种选品)· 填 `sales-invoices` 空壳 | 两份既有 PRD **都没覆盖**·属真空白·复用它们的 intake/PDF/对账底座 |
 
 > 结论:"统一智能录入引擎"愿景里,**进项侧已被 Expense PRD 规划**;本沙盒聚焦**销项开票**,

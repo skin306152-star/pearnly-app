@@ -2,7 +2,7 @@
 
 > 2026-05-30 重制 · Zihao 拍板:**全权放行高敏 + 无人值守全自动 + 范围=所有整顿计划 + 按钮全换**。
 > 前置安全网:pre-push 机械闸(`scripts/git-hooks/pre-push`)已上线 · 坏码(语法/漏 import/测试红/build 坏)推送前被本地拦下 · 永不上 master。
-> 配套权威:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(9 阶段全任务)· 铁律 #26/#27 · 本文 §A 审计 = 要补的"纸面规矩"。
+> 配套权威:`docs/project/REFACTOR_MASTER_PLAN.md`(9 阶段全任务)· 铁律 #26/#27 · 本文 §A 审计 = 要补的"纸面规矩"。
 
 ---
 

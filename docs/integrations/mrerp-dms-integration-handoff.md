@@ -29,7 +29,7 @@ MR.ERP DMS 不要做成新页面,也不要塞进旧 Webhook 弹窗。它应该�
 
 ### 1. 整顿封锁期冲突
 
-当前项目状态是整顿封锁期,`AGENTS.md:24` 明确写 0 新功能,`CLAUDE.md/CLAUDE.md:373-390` 是铁律 #18。DMS 是新功能,所以代码接入本身与封锁期冲突。
+当前项目状态是整顿封锁期,`AGENTS.md:24` 明确写 0 新功能,`AGENTS.md:373-390` 是铁律 #18。DMS 是新功能,所以代码接入本身与封锁期冲突。
 
 处理方式:
 
@@ -42,7 +42,7 @@ MR.ERP DMS 不要做成新页面,也不要塞进旧 Webhook 弹窗。它应该�
 DMS 会碰 OCR、ERP 推送、凭据、外部系统写入,命中高敏区。依据:
 
 - OCR/ERP/推送主路径改动先报方案:`AGENTS.md:49`
-- 高敏区范围含 OCR 热路径、`services/ocr/*`、`app.py` recognize、auth/session:`CLAUDE.md/CLAUDE.md:612-625`
+- 高敏区范围含 OCR 热路径、`services/ocr/*`、`app.py` recognize、auth/session:`AGENTS.md:612-625`
 - 工程标准要求高敏走 Ready 流程:`docs/ENGINEERING_STANDARD.md:64-83`
 
 处理方式:
@@ -53,7 +53,7 @@ DMS 会碰 OCR、ERP 推送、凭据、外部系统写入,命中高敏区。依�
 
 ### 3. 无 API ERP 技术路线冲突
 
-原实验室方案用了 HTTP/session 重放 DMS endpoint。主项目铁律 #7 已规定:无开放 API 的 ERP 一律走服务端 Playwright,不要把老 PHP endpoint 抓包重放作为生产默认方案,见 `CLAUDE.md/CLAUDE.md:86-105`。
+原实验室方案用了 HTTP/session 重放 DMS endpoint。主项目铁律 #7 已规定:无开放 API 的 ERP 一律走服务端 Playwright,不要把老 PHP endpoint 抓包重放作为生产默认方案,见 `AGENTS.md:86-105`。
 
 修正后的生产主方案:
 
@@ -64,7 +64,7 @@ DMS 会碰 OCR、ERP 推送、凭据、外部系统写入,命中高敏区。依�
 
 允许保留的部分:
 
-- 官方 Excel 模板克隆。字节级模板处理属于铁律 #8 支持范围,见 `CLAUDE.md/CLAUDE.md:112-135`。
+- 官方 Excel 模板克隆。字节级模板处理属于铁律 #8 支持范围,见 `AGENTS.md:112-135`。
 - Playwright 可在内部监听响应,但业务动作必须以官方 UI 流程为准。
 
 ### 4. 发票 auto_push 语义冲突
@@ -82,9 +82,9 @@ DMS 会碰 OCR、ERP 推送、凭据、外部系统写入,命中高敏区。依�
 
 新业务不能塞进巨石,依据:
 
-- 新路由不进 `app.py`:`CLAUDE.md/CLAUDE.md:554`
-- 新前端业务进 `src/home/*`,不是 `static/*.js` IIFE:`CLAUDE.md/CLAUDE.md:557`
-- 新功能必须独立文件并带测试:`CLAUDE.md/CLAUDE.md:649-650`
+- 新路由不进 `app.py`:`AGENTS.md:554`
+- 新前端业务进 `src/home/*`,不是 `static/*.js` IIFE:`AGENTS.md:557`
+- 新功能必须独立文件并带测试:`AGENTS.md:649-650`
 
 处理方式:
 

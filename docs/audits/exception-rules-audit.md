@@ -177,7 +177,7 @@ business). Good template; future ERPs (FlowAccount, PEAK) should mirror.
 
 ### 1.10 Empty `except:` blocks (separate concern)
 
-CLAUDE.md/TECH_DEBT.md §2 calls out 106 silent `try/except: pass` sites.
+docs/project/TECH_DEBT.md §2 calls out 106 silent `try/except: pass` sites.
 That's a separate cleanup track from this audit — many were intentional
 (e.g. screenshot failure tolerance in the probe). Not blocking adapter
 rollout but worth pursuing alongside.

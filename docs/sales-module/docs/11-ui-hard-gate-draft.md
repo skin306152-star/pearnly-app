@@ -115,7 +115,7 @@ python scripts/check_ui_consistency.py --quiet || fail "UI 硬规:新增了抽�
 
 ## §4 · 主项目文档纠正(规定统一 · 让闸有据)
 
-### CLAUDE.md/CLAUDE.md(§30 NAV-IA 视觉对齐铁律那行)
+### AGENTS.md(§30 NAV-IA 视觉对齐铁律那行)
 
 把:
 > `active/focus 仍可保黑系或随蓝(侧栏 active 视觉另议)· 但 .btn-primary 一律蓝。`

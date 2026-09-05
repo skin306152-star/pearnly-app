@@ -27,7 +27,7 @@
 
 | # | Task | 产出 | 状态 |
 |---|---|---|---|
-| 1 | CLAUDE.md 铁律 #27 · 4 条防屎山规矩 | `CLAUDE.md/CLAUDE.md` +97 行 | ✅ |
+| 1 | CLAUDE.md 铁律 #27 · 4 条防屎山规矩 | `AGENTS.md` +97 行 | ✅ |
 | 2 | CLAUDE.md 铁律 #28 · 新功能 4 问流程 | (同段)| ✅ |
 | 3 | `scripts/check_file_size.py` | 220 行 · 零依赖 · `--quiet` flag | ✅ |
 | 4 | `scripts/check_line_ratchet.py` | 250 行 · `RATCHET-EXEMPT:` 透明豁免 | ✅ |
@@ -101,7 +101,7 @@ d37f091 test(integration+visual): D2 集成 21 个 + D5 视觉回归 10 页 base
 ## 4. 硬约束遵守报告(0 业务代码)
 
 **允许 touch · 已 touch**:
-- `CLAUDE.md/CLAUDE.md`(+ 铁律 #27 + #28)
+- `AGENTS.md`(+ 铁律 #27 + #28)
 - `.github/workflows/ci.yml`(+ lint-size job)
 - `.github/CODEOWNERS`(纯新增)
 - `.github/ISSUE_TEMPLATE/question.md`(纯新增)
@@ -177,7 +177,6 @@ chore(ci): 防屎山闸切 fail 模式 · 整顿期硬门激活 · REFACTOR-WC-G
 此后任何 commit 涨监控文件 = CI 红挡 push · 整顿期不会再糊回去。
 警告期反馈:见 ADR-010 §7 (How we'll know it works)。
 
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -241,8 +240,8 @@ EOF
 
 **60 秒入窗口**:
 1. `git branch --show-current` → master(铁律 #14)
-2. `cat CLAUDE.md/STATE_PEARNLY.md` 头部 50 行(看本文窗口 C 收尾段)
-3. `cat CLAUDE.md/REFACTOR_MASTER_PLAN.md` "当前进度看板"
+2. `cat docs/project/STATE_PEARNLY.md` 头部 50 行(看本文窗口 C 收尾段)
+3. `cat docs/project/REFACTOR_MASTER_PLAN.md` "当前进度看板"
 4. `python scripts/refactor_progress.py`(数字没动 = 没干活)
 5. **如果你是窗口 A**:接 B1 / B2 主线(STATE §8.1)
 6. **如果你是窗口 B**:接 C1 / C3 前端(STATE §8.2)

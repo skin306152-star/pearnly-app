@@ -5,21 +5,21 @@
 > 这是 `docs/` 下所有 markdown 的导航 · 给新接力 agent 和 Zihao 用。
 > 每条 1-2 句说明 + 创建/更新日期 + 现在还能不能信(✅ 当前 / 📚 历史 / ⚠️ 已过时但保留)。
 >
-> **⚠️ 单一权威源(活文档·只信这些)**:`AGENTS.md`(唯一入口)· `CLAUDE.md/STATE_PEARNLY.md`(状态卡)· `CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板)· `CLAUDE.md/CLAUDE.md`(铁律)· `OUTCOMES.md`(Zihao 结果跟踪)。
+> **⚠️ 单一权威源(活文档·只信这些)**:`AGENTS.md`(唯一入口)· `docs/project/STATE_PEARNLY.md`(状态卡)· `docs/project/REFACTOR_MASTER_PLAN.md`(进度看板)· `AGENTS.md`(铁律)· `OUTCOMES.md`(Zihao 结果跟踪)。
 > **当前主线活文档**:`docs/agent/MASTER-PLAN.md`(对话 Agent M1 · WP1~5)+ `docs/agent/M1-SOCKET-DESIGN.md` + `docs/agent/CONVERSATION-SPEC.md`。
 > **已归档到 `docs/archive/`(历史快照·勿当现状)**:2026-06 的一次性 HANDOFF(绑主体面板/体积闸/全检收口/整顿恢复/全局诊断/erp-recon/express-v1/B8-RLS-wave2 等)· `Pearnly_按优先级可执行任务清单_2026-05-21.md` · `STATE_2026_05_19.md`。均已被 STATE 状态卡取代。`docs/ONBOARDING.md` 与根 `ONBOARDING.md` 重复(待合并)。
 >
 > **项目级文档不在这里** · 见项目根:
-> - `CLAUDE.md/CLAUDE.md`(项目宪法 · 28 条铁律)
-> - `CLAUDE.md/STATE_PEARNLY.md`(当前状态 · 每会话末更新)
-> - `CLAUDE.md/EXECUTION_PLAN.md`(8 阶段执行清单 · 阶段 7 收尾中)
-> - `CLAUDE.md/TECH_DEBT.md`(技术债清单 · 长期持续)
-> - `CLAUDE.md/BACKLOG.md`(任务清单)
-> - `CLAUDE.md/MODULE_ROADMAP.md`(12 模块路线图)
-> - `CLAUDE.md/DESIGN_SYSTEM.md`(UI 设计规范)
-> - `CLAUDE.md/NAV_IA_PRD.md`(导航 IA · Phase 1-8 已收官)
-> - `CLAUDE.md/MODULE_SALE_VAT_RECON_PRD.md`(P0-VAT 需求)
-> - `CLAUDE.md/MODULE_EXPENSE_PRD_v2.md`(进项管理 v118.40 MVP)
+> - `AGENTS.md`(项目宪法 · 28 条铁律)
+> - `docs/project/STATE_PEARNLY.md`(当前状态 · 每会话末更新)
+> - `docs/project/EXECUTION_PLAN.md`(8 阶段执行清单 · 阶段 7 收尾中)
+> - `docs/project/TECH_DEBT.md`(技术债清单 · 长期持续)
+> - `docs/project/BACKLOG.md`(任务清单)
+> - `docs/project/MODULE_ROADMAP.md`(12 模块路线图)
+> - `docs/project/DESIGN_SYSTEM.md`(UI 设计规范)
+> - `docs/project/NAV_IA_PRD.md`(导航 IA · Phase 1-8 已收官)
+> - `docs/project/MODULE_SALE_VAT_RECON_PRD.md`(P0-VAT 需求)
+> - `docs/project/MODULE_EXPENSE_PRD_v2.md`(进项管理 v118.40 MVP)
 > - `CONTRIBUTING.md`(协作者快速参考卡 · 铁律 #17 配套)
 
 ---
@@ -132,7 +132,7 @@
 | [`deploy-sync-analysis.md`](deploy-sync-analysis.md) | 部署流程现状 + 防失同步建议 · webhook + git pull 链路 |
 | [`excel-export-test-checklist.md`](excel-export-test-checklist.md) | Excel 导出实测 Checklist · 银行对账 v2 |
 
-> 主部署文档在 `CLAUDE.md/CLAUDE.md` § 部署 & 打包铁律(L632+)。RUNBOOK 是其可操作版浓缩。
+> 主部署文档在 `AGENTS.md` § 部署 & 打包铁律(L632+)。RUNBOOK 是其可操作版浓缩。
 
 ---
 
@@ -142,14 +142,14 @@
 |---|---|
 | [`STATE_2026_05_19.md`](STATE_2026_05_19.md) | MR.ERP 集成窗口 handoff(2026-05-19) · 起点 commit `6eaf155` |
 
-> 当前 STATE 看 `CLAUDE.md/STATE_PEARNLY.md`(项目根) · 不看 `docs/STATE_*.md`(那是历史快照)。
+> 当前 STATE 看 `docs/project/STATE_PEARNLY.md`(项目根) · 不看 `docs/STATE_*.md`(那是历史快照)。
 
 ---
 
 ## 怎么用本索引
 
 **接力 agent 进窗口先看**:
-1. `CLAUDE.md/CLAUDE.md` + `STATE_PEARNLY.md` + `EXECUTION_PLAN.md`(项目宪法 + 状态 + 路线)
+1. `AGENTS.md` + `STATE_PEARNLY.md` + `EXECUTION_PLAN.md`(项目宪法 + 状态 + 路线)
 2. 任务相关时再翻这个 README
    - 改 DB schema → `architecture/db-*.md`
    - 接 ERP → `integrations/mrerp-*.md`

@@ -50,7 +50,7 @@
 - key 命名遵 `DESIGN_SYSTEM.md §15`:kebab-case · 最多 4 段 · area 前缀(本模块 `sales-` / `ar-`)· 动态内容必 `subscribeI18n` 注册。
 - 开工前 `grep -r 'data-i18n="sales-' home.html` 查前缀冲突(§15.6)。
 
-## 设计系统对照(必须遵 `CLAUDE.md/DESIGN_SYSTEM.md` · 新组件偏离要在 PR 说明)
+## 设计系统对照(必须遵 `docs/project/DESIGN_SYSTEM.md` · 新组件偏离要在 PR 说明)
 
 App 主题 token(`home.css :root`),本模块直接用、不另造色值:
 

@@ -95,9 +95,9 @@
 - **rule b**:❌ 不触发
 - **执行**:直接清 ✅
 
-### 🟢-NEW-4 旧 HANDOVER_TO_NEXT_WINDOW.md(CLAUDE.md/ 内)
-- **降级理由**:重复文档 · CLAUDE.md/HANDOVER 是 5/17 旧版 · 根目录 HANDOVER 是 5/18 新版
-- **删除范围**:`CLAUDE.md/HANDOVER_TO_NEXT_WINDOW.md`(19515 字节)
+### 🟢-NEW-4 旧 HANDOVER_TO_NEXT_WINDOW.md(docs/project/ 内)
+- **降级理由**:重复文档 · docs/project/HANDOVER 是 5/17 旧版 · 根目录 HANDOVER 是 5/18 新版
+- **删除范围**:`docs/project/HANDOVER_TO_NEXT_WINDOW.md`(19515 字节)
 - **scope**:1 文件
 - **rule b**:❌ 不触发
 - **执行**:直接清 ✅

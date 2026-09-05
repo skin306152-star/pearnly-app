@@ -21,7 +21,7 @@ closeModal → unmountInvScan 这条真路」,选择器却是 `page.locator('.in
 在同行或上一行留 `// SELECTOR-INDEX-OK: <理由>`。理由不许空:空的等于没写。
 
 这道闸只管选择器这一半。另一半「断言必须只有走目标路径才会变」机械化不了(判不了两条
-路的结果是否重合),落在 `.claude/skills/verification` 的验收脚本规范 + review 清单里。
+路的结果是否重合),落在 `docs/agent/VERIFICATION.md` 的验收脚本规范 + review 清单里。
 """
 
 from __future__ import annotations

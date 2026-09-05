@@ -1,7 +1,7 @@
 # 🚀 Pearnly 整顿 · `/batch` 加速作战手册（BATCH_STRATEGY）
 
 > **这份文档是整顿期"如何用 `/batch` 把大文件/屎山快速拆完"的单一权威源。**
-> 配套上级文档:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(整顿主计划 · task 定义)。
+> 配套上级文档:`docs/project/REFACTOR_MASTER_PLAN.md`(整顿主计划 · task 定义)。
 > 本文档只回答一个问题:**那些重复的拆分/补测试,怎么用并行 agent 几天啃完,而不出事。**
 >
 > 最后更新:2026-05-27(初版 · 设计阶段 · 尚未开跑)
@@ -137,7 +137,6 @@
     node --check <改的.js>
     npm run build
     npx playwright test            # (按需 E2E)改了前端/核心路径才跑
-- commit message 必含 · REFACTOR-<task-id>,带 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>。
 - 完成后开 PR,描述写清:产出文件、跑过哪 6 道门、覆盖哪条核心路径。
 - 任何不确定 / 要碰巨石 / 触发高敏(登录·计费·OCR热路径)→ 立刻停,PR 里标注,不硬来。
 ```
@@ -207,7 +206,7 @@
 
 ```
 1. git branch --show-current → 确认 master(铁律 #14)
-2. 读 CLAUDE.md/CLAUDE.md(铁律) + STATE_PEARNLY.md(当前状态)
+2. 读 AGENTS.md(铁律) + STATE_PEARNLY.md(当前状态)
 3. 读 REFACTOR_MASTER_PLAN.md(找 task) + 本文档(找当前波次)
 4. 看本文档 §10 进度账本 → 确认上一波做到哪
 5. 给 Zihao 一句话:"现在该 Wave X,建议开 N 个 agent 干这些,指令我写好了"

@@ -21,14 +21,14 @@
 
 **显式排除**:
 - `.git/`、`__pycache__/`、`_pkg/`、`_pkg_tmpstatic/`(空)— 运行时/版控产物
-- `CLAUDE.md/` 目录下的 10 个 .md 项目文档 — 不是代码
+- `docs/project/` 目录下的 10 个 .md 项目文档 — 不是代码
 - `docs/` 下的 .md 文档 — 不是代码
 - 根目录 3 个 `deploy_v*.tar.gz/zip` 部署包(已 gitignore,见后述)
 - 数据库 SQL 迁移文件 — 不在本次清理类目内
 
 ### 0.2 与现有 TECH_DEBT.md 的边界
 
-项目已有 `CLAUDE.md/TECH_DEBT.md`(2026-05-15 启动),覆盖了 **前端三大件**(home.js / home.css / home.html)的头部问题:
+项目已有 `docs/project/TECH_DEBT.md`(2026-05-15 启动),覆盖了 **前端三大件**(home.js / home.css / home.html)的头部问题:
 - home.js 1346 KB / 30071 行
 - `deleteEndpoint` 12694 行函数
 - `closeSettingsModal` 2386 行函数
@@ -245,7 +245,7 @@ OCR 模块正在另一个会话(`docs/ocr-migration/`)进行架构迁移(Vision 
 - **建议处理方式**:阶段 3 批量清理(不是本审计该决定的)
 - **风险**:零
 
-#### 🟡-8 `MODULE_EXPENSE_PRD_v2.md`(在 CLAUDE.md/ 目录,不是代码)
+#### 🟡-8 `MODULE_EXPENSE_PRD_v2.md`(在 docs/project/ 目录,不是代码)
 - **位置**:`CLAUDE.md\MODULE_EXPENSE_PRD_v2.md`
 - **类型**:过时文档 — 文件名带 `_v2` 暗示存在 v1
 - **证据**:`find` 未找到对应的 `MODULE_EXPENSE_PRD.md`(v1)

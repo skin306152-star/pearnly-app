@@ -10,7 +10,7 @@
 > 的旧拍板**没有被推翻**——`users.active_jti` 对**同一账号**的单活约束仍生效(后登录撤销前登录,
 > 同账号多入口不互踢不成立)。本轮新增的是**同一浏览器里不同账号在 `/cowork` 与 `/erp` 两个入口的
 > 并存**:cowork 与 erp 各用独立 token 槽 + workspace 槽,不同账号在同一 Chrome 可同时在线、互不覆盖。
-> 历史文字保留供溯因;现行会话/入口口径以 `CLAUDE.md/STATE_PEARNLY.md` 顶部状态卡 + `AGENTS.md` 为准。
+> 历史文字保留供溯因;现行会话/入口口径以 `docs/project/STATE_PEARNLY.md` 顶部状态卡 + `AGENTS.md` 为准。
 
 ## 1. 定稿模型（四层各管各的）
 

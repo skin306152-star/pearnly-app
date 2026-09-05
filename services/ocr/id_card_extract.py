@@ -8,7 +8,7 @@ car-sales intake flow (document_type = "thai_id_card").
 Deliberately SEPARATE from the invoice OCR hot path: it reuses the shared
 ai_gateway transport (multimodal → JSON), but with its OWN prompt and its OWN
 output shape. The invoice _SYSTEM_PROMPT / ThaiInvoice
-schema are never touched (CLAUDE.md/CLAUDE.md high-sensitivity OCR rule + the
+schema are never touched (AGENTS.md high-sensitivity OCR rule + the
 DMS handoff doc: "do not force Thai ID cards through the invoice fields").
 
 Public:

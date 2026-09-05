@@ -8,7 +8,7 @@ identity patch + master-data lookups against the MR.ERP DMS PHP forms.
 This module speaks NO Playwright and NO requests directly. It drives an
 injected `transport` object so it stays unit-testable with a fake. In
 production mrerp_dms_adapter.py wraps the authenticated Playwright browser
-context's request API as the transport (CLAUDE.md/CLAUDE.md §7 — the DMS
+context's request API as the transport (AGENTS.md §7 — the DMS
 session is owned by a real Playwright browser login, not raw external HTTP).
 
 Lineage: ported from the lab transport

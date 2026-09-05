@@ -1,11 +1,11 @@
 # 🤖 后台并行 agent 派工模板（BATCH_AGENT_DISPATCH）
 
 > **这份文档 = 主控窗口「派后台并行 agent 干活」的标准操作模板（copy-paste 即用）。**
-> 上级文档：`CLAUDE.md/BATCH_STRATEGY.md`（整套作战手册 · 5 波次 + 进度账本）。
+> 上级文档：`docs/project/BATCH_STRATEGY.md`（整套作战手册 · 5 波次 + 进度账本）。
 > 本文档只回答一个问题：**主控窗口具体怎么把活拆给后台 agent、怎么收口、什么时候能自动合并。**
 >
 > 最后更新：2026-05-28（初版）
-> 配套铁律：`CLAUDE.md/CLAUDE.md` 铁律 #26（无人值守自动修 bug + 自动合并 · 安全区 / 高敏两档）
+> 配套铁律：`AGENTS.md` 铁律 #26（无人值守自动修 bug + 自动合并 · 安全区 / 高敏两档）
 
 ---
 

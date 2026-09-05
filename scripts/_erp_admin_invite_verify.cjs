@@ -1,6 +1,6 @@
 // E2E 真浏览器验收(2026-08-27 · Earn 超管 /admin/erp ERP 邀请页)· 只新增本文件与截图,不改任何源码/测试/dist。
 //
-// 验收目标(对应 .claude/skills/verification → 截图范式:isVisible + getComputedStyle,输入用 keyboard.type):
+// 验收目标(对应 docs/agent/VERIFICATION.md → 截图范式:isVisible + getComputedStyle,输入用 keyboard.type):
 //   1. /admin/erp 侧栏「ERP 邀请」与页面都可见(#page-admin-erp.active + nav-item active)。
 //   2. overview 名单 tenant-first 信息渲染:tenant 行显示 owner 用户名 + 公司名;user 行显示用户名;
 //      unknown 行显示失联占位词。期望值从页面真词典(window.ADMIN_I18N)取,脚本不注入任何词典。

@@ -15,7 +15,7 @@
 # ── 文档 / docs(低敏 · 任何接力 agent 可改 · 但还是知会 Zihao)──
 *.md @skin306152-star
 docs/ @skin306152-star
-CLAUDE.md/ @skin306152-star
+docs/project/ @skin306152-star
 
 # ── 配置 / 构建(中敏 · 改动需要更谨慎)──
 pyproject.toml @skin306152-star

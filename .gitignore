@@ -121,8 +121,6 @@ _deploy_nginx/
 _test_reports/
 recon-i18n-fixes-*.md
 
-# Claude Code 本地覆盖配置(每台机器各自的权限/偏好 · 按约定不入库)
-.claude/settings.local.json
 
 # 个人杂物 / 系统文件 / 会话转录(不进 git · 2026-05-29)
 desktop.ini
@@ -137,7 +135,7 @@ design-preview/check_ui_consistency.py
 
 # 主控 UI 验真探针产出(本地·勿提交)
 scripts/_mc_verify/
-CLAUDE.md/STATE_PEARNLY.md.bak
+docs/project/STATE_PEARNLY.md.bak
 
 # DMS probe scratch (live-probe screenshots/html · never commit)
 _dms_probe/

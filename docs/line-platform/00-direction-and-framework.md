@@ -114,4 +114,3 @@ per-user FIFO 串行(多图排队不乱序)→ OCR pipeline(L1 Google Vision →
 - 用 worktree 隔离(并行窗口常在改同片代码),开工先 `git pull --rebase`。
 - 每个新文件 ≥1 测试;`compute_purchase_totals` 金标口径不动;金额/税额永不信 LLM。
 - 守门 13 闸全绿 + 真账号 E2E;真机渲染 / 大脑表现留 Zihao 实测(代码窗口无真 LINE channel)。
-- Conventional Commits;署名 `Co-Authored-By: Claude Opus 4.8 (1M context)`。收尾先跑 `/simplify` 再出报告。

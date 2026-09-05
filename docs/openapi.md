@@ -233,7 +233,7 @@ npx playwright test
 
 ## 7. 参考
 
-- 项目宪法:`CLAUDE.md/CLAUDE.md`(铁律 #15 改返回字段必同步改 Pydantic)
-- 整顿主计划:`CLAUDE.md/REFACTOR_MASTER_PLAN.md`(B 阶段路由拆分 / G4 OpenAPI 完善)
+- 项目宪法:`AGENTS.md`(铁律 #15 改返回字段必同步改 Pydantic)
+- 整顿主计划:`docs/project/REFACTOR_MASTER_PLAN.md`(B 阶段路由拆分 / G4 OpenAPI 完善)
 - ADR:`docs/refactor/adr-007-services-extraction.md`(services 拆分思路)· `adr-010-anti-bigfile-mechanism.md`(防屎山 4 件套)
 - 入门:`docs/ONBOARDING.md`(新协作者 / 新 AI 窗口)

@@ -10,9 +10,9 @@
 
 **Pearnly** = 泰国会计师 + SME 老板的 AP 自动化 SaaS · 4 语(zh / en / th / ja)。
 - 🌐 Live:https://pearnly.com
-- 🧠 大脑:`CLAUDE.md/CLAUDE.md`(项目宪法 · 28 条铁律)
-- 📊 当前状态:`CLAUDE.md/STATE_PEARNLY.md`(每窗口收尾必更新)
-- 🏗️ 整顿期:2026-05-22 起 · 5-8 个月 · **0 新功能** · 只做工程标准化(主计划 `CLAUDE.md/REFACTOR_MASTER_PLAN.md`)
+- 🧠 大脑:`AGENTS.md`(项目宪法 · 28 条铁律)
+- 📊 当前状态:`docs/project/STATE_PEARNLY.md`(每窗口收尾必更新)
+- 🏗️ 整顿期:2026-05-22 起 · 5-8 个月 · **0 新功能** · 只做工程标准化(主计划 `docs/project/REFACTOR_MASTER_PLAN.md`)
 
 ---
 
@@ -20,9 +20,9 @@
 
 ```
 [ ] git branch --show-current → master(铁律 #14)
-[ ] cat CLAUDE.md/CLAUDE.md(全读完 · 28 铁律是项目宪法)
-[ ] cat CLAUDE.md/STATE_PEARNLY.md 头部 50 行("整顿模式 ON" 段)
-[ ] cat CLAUDE.md/REFACTOR_MASTER_PLAN.md(看"当前进度看板" + "下一个 task")
+[ ] cat AGENTS.md(全读完 · 28 铁律是项目宪法)
+[ ] cat docs/project/STATE_PEARNLY.md 头部 50 行("整顿模式 ON" 段)
+[ ] cat docs/project/REFACTOR_MASTER_PLAN.md(看"当前进度看板" + "下一个 task")
 [ ] python scripts/refactor_progress.py(看综合进度 % · 数字没动 = 上窗口没干活)
 ```
 
@@ -34,9 +34,9 @@
 
 | 顺序 | 文件 | 看什么 |
 |---|---|---|
-| 1 | `CLAUDE.md/CLAUDE.md` | 项目宪法 · 28 条铁律 · 至少看完铁律 #18-#28 |
-| 2 | `CLAUDE.md/STATE_PEARNLY.md` 头部 | "下个窗口立即接手"段 + 当前 commit hash + 数字 |
-| 3 | `CLAUDE.md/REFACTOR_MASTER_PLAN.md` | 整顿主计划 · 单一权威源 · 看"当前进度看板" |
+| 1 | `AGENTS.md` | 项目宪法 · 28 条铁律 · 至少看完铁律 #18-#28 |
+| 2 | `docs/project/STATE_PEARNLY.md` 头部 | "下个窗口立即接手"段 + 当前 commit hash + 数字 |
+| 3 | `docs/project/REFACTOR_MASTER_PLAN.md` | 整顿主计划 · 单一权威源 · 看"当前进度看板" |
 | 4 | 当前 task 对应段 | 主计划里 task 行的"完成判定" |
 
 **漏读后果**:
@@ -134,7 +134,6 @@ node --check <changed.js>
 
 <body 说改了什么 · 为啥 · 怎么验证>
 
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 ```
 
 **type 取值**:`feat` / `fix` / `refactor` / `test` / `chore` / `docs` / `hotfix`(整顿期允许的紧急 BUG 修复 · 不带 REFACTOR-id)
@@ -223,8 +222,8 @@ $env:PEARNLY_E2E_PASS = [Environment]::GetEnvironmentVariable('PEARNLY_E2E_PASS'
 ## 10. 接力收尾必更新
 
 每个窗口收尾必须:
-1. **更新 `CLAUDE.md/STATE_PEARNLY.md` 头部**:本窗口完成的 task + commit hash + 数字变化
-2. **更新 `CLAUDE.md/REFACTOR_MASTER_PLAN.md` 进度看板**:对应 task 待 → 做中 → 已完成
+1. **更新 `docs/project/STATE_PEARNLY.md` 头部**:本窗口完成的 task + commit hash + 数字变化
+2. **更新 `docs/project/REFACTOR_MASTER_PLAN.md` 进度看板**:对应 task 待 → 做中 → 已完成
 3. **跑 `python scripts/refactor_progress.py`**:确认综合进度 % 真涨了(没涨 = 没干活)
 4. 写一句话给下个窗口:"下一步建议做 X · 在哪里 · 注意什么"
 

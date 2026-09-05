@@ -3,7 +3,7 @@
 > **生成时间**：2026-05-21
 > **分析对象**：v118.35.0.28（commit `bdef105`）
 > **分析方式**：只读 grep / read 全代码库 · 不连真实数据库
-> **执行任务**：`CLAUDE.md/EXECUTION_PLAN.md` 阶段 1 · Task 1.1 (体检报告 P1-05)
+> **执行任务**：`docs/project/EXECUTION_PLAN.md` 阶段 1 · Task 1.1 (体检报告 P1-05)
 > **下一步**：Task 1.2 写 contract tests 把"应该有的限制"锁死成自动化测试
 
 ## 1. 起源与范围
@@ -316,7 +316,7 @@ Pearnly 的多租户由 4 类角色构成：
 
 ## 6. 下一步行动（Task 1.2 触发）
 
-按 `CLAUDE.md/EXECUTION_PLAN.md` 阶段 1 计划：
+按 `docs/project/EXECUTION_PLAN.md` 阶段 1 计划：
 
 ### 立刻处理（P0 · 不等 Task 1.2）
 - **风险 1 + 2 · 必须验证 app 路由层是否补了权限** — 这是真漏洞 · 不能等
@@ -345,5 +345,5 @@ Pearnly 的多租户由 4 类角色构成：
 
 - 原始 Explore agent 分析输出（约 600 行 grep + read 报告）· 落档前压缩成本文档
 - 体检报告 P1-05：`Desktop\Pearnly_按优先级可执行任务清单_2026-05-21.md` §3 P1-05
-- 执行清单：`CLAUDE.md/EXECUTION_PLAN.md` 阶段 1 · Task 1.1
-- 多租户双轨制说明：`CLAUDE.md/STATE_PEARNLY.md`（v118.27.7 改造记录）
+- 执行清单：`docs/project/EXECUTION_PLAN.md` 阶段 1 · Task 1.1
+- 多租户双轨制说明：`docs/project/STATE_PEARNLY.md`（v118.27.7 改造记录）

@@ -5,7 +5,7 @@ services/erp/mrerp_dms_adapter.py
 Production MR.ERP DMS (car-sales) adapter: Thai ID card → DMS customer +
 booking draft.
 
-Architecture (CLAUDE.md/CLAUDE.md):
+Architecture (AGENTS.md):
     §7  Playwright owns the DMS session — a real chromium login, never raw
         external HTTP. After login the authenticated browser context's
         request API drives the verified DMS form contract (mrerp_dms_client),

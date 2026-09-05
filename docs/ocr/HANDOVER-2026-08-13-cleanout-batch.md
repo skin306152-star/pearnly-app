@@ -31,7 +31,7 @@ A1 vat_report 400 根治(399dc7b1·PDF 当图片直塞 image_url,修在 http_com
    `dms-bill-rec-b-free` / admin 导出 CSV 无标注(description 列可读,低优)。
 4. `tests/e2e/20-recon-step-resume.spec.js` 对 prod 存量红(与本批无关):侧栏「ลงบัญชี」
    组收起态,helper `openRoute` 点不可见子项超时;修=openRoute 前 `expandAllGroups()`。
-5. `.claude/skills/verification/SKILL.md:21`「收尾跑全套机械闸」与铁律#2 新口径
+5. `docs/agent/VERIFICATION.md/SKILL.md:21`「收尾跑全套机械闸」与铁律#2 新口径
    (10 秒自检)有张力,对齐一次。
 
 ## C. 记档(不施工)

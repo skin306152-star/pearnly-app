@@ -10,7 +10,7 @@ Lineage:
     - Site facts:      docs/integrations/mrerp-known-facts.md
     - xlsx contract:   docs/integrations/mrerp-spec.md §4-§6
 
-Architecture rules this module obeys (CLAUDE.md/CLAUDE.md):
+Architecture rules this module obeys (AGENTS.md):
     §7  Playwright only — never speak HTTP to mrerp4sme.com directly.
     §8  xlsx generation goes through mrerp_xlsx_generator.generate_xlsx,
         which already clones the verified Korn template byte-for-byte.

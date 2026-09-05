@@ -2,7 +2,7 @@
 
 生成日期：2026-06-03
 作者：Opus 4.8（设计，非执行）
-依据：对主项目 `pearnly-app` 的只读核查（CLAUDE.md/CLAUDE.md 28+ 铁律、ENGINEERING_STANDARD.md、scripts/git-hooks/pre-push、check_*.py、services/startup.py、core/db.py、src/main.js、vite.config.mjs）。
+依据：对主项目 `pearnly-app` 的只读核查（AGENTS.md 28+ 铁律、ENGINEERING_STANDARD.md、scripts/git-hooks/pre-push、check_*.py、services/startup.py、core/db.py、src/main.js、vite.config.mjs）。
 作用：**纠正本项目早先设计文档中与主项目真实规矩不符的地方**，尤其是几处"会让沙盒重犯整顿正在清除的债"的错误。**本补丁优先级高于早先文档的冲突表述。**
 
 ---
@@ -89,7 +89,6 @@ P0 实地核对结论：
 ## 5. 提交规范与署名
 
 - **格式**：Conventional Commits — `feat(knowledge): ... ` / `refactor(...)` / `chore(...)` / `test(...)` / `docs:`。subject 英文、命令式。
-- **署名**：尾部 `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`（强制）。
 - **任务标记**：主项目整顿期 commit 必带 `· REFACTOR-<id>`。**沙盒是独立 repo、且做的是新功能（整顿期主项目禁新功能·铁律#18），不套 REFACTOR-**；本沙盒用自己的标记，如 `· KB-P0` / `· KB-P3`，便于追踪。**迁移进主项目那批 commit**（整顿解锁后）用 `feat(knowledge): ... `，按当时主项目规矩定标记。
 - **禁 `--no-verify`**（除非人工明确放行）。
 - 沙盒阶段 push 到哪：本地或你自建远程皆可，**不 push 到主项目仓库**。

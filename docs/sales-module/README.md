@@ -64,10 +64,10 @@ Pearnly 现在只有"进项"半边(OCR 识别别人开给我的票 + 对账)。�
 
 **完整「主项目约束 + 守门闸」清单见 `docs/10-mainproject-constraints.md`**(闸真相 = pre-push 本地硬闸 +
 CI 6 jobs + 9 个 checker 脚本 · 不是 3-4 道)。源头:主仓库 `docs/ENGINEERING_STANDARD.md` 与
-`CLAUDE.md/CLAUDE.md`(28+ 铁律)。
+`AGENTS.md`(28+ 铁律)。
 
 ## 与既有 PRD 的边界(防重造 · 详见 `docs/10` §6)
 
-- 客户的 **Paypers 截图(支出/进项)** → 已被 `CLAUDE.md/MODULE_EXPENSE_PRD_v2.md`(凭证中心 · "Paypers 一比一+超越")覆盖,本沙盒不重做。
-- **销项税对账** → 已被 `CLAUDE.md/MODULE_SALE_VAT_RECON_PRD.md` 覆盖(那是"对账"不是"开票")。
+- 客户的 **Paypers 截图(支出/进项)** → 已被 `docs/project/MODULE_EXPENSE_PRD_v2.md`(凭证中心 · "Paypers 一比一+超越")覆盖,本沙盒不重做。
+- **销项税对账** → 已被 `docs/project/MODULE_SALE_VAT_RECON_PRD.md` 覆盖(那是"对账"不是"开票")。
 - **本沙盒 = 销项开票**(自己开 ใบกำกับภาษี/ใบเสร็จ + POS 选品),两份 PRD 都没覆盖,属真空白。

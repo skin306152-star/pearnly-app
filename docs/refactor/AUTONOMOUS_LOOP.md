@@ -26,7 +26,7 @@ C. CI 红 或 E2E 红 → 立刻 git revert 回滚这个 commit + 单独 push,�
 D. 计费可自由测(系统无自动支付通道,充值/扣费=改内部台账数字,Earn 随时重置)。唯一边界:只动【测试账号】台账,绝不碰真付费用户(mrerp)余额。
 
 【每一轮】
-1. 读 CLAUDE.md/CLAUDE.md(铁律,重点 #26)+ STATE_PEARNLY.md + REFACTOR_MASTER_PLAN.md + docs/refactor/BATCH_STRATEGY.md(§9.5 + §10/§13),找下一个拆搬删块。
+1. 读 AGENTS.md(铁律,重点 #26)+ STATE_PEARNLY.md + REFACTOR_MASTER_PLAN.md + docs/refactor/BATCH_STRATEGY.md(§9.5 + §10/§13),找下一个拆搬删块。
 2. 抽前必 re-grep 真实行号。做这块:copy-out → 接线 → 删巨石。高敏块按上面 A 纯结构性。
 3. 跑全 6 道守门,全绿才继续:npm run format:check、全量 unittest、check_imports、check_i18n、node --check <改的.js>、npm run build。
 4. commit(message 含 · REFACTOR-C1/B1/B2/C3)+ 单独一条 git push origin master。

@@ -54,7 +54,7 @@
 如果你想继续找 Claude 商讨,新开一个 Claude Code 窗口 · 跟它说:
 
 ```
-读 docs/refactor/ZIHAO_RECOVERY_GUIDE.md(就是本文件)+ CLAUDE.md/STATE_PEARNLY.md 头部 ·
+读 docs/refactor/ZIHAO_RECOVERY_GUIDE.md(就是本文件)+ docs/project/STATE_PEARNLY.md 头部 ·
 帮我看下窗口 A 和窗口 C 现在跑到哪了 · 告诉我下一步该做什么。
 ```
 
@@ -111,9 +111,9 @@
 你是整顿主控/指挥官。Zihao 不在键盘前。你全包:研究 / 派工 / 接线 / 跑守门 / 真账号 E2E 自测 / 查 CI / 上线 / 更新文档。不要问任何问题 · 不要等任何确认。
 
 【开工前 60 秒必读】
-1. CLAUDE.md/CLAUDE.md(铁律 #14/#16/#19/#20/#25/#26/#27/#28)
-2. CLAUDE.md/STATE_PEARNLY.md 头部
-3. CLAUDE.md/REFACTOR_MASTER_PLAN.md(找当前 task)
+1. AGENTS.md(铁律 #14/#16/#19/#20/#25/#26/#27/#28)
+2. docs/project/STATE_PEARNLY.md 头部
+3. docs/project/REFACTOR_MASTER_PLAN.md(找当前 task)
 4. docs/refactor/BATCH_STRATEGY.md §9.5 + §10 + §13
 5. docs/refactor/AUTONOMOUS_LOOP.md + adr-009 + adr-010(防屎山闸设计)
 6. docs/refactor/ZIHAO_RECOVERY_GUIDE.md(看 Loop 2 范围)
@@ -125,7 +125,7 @@
 1. 跑 wc -l app.py db.py home.js home.html · 确认全部 < 验收行数 · 否则停下报告"Loop 1 没跑完"
 2. 改 .github/workflows/ci.yml · lint-size job 把 continue-on-error: true 改成 false(切 fail 模式 · 真挡 push)
 3. 跑一次假超行 commit 验真挡(模拟一个超行 commit · CI 必须红)
-4. 改 CLAUDE.md/CLAUDE.md 加一条 · 防屎山闸已激活
+4. 改 AGENTS.md 加一条 · 防屎山闸已激活
 
 第二块 · B 后端剩 8 项(3-5 天)
 B3: 所有 ensure_* 迁 Alembic(25 个 · 一次一个 · git-deploy.sh 加 alembic upgrade head 钩子)
@@ -154,7 +154,7 @@ D5: Visual regression(Playwright screenshot diff · 10 个核心页面 baseline)
 沿用 Loop 1:re-grep 真实行号 / 6 道门 / 单独 push / gh run watch CI 真绿 / 高敏块 E2E 闸 / 红即 revert / 每轮写 STATE + 主计划 + BATCH §10。
 
 【完成判定】
-CLAUDE.md/REFACTOR_MASTER_PLAN.md 进度看板上 B/C/D 阶段全部 ✅ + 防屎山闸 fail 模式上线 + 写 docs/refactor/LOOP2_COMPLETE.md 总结成果。
+docs/project/REFACTOR_MASTER_PLAN.md 进度看板上 B/C/D 阶段全部 ✅ + 防屎山闸 fail 模式上线 + 写 docs/refactor/LOOP2_COMPLETE.md 总结成果。
 
 到这才停。不许问 · 不许等。
 ```
@@ -344,7 +344,7 @@ python scripts/refactor_progress.py
 
 1. 打开任何一个 Claude Code 窗口
 2. 复制这一句话发过去:
-> 读 docs/refactor/ZIHAO_RECOVERY_GUIDE.md 全文 + CLAUDE.md/STATE_PEARNLY.md 头部 · 告诉我现在整顿期跑到哪一步了 · 我下一步该做什么 · 用大白话别讲技术。
+> 读 docs/refactor/ZIHAO_RECOVERY_GUIDE.md 全文 + docs/project/STATE_PEARNLY.md 头部 · 告诉我现在整顿期跑到哪一步了 · 我下一步该做什么 · 用大白话别讲技术。
 
 它会读完这份文档 · 把你状态完整回报。
 
@@ -352,7 +352,7 @@ python scripts/refactor_progress.py
 
 ## 💾 别动的文件 / 永远别删
 
-- `CLAUDE.md/*.md` — 项目宪法 · 永远别删
+- `docs/project/*.md` — 项目宪法 · 永远别删
 - `docs/refactor/*.md` — 整顿计划 + ADR · 永远别删
 - `tests/e2e/.auth/state.json` — 这个**可以删**(里面是测试账号 token · loop 跑完会自己删)
 - `.claude/scheduled_tasks.lock` — loop dynamic 调度锁 · 别动

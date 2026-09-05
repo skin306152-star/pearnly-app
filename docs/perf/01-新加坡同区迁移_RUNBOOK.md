@@ -93,5 +93,5 @@ DNS 在 **Cloudflare 且橙云代理**(pearnly.com 解析到 Cloudflare IP,源�
 1. **密钥轮换(顺手清 06-08 泄漏债)**:迁移后全套密钥本就过手,是轮换 `DATABASE_URL` 密码 /
    `JWT_SECRET`(会全员登出,低峰做)/ LINE token 的最佳时机。高敏,Zihao 在场逐项做。
 2. SG 测试机 `139.180.185.166` Destroy(密码已泄,不留);观察期满退订日本机。
-3. 更新文档里的服务器 IP(`AGENTS.md` §5、`CLAUDE.md/CLAUDE.md` 服务器表、相关 memory)。
+3. 更新文档里的服务器 IP(`AGENTS.md` §5、`AGENTS.md` 服务器表、相关 memory)。
 4. 记忆 `sg-migration-probe-inflight` 改写为 shipped。

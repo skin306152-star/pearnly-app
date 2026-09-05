@@ -52,7 +52,6 @@
 - 新功能文件是**净新增**,会被 size/ratchet 闸盯上。按 [[gates-hardened-post-refactor]] 的
   **RATCHET-EXEMPT 豁免法**登记新文件,避免 pre-push/CI 把正常新增判红。
 - 单文件 **<500 行**硬门:大模块(如 PDF 生成)按职责拆多文件,别堆一个巨文件。
-- 提交走 **Conventional Commits**,署名 `Co-Authored-By: Claude Opus 4.8`。
 - `.github/workflows/` 若要加 CI step,需 `gh auth refresh -s workflow`(token 缺 workflow scope,见记忆)。
 
 ## 验收(迁回后)

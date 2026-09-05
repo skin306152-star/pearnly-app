@@ -4,7 +4,7 @@
 > **生成会话**:屎山清理会话 阶段 1.5++(deploy 调研专项)
 > **状态**:**只调研、不动手**。任何 deploy 脚本本身都未修改。
 >
-> **历史文档提示(2026-08-26)**:下文记录的是 2026-05 的旧 webhook 直部署架构,不可作为当前操作手册。现行流程是 push master → CI 全闸 → deploy job 精确 SHA 部署,旧 webhook 已停用;以 `docs/RUNBOOK.md` 和 `.claude/skills/deploy-release/SKILL.md` 为准。
+> **历史文档提示(2026-08-26)**:下文记录的是 2026-05 的旧 webhook 直部署架构,不可作为当前操作手册。现行流程是 push master → CI 全闸 → deploy job 精确 SHA 部署,旧 webhook 已停用;以 `docs/RUNBOOK.md` 和 `.agents/skills/deploy-release/SKILL.md` 为准。
 
 ---
 

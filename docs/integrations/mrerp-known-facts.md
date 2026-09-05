@@ -637,8 +637,8 @@ Korn 真样本:`690507-001`
 ## 11. 历史窗口产出参考
 
 抓包窗口产出的代码已按"事实归 docs / 不留废代码"铁律删除 · 仅本文档作为先验留存。如需深度回溯历史 cURL / 字节序列实测过程 · 见:
-- `CLAUDE.md/STATE_PEARNLY.md` § "🔌 MR.ERP 反向工程结果"
-- `CLAUDE.md/BACKLOG.md` § v27.8.0 ~ v27.8.1.x
+- `docs/project/STATE_PEARNLY.md` § "🔌 MR.ERP 反向工程结果"
+- `docs/project/BACKLOG.md` § v27.8.0 ~ v27.8.1.x
 - `docs/cleanup/round1-final-report.md`
 
 xlsx 生成器仍保留(`mrerp_xlsx_generator.py`)· Playwright 方案上传同一文件格式 · 不需要重写。

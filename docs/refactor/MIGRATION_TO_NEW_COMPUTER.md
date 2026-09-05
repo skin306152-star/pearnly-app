@@ -375,7 +375,7 @@ npm run build
 迁完后打开新电脑 Claude Code · 第一句话发:
 
 ```
-读 docs/refactor/ZIHAO_RECOVERY_GUIDE.md(救命指南)+ CLAUDE.md/STATE_PEARNLY.md 头部 ·
+读 docs/refactor/ZIHAO_RECOVERY_GUIDE.md(救命指南)+ docs/project/STATE_PEARNLY.md 头部 ·
 我刚迁完电脑 · 告诉我整顿期现在跑到哪一步了 · 我下一步该做什么。
 ```
 

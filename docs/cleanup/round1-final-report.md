@@ -24,7 +24,7 @@
 | 9 | `62bd96e` | 📄 docs | audit + startup-check + deploy-analysis + requirements.txt + 4 phase + 7 OCR docs · 共 16 files +2797 |
 | 10 | `96eba30` | 📄 docs | 19 🟡 项激进重估(8 项降 🟢) |
 | 11 | `6051dbb` | 🟡→🟢 | auth_signup.py:1530 v118.12 墓碑注释删除 |
-| 12 | `943597e` | 🟡→🟢 | 删旧 HANDOVER(`CLAUDE.md/HANDOVER`,-335 行,保留根新 HANDOVER) |
+| 12 | `943597e` | 🟡→🟢 | 删旧 HANDOVER(`docs/project/HANDOVER`,-335 行,保留根新 HANDOVER) |
 | 13 | `53a79c8` | 🟡→🟢 | 删 `mrerp_bridge/` 目录(2 文件 / -239 行) |
 | 14 | `1e70cd9` | 🟡→🟢 | 删 erp_push.py `push_mr_erp` stub + ADAPTER_REGISTRY 项 + docstring |
 | 15 | `eb77b7e` | 📄 docs | bank_reconcile 迁移调研报告(任务 A · 不动手) |
@@ -81,7 +81,7 @@
 - `mrerp_bridge/pearnly_bridge.php`
 
 **已删的文档(1)**:
-- `CLAUDE.md/HANDOVER_TO_NEXT_WINDOW.md`(旧版重复)
+- `docs/project/HANDOVER_TO_NEXT_WINDOW.md`(旧版重复)
 
 **新建的清理文档(8)**:
 - `docs/code-cleanup-audit.md`(v1.2 · 含 🟡-15.5 已解决标注 + 🟡-10 误名备忘)

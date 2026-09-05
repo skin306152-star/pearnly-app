@@ -85,7 +85,7 @@ Pearnly 整顿期(2026-05-22 起约 5-8 个月)9 阶段 60+ task · 单窗口跑
 
 **硬约束**(本窗口 C 启动时 Zihao 写)· 只 touch:
 ```
-- CLAUDE.md/*.md(改铁律)
+- docs/project/*.md(改铁律)
 - .github/workflows/ci.yml + .github/*.md / PULL_REQUEST_TEMPLATE / ISSUE_TEMPLATE/
 - scripts/*.py(改棘轮脚本)
 - tests/integration/* / tests/visual/*(纯新增)
@@ -137,7 +137,7 @@ Pearnly 整顿期(2026-05-22 起约 5-8 个月)9 阶段 60+ task · 单窗口跑
 |---|---|---|
 | A | `app.py` / `db.py` / `auth_signup.py` / `*_routes.py` / `services/**/*.py` | `home.*` / `src/home/**` / `tests/visual/` |
 | B | `home.js` / `home.html` / `home.css` / `src/home/**/*.{js,css}` / `vite.config.*` | `*.py` / `services/` |
-| C | `CLAUDE.md/*.md` / `docs/**/*.md` / `.github/` / `scripts/*.py` / `tests/integration/*` / `tests/visual/*` | 所有业务代码 |
+| C | `docs/project/*.md` / `docs/**/*.md` / `.github/` / `scripts/*.py` / `tests/integration/*` / `tests/visual/*` | 所有业务代码 |
 
 **唯一可能冲突的边界**:`tests/unit/test_*_contract.py`
 - A 抽出 service 同时加 contract test → 跟 B / C 的契约测试 add 在同目录

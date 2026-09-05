@@ -247,4 +247,4 @@ ProMem(arXiv 2601.04463)点破:*"if the model makes a mistake ... this error wil
 - master `e77f6649`,CI 全绿(run 29718390215),prod 已部署同 commit。
 - /simplify:GC-D 全批四路审查已做(~15 项);GC-E-1 为纯机械「修一类」,自审无可收口(两套表格 CSS 合并记债)。
 - 5 个 wip 分支已合入并删(远端+本地);施工 worktree 已清;共享树 DMS 窗未碰;未 push=0。
-- 换窗入口:本文 + `CLAUDE.md/STATE_PEARNLY.md` 状态卡 + 记忆 `[[gcd-0720-full-queue-shipped]]` `[[agent-boundary-read-vs-calc]]`。
+- 换窗入口:本文 + `docs/project/STATE_PEARNLY.md` 状态卡 + 记忆 `[[gcd-0720-full-queue-shipped]]` `[[agent-boundary-read-vs-calc]]`。

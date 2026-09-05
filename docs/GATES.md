@@ -1,8 +1,10 @@
-# 机械闸自查手册(每个窗口开工先读 · 左移=别等 push 才第一次见闸)
+# 机械闸自查手册
 
-> 出身(历史):旧链路 push 即 webhook 部署、CI 事后才红,所以质量检查前移为 pre-push 本地硬拦。历史上曾由 GitHub CI 全闸后精确 SHA 部署；2026-08-30 用户拍板停用 GitHub `CI` workflow `281113573`，`ci.yml` 保留作历史/可恢复配置。本地风险分层 lint/unit/真 PG/HTTP 继续保留；真实流程固定为本地测试(UI可先本地真实浏览器)→commit/push→manual pinned-SHA CD→回读生产 HEAD/service/ready→主控在精确 production SHA 做真实站点/真实环境/ERP report 预验收→Zihao 最终真机 OK。
-> **本页的用法:① 开工第 0 步拿基线 ② 干活中途跑对应风险层级 ③ push 后手动 CD 并回读生产 ④ 在精确 production SHA 完成真实预验收与最终用户真机 OK。**
-> 一键全套(等价 pre-push,不用真推):`sh scripts/git-hooks/pre-push`(在 Git Bash)或逐条跑下表命令。
+按当前改动选择对应检查，完整命令与触发条件保留如下；运行逻辑以 `scripts/git-hooks/pre-push` 为准。现有强制闸不因指令精简而放宽。
+
+开工时仅在需要区分存量失败时运行相关基线；通过的结果可复用，不手动在每个阶段重复全套。推送时钩子仍自动执行。仅当任务包括发布，才按 [Cloud Run 规范](deployment/CLOUD_RUN.md) 发布并回读结果。
+
+常规 GitHub CI 当前停用，历史表中“CI”表示对应脚本/历史接入，不能当作远端已执行证据。实际部署状态以 [部署账本](deployment/MIGRATION_STATUS.md) 为准。验证范围和真实业务证据见 [VERIFICATION](agent/VERIFICATION.md)。
 
 ## 装钩子(一句话 · 复制就跑)
 
@@ -35,7 +37,7 @@ CI 的 diff 闸在 push 事件只 checkout 最近 2 个 commit(足够判断 `HEA
 | check_i18n_refs | 改 .py | **纵向**查:`t()` / `POS.t()` / `data-i18n` 用到的键必须在 `static/i18n-data.js` / `static/pos/pos-i18n.js` 里存在(落空 = 屏上印裸键名) | `python scripts/check_i18n_refs.py` | 2026-07-31 建;`sx-p-bc-dup-unit` / `posui.bscan.fails_n` 四语一起缺、check_i18n 同时报 0 missing,就是这么上屏的;拼接键 `t('pre_' + x)` 不查(判据故意做窄,误报一次闸就废);反证 `tests/unit/test_i18n_refs_gate.py` |
 | unit 影响面(`scripts/impact.py`) | 改 `.py` | 测试-only 变更跑点名模块,生产 Python 回退全量分片 | `python scripts/impact.py --base <base> --head HEAD --run-unit` | 生产 Python 不裁剪;子进程清掉 GIT_* 防临时 git 仓写回宿主;CI 仍全量兜底 |
 | E2E 台账闸(跑在全量 unittest 里) | 改扫码这一片的源码,或新写扫码验收脚本 | ① 新写的扫码 E2E 必须在 `tests/e2e/e2e_ledger.json` 里登记「只有它能保什么」② 只检查 `merge-base(origin/master, HEAD)..HEAD` 本次待推源码;命中责任 `covers` 且验收产物比它旧才红,历史提交不跨窗口追债;共享词典按 `i18n_keys` 精确归责,共享 HTML 按 `cover_tokens` 只看契约区域;CI 检出时间不可作为验收先后证据,自动跳过时效判定 | `python -m unittest tests.unit.test_e2e_ledger_gate` | Git/diff 不可用时 fail-safe 退回全量判定;时效红的唯一过法是在台账 `stale_ack` 写带 `until` 的欠条(说清为什么、最长 14 天、过期照红) |
-| 验收脚本两道(跑在全量 unittest 里) | 改 `scripts/_*.cjs` | ① 点击必须唯一定位(`.first()/.nth()` + `.click()` 关掉了 Playwright 严格模式 → 打偏也不抛)② 期望值必须现场从页面真词典取,脚本一个字都不注入 | `python -m unittest tests.unit.test_verify_script_selector_gate tests.unit.test_verify_script_i18n_injection_gate` | ① 真要按位置点:同行/上一行写 `// SELECTOR-INDEX-OK: <点的是哪一个>`(理由不许空)② 整份搬真词典进合成页放行(要 require 真词典源);「断言必须只有走目标路径才会变」机械化不了,见 `.claude/skills/verification` 验收脚本规范第 1 条 |
+| 验收脚本两道(跑在全量 unittest 里) | 改 `scripts/_*.cjs` | ① 点击必须唯一定位(`.first()/.nth()` + `.click()` 关掉了 Playwright 严格模式 → 打偏也不抛)② 期望值必须现场从页面真词典取,脚本一个字都不注入 | `python -m unittest tests.unit.test_verify_script_selector_gate tests.unit.test_verify_script_i18n_injection_gate` | ① 真要按位置点:同行/上一行写 `// SELECTOR-INDEX-OK: <点的是哪一个>`(理由不许空)② 整份搬真词典进合成页放行(要 require 真词典源);「断言必须只有走目标路径才会变」机械化不了,见 `docs/agent/VERIFICATION.md` 的浏览器与外部系统证据 |
 | check_new_debt | 改 .py | 禁新增 ensure_*/app.py 巨石路由 | `python scripts/check_new_debt.py` | 真要新 ensure:commit 写 `NEW-DEBT-EXEMPT: <理由>` |
 | prettier 全仓 | 任何改动(无条件) | 全仓格式合规(按 **HEAD 已提交字节**校验,与工作树/CRLF 无关)+ prettier 版本锁/配置文件漂移 fail-closed | `node scripts/check_prettier_committed.mjs`(本地与 CI 同脚本、同口径;版本从 HEAD:package-lock.json 读,运行中 prettier.version 必须严格匹配;.prettierrc.json/.prettierignore 工作树字节必须 == HEAD blob,不一致即 exit 1) | home.html/home.js 在 .prettierignore;**禁 prettier --write 它们**;CI 干净 checkout 自然通过配置漂移闸 |
 | eslint | 改前端 | 前端真 bug | `npm run lint` | 无 |

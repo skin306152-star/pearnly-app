@@ -5,7 +5,7 @@
 ## 背景(读这几样再动手)
 - `../MASTER-PLAN.md`(全景 + 为什么是"插座插头")
 - `../M1-SOCKET-DESIGN.md`(本包的实现蓝本 · §1~§7 是你要建的全部)
-- 项目铁律:`CLAUDE.md/CLAUDE.md`(28 条)· 单文件 <500 · 每新文件 ≥1 测试 · 去 AI 味
+- 项目铁律:`AGENTS.md`(28 条)· 单文件 <500 · 每新文件 ≥1 测试 · 去 AI 味
 
 ## 现状事实(已探查 · 直接用,别重查)
 - 网关门面:`services/ai_gateway/transport.py:text_to_json(prompt,text,tier,response_mime,max_tokens,timeout_s,max_retries,task)` → 按 `OCR_LLM_BACKEND` 自动切后端。**不支持 tools 透传**,走 JSON 动作模式。

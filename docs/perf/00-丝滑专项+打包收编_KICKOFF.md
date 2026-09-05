@@ -13,7 +13,7 @@
 第0步:读 docs/GATES.md 并跑全套闸基线(知道哪些红是存量;新债别背锅)
 
 必读:
-1. AGENTS.md + CLAUDE.md/CLAUDE.md
+1. AGENTS.md + AGENTS.md
 2. docs/perf/INTERACTION_AUDIT.md(最慢交互 Top10 + 归因 + 修复清单)
 3. docs/ui/THEME_FOLLOWUP_BACKLOG.md 第 8 项(打包收编)
 4. memory: frontend-asset-bundling-playbook(E7 范式:CSS 独立 link 防闪/JS 分组保时序/dist 入 git)

@@ -1,7 +1,7 @@
 ---
 name: 问题 / 咨询 / Discussion
 about: 提一个使用问题、设计咨询、或想跟团队讨论(不是 bug · 不是新功能)
-title: "[Q] "
+title: '[Q] '
 labels: question
 assignees: ''
 ---
@@ -14,7 +14,6 @@ assignees: ''
 
 <!-- 一两句话:你的问题是什么,或者想聊什么决策。 -->
 
-
 ## 背景 / 上下文
 
 <!-- 让回答者快速进入语境:
@@ -22,14 +21,13 @@ assignees: ''
      - 你在用 Pearnly 做什么场景
      - 已经试过哪些方法 / 看过哪些文档 -->
 
-
 ## 已经查过的资源
 
-- [ ] `CLAUDE.md/CLAUDE.md`(项目宪法 / 28 铁律)
+- [ ] `AGENTS.md`(项目开发约定)
 - [ ] `docs/ONBOARDING.md`(新协作者入门)
 - [ ] `docs/RUNBOOK.md`(运维手册)
 - [ ] `docs/openapi.md`(API 索引)
-- [ ] `CLAUDE.md/REFACTOR_MASTER_PLAN.md`(整顿主计划)
+- [ ] `docs/project/REFACTOR_MASTER_PLAN.md`(整顿主计划)
 - [ ] 搜过已有的 closed issues / PR 评论
 - [ ] 其他:<!-- 写明你查过的具体文档或链接 -->
 
@@ -41,7 +39,6 @@ assignees: ''
      - 给一个设计决策 + 理由
      - 拍板 yes / no
      - 介绍跟其他类似项目的对比 -->
-
 
 ## 紧急程度
 

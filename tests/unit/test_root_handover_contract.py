@@ -38,12 +38,11 @@ _FORBIDDEN = [
 
 # 现行精确 SHA 部署闭环锚点。
 _REQUIRED_MARKERS = [
-    "git push origin master",
-    "rev-parse HEAD",
-    "github.sha",
-    "TARGET_SHA",
-    "ActiveEnterTimestamp",
-    "deploy",
+    "docs/deployment/CLOUD_RUN.md",
+    "docs/deployment/MIGRATION_STATUS.md",
+    "SHA",
+    "digest",
+    "revision",
 ]
 
 
@@ -70,7 +69,7 @@ class RootHandoverContractTests(unittest.TestCase):
 
     def test_points_to_live_map_and_archive(self):
         # 活地图指向 + 历史正文挪档位置,新窗口不再拿旧正文当现状读。
-        self.assertIn("CLAUDE.md/STATE_PEARNLY.md", self.text)
+        self.assertIn("docs/project/STATE_PEARNLY.md", self.text)
         self.assertIn("AGENTS.md", self.text)
         self.assertIn("docs/archive/HANDOFF-2026-05-23-银行对账M4-收尾.md", self.text)
 

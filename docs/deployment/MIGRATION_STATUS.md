@@ -1,6 +1,7 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-05（Asia/Bangkok，UTC+7）。状态：**Cloud Run 已接管正式域名；启动状态检查修复与最终验收收尾中**。
+更新时间：2026-09-05（Asia/Bangkok，UTC+7）。状态：**Cloud Run 已接管；用户要求暂停，剩余安装包发布、旧实例退役及用户验收**。
+暂停时间：2026-09-05。用户将关闭Mac外出；不继续实施或销毁，恢复顺序见[暂停与恢复点](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
 ## 当前部署
@@ -26,19 +27,23 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`c3797e18278559f7ae9fa6ba88e07aadd759db52`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:1c4a43f58fa6723e775abe71e839da59770260989907d04deda190e14f0779f0`。
-- Web revision：`pearnly-web-c3797e182785-s1`，100%流量；Worker revision：`pearnly-worker-c3797e182785-s1`，100%流量。
-- [成功的 GitHub 发布运行 33954963112](https://github.com/skin306152-star/pearnly-app/actions/runs/33954963112)。schema execution `pearnly-schema-98hsn` 成功，使用同一精确镜像。
+- 完整 SHA：`85cc56b465bfad8e0293174dfc7ecfc0d46e36a2`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:ba5009503b2c390a63e21e9ff5ed5e6e41781c5be569d42f54f31877ae43cb80`。
+- Web revision：`pearnly-web-85cc56b465bf-s1`，100%流量；Worker revision：`pearnly-worker-85cc56b465bf-s1`，100%流量。
+- [成功的 GitHub 发布运行 33956960191](https://github.com/skin306152-star/pearnly-app/actions/runs/33956960191)。schema Job于09:08:36 UTC完成，执行20.36秒，使用同一精确镜像。
 - 服务地址：`https://pearnly-web-112074003592.asia-southeast1.run.app`；私有 Worker `https://pearnly-worker-112074003592.asia-southeast1.run.app`。
-- 2026-09-05 15:28 左右切流。正式域名 readiness nonce `cutover-20260905-0828` 的 Cloud Run 请求日志确认命中新 Web revision，HTTP 200；www health 也为200。
-- 当前待修：将 DDL 移至 schema Job 后，四项 Express 进程内 schema-ready 状态未恢复。无效小助手 heartbeat 从旧环境401变为503；不算验收成功，必须补齐只读启动校验再发布。
+- 2026-09-05 15:28 左右切流。正式域名 readiness nonce `cutover-20260905-0828` 的 Cloud Run 请求日志确认命中初次接管的 `pearnly-web-c3797e182785-s1`，HTTP 200；www health 也为200。
+- 当前版本已补齐四项Express进程内schema-ready：每次启动只读验证列、约束、RLS、策略、函数与触发器，失败阻止启动。09:13:51 UTC正式域名nonce `final-readiness` 在Web/Worker新revision回读，无token heartbeat恢复401；直接匿名调用Worker为403。
+- 本次曾因错误SHA输入取消运行33956937444，未进入云端变更；以上33956960191才是正确SHA的成功发布。
+- 账本/CI文档提交可能晚于线上镜像SHA；文档更新不自动重发容器，不能据仓库HEAD推断线上版本。
 
 ## 域名与旧发布入口
 
 Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均 fail closed。没有新增 `*.pearnly.com/*`，避免接管其他租户子域名。源站在 Worker 中明确指定 Cloud Run Web。
 
 2026-09-05 DNS 回读：主域名由旧 A `66.42.49.213` 改成 proxied CNAME `pearnly-web-112074003592.asia-southeast1.run.app`；www 保持 proxied CNAME `pearnly.com`。原有 MX、SPF、DKIM 保留。旧 IP 不再是网站 DNS 源站。
+
+小助手安装包仍是独立仓库`pearnly-companion`，已暂停其旧SSH发布workflow防止回到Vultr；新GCS发布验证进行中，详见[暂停与恢复点](RESUME_MIGRATION.md)。
 
 旧 GitHub webhook `625195648`（`/internal/deploy`）已 inactive；Cloudflare 阻断 `/internal/`，新应用也不提供旧 VM 发布路径。旧 systemd 不得自行重启；不要同时运行两套周期消费者。
 
@@ -50,8 +55,8 @@ Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均
 - 切流前另存 `supabase-pre-cutover.dump`（4,518,312字节）；已上传。恢复试验针对初始备份，未把第二份声称为另一次完整恢复试验。
 - 完整旧文件归档 `legacy-files-complete.tar.gz`，6,521,306,807字节，gzip 完整性通过；GCS 对象已在08:29:57 UTC创建，CRC32C `Uz0lgg==`，独立本地CRC32C计算与云对象匹配。完整归档包括历史安装包备份。
 - 旧 nginx、systemd和环境配置存于私有 `legacy-server-config.tar.gz`，4,777字节；不把密钥写入 Git。
-- 私有云备份前缀 `gs://pearnly-app-backups-112074003592/20260905/`；本机受限目录 `/Users/skin/.config/pearnly-migration/20260905/`。`.partial` 是失败中间件，不能用于恢复。
-- 真实 Cloud Run 独立 Job 完成三处挂载的跨实例写入/读取哈希验证、Chromium启动和测试对象清理；不是仅本地单元测试。
+- 私有云备份前缀 `gs://pearnly-app-backups-112074003592/20260905/`；本机受限目录 `/Users/skin/.config/pearnly-migration/20260905/`。失败的`.partial`中间文件已移入本机废纸篓，不能用于恢复。
+- 真实 Cloud Run 独立 Job 完成三处挂载的跨实例写入/读取哈希验证、Chromium启动和测试对象清理；不是仅本地单元测试。测试Job已删除，两只专用PG验证容器已停止；ERPNext管理后台容器未清理。
 
 | GCS bucket | 用途 |
 |---|---|
@@ -61,14 +66,15 @@ Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均
 | `pearnly-app-backups-112074003592` | 迁移备份，版本保留；旧版本30天清理 |
 | `pearnly-app-build-112074003592` | 构建临时源，7天过期 |
 
-所有桶均新加坡、统一桶级权限、阻止公共访问。Cloud Run 本地临时磁盘不是备份。
+所有桶均新加坡、统一桶级权限、阻止公共访问。业务文件桶启用7天soft-delete保护。Cloud Run 本地临时磁盘不是备份。
 
 ## 验证与告警边界
 
-- 本地：当前发布的完整 pre-push 已通过（1146个测试模块与静态闸）；定向真实 PostgreSQL 任务状态测试与备份恢复分别执行。GitHub通用CI仍停用，不把本地通过写成远程CI通过。
+- 启动修复：40个聚焦测试及24个subtest通过；真实PG副本12种安全结构破坏均阻断启动，只读线上目录预检通过。
+- 本地：当前发布的完整 pre-push 已通过（1147个测试模块与静态闸）；定向真实 PostgreSQL 任务状态测试与备份恢复分别执行。GitHub通用CI仍停用，不把本地通过写成远程CI通过。
 - 远程：上述 GitHub CD成功；镜像内 Python compileall、Chromium启动、schema Job、候选健康/就绪/精确版本及最终流量检查通过。
-- 线上：正式域名健康/就绪、页面与静态文件检查通过；保留登录态的管理后台可读取。真实 Cloud Tasks OIDC 探针到私有 Worker 返回200。
-- Scheduler启用后，数据库已回读 `maintenance`、`queue.ocr`、`queue.recon`、`queue.steward` 各3次 succeeded。这里只证明调度/消费；无待处理业务时不等于完成一次真实OCR或外部ERP交易。
+- 线上：正式域名健康/就绪、页面与静态文件检查通过；保留登录态的管理后台可读取；真实历史记录详情和迁移前PDF在浏览器中正确渲染，未保存修改或推送ERP。真实 Cloud Tasks OIDC 探针到私有 Worker 返回200。
+- Scheduler启用后，数据库已回读 `maintenance`、`queue.ocr`、`queue.recon`、`queue.steward` 各10次 succeeded。这里只证明调度/消费；无待处理业务时不等于完成一次真实OCR或外部ERP交易。
 - 原有小助手每3秒 lease 返回401，旧 Vultr 日志也存在；不能通过迁移放宽认证。真实设备需使用有效绑定验收。历史 ERP retrying 记录（2026-06-20）保留，不冒充已修复。
 - 邮件通知渠道已配置为用户指定的 `skinzihao@gmail.com`，channel `9342288420654696611`；4条告警已启用：公开readiness、内存85%、队列积压、任务失败/不确定日志。没有主动发送测试邮件，未确认邮件实收。
 - Uptime每15分钟，至少两个地点失败触发；15:45回读六个探测地点的最近样本均为true。任务日志规则不是所有LINE/ERP业务失败的全覆盖。详见 [监控配置](../../deployment/cloud-run/monitoring/README.md)。

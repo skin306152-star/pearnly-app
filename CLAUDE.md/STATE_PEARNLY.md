@@ -1,14 +1,15 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 09-05 Cloud Run 已接管，验收收尾中
+## 当前状态卡 · 09-05 Cloud Run 已接管，用户要求暂停
 
+- **暂停恢复入口**：`docs/deployment/RESUME_MIGRATION.md`。用户要关闭Mac外出，当前不启动新发布、不销毁旧VM。
 - **部署状态唯一正本**：`docs/deployment/MIGRATION_STATUS.md`；规范 `docs/deployment/CLOUD_RUN.md`。下方卡片仅是历史功能证据。
 - **正式入口**：`pearnly.com` / `www.pearnly.com` → Cloudflare Worker → GCP `pearnly` / `asia-southeast1` 的 Cloud Run。
 - **实际配置**：Web1 CPU/1 GiB min0 max2；Worker1 CPU/2 GiB min0 max2 并发1；Supabase保留，文件私有GCS，Tasks/Scheduler已实际运行。
-- **当前线上 SHA**：`c3797e18278559f7ae9fa6ba88e07aadd759db52`；CD `33954963112` 成功。Express schema-ready 启动校验修复中，完成后更新本卡和账本。
+- **当前线上 SHA**：`85cc56b465bfad8e0293174dfc7ecfc0d46e36a2`；CD `33956960191` 成功。Express schema-ready只读启动校验已上线，匿名心跳恢复401，Worker IAM403。
 - **旧实例**：Vultr `66.42.49.213` 的mrpilot停用且禁自启、旧webhook停用；VM未Destroy，仍计费。
 - **项目边界**：`/Users/skin/pearnly-erp` 的ERPNext及其GCP项目未改，VM回读RUNNING。
-- **未完成**：启动校验修复回读、Vultr最终退役确认、用户手机LINE/OCR/ERP实际验收；不标记USER_ACCEPTED。
+- **未完成**：小助手安装包GCS发布验证、Vultr最终退役确认、用户手机LINE/OCR/ERP实际验收；不标记USER_ACCEPTED。
 - **防冲突**：当前manual-deploy.yml是Cloud Run精确SHA发布；不得恢复其历史VM内容，不得重启旧周期消费者。
 
 ---

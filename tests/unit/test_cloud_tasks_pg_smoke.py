@@ -18,6 +18,7 @@ from psycopg2 import sql
 
 from services.cloud_tasks import registry, routes, store, workorders
 from services.erp import session_lock
+from tests.unit._pg_smoke import require_disposable_db
 
 
 class CloudTasksPostgresTests(unittest.TestCase):
@@ -81,7 +82,8 @@ class CloudTasksPostgresTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        with psycopg2.connect(cls.dsn) as conn, conn.cursor() as cur:
+        with cls.cursor(commit=True) as cur:
+            require_disposable_db(cur, cls.schema, "cloud_tasks_test_")
             cur.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(cls.schema)))
             for role in cls.created_roles:
                 cur.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(role)))
@@ -91,6 +93,7 @@ class CloudTasksPostgresTests(unittest.TestCase):
         self.patch_cursor.start()
         self.addCleanup(self.patch_cursor.stop)
         with self.cursor(commit=True) as cur:
+            require_disposable_db(cur, self.schema, "cloud_tasks_test_")
             cur.execute(
                 "TRUNCATE cloud_task_deliveries, cloud_task_locks, observed_effects, work_orders"
             )

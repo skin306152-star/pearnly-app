@@ -1,0 +1,4 @@
+# Merge this section into ~/.codex/config.toml; do not replace the whole file.
+# Requires a supported client/account; start a new task after enabling.
+[features.context_management]
+experimental_mode = true

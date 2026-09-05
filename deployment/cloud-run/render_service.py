@@ -98,7 +98,7 @@ def render_service(
                     "containers": [
                         {
                             "image": image,
-                            "ports": [{"containerPort": 8080}],
+                            "ports": [{"name": "h2c", "containerPort": 8080}],
                             "resources": {
                                 "limits": {
                                     "cpu": "1",

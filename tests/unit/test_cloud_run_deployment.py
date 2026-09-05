@@ -56,6 +56,9 @@ class DeploymentTests(unittest.TestCase):
             spec = template["spec"]
             self.assertEqual(spec["timeoutSeconds"], 1800)
             self.assertEqual(spec["containerConcurrency"], concurrency)
+            self.assertEqual(
+                spec["containers"][0]["ports"], [{"name": "h2c", "containerPort": 8080}]
+            )
             self.assertTrue(spec["serviceAccountName"].startswith(role + "@"))
             self.assertEqual(
                 spec["containers"][0]["resources"]["limits"], {"cpu": "1", "memory": memory}

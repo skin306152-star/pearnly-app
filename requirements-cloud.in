@@ -1,3 +1,4 @@
-# Additional Cloud Run delivery client; constrained by requirements.lock.
--c requirements.lock
+-c requirements.lock.txt
 google-cloud-tasks==2.23.0
+hypercorn==0.18.0
+httpx[http2]==0.28.1

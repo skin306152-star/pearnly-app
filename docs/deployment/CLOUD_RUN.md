@@ -60,6 +60,8 @@ WIF 发布身份需要在 deploy 服务账号上具备 `iam.serviceAccounts.getO
 
 ## 大文件下载与发布验证
 
-Cloud Run HTTP/1 非流式响应受32 MiB限制，见[官方配额](https://docs.cloud.google.com/run/quotas)。Cloud入口的LargeResponseStreaming中间件对至少32 MiB的有正文响应移除Content-Length，让Uvicorn按chunked发送；不缓存正文，不改变文件权限、ETag、Last-Modified、Content-Range或小响应，HEAD保留长度。标准FileResponse和StaticFiles继续分块读GCS挂载。
+Cloud Run HTTP/1 非流式响应受32 MiB限制，见[官方配额](https://docs.cloud.google.com/run/quotas)。Cloud入口的LargeResponseStreaming中间件对至少32 MiB的有正文响应移除Content-Length，让ASGI服务器在HTTP/1连接中按chunked发送；不缓存正文，不改变文件权限、ETag、Last-Modified、Content-Range或小响应，HEAD及HTTP/2响应保留长度（下载进度仍可取得完整大小）。标准FileResponse和StaticFiles继续分块读GCS挂载。
 
 Web和Worker候选及正式流量检查都必须完整下载现有安装包，与GCS对象大小/MD5比对并确认generation未变；不能仅凭health/ready或HEAD判定大文件可用。deploy账号因此只有安装包桶额外objectViewer权限，不获写权限。任何下载失败均阻断候选切流。
+
+上传契约包括100 MiB单文件和超过32 MiB的多文件批次，因此Web/Worker容器均通过`ports.name=h2c`使用HTTP/2入口，云端由Hypercorn单进程提供ASGI服务，原开发/VM入口不变。Web→Worker的HTTPX客户端强制HTTP/2；不能只移除请求Content-Length绕过HTTP/1请求限制。服务复用原Uvicorn ProxyHeadersMiddleware以保留客户端IP和scheme语义，Cloudflare与WorkerProxy继续清理代理头。云专用依赖由`requirements-cloud.in`在原业务依赖约束下编译到`requirements-cloud.lock`。

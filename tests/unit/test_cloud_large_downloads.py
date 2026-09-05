@@ -88,6 +88,12 @@ class LargeDownloadTests(unittest.IsolatedAsyncioTestCase):
         await LargeResponseStreaming(app)(scope, receive, send)
         app.assert_awaited_once_with(scope, receive, send)
 
+    async def test_http2_preserves_lengths_for_download_progress(self):
+        app, receive, send = AsyncMock(), AsyncMock(), AsyncMock()
+        scope = {"type": "http", "method": "GET", "http_version": "2"}
+        await LargeResponseStreaming(app)(scope, receive, send)
+        app.assert_awaited_once_with(scope, receive, send)
+
 
 if __name__ == "__main__":
     unittest.main()

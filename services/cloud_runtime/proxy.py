@@ -138,7 +138,7 @@ class WorkerProxy:
             await send(message)
 
         async with httpx.AsyncClient(
-            timeout=httpx.Timeout(1800, connect=30), follow_redirects=False
+            timeout=httpx.Timeout(1800, connect=30), follow_redirects=False, http1=False, http2=True
         ) as client:
             request = client.build_request(scope["method"], url, headers=headers, content=body())
             try:

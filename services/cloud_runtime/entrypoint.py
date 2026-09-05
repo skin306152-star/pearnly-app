@@ -26,17 +26,10 @@ def main() -> None:
 
         migrate()
         return
-    import uvicorn
+    from services.cloud_runtime.application import app
+    from services.cloud_runtime.server import run
 
-    uvicorn.run(
-        "services.cloud_runtime.application:app",
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", "8080")),
-        workers=1,
-        proxy_headers=True,
-        forwarded_allow_ips="*",
-        timeout_graceful_shutdown=8,
-    )
+    run(app)
 
 
 if __name__ == "__main__":

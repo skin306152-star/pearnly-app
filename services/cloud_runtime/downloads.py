@@ -8,7 +8,7 @@ class LargeResponseStreaming:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope["method"] == "HEAD":
+        if scope["type"] != "http" or scope["method"] == "HEAD" or scope.get("http_version") == "2":
             return await self.app(scope, receive, send)
 
         async def stream_response(message):
@@ -19,7 +19,7 @@ class LargeResponseStreaming:
                     for name, value in headers
                 ):
                     # FileResponse already emits chunks. Omitting the length lets
-                    # Uvicorn use chunked encoding instead of Cloud Run buffering it.
+                    # the HTTP/1 server use chunked encoding instead of buffering it.
                     message = {
                         **message,
                         "headers": [(k, v) for k, v in headers if k.lower() != b"content-length"],

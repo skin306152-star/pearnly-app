@@ -21,7 +21,9 @@ Vultr `66.42.49.213`，UUID `25a6d7e9-bbcd-4c00-958b-c771f503cdbc`。应用mrpil
 
 旧workflow `.github/workflows/release.yml` ID331277700已由主控disabled_manually，因为它仍向Vultr做SSH/SCP。**新流程未提交、未推送、未启用、未实际跑Windows构建或GCS发布；不可声称已完成。** 没有运行中的companion发布。
 
-隔离worktree：`/Users/skin/Developer/Pearnly/pearnly-companion-cloud-storage-release`，分支`codex/cloud-storage-release`。保留以下WIP：release.yml、release.ps1、packaging/publish_gcs.py、tests/test_gcs_publication.py。子任务暂停说明在`/tmp/pearnly-companion-release-review/PAUSE.md`（需复制到持久工作树保存）；原始证据在同目录对应路径，不能调用旧脚本上传。
+隔离worktree：`/Users/skin/Developer/Pearnly/pearnly-companion-cloud-storage-release`，分支`codex/cloud-storage-release`。保留以下WIP：release.yml、release.ps1、README.md、docs/RELEASE.md、packaging/publish_gcs.py、tests/test_gcs_publication.py。子任务暂停说明已持久保存到companion工作树`docs/CLOUD_STORAGE_MIGRATION_PAUSE.md`；原始证据在同目录对应路径，不能调用旧脚本上传。
+
+已跑发布脚本10个stdlib测试及聚焦pytest（17 passed、1 skipped、5 subtests），Ruff通过，Black格式化完成；实际PowerShell/Windows/GCS staging尚未执行。应用工作树另有未提交的`docs/deployment/COMPANION_PUBLICATION.md`，仍是待运行的流程说明。
 
 最小目标：Windows只构建并校验ProductVersion，Ubuntu下载同run artifact校验SHA/hash/size，经WIF发布私有GCS。dispatch默认staging只验证独立前缀，prod先immutable安装包、回读公开URL及哈希，再CAS发布manifest/兼容固定文件；保留可恢复旧版本。不改VERSION，不发新生产安装包，仅跑staging真实验证。
 

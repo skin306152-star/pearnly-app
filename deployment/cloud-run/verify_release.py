@@ -1,6 +1,8 @@
 """Gate Cloud Run traffic on the candidate image and its actual HTTP runtime."""
 
 import argparse
+import base64
+import hashlib
 import json
 import subprocess
 import urllib.request
@@ -90,6 +92,45 @@ def probe(url, token):
         return json.load(response)
 
 
+def check_download(stream, expected):
+    digest, received = hashlib.md5(usedforsecurity=False), 0
+    size = int(expected["size"])
+    while chunk := stream.read(1024 * 1024):
+        received += len(chunk)
+        if received > size:
+            raise ValueError("installer exceeds expected object size")
+        digest.update(chunk)
+    if received != size or base64.b64encode(digest.digest()).decode() != expected["md5_hash"]:
+        raise ValueError("installer download differs from the stored object")
+
+
+def probe_installer(url, token):
+    """Exercise a real large response before traffic can reach this revision."""
+    uri = "gs://pearnly-app-installers-112074003592/PearnlyCompanion-Setup.exe"
+
+    def metadata():
+        return json.loads(
+            gcloud("storage", "objects", "describe", uri, "--project=" + PROJECT, "--format=json")
+        )
+
+    expected = metadata()
+    request = urllib.request.Request(
+        url + "/static/companion/PearnlyCompanion-Setup.exe",
+        headers={"Authorization": "Bearer " + token},
+    )
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    with urllib.request.build_opener(NoRedirect).open(request, timeout=180) as response:
+        if response.status != 200:
+            raise ValueError("installer HTTP gate failed")
+        check_download(response, expected)
+    if metadata()["generation"] != expected["generation"]:
+        raise ValueError("installer changed during release verification")
+
+
 def verify(args):
     service = json.loads(
         gcloud(
@@ -139,6 +180,7 @@ def verify(args):
     check_runtime(
         probe(url + "/internal/runtime-version", token), args.sha, args.revision, args.role
     )
+    probe_installer(url, token)
     print(
         json.dumps(
             {

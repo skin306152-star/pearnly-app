@@ -43,7 +43,7 @@ Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均
 
 2026-09-05 DNS 回读：主域名由旧 A `66.42.49.213` 改成 proxied CNAME `pearnly-web-112074003592.asia-southeast1.run.app`；www 保持 proxied CNAME `pearnly.com`。原有 MX、SPF、DKIM 保留。旧 IP 不再是网站 DNS 源站。
 
-小助手安装包来自独立仓库`pearnly-companion`。旧SSH workflow已替换，新流程提交`ed48b1a1295f01e2f9d8b4ed7afbe0eb39f3e5ce`已推送，workflow331277700已重新启用，staging验证[33961319994](https://github.com/skin306152-star/pearnly-companion/actions/runs/33961319994)进行中；尚不宣称Windows构建/GCS发布通过。生产仍为1.1.77，未替换安装包；操作见[安装包发布](COMPANION_PUBLICATION.md)。
+小助手安装包来自独立仓库`pearnly-companion`。旧SSH workflow已替换，新流程提交`ed48b1a1295f01e2f9d8b4ed7afbe0eb39f3e5ce`已推送，workflow331277700已重新启用，staging验证[33961319994](https://github.com/skin306152-star/pearnly-companion/actions/runs/33961319994)的Windows构建、WIF身份和GCS上传/回读已通过；公开安装包下载被Cloud Run响应大小限制拦截为500，流程正确阻断，正在修复应用下载。生产仍为1.1.77，未替换安装包；操作见[安装包发布](COMPANION_PUBLICATION.md)。
 
 通用CI仍停用，ci.yml已移除旧VM deploy job并保留所有验证job，避免未来恢复CI时误触发历史部署。
 

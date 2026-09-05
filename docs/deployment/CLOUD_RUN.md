@@ -57,3 +57,9 @@ Vultr 销毁是独立且不可逆的步骤：备份及可恢复性、新站关�
 候选 revision 的 IAM 探针显式模拟 `pearnly-deploy@pearnly.iam.gserviceaccount.com`，ID token audience 使用服务 canonical URL，实际请求访问 candidate tag URL。发布脚本仅添加服务级 Invoker：Worker 授予 Web、Tasks 和 deploy 账号；Web 授予 deploy。初次 Web 保持私有，正式域名切换由迁移主控单独处理；后续发布保留已有 IAM。
 
 WIF 发布身份需要在 deploy 服务账号上具备 `iam.serviceAccounts.getOpenIdToken`。如身份已是该账号，可授予其自身较窄的 `roles/iam.serviceAccountOpenIdTokenCreator`，不要为 ID token 探针授予能反复生成 access token 的宽泛自模拟权限。本机操作者也需有该账号的 ID-token 生成权限。[Google ID token 说明](https://docs.cloud.google.com/docs/authentication/get-id-token)。
+
+## 大文件下载与发布验证
+
+Cloud Run HTTP/1 非流式响应受32 MiB限制，见[官方配额](https://docs.cloud.google.com/run/quotas)。Cloud入口的LargeResponseStreaming中间件对至少32 MiB的有正文响应移除Content-Length，让Uvicorn按chunked发送；不缓存正文，不改变文件权限、ETag、Last-Modified、Content-Range或小响应，HEAD保留长度。标准FileResponse和StaticFiles继续分块读GCS挂载。
+
+Web和Worker候选及正式流量检查都必须完整下载现有安装包，与GCS对象大小/MD5比对并确认generation未变；不能仅凭health/ready或HEAD判定大文件可用。deploy账号因此只有安装包桶额外objectViewer权限，不获写权限。任何下载失败均阻断候选切流。

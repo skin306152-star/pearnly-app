@@ -2,7 +2,7 @@
 
 ## 当前状态卡 · 09-05 Cloud Run 已接管，迁移已恢复
 
-- **当前工作**：用户已恢复迁移；Companion新GCS发布流程已推送，staging运行33961319994验证中。旧VM尚未获得销毁确认。
+- **当前工作**：用户已恢复迁移；Companion的Windows构建/WIF/GCS回读通过，staging33961319994公开大文件下载被平台限制阻断，正在修复流式下载。旧VM尚未获得销毁确认。
 - **部署状态唯一正本**：`docs/deployment/MIGRATION_STATUS.md`；规范 `docs/deployment/CLOUD_RUN.md`。下方卡片仅是历史功能证据。
 - **正式入口**：`pearnly.com` / `www.pearnly.com` → Cloudflare Worker → GCP `pearnly` / `asia-southeast1` 的 Cloud Run。
 - **实际配置**：Web1 CPU/1 GiB min0 max2；Worker1 CPU/2 GiB min0 max2 并发1；Supabase保留，文件私有GCS，Tasks/Scheduler已实际运行。

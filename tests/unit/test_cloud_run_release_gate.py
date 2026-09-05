@@ -14,6 +14,21 @@ IMAGE = "registry/app@sha256:" + "a" * 64
 
 
 class ReleaseGateTests(unittest.TestCase):
+    def test_download_gate_rejects_truncation_extra_bytes_and_wrong_digest(self):
+        import base64
+        import hashlib
+        from io import BytesIO
+
+        content = b"verified-installer"
+        expected = {
+            "size": len(content),
+            "md5_hash": base64.b64encode(hashlib.md5(content).digest()).decode(),
+        }
+        gate.check_download(BytesIO(content), expected)
+        for wrong in (content[:-1], content + b"extra", b"x" * len(content)):
+            with self.subTest(wrong=wrong), self.assertRaises(ValueError):
+                gate.check_download(BytesIO(wrong), expected)
+
     def test_preserves_resolved_traffic_not_latest_pointer(self):
         service = {"spec": {"template": {"metadata": {}}}}
         old = {

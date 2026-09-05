@@ -3,6 +3,7 @@
 import os
 
 from app import app
+from services.cloud_runtime.downloads import LargeResponseStreaming
 from services.cloud_runtime.proxy import WorkerProxy
 
 role = os.environ["PEARNLY_RUNTIME_ROLE"]
@@ -11,6 +12,7 @@ if role == "worker":
 
     app.include_router(router)
 app.add_middleware(WorkerProxy, role=role)
+app.add_middleware(LargeResponseStreaming)
 
 
 @app.get("/internal/runtime-version")

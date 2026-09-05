@@ -14,6 +14,19 @@ def gcloud(*args):
     return subprocess.check_output(["gcloud", *args], text=True).strip()
 
 
+def probe_identity_token(audience):
+    # Use the caller's existing access token; no self access-token impersonation.
+    access = gcloud("auth", "print-access-token")
+    request = urllib.request.Request(
+        "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/"
+        "pearnly-deploy@pearnly.iam.gserviceaccount.com:generateIdToken",
+        data=json.dumps({"audience": audience, "includeEmail": True}).encode(),
+        headers={"Authorization": "Bearer " + access, "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.load(response)["token"]
+
+
 def candidate_service(service, previous, revision):
     """Pin existing serving revisions so latestRevision cannot switch traffic."""
     service["spec"]["template"]["metadata"]["name"] = revision
@@ -119,12 +132,7 @@ def verify(args):
         ):
             raise ValueError("traffic does not serve the verified revision")
         url = service["status"]["url"]
-    token = gcloud(
-        "auth",
-        "print-identity-token",
-        "--impersonate-service-account=pearnly-deploy@pearnly.iam.gserviceaccount.com",
-        "--audiences=" + service["status"]["url"],
-    )
+    token = probe_identity_token(service["status"]["url"])
     probe(url + "/api/health", token)
     ready = probe(url + "/api/ready", token)
     check_readiness(ready)

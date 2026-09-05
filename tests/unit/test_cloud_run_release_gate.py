@@ -118,10 +118,25 @@ class ReleaseGateTests(unittest.TestCase):
             with self.subTest(payload=payload), self.assertRaises(ValueError):
                 gate.check_readiness(payload)
 
-    def test_probes_use_explicit_service_account_identity(self):
-        source = (ROOT / "deployment/cloud-run/verify_release.py").read_text()
-        self.assertIn(
-            "--impersonate-service-account=pearnly-deploy@pearnly.iam.gserviceaccount.com", source
+    def test_probe_identity_is_scoped_without_self_access_token_impersonation(self):
+        from unittest.mock import patch
+        from io import BytesIO
+        import json
+
+        with (
+            patch.object(gate, "gcloud", return_value="access") as cli,
+            patch.object(
+                gate.urllib.request, "urlopen", return_value=BytesIO(b'{"token":"id-token"}')
+            ) as request,
+        ):
+            self.assertEqual(gate.probe_identity_token("https://worker"), "id-token")
+        cli.assert_called_once_with("auth", "print-access-token")
+        sent = request.call_args.args[0]
+        self.assertTrue(
+            sent.full_url.endswith("pearnly-deploy@pearnly.iam.gserviceaccount.com:generateIdToken")
+        )
+        self.assertEqual(
+            json.loads(sent.data), {"audience": "https://worker", "includeEmail": True}
         )
 
     def test_invoker_grants_are_scoped_and_do_not_publish_initial_web(self):

@@ -6,7 +6,7 @@
   · 禁止可复制的 webhook active=true 复启命令(历史说明放行)
   · 禁止不带参数的 git-deploy.sh 调用(必须带 SHA)
   · 当前入口必须指向迁移状态与 Cloud Run 正本，保留候选镜像、readiness、流量回读门槛
-  · 历史 VM 手册仍保留精确 SHA 与旧主机诊断约束，不反向要求新发布使用 SSH
+  · 当前运维与验收文档不得保留可执行旧VM上线/诊断命令
 
 扫描范围仅限活跃文档;archive/history/legacy 路径自动跳过。
 """
@@ -136,16 +136,17 @@ class DeployProcessContractTests(unittest.TestCase):
     def test_runbook_has_sha_verification(self):
         text = self.docs["RUNBOOK.md"]
         self.assertIn("rev-parse HEAD", text)
-        self.assertIn("github.sha", text)
+        self.assertIn("commits/master --jq .sha", text)
+        self.assertIn("status.latestReadyRevisionName,status.traffic", text)
 
     def test_acceptance_playbooks_has_sha_verification(self):
         text = self.docs["ACCEPTANCE_PLAYBOOKS.md"]
         self.assertIn("rev-parse HEAD", text)
-        self.assertIn("pearnly-prod", text)
+        self.assertIn("--project=pearnly", text)
 
-    def test_task_modes_has_pearnly_prod(self):
+    def test_task_modes_uses_current_cloud_diagnostics(self):
         text = self.docs["TASK_MODES.md"]
-        self.assertIn("pearnly-prod", text)
+        self.assertIn("gcloud logging read", text)
 
     def test_agents_md_has_canonical_deploy_chain(self):
         text = self.docs["AGENTS.md"]
@@ -170,19 +171,17 @@ class DeployProcessContractTests(unittest.TestCase):
             "Web",
         ):
             self.assertIn(required, canonical)
-        self.assertIn("历史 Vultr 单机运维手册", self.docs["RUNBOOK.md"])
+        self.assertIn("历史版本", self.docs["RUNBOOK.md"])
 
     def test_claude_md_references_deploy_skill(self):
         text = self.docs["CLAUDE.md"]
         self.assertIn("deploy-release", text)
 
-    # ── 5. RUNBOOK 紧急部署必须有 Zihao 授权门槛 ──────────────────
-
-    def test_runbook_emergency_requires_zihao_authorization(self):
-        text = self.docs["RUNBOOK.md"]
-        self.assertIn("Zihao", text)
-        emergency_section = text[text.find("紧急时:") :]
-        self.assertIn("Zihao", emergency_section[:500])
+    def test_current_runbooks_never_send_work_to_the_retired_vm(self):
+        for name in ("RUNBOOK.md", "TASK_MODES.md", "ACCEPTANCE_PLAYBOOKS.md"):
+            self.assertNotRegex(self.docs[name], r"ssh\s+pearnly-prod")
+            self.assertNotRegex(self.docs[name], r"systemctl\s+(restart|start)\s+mrpilot")
+        self.assertIn("失败不得手工跳过门禁来切流", self.docs["RUNBOOK.md"])
 
     # ── 6. 所有活跃文档不含旧 IP 作为当前服务器地址 ────────────────
 

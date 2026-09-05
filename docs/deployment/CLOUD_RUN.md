@@ -1,6 +1,6 @@
 # Pearnly Cloud Run 部署正本
 
-本文件规定 Pearnly 应用的目标部署与操作边界。**当前真正上线的位置、版本及未完成项只看 [迁移状态账本](MIGRATION_STATUS.md)**；存在配置、workflow 或镜像不代表完成迁移。旧 [RUNBOOK](../RUNBOOK.md) 的 SSH/systemd 流程仅供已确认仍在运行的 Vultr 故障诊断或显式回退，不能用来发布 Cloud Run。
+本文件规定 Pearnly 应用的 Cloud Run 部署与操作边界。**当前真正上线的位置、版本及未完成项只看 [迁移状态账本](MIGRATION_STATUS.md)**；存在配置、workflow 或镜像不代表完成迁移。旧 [RUNBOOK](../RUNBOOK.md) 的 SSH/systemd 流程仅供已确认仍在运行的 Vultr 故障诊断或显式回退，不能用来发布 Cloud Run。
 
 ## 项目边界
 
@@ -14,7 +14,7 @@
 
 ## 目标资源
 
-GCP 项目 `pearnly`（项目编号 `112074003592`），区域 `asia-southeast1`（新加坡）。以下为目标值，实际值须经账本回读。
+GCP 项目 `pearnly`（项目编号 `112074003592`），区域 `asia-southeast1`（新加坡）。以下为当前开发配置基线；每次调整后的实际值记在账本。
 
 | 资源 | 目标 |
 |---|---|
@@ -38,7 +38,7 @@ Cloud Run 本地磁盘只作临时空间。响应后继续执行的进程内任�
 5. 回读 GCP 项目、区域、服务配置、revision、实际 digest、流量分配；在正式域名核对健康、就绪及应用版本，并按变更验证网页、LINE、任务、附件、OCR、ERP 实际消费路径。
 6. 分别记录本地检查、容器检查、远程 workflow、生产回读和用户真机验收。HTTP 200 不等于 OCR 成功或外部 ERP 已入账。
 
-旧 `manual-deploy.yml` / `/internal/deploy/manual` / `git-deploy.sh` 不得被误认为 Cloud Run 发布入口。切流前后明确停用旧发布及后台任务入口，避免同一个 Supabase 上运行两套调度器。不要同时向两边部署来“保险”。
+当前 `.github/workflows/manual-deploy.yml` 已重写为 Cloud Run 的 `Manual CD`；同名文件的历史 VM 内容已退役。旧 `/internal/deploy/manual` / `git-deploy.sh` 不得再用于发布。切流前后明确停用旧发布及后台任务入口，避免同一个 Supabase 上运行两套调度器。不要同时向两边部署来“保险”。
 
 ## 切换与回退
 

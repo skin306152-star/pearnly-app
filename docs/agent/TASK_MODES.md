@@ -51,15 +51,15 @@
 **铁律:先复现 + 查日志,不先改代码(铁律 #25)。**
 
 步骤:
-1. **磁盘**:`ssh pearnly-prod "df -h /"`(>85% 是头号嫌疑·铁律 #24:满盘→Nginx 500→前端 `Unexpected token '<'`)。
-2. **抓真栈**:`journalctl -u mrpilot --since '...' | grep -iE 'ERR_|Traceback|<关键词>'`。不猜根因。
+1. **当前部署**：先读 `docs/deployment/MIGRATION_STATUS.md`；Cloud Run故障检查对应revision、内存、GCS挂载及依赖。旧Vultr磁盘不再是当前网站故障源。
+2. **抓真栈**：按 `docs/RUNBOOK.md` 使用 `gcloud logging read`，明确 `--project=pearnly`、Web/Worker与时间范围。不猜根因。
 3. **分类**(见 `ERROR_CODES_AND_STATES.md`):用户数据错 / 业务拒绝 / 技术错 / 环境错。
 4. **复现**:能本地用真 adapter + sandbox(test01)复现就复现(铁律 #25 "用测试证根因")。
 5. 定位后**修一类不修一处**(铁律 #1:grep 同类 pattern 一次修全)。
-6. 修后**验证生产 HEAD == 你 push 的精确 SHA**:`ssh pearnly-prod "git -C /opt/mrpilot rev-parse HEAD"` + `systemctl show mrpilot -p ActiveEnterTimestamp` ≥ 部署时间。
+6. 修后**验证实际Cloud Run完整SHA、镜像digest、revision和100%流量**，按 `docs/deployment/CLOUD_RUN.md` 回读正式域名命中与健康状态。
 7. 真 bug 必补守门测试。
 
-实战要点:500≠504(不是超时);uvicorn 日志查不到该 POST = 卡在 Nginx 没到应用;`--workers 2` 下进程内锁无效(要 pg advisory / DB lease)。
+实战要点：500与504分别定位；请求未到Worker时先查Cloudflare、Web代理与IAM，不能直接归因旧Nginx。多实例进程内锁无效，使用PG advisory lock或DB lease。
 
 禁忌:报"上传 500"先怀疑代码——先查磁盘;凭直觉盲调字节级格式——拿真样本对照(铁律 #8)。
 

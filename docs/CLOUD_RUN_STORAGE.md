@@ -2,7 +2,7 @@
 
 This document describes the Pearnly FastAPI storage layout. It does not change the
 separate ERPNext VM, MariaDB, Redis, Frappe Sites or their backups. Deployment status
-and the active revision belong in the deployment runbook and STATE status card;
+and the active revision belong in [the deployment ledger](deployment/MIGRATION_STATUS.md);
 the layout below alone is not evidence of a completed migration.
 
 ## Persistent paths

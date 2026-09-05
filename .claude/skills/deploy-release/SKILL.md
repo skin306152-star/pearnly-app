@@ -9,7 +9,7 @@ description: 部署前读 Cloud Run 部署正本和迁移状态；本地风险�
 
 必读 `docs/deployment/MIGRATION_STATUS.md` 和 `docs/deployment/CLOUD_RUN.md`。前者是实际部署状态，后者是发布规范；本 skill 不复制易漂移的主机或 workflow 命令。
 
-- Pearnly 应用迁往 GCP `pearnly` / `asia-southeast1`；ERPNext 在独立仓库/项目，不随此发布修改。
+- Pearnly 应用已部署于 GCP `pearnly` / `asia-southeast1`；ERPNext 在独立仓库/项目，不随此发布修改。
 - 在本任务隔离 worktree 验证、提交精确候选 SHA；不要自动切走任务分支。
 - 前端改动仍需 dist 同提交与缓存版本更新；本地风险分层检查和 pre-push 闸保留。
 - 当前 `.github/workflows/manual-deploy.yml` 已改为 Cloud Run 发布：经 GitHub WIF 构建/推送 Artifact Registry 镜像，发布精确镜像 digest。同名文件的历史 VM 版本已退役，不得恢复该历史版本或调用旧 `/internal/deploy/manual` 来发布 Cloud Run。

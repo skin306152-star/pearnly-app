@@ -1,6 +1,6 @@
 # CLAUDE.md · Pearnly 项目宪法(轻量版)
 
-> **部署状态正本（2026-09-05）**：先读 `docs/deployment/MIGRATION_STATUS.md`（实际状态）和 `docs/deployment/CLOUD_RUN.md`（操作规范）。Pearnly 正从 Vultr 迁到 Cloud Run；ERPNext 是独立仓库/项目，本次不动。旧 SSH/systemd/manual-deploy 流程不能用于 Cloud Run；是否已切流只以状态账本证据为准。
+> **部署状态正本（2026-09-05）**：先读 `docs/deployment/MIGRATION_STATUS.md`（实际状态）和 `docs/deployment/CLOUD_RUN.md`（操作规范）。Pearnly 正式域名已由 Cloud Run 接管；ERPNext 是独立仓库/项目，本次不动。旧 SSH/systemd 发布流程已退役；当前同名 manual-deploy.yml 是 Cloud Run CD，最新版本、旧实例计费和验收边界只看状态账本。
 
 > **不用通读。** 开工只要三样:`AGENTS.md` → STATE 顶部状态卡 → 跑 `python scripts/refactor_progress.py`。本页是"坑 + 硬线 + 索引",干活的具体做法在 `.claude/skills/`(按需自动装载)和 `docs/`(用 `@` 引用)。
 >

@@ -1,6 +1,6 @@
 # Contributing to Pearnly
 
-> **部署状态正本（2026-09-05）**：先读 `docs/deployment/MIGRATION_STATUS.md`（实际状态）和 `docs/deployment/CLOUD_RUN.md`（操作规范）。Pearnly 正从 Vultr 迁到 Cloud Run；ERPNext 是独立仓库/项目，本次不动。旧 SSH/systemd/manual-deploy 流程不能用于 Cloud Run；是否已切流只以状态账本证据为准。
+> **部署状态正本（2026-09-05）**：先读 `docs/deployment/MIGRATION_STATUS.md`（实际状态）和 `docs/deployment/CLOUD_RUN.md`（操作规范）。Pearnly 正式域名已由 Cloud Run 接管；ERPNext 是独立仓库/项目，本次不动。旧 SSH/systemd 发布流程已退役；当前同名 manual-deploy.yml 是 Cloud Run CD，最新版本、旧实例计费和验收边界只看状态账本。
 
 > 这份文档是 Pearnly 项目的协作守则(对人 + 对 AI / Claude 窗口都适用)。完整的项目宪法见 `CLAUDE.md/CLAUDE.md`(450+ 行)· 本文件是它的"快速参考卡"。
 

@@ -1,6 +1,6 @@
 # AGENTS.md · Pearnly 唯一入口(所有 AI 窗口先读这一页)
 
-> **部署状态正本（2026-09-05）**：先读 `docs/deployment/MIGRATION_STATUS.md`（实际状态）和 `docs/deployment/CLOUD_RUN.md`（操作规范）。Pearnly 正从 Vultr 迁到 Cloud Run；ERPNext 是独立仓库/项目，本次不动。旧 SSH/systemd/manual-deploy 流程不能用于 Cloud Run；是否已切流只以状态账本证据为准。
+> **部署状态正本（2026-09-05）**：先读 `docs/deployment/MIGRATION_STATUS.md`（实际状态）和 `docs/deployment/CLOUD_RUN.md`（操作规范）。Pearnly 正式域名已由 Cloud Run 接管；ERPNext 是独立仓库/项目，本次不动。旧 SSH/systemd 发布流程已退役；当前同名 manual-deploy.yml 是 Cloud Run CD，最新版本、旧实例计费和验收边界只看状态账本。
 
 > **这是唯一的"必读"。** 故意保持一页。坑与红线在 `CLAUDE.md/CLAUDE.md`(轻量版约 90 行),干活的具体做法在 `.claude/skills/*`(按需自动装载,别背),业务概念在 `docs/agent/`。**进窗口先把这页 + STATE 状态卡读完 + 跑一次进度脚本**就能开工。
 > (2026-07-25:CLAUDE.md 由 1470 行瘦身成轻量版 + 8 个 skill,旧全文冻结在 `CLAUDE.md/ARCHIVE_CLAUDE_LEGACY.md`,逐段对照表见 `docs/context-engineering/2026-07-25-claude-md-simplify.md`。)

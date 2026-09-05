@@ -46,6 +46,7 @@ class CloudImportSchemaTests(unittest.TestCase):
             patch("services.startup._boot_schema_ddl"),
             patch("services.users.columns.ensure_user_profile_columns"),
             patch("services.cloud_tasks.store.ensure_table"),
+            patch("services.cloud_runtime.schema.migrate_queue_schema"),
             patch("builtins.__import__", side_effect=warned_import),
         ):
             with self.assertRaisesRegex(RuntimeError, "Schema gate reported failures"):

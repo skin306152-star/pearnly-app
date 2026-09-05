@@ -28,6 +28,7 @@ def migrate() -> None:
         _boot_schema_ddl()
         ensure_user_profile_columns()
         ensure_table()
+        migrate_queue_schema()
     finally:
         root.removeHandler(failures)
     if failures.failures:
@@ -35,6 +36,18 @@ def migrate() -> None:
         raise RuntimeError(
             f"Schema gate reported failures in {locations}; revision must not receive traffic"
         )
+
+
+def migrate_queue_schema():
+    from services.ocr.jobs.store import ensure_table as ocr
+    from services.recon_jobs.store import ensure_table as recon
+    from services.steward.schema import ensure_once as steward
+    from services.importer.template_store import ensure_table as templates
+    from services.workorder.store import ensure_runtime as workorders
+
+    for initialize in (ocr, recon, steward, templates, workorders):
+        if initialize() is False:
+            raise RuntimeError("Queue schema initialization failed")
 
 
 if __name__ == "__main__":

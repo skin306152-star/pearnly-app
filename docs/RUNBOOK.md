@@ -19,7 +19,7 @@ Pearnly项目始终显式使用`--project=pearnly --region=asia-southeast1`。�
 
 正式入口为Cloudflare的`pearnly.com`和`www.pearnly.com`，Web公开、Worker受IAM保护，Supabase实例保持。Web/Worker共用精确镜像和私有GCS文件，账号/密钥分开；Cloud Tasks派发，Cloud Scheduler周期恢复。
 
-旧`66.42.49.213`及其`mrpilot`不再服务网站。旧VM是否已Destroy、是否仍计费只以状态账本和提供商回读为准，不以SSH失败或systemd inactive推断停止计费。
+旧`66.42.49.213`已于2026-09-05 18:25（Bangkok）Destroy，控制台回读No Instances；证据见状态账本。旧IP和`pearnly-prod` SSH别名已退役，不得再连接或部署。
 
 ## 2. 部署
 
@@ -48,7 +48,7 @@ gcloud run services update-traffic pearnly-web --to-revisions=<已验证WebRevis
 
 普通回退不会自动撤销数据库或文件变更。若schema不向后兼容，须先制定兼容迁移或备份恢复方案，禁止直接拿旧数据库覆盖现有Supabase。源码修复或`git revert`后仍走完整精确SHA发布。
 
-如确需恢复Vultr，必须先核实实例还存在、暂停新Scheduler并处理在途任务、同步切流后GCS文件、确认DB兼容，再协调唯一消费者和流量；不能仅重启旧systemd。
+旧Vultr已不存在，不能重启旧systemd回退。如未来需要VM部署，须另行建立新资源、暂停Scheduler并处理在途任务，验证兼容DB及完整文件恢复，再协调唯一消费者和流量。
 
 ## 4. CI状态查看
 

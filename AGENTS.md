@@ -72,7 +72,7 @@ sh scripts/git-hooks/pre-push     # Git Bash
 
 - 当前部署位置、精确版本、切流与旧机状态只读 `docs/deployment/MIGRATION_STATUS.md`；发布操作读 `docs/deployment/CLOUD_RUN.md`。
 - Pearnly 目标为 GCP `pearnly` / `asia-southeast1` 的 Cloud Run Web/Worker，Supabase 保持。ERPNext 在另一个仓库和 GCP 项目，本次不动。
-- Cloud Run 发布使用不可变 SHA 镜像与 revision/digest/流量回读。旧 Vultr SSH 别名 `pearnly-prod` 仅在账本确认仍保留时用于诊断或协调回退，不是新服务发布入口。
+- Cloud Run 发布使用不可变 SHA 镜像与 revision/digest/流量回读。旧 Vultr 已销毁，SSH 别名 `pearnly-prod` 已退役；旧 IP `66.42.49.213` 可能重新分配，不得再连接或发布。
 - Cloud Run schema 初始化须通过发布流程串行执行；不得沿用单机文件锁协调实例，也不得擅自改成 `alembic upgrade`。
 
 ## 5-bis. 入口/路由地图

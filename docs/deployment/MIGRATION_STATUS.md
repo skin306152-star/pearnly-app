@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-05 18:18（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，迁移技术验证通过；旧Vultr仍待销毁确认，用户业务验收单列**。
+更新时间：2026-09-05 18:25（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，迁移技术验证通过；旧Vultr已销毁，用户业务验收单列**。
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -20,7 +20,7 @@
 | 周期任务 | Scheduler `pearnly-background-recovery`，每5分钟调用私有 Worker recovery；状态 ENABLED，实际执行成功 |
 | 密钥和账号 | Secret Manager `pearnly-web-env` / `pearnly-worker-env`；各自独立运行账号，只读取各自密钥 |
 | 发布 | GitHub `Manual CD`（当前 `manual-deploy.yml`）→ WIF → Artifact Registry → schema Job → 候选验证 → 两服务切流 |
-| 旧 Vultr | `66.42.49.213` 的 `mrpilot` 已停止且禁用开机自启；实例尚未 Destroy，**仍计费** |
+| 旧 Vultr | `66.42.49.213` / UUID `25a6d7e9-bbcd-4c00-958b-c771f503cdbc` 已于2026-09-05 18:25销毁；控制台回读已终止、No Instances |
 | ERPNext | 独立仓库 `/Users/skin/pearnly-erp`，GCP `project-d0fbd530-1ee3-436d-b58`，VM `pearnly-erp-dev`；只读回查 RUNNING，本次未修改 |
 
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
@@ -47,7 +47,7 @@ Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均
 
 通用CI仍停用，ci.yml已移除旧VM deploy job并保留所有验证job，避免未来恢复CI时误触发历史部署。
 
-旧 GitHub webhook `625195648`（`/internal/deploy`）已 inactive；Cloudflare 阻断 `/internal/`，新应用也不提供旧 VM 发布路径。旧 systemd 不得自行重启；不要同时运行两套周期消费者。
+旧 GitHub webhook `625195648`（`/internal/deploy`）已 inactive；Cloudflare 阻断 `/internal/`，新应用也不提供旧 VM 发布路径。旧实例已销毁，SSH别名 `pearnly-prod` 已退役；旧IP可能重新分配，不得再连接或发布。不要重新建立第二套周期消费者。
 
 ## 数据与恢复证据
 
@@ -97,8 +97,10 @@ Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均
 
 ## 退役与回退规则
 
-旧 VM仍存在时也不得用历史 `git-deploy.sh` 再发布。Destroy须在新站验证和备份完成后单独明确确认；关应用或Stop都不代表Vultr停止实例计费。退款是独立工单事项，本次没有提交退款回复。
+用户明确回复“销毁”后，2026-09-05约11:25 UTC（18:25 Bangkok）在Vultr控制台核对IP及UUID并执行Destroy。回读显示“Your VPS has been terminated”和“No Instances”。此前已核查无快照、附加磁盘、对象存储、保留IP，自动备份未启用。旧实例不再新增实例使用费；已产生账单及余额退款另行结算，本次没有提交退款回复，也没有获得退款批准。
+
+销毁后正式域名 `/api/ready` 回读ready=true，db/gemini/smtp/line均ok；GCP项目pearnly仅保留Web/Worker两个服务，latestReady均为674909a0bd51-s1。独立ERPNext VM `pearnly-erp-dev` 回读RUNNING，未修改。
 
 后续 Cloud Run 回退只切到已验证、与当前schema/持久文件兼容的 revision。施工用 preflight revision不是验收基线。数据库/文件破坏性变更需配套恢复，不能只换旧镜像。
 
-若必须回到旧VM，先暂停Scheduler并处理在途任务，确认数据库向后兼容，把切流后新增/修改的GCS文件同步回旧挂载，再验证旧服务和单一消费者；不能直接重启旧Vultr导致新文件缺失或双份任务。备份恢复须在隔离环境验证后单独决策，禁止覆盖现有Supabase来“试一下”。
+旧VM已不存在，不能再通过旧IP或systemd回退。未来如需恢复VM部署，必须另行建立新资源、暂停Scheduler并处理在途任务，验证兼容数据库和完整文件恢复，再协调单一消费者及流量；不得使用迁移前文件覆盖切流后的新增数据。备份恢复须在隔离环境验证后单独决策，禁止覆盖现有Supabase来“试一下”。

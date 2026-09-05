@@ -2,7 +2,7 @@
 """
 scripts/probe/probe-mrerp.py · MR.ERP 销项发票批量导入端到端探测
 
-设计原则(CLAUDE.md 铁律 §7):
+设计原则(AGENTS.md 铁律 §7):
     - 仅走 Playwright 浏览器 UI · 严禁直接 POST endpoint
     - known-facts.md 的 URL 仅作"如果跳转到这就对了"的验证锚点
     - 凭据从 .env.local 读 · 不打印明文

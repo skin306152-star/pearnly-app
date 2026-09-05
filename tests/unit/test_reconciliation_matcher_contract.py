@@ -5,7 +5,7 @@ reconciliation_matcher.py(逐字段对照模式 · 两轮强配对)此前 0 专�
 但仍被 recon_routes / bank_recon_v2 / vat_excel_export 使用(live)。
 纯函数 · 无 DB/网络/凭证(Wave 0 安全网 · 零冲突)。
 
-锁定产品哲学铁律(CLAUDE.md P0-VAT):
+锁定产品哲学铁律(AGENTS.md P0-VAT):
   - 只用「用户一眼能看出是同一笔」的强键配对 · 不做模糊匹配
   - pass1 = 发票号完全一致(1.0) · pass2 = 日期+税号+金额全等(0.95)
   - 第三轮 fuzzy(名称/日期±1)已永久砍 · pass3_count 恒 0

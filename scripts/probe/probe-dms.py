@@ -2,7 +2,7 @@
 """
 scripts/probe/probe-dms.py · MR.ERP DMS 汽车销售 身份证→订车单 端到端探测
 
-设计原则(CLAUDE.md 铁律 §7):
+设计原则(AGENTS.md 铁律 §7):
     - 仅走 Playwright 浏览器 UI · endpoint 仅作"跳到这就对了"的锚点
     - 凭据从 env 读 · 绝不打印明文 · 绝不写进脚本
 

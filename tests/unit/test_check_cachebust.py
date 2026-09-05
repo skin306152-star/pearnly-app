@@ -180,7 +180,7 @@ def _entry_pages():
     从清单反推等于用清单守清单:只查得出「已列入口页里漏了某个资源」,查不出「整个入口页
     漏了」,而后者正是同一失效模式往上一层。实测这么改立刻照出 POS/登录页等 9 个入口全在闸外。
     """
-    skip = ("static/dist/", ".claude/", "node_modules/", "tests/", "_scratch/", "outputs/")
+    skip = ("static/dist/", ".agents/", "node_modules/", "tests/", "_scratch/", "outputs/")
     out = []
     for p in _ROOT.rglob("*.html"):
         rel = p.relative_to(_ROOT).as_posix()

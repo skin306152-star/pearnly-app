@@ -5,7 +5,7 @@ i18n_reports.py(后端独立报表 i18n · 模板名/列头/标题/合计)此前
 纯字典 + 取值函数(无 DB/网络/凭证 · Wave 0 安全网 · 零冲突)。
 
 最大价值:把模块里只「打印警告」的软自检 _self_check 升级成 **硬 CI 守门**——
-缺任一语言(zh/th/en/ja)直接红,贴合 CLAUDE.md「4 语 i18n 完整性铁律」。
+缺任一语言(zh/th/en/ja)直接红,贴合 AGENTS.md「4 语 i18n 完整性铁律」。
 """
 
 import unittest

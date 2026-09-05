@@ -4,7 +4,7 @@
 field_comparator.py(P0-VAT 核对表「逐字段对照」核心)此前 0 专属测试。
 纯函数 · 无 DB / 无网络 / 无凭证(Wave 0 安全网 · 零冲突)。
 
-锁定产品哲学铁律(CLAUDE.md P0-VAT):
+锁定产品哲学铁律(AGENTS.md P0-VAT):
   - 「核对表生成器 · 不替用户做决定」→ INV/IV 前缀不剥离、买方名不 fuzzy 自动判定
   - 系统只如实展示差异 + 标分类 · 不模糊匹配
 覆盖:7 个 normalize_* / parse_date(佛历)/ levenshtein / mod11 / compare_field 9 字段 /

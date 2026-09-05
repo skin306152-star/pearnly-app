@@ -18,13 +18,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 ACTIVE_DOCS = {
-    "SKILL.md": REPO_ROOT / ".claude" / "skills" / "deploy-release" / "SKILL.md",
+    "SKILL.md": REPO_ROOT / ".agents" / "skills" / "deploy-release" / "SKILL.md",
+    "DEBUG_SKILL.md": REPO_ROOT / ".agents" / "skills" / "debug-prod-500" / "SKILL.md",
     "RUNBOOK.md": REPO_ROOT / "docs" / "RUNBOOK.md",
     "CLOUD_RUN.md": REPO_ROOT / "docs" / "deployment" / "CLOUD_RUN.md",
     "TASK_MODES.md": REPO_ROOT / "docs" / "agent" / "TASK_MODES.md",
     "ACCEPTANCE_PLAYBOOKS.md": REPO_ROOT / "docs" / "agent" / "ACCEPTANCE_PLAYBOOKS.md",
     "AGENTS.md": REPO_ROOT / "AGENTS.md",
-    "CLAUDE.md": REPO_ROOT / "CLAUDE.md" / "CLAUDE.md",
 }
 
 OLD_TOKYO_IP = "45.76.53.194"
@@ -121,16 +121,16 @@ class DeployProcessContractTests(unittest.TestCase):
         for required in (
             "docs/deployment/MIGRATION_STATUS.md",
             "docs/deployment/CLOUD_RUN.md",
-            ".github/workflows/manual-deploy.yml",
-            "GitHub WIF",
-            "Artifact Registry",
             "镜像 digest",
             "readiness",
             "流量",
             "真机",
         ):
             self.assertIn(required, text)
-        self.assertIn("同名文件的历史 VM 版本已退役", text)
+        self.assertIn("发布流程已退役", text)
+        canonical = self.docs["CLOUD_RUN.md"]
+        for required in ("manual-deploy.yml", "Workload Identity Federation", "Artifact Registry"):
+            self.assertIn(required, canonical)
         self.assertNotRegex(text, r"gh\s+api[^\n]*/internal/deploy/manual")
 
     def test_runbook_has_sha_verification(self):
@@ -145,8 +145,10 @@ class DeployProcessContractTests(unittest.TestCase):
         self.assertIn("--project=pearnly", text)
 
     def test_task_modes_uses_current_cloud_diagnostics(self):
-        text = self.docs["TASK_MODES.md"]
-        self.assertIn("gcloud logging read", text)
+        self.assertIn("生产诊断技能", self.docs["TASK_MODES.md"])
+        text = self.docs["DEBUG_SKILL.md"]
+        self.assertIn("docs/RUNBOOK.md", text)
+        self.assertIn("gcloud logging read", self.docs["RUNBOOK.md"])
 
     def test_agents_md_has_canonical_deploy_chain(self):
         text = self.docs["AGENTS.md"]
@@ -156,7 +158,6 @@ class DeployProcessContractTests(unittest.TestCase):
             "Cloud Run",
             "Supabase",
             "ERPNext",
-            "revision/digest/流量回读",
         ):
             self.assertIn(required, text)
         canonical = self.docs["CLOUD_RUN.md"]
@@ -173,9 +174,8 @@ class DeployProcessContractTests(unittest.TestCase):
             self.assertIn(required, canonical)
         self.assertIn("历史版本", self.docs["RUNBOOK.md"])
 
-    def test_claude_md_references_deploy_skill(self):
-        text = self.docs["CLAUDE.md"]
-        self.assertIn("deploy-release", text)
+    def test_agents_md_references_deploy_skill(self):
+        self.assertIn(".agents/skills/deploy-release/SKILL.md", self.docs["AGENTS.md"])
 
     def test_current_runbooks_never_send_work_to_the_retired_vm(self):
         for name in ("RUNBOOK.md", "TASK_MODES.md", "ACCEPTANCE_PLAYBOOKS.md"):

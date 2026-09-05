@@ -8,7 +8,7 @@ tests/integration/test_version_endpoint_contract.py · REFACTOR-WC
 
 为啥要这个测试:
   /api/version 是**每次部署后的验证金丝雀**(`curl https://pearnly.com/api/version`
-  看 version 翻新 = 部署成功 · 见 CLAUDE.md 部署铁律)。它若被结构性重构搬丢字段 /
+  看 version 翻新 = 部署成功 · 见 AGENTS.md 部署铁律)。它若被结构性重构搬丢字段 /
   改坏返回,整条"部署是否生效"的验证链就瞎了。
 
   本测试锁定契约:GET /api/version → 200,且含 version(str)+ ts(部署时间戳)。

@@ -1,15 +1,16 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 09-05 Cloud Run 已接管，迁移已恢复
+## 当前状态卡 · 09-05 Cloud Run迁移技术验证通过，待旧VM退役确认
 
-- **当前工作**：用户已恢复迁移；Companion的Windows构建/WIF/GCS回读通过，staging33961319994公开大文件下载被平台限制阻断，正在修复流式下载。旧VM尚未获得销毁确认。
+- **当前工作**：大文件HTTP/2链路和Companion安装包发布已验证；旧VM尚未获得销毁确认。恢复检查点只作历史，当前状态看迁移账本。
 - **部署状态唯一正本**：`docs/deployment/MIGRATION_STATUS.md`；规范 `docs/deployment/CLOUD_RUN.md`。下方卡片仅是历史功能证据。
 - **正式入口**：`pearnly.com` / `www.pearnly.com` → Cloudflare Worker → GCP `pearnly` / `asia-southeast1` 的 Cloud Run。
 - **实际配置**：Web1 CPU/1 GiB min0 max2；Worker1 CPU/2 GiB min0 max2 并发1；Supabase保留，文件私有GCS，Tasks/Scheduler已实际运行。
-- **当前线上 SHA**：`85cc56b465bfad8e0293174dfc7ecfc0d46e36a2`；CD `33956960191` 成功。Express schema-ready只读启动校验已上线，匿名心跳恢复401，Worker IAM403。
+- **当前线上 SHA**：`674909a0bd51e1a3c76b3656c3ac0449373aba4a`；CD `33962463833` 成功，两服务100%流量。HTTP/2大文件上传/完整下载与Express schema-ready通过，Worker保持IAM私有。
 - **旧实例**：Vultr `66.42.49.213` 的mrpilot停用且禁自启、旧webhook停用；VM未Destroy，仍计费。
 - **项目边界**：`/Users/skin/pearnly-erp` 的ERPNext及其GCP项目未改，VM回读RUNNING。
-- **未完成**：小助手安装包GCS发布验证、Vultr最终退役确认、用户手机LINE/OCR/ERP实际验收；不标记USER_ACCEPTED。
+- **未完成**：Vultr最终退役确认、用户手机LINE/OCR/ERP实际验收；不标记USER_ACCEPTED。
+- **Companion**：独立仓GCS发布流程ed48b1a；staging33961319994 attempt2通过，生产原1.1.77包与manifest未改，临时探针/测试对象已清理。
 - **防冲突**：当前manual-deploy.yml是Cloud Run精确SHA发布；不得恢复其历史VM内容，不得重启旧周期消费者。
 
 ---

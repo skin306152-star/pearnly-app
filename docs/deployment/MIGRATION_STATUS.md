@@ -1,7 +1,7 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-05（Asia/Bangkok，UTC+7）。状态：**Cloud Run 已接管；用户已恢复迁移，正在验证安装包发布链，旧实例仍待退役确认**。
-2026-09-05 用户暂停后已明确回复“可以继续了”；当前恢复实施，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
+更新时间：2026-09-05 18:18（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，迁移技术验证通过；旧Vultr仍待销毁确认，用户业务验收单列**。
+2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
 ## 当前部署
@@ -27,14 +27,14 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`85cc56b465bfad8e0293174dfc7ecfc0d46e36a2`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:ba5009503b2c390a63e21e9ff5ed5e6e41781c5be569d42f54f31877ae43cb80`。
-- Web revision：`pearnly-web-85cc56b465bf-s1`，100%流量；Worker revision：`pearnly-worker-85cc56b465bf-s1`，100%流量。
-- [成功的 GitHub 发布运行 33956960191](https://github.com/skin306152-star/pearnly-app/actions/runs/33956960191)。schema Job于09:08:36 UTC完成，执行20.36秒，使用同一精确镜像。
+- 完整 SHA：`674909a0bd51e1a3c76b3656c3ac0449373aba4a`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:d62dee259067a14eeebd7f6aa55858939be21bebb2147d136b0430294e3e07e3`。
+- Web revision：`pearnly-web-674909a0bd51-s1`，100%流量；Worker revision：`pearnly-worker-674909a0bd51-s1`，100%流量。
+- [成功的 GitHub 发布运行33962463833](https://github.com/skin306152-star/pearnly-app/actions/runs/33962463833)。同镜像schema execution `pearnly-schema-mmsws`于11:11:11 UTC确认完成；Web/Worker候选及正式流量均通过完整安装包校验，18:13 Bangkok完成切流回读。上一已验证版本为85cc56b4（CD33956960191）；它尚有大文件传输限制，不作为当前传输能力基线。
 - 服务地址：`https://pearnly-web-112074003592.asia-southeast1.run.app`；私有 Worker `https://pearnly-worker-112074003592.asia-southeast1.run.app`。
 - 2026-09-05 15:28 左右切流。正式域名 readiness nonce `cutover-20260905-0828` 的 Cloud Run 请求日志确认命中初次接管的 `pearnly-web-c3797e182785-s1`，HTTP 200；www health 也为200。
-- 当前版本已补齐四项Express进程内schema-ready：每次启动只读验证列、约束、RLS、策略、函数与触发器，失败阻止启动。09:13:51 UTC正式域名nonce `final-readiness` 在Web/Worker新revision回读，无token heartbeat恢复401；直接匿名调用Worker为403。
-- 本次曾因错误SHA输入取消运行33956937444，未进入云端变更；以上33956960191才是正确SHA的成功发布。
+- 当前版本已补齐四项Express进程内schema-ready：每次启动只读验证列、约束、RLS、策略、函数与触发器，失败阻止启动。85cc56b4阶段在09:13:51 UTC以nonce `final-readiness`回读无token heartbeat恢复401；674909a0已保留该修复并再次回读401，直接匿名Worker仍为403。
+- 历史85cc56b4发布曾因错误SHA输入取消33956937444，未进入云端变更；随后33956960191成功。当前674909a0的发布记录为33962463833，两者不可混用。
 - 账本/CI文档提交可能晚于线上镜像SHA；文档更新不自动重发容器，不能据仓库HEAD推断线上版本。
 
 ## 域名与旧发布入口
@@ -43,7 +43,7 @@ Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均
 
 2026-09-05 DNS 回读：主域名由旧 A `66.42.49.213` 改成 proxied CNAME `pearnly-web-112074003592.asia-southeast1.run.app`；www 保持 proxied CNAME `pearnly.com`。原有 MX、SPF、DKIM 保留。旧 IP 不再是网站 DNS 源站。
 
-小助手安装包来自独立仓库`pearnly-companion`。旧SSH workflow已替换，新流程提交`ed48b1a1295f01e2f9d8b4ed7afbe0eb39f3e5ce`已推送，workflow331277700已重新启用，staging验证[33961319994](https://github.com/skin306152-star/pearnly-companion/actions/runs/33961319994)的Windows构建、WIF身份和GCS上传/回读已通过；公开安装包下载被Cloud Run响应大小限制拦截为500，流程正确阻断，正在修复应用下载。生产仍为1.1.77，未替换安装包；操作见[安装包发布](COMPANION_PUBLICATION.md)。
+小助手安装包来自独立仓库`pearnly-companion`。旧SSH workflow已替换，新流程提交`ed48b1a1295f01e2f9d8b4ed7afbe0eb39f3e5ce`已推送，workflow331277700已重新启用，staging验证[33961319994，第2次attempt](https://github.com/skin306152-star/pearnly-companion/actions/runs/33961319994)已成功：Windows构建、WIF、GCS完整回读和正式域名完整下载均通过。第1次attempt发现HTTP/1大响应限制并正确阻断；应用674909a0修复后只重跑publish job，沿用原Windows artifact，未重建或替换生产包。生产仍为1.1.77，未替换安装包；操作见[安装包发布](COMPANION_PUBLICATION.md)。
 
 通用CI仍停用，ci.yml已移除旧VM deploy job并保留所有验证job，避免未来恢复CI时误触发历史部署。
 
@@ -73,7 +73,7 @@ Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均
 ## 验证与告警边界
 
 - 启动修复：40个聚焦测试及24个subtest通过；真实PG副本12种安全结构破坏均阻断启动，只读线上目录预检通过。
-- 本地：当前发布的完整 pre-push 已通过（1147个测试模块与静态闸）；定向真实 PostgreSQL 任务状态测试与备份恢复分别执行。GitHub通用CI仍停用，不把本地通过写成远程CI通过。
+- 本地：当前发布的完整 pre-push 已通过（1149个测试模块与静态闸）；定向真实 PostgreSQL 任务状态测试与备份恢复分别执行。GitHub通用CI仍停用，不把本地通过写成远程CI通过。
 - 远程：上述 GitHub CD成功；镜像内 Python compileall、Chromium启动、schema Job、候选健康/就绪/精确版本及最终流量检查通过。
 - 线上：正式域名健康/就绪、页面与静态文件检查通过；保留登录态的管理后台可读取；真实历史记录详情和迁移前PDF在浏览器中正确渲染，未保存修改或推送ERP。真实 Cloud Tasks OIDC 探针到私有 Worker 返回200。
 - Scheduler启用后，数据库已回读 `maintenance`、`queue.ocr`、`queue.recon`、`queue.steward` 各10次 succeeded。这里只证明调度/消费；无待处理业务时不等于完成一次真实OCR或外部ERP交易。
@@ -83,6 +83,17 @@ Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均
 - 预算实际为 **300 THB/月**，50%/90%/100%实际用量及100%预测告警；仅项目pearnly的Run、Storage、Artifact Registry、Tasks、Scheduler、Secret Manager，排除Vertex和Supabase。预算不是硬停机或总费用上限。
 - 项目 `_Default` 日志保留14天。历史“$1–3/月”等仅初步估算；真实支出受任务时长、客户端轮询、存储、流量和构建影响。
 - **用户手机 LINE、OCR 文件处理和实际 ERP 写后回查仍未验收，不标记 USER_ACCEPTED。**
+
+## 恢复后补齐的传输与安装包验证
+
+- 原HTTP/1容器的约63MB安装包下载被平台限制为500；同时原业务支持100MiB单文件和超过32MiB的多文件批次，不能把迁移后的上限降到32MiB。
+- 当前Web/Worker均为Hypercorn单进程ASGI、h2c容器入口，Web→Worker强制HTTP/2。保留原代理头处理；HTTP/1大响应使用流式传输，HTTP/2和HEAD保留长度。Cloudflare原有额度和应用自身上传限制仍适用。
+- 新增发布检查会对Web/Worker候选及正式流量完整下载安装包，核对GCS大小/MD5，并验证generation未变；任一步失败阻断切流。本次四次检查均实际通过。
+- 本地38个聚焦测试与20个subtests通过；34MiB（35,651,584字节）在直接Hypercorn与Web代理的HTTP/1、HTTP/2链路均完整回读。
+- 使用同一已发布镜像在两个临时IAM私有CloudRun服务上做真实34MiB验证：直接Worker和经Web→Worker，各用HTTP/1与HTTP/2客户端，共四条链路；容器均回读HTTP/2、正确大小及SHA256 `23dfbc08258fa16e92089de9eeedd0d199590c6983c0deebeca11b3baffab7b2`。无业务写入。首次新IAM授权传播期间转发返回403/503，授权不变的后续完整验证通过。两服务已删除，匿名调用曾分别验证403。
+- Companion构建来源`ed48b1a1295f01e2f9d8b4ed7afbe0eb39f3e5ce`，VERSION/ProductVersion=1.1.77，staging包62,904,235字节，SHA256 `5e6b3d1e3bb98c98cf2f961d336c75148d38a02c64d70fc500cc78eea4d3cc6d`。这是测试构建，不是新的正式客户端发布。
+- 生产原安装包仍62,905,102字节、generation `1788593866085056`；latest.json仍86字节、generation `1788593862422782`。两者MD5/大小/generation与staging前逐项一致。仅清理本次`staging/33961319994-1/`和`-2/`对象，未清理生产releases或其他发布。
+- Companion本地发布/更新相关17 tests和5 subtests通过；1项PySide6 UI测试在Mac缺依赖跳过，未冒称Windows用户设备验收。真实Windows构建及ProductVersion检查由上述GitHub run完成。
 
 ## 退役与回退规则
 

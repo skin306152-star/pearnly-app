@@ -1,5 +1,7 @@
 # Companion 安装包分发状态与发布入口
 
+2026-09-05已验证：独立仓发布代码ed48b1a，GitHub staging运行33961319994 attempt2成功，原Windows构建产物经WIF/GCS/正式域名完整回读；生产1.1.77安装包和manifest保持不变。首次attempt发现的大文件平台限制已由应用674909a0修复，详见[MIGRATION_STATUS.md](MIGRATION_STATUS.md)。
+
 Pearnly Web 的 Cloud Run 迁移同时改变了 Windows 小助手的安装包存储位置。客户端源码在独立仓库 `skin306152-star/pearnly-companion`，不在 ERPNext 仓库，也不随 Pearnly Web 容器自动构建。
 
 ## 当前下载位置

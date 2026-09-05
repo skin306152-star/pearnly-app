@@ -296,7 +296,10 @@ async def run_startup() -> dict:
     logger.info("🚀 Pearnly 启动中...")
 
     if os.environ.get("PEARNLY_RUNTIME_ROLE") in {"web", "worker"}:
-        # Cloud instances never migrate schema or recover another instance's tasks.
+        # The schema job's process flags do not carry over into serving instances.
+        from services.erp.shared_express_readiness import initialize_serving_schema
+
+        await asyncio.to_thread(initialize_serving_schema)
         return {"email_task": None, "erp_retry_task": None}
 
     # v118.35.0.28 P0 安全 self-check (体检 2026-05-21)

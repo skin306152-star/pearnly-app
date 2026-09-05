@@ -78,7 +78,7 @@ def policy(name, condition, channels):
 def policies(channels, uptime_id, queue):
     resource = 'resource.type="cloud_run_revision" AND resource.labels.project_id="pearnly" AND resource.labels.location="asia-southeast1" AND (resource.labels.service_name="pearnly-web" OR resource.labels.service_name="pearnly-worker")'
     threshold = {
-        "filter": resource + ' AND metric.type="run.googleapis.com/container/memory/utilizations"',
+        "filter": 'resource.type="cloud_run_revision" AND resource.labels.project_id="pearnly" AND resource.labels.location="asia-southeast1" AND resource.labels.service_name=monitoring.regex.full_match("pearnly-(web|worker)") AND metric.type="run.googleapis.com/container/memory/utilizations"',
         "comparison": "COMPARISON_GT",
         "thresholdValue": 0.85,
         "duration": "300s",
@@ -152,8 +152,12 @@ def upsert(collection, desired, existing):
         return request("POST", BASE + "/" + collection, desired)
     current = matches[0]
     # Patch only owned fields; never delete unrelated resources or channel definitions.
-    body = {**desired, "name": current["name"]}
-    mask = ",".join(desired)
+    updates = dict(desired)
+    if collection == "uptimeCheckConfigs":
+        if current.get("monitoredResource") != updates.pop("monitoredResource"):
+            raise ValueError("uptime monitored resource cannot be changed")
+    body = {**updates, "name": current["name"]}
+    mask = ",".join(updates)
     return request(
         "PATCH",
         "https://monitoring.googleapis.com/v3/" + current["name"] + "?updateMask=" + mask,

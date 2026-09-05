@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.line_platform import client as line_client
 from services.line_dms import booking_qa, cards, menu_cards, query_access, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
@@ -121,8 +122,16 @@ async def _choose(
     if id_card and phone:
         from services.line_dms import flow  # 延迟导入避免 flow ↔ menu_flow 环依赖
 
-        flow._spawn(
-            flow._run_dedup(binding, line_user_id, None, id_card, phone, payload.get("endpoint_id"))
+        cloud_dispatch.spawn(
+            "dms.dedup",
+            flow._run_dedup,
+            binding,
+            line_user_id,
+            None,
+            id_card,
+            phone,
+            payload.get("endpoint_id"),
+            _legacy_spawn=flow._spawn,
         )
         return
     if id_card:

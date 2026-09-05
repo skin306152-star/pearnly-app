@@ -8,6 +8,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from core.feature_flags import erp_target_projection_enabled_for
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.auth.entrance import require_erp_portal
 from services.authz.deps import require_perm
 from services.erp import line_target_projection, shared_express_access, target_refresh, team_access
@@ -147,11 +148,8 @@ async def refresh_erp_target_projection(
     )
     adapter = result.pop("adapter")
     if adapter == "mrerp":
-        asyncio.create_task(
-            asyncio.to_thread(
-                target_refresh.process_mrerp_request,
-                result["refresh"]["request_id"],
-            )
+        cloud_dispatch.spawn_sync(
+            "erp.refresh", target_refresh.process_mrerp_request, result["refresh"]["request_id"]
         )
     return result
 

@@ -6,8 +6,8 @@ services.db_migrations.field_overrides · P1.1 BUG-FIX-P1.1 v118.35.0.41
 4 模块的 task / row 表都加 field_overrides JSONB 列(允许 NULL · 老数据不动):
 - M1 ocr_history
 - M2 reconciliation_row
-- M3 gl_vat_tasks
-- M4 bank_recon_v2_tasks
+- M3 gl_vat_task
+- M4 bank_recon_v2_task
 
 Schema:`field_overrides JSONB`
 形态:`{field_name: {"ocr": <value>, "user": <value>, "ts": <iso8601>}, ...}`
@@ -22,7 +22,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # 4 模块 task / row 表 · 跟 alembic 002 同源(单一权威源在 audit doc · 改这里也要改 alembic)
-TARGET_TABLES = ("ocr_history", "reconciliation_row", "gl_vat_tasks", "bank_recon_v2_tasks")
+TARGET_TABLES = ("ocr_history", "reconciliation_row", "gl_vat_task", "bank_recon_v2_task")
 
 
 def ensure_field_overrides_columns() -> None:

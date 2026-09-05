@@ -31,7 +31,7 @@ from services.erp.mrerp_http.preview_parse import TAGSTRIP_RE, parse_preview_for
 from services.erp.mrerp_http.report_parse import parse_master_report
 from services.erp.mrerp_http.session import MrErpSession
 from services.erp.mrerp_report_parser import parse_import_report
-from services.erp.session_lock import mrerp_session_lock
+from services.erp.session_lock import cloud_lock_required, mrerp_session_lock
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +86,14 @@ class MrErpHttpAdapter:
     # ---- lifecycle (同 MRERPAdapter 契约) -----------------------------
 
     def __enter__(self) -> "MrErpHttpAdapter":
-        if self.serialize_sessions:
+        if self.serialize_sessions or cloud_lock_required():
             self._lock_cm = mrerp_session_lock(f"{self.login_url}|{self._username}")
             try:
                 self._lock_cm.__enter__()
             except Exception:
                 self._lock_cm = None
+                if cloud_lock_required():
+                    raise
         self._sess = MrErpSession(
             login_url=self.login_url,
             username=self._username,

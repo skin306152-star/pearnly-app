@@ -7,6 +7,7 @@ from typing import Any
 
 from core import db
 from core.route_helpers import _tid
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.exceptions.exception_checks import _async_run_exception_checks
 
 logger = logging.getLogger("mr-pilot")
@@ -37,7 +38,9 @@ def charge_batch(
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
-        if loop is not None:
+        if cloud_dispatch.enabled():
+            cloud_dispatch.enqueue("ocr.charge", *args)
+        elif loop is not None:
             loop.create_task(asyncio.to_thread(db.charge_ocr_async, *args))
         else:
             db.charge_ocr_async(*args)
@@ -116,8 +119,6 @@ def process_history(
         logger.warning("buyer-resolve client_id failed (history=%s): %s", history_id[:8], exc)
 
     try:
-        import asyncio
-
         total_amount = None
         raw_total = fields.get("total_amount")
         if raw_total:
@@ -125,18 +126,18 @@ def process_history(
                 total_amount = float(str(raw_total).replace(",", "").strip())
             except (TypeError, ValueError):
                 logger.warning("[exc_check] total_amount parse failed: %r", raw_total)
-        asyncio.create_task(
-            _async_run_exception_checks(
-                history_id=str(history_id),
-                user_id=str(user["id"]),
-                tenant_id=_tid(user),
-                seller_name=fields.get("seller_name"),
-                invoice_no=fields.get("invoice_number"),
-                total_amount=total_amount,
-                confidence=confidence,
-                duplicate=duplicate_warning,
-                fields=fields,
-            )
+        cloud_dispatch.spawn(
+            "ocr.exception_checks",
+            _async_run_exception_checks,
+            history_id=str(history_id),
+            user_id=str(user["id"]),
+            tenant_id=_tid(user),
+            seller_name=fields.get("seller_name"),
+            invoice_no=fields.get("invoice_number"),
+            total_amount=total_amount,
+            confidence=confidence,
+            duplicate=duplicate_warning,
+            fields=fields,
         )
     except Exception as exc:
         logger.warning("exception check enqueue failed: %s", exc)

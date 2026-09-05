@@ -99,18 +99,30 @@ def _resume_one(tenant_id: str, work_order_id: str) -> bool:
     if owner is None:
         return False  # 有人在跑(进程内或跨进程租约),让位
     try:
-        threading.Thread(
-            target=brain.run_async,
-            kwargs={
-                "tenant_id": tenant_id,
-                "work_order_id": work_order_id,
-                "claimed": True,
-                "lease_owner": owner,
-                "trigger": brain.TRIGGER_RECOVERY,
-            },
-            daemon=True,
-            name=f"bank-sales-recover-{work_order_id[:8]}",
-        ).start()
+        from services.cloud_tasks import dispatch
+
+        if dispatch.enabled():
+            dispatch.enqueue(
+                "workorder.bank_sales",
+                tenant_id=tenant_id,
+                work_order_id=work_order_id,
+                claimed=True,
+                lease_owner=owner,
+                trigger=brain.TRIGGER_RECOVERY,
+            )
+        else:
+            threading.Thread(
+                target=brain.run_async,
+                kwargs={
+                    "tenant_id": tenant_id,
+                    "work_order_id": work_order_id,
+                    "claimed": True,
+                    "lease_owner": owner,
+                    "trigger": brain.TRIGGER_RECOVERY,
+                },
+                daemon=True,
+                name=f"bank-sales-recover-{work_order_id[:8]}",
+            ).start()
     except Exception:
         brain.fail_start(tenant_id, work_order_id, owner)
         raise

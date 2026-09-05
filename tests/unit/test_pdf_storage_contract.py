@@ -9,7 +9,9 @@ pdf_storage.py(本地文件系统留底 · 含路径穿越防护)此前 0 专属
 """
 
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
 
@@ -85,6 +87,22 @@ class PdfStorageTests(unittest.TestCase):
         self.assertEqual(h["path"], self.base)
         # 健康检查不留垃圾文件
         self.assertFalse((Path(self.base) / ".health_check").exists())
+
+    def test_concurrent_health_checks_do_not_delete_each_others_probe(self):
+        written = threading.Barrier(2)
+        write_text = Path.write_text
+
+        def write_then_wait(path, content, *args, **kwargs):
+            result = write_text(path, content, *args, **kwargs)
+            written.wait(timeout=5)
+            return result
+
+        with mock.patch.object(Path, "write_text", write_then_wait):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                checks = list(pool.map(lambda _: pdf_storage.storage_health_check(), range(2)))
+
+        self.assertTrue(all(check["ok"] for check in checks), checks)
+        self.assertEqual(list(Path(self.base).iterdir()), [])
 
 
 if __name__ == "__main__":

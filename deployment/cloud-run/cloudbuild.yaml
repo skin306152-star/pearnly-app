@@ -1,0 +1,26 @@
+steps:
+    - name: gcr.io/cloud-builders/docker
+      args:
+          [
+              build,
+              --build-arg,
+              'BUILD_SHA=${_SOURCE_SHA}',
+              -t,
+              'asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app:${_IMAGE_TAG}',
+              .,
+          ]
+    - name: gcr.io/cloud-builders/docker
+      args:
+          [
+              run,
+              --rm,
+              --entrypoint,
+              python,
+              'asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app:${_IMAGE_TAG}',
+              -c,
+              'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); b=p.chromium.launch(headless=True); b.close(); p.stop()',
+          ]
+images: ['asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app:${_IMAGE_TAG}']
+options:
+    logging: CLOUD_LOGGING_ONLY
+timeout: 1800s

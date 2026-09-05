@@ -6,6 +6,7 @@ import asyncio
 from typing import Any
 
 from core.feature_flags import erp_target_projection_enabled_for
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import target_catalog_evidence, target_refresh
 from services.line_erp import target_preflight
 
@@ -60,8 +61,8 @@ async def start(
     except ValueError as exc:
         raise CatalogRefreshError(str(exc)) from None
     if adapter == "mrerp":
-        asyncio.create_task(
-            asyncio.to_thread(target_refresh.process_mrerp_request, refresh["request_id"])
+        cloud_dispatch.spawn_sync(
+            "erp.refresh", target_refresh.process_mrerp_request, refresh["request_id"]
         )
     return refresh
 

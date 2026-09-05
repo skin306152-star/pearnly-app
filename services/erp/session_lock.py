@@ -1,25 +1,14 @@
 # -*- coding: utf-8 -*-
-"""
-MR.ERP 会话跨进程串行锁(2026-05-25)
+"""Serialize MR.ERP logins with a transaction-pinned PostgreSQL advisory lock.
 
-根因(已实测坐实):mrerp4sme 是老 PHP · 一个账号只允许一个活动会话 ·
-第二个登录会把第一个踢下线 → 被踢的那次报 ERR_AUTH。生产 uvicorn `--workers 2` ·
-两个 worker 同时推送同一 MR.ERP 账号 → 随机一个被踢 → "几乎都失败"。
-
-进程内 threading.Lock 解不了(两个 worker 是独立进程)· 必须跨进程锁。
-用 Postgres session 级 advisory lock(pg_advisory_lock)· 按 MR.ERP 账号
-(login_url|username)取键 · 不同账号互不阻塞 · 同账号串行。
-
-崩溃安全:session 级 advisory lock 在持锁连接断开时(含进程崩溃)自动释放 ·
-不会留死锁。
-
-降级:DATABASE_URL 未配 / 取锁失败 → 记日志后**放行**(可用性 > 偶发互踢)·
-单测无 DB 时天然 no-op。
+Cloud Run must acquire the lock before opening a session. Legacy local execution
+retains the existing no-database fallback.
 """
 
 from __future__ import annotations
 
 import time
+import os
 import hashlib
 import logging
 from contextlib import contextmanager
@@ -42,13 +31,26 @@ def _account_lock_key(account_key: str) -> int:
     return key
 
 
+class MrerpSessionLockUnavailable(RuntimeError):
+    """No browser session may start without the required distributed lock."""
+
+
+def cloud_lock_required() -> bool:
+    return os.environ.get("PEARNLY_RUNTIME_ROLE") in {"web", "worker"}
+
+
+def _require_cloud_lock(reason: str) -> None:
+    if cloud_lock_required():
+        raise MrerpSessionLockUnavailable(f"mrerp_session_lock_{reason}")
+
+
 @contextmanager
 def mrerp_session_lock(account_key: str, timeout_sec: float = 180.0, poll_sec: float = 1.0):
     """
     对同一 MR.ERP 账号串行化浏览器会话。
 
     account_key: 唯一标识一个 MR.ERP 账号 · 典型 = f"{login_url}|{username}"。
-    timeout_sec: 最长等待持锁时间 · 超时仍放行(记 warning · 不阻塞业务)。
+    timeout_sec: 最长等待持锁时间；Cloud Run 超时拒绝执行，旧本机模式保留降级。
 
     实现:用一条专用连接,在**一个保持打开的事务**里取 `pg_advisory_xact_lock`。
     关键 · 为何用 xact 锁而非 session 锁:Supabase Pooler 若是 transaction-pooling,
@@ -70,7 +72,7 @@ def mrerp_session_lock(account_key: str, timeout_sec: float = 180.0, poll_sec: f
             # 必须事务式(非 autocommit):让事务保持打开 → 后端被 pin → xact 锁跨语句有效
             conn.autocommit = False
         except Exception as e:
-            # 没 DB / 池建不起来 → 降级放行(单测、本地无 DB)
+            _require_cloud_lock("unavailable")
             logger.debug("[mrerp-lock] 无法取锁连接 · 降级放行: %s", e)
             yield False
             return
@@ -83,6 +85,7 @@ def mrerp_session_lock(account_key: str, timeout_sec: float = 180.0, poll_sec: f
                     row = cur.fetchone()
                     locked = bool(row[0]) if row else False
             except Exception as e:
+                _require_cloud_lock("query_failed")
                 logger.warning("[mrerp-lock] try-lock 异常 · 降级放行: %s", e)
                 try:
                     conn.rollback()
@@ -98,6 +101,7 @@ def mrerp_session_lock(account_key: str, timeout_sec: float = 180.0, poll_sec: f
                 break
 
             if time.time() - t0 >= timeout_sec:
+                _require_cloud_lock("timeout")
                 logger.warning(
                     "[mrerp-lock] 等待 %.0fs 仍未取到锁 key=%s · 降级放行(可能与他会话并发)",
                     timeout_sec,

@@ -53,6 +53,7 @@ def _fallback_modules() -> dict[str, types.ModuleType]:
     extras.Json = lambda value: value
     pool.ThreadedConnectionPool = _StubPool
     pool.SimpleConnectionPool = _StubPool
+    pool.ThreadedConnectionPool = _StubPool
     sql.SQL = lambda value: value
     sql.Identifier = lambda value: value
     pg.errors = errors

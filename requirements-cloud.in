@@ -1,0 +1,3 @@
+# Additional Cloud Run delivery client; constrained by requirements.lock.
+-c requirements.lock
+google-cloud-tasks==2.23.0

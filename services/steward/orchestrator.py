@@ -408,6 +408,10 @@ def _enqueue(
                 title=title,
                 lang=lang,
             )
+    from services.cloud_tasks.dispatch import wake_queue
+
+    if not needs_auth:
+        wake_queue("steward")
     if needs_auth:
         reply, task_status = copy.authz_ack(title, lang), store.TASK_WAITING_USER
     else:

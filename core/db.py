@@ -7,11 +7,12 @@ Pearnly · 数据库模块(v3)
 import os
 import re
 import logging
+import threading
 from typing import Optional, Dict, Any
 from contextlib import contextmanager
 
 from psycopg2.extras import RealDictCursor
-from psycopg2.pool import SimpleConnectionPool
+from psycopg2.pool import ThreadedConnectionPool
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,8 @@ OCR_PRICING = {
     "usd_thb": 36.5,  # v4.10.14 过渡 · v4.10.15 admin 改造时统一砍
 }
 
-_pool: Optional[SimpleConnectionPool] = None
+_pool: Optional[ThreadedConnectionPool] = None
+_pool_lock = threading.Lock()
 
 
 def _get_database_url() -> str:
@@ -35,23 +37,19 @@ def _get_database_url() -> str:
     return url
 
 
-def get_pool() -> SimpleConnectionPool:
+def get_pool() -> ThreadedConnectionPool:
     global _pool
-    if _pool is None:
-        url = _get_database_url()
-        # v118.35.0.21 · maxconn 5 → 30 · 修 v0.20 部署后全站超时的真因
-        # 老 maxconn=5 在 v0.20 加 credits 检查后(每个 OCR 多 3 次 DB 查询)
-        # 5 个并发 OCR 就把连接池打满 · 后续请求阻塞 → 累积 → 全站超时
-        # 2026-06-11 · maxconn 30→15 配 workers 2→4(总 4×15=60 维持原预算)。
-        # 之前 4-worker 撞启动 DDL deadlock 已由 services/startup_lock 文件锁串行化根治。
-        _pool = SimpleConnectionPool(
-            minconn=2,
-            maxconn=15,
-            dsn=url,
-            connect_timeout=10,
-            sslmode=os.environ.get("PGSSLMODE", "require"),
-        )
-        logger.info("✅ PostgreSQL 连接池已建立(minconn=2 maxconn=15)")
+    with _pool_lock:
+        if _pool is None:
+            url = _get_database_url()
+            _pool = ThreadedConnectionPool(
+                minconn=int(os.environ.get("DB_POOL_MIN", "2")),
+                maxconn=int(os.environ.get("DB_POOL_MAX", "15")),
+                dsn=url,
+                connect_timeout=10,
+                sslmode=os.environ.get("PGSSLMODE", "require"),
+            )
+            logger.info("PostgreSQL connection pool ready")
     return _pool
 
 

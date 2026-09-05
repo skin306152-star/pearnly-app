@@ -18,6 +18,7 @@ import logging
 from typing import Dict, List, Optional
 
 from core import db
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.dms_roster import store as roster_store
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
@@ -243,7 +244,9 @@ async def _decide(
         return
 
     _reply(reply_token, approval_cards.TXT_PROCESSING)
-    _spawn(_execute_approved(binding, line_user_id, req))
+    cloud_dispatch.spawn(
+        "dms.approve", _execute_approved, binding, line_user_id, req, _legacy_spawn=_spawn
+    )
 
 
 async def _execute_approved(binding: dict, admin_line_user_id: str, req: dict) -> None:

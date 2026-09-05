@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from core.auth import JWT_ALGORITHM, _jwt_secret
 from core.feature_flags import erp_target_projection_enabled_for
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import target_catalog_evidence, target_refresh
 from services.cowork_line import identity_store, intake, session_store
 from services.line_platform.liff import verify_id_token
@@ -190,8 +191,8 @@ async def cowork_intake_target_refresh(
     except ValueError as exc:
         raise HTTPException(409, detail=str(exc)) from None
     if adapter == "mrerp":
-        asyncio.create_task(
-            asyncio.to_thread(target_refresh.process_mrerp_request, refresh["request_id"])
+        cloud_dispatch.spawn_sync(
+            "erp.refresh", target_refresh.process_mrerp_request, refresh["request_id"]
         )
     response.headers["Cache-Control"] = "no-store"
     return {"ok": True, "data": refresh}

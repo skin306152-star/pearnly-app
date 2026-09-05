@@ -37,6 +37,12 @@ _sheets_sync_tasks: set = set()
 
 
 def _schedule_sheets_sync(tenant_id: str, workspace_client_id: int, sale_id: str) -> None:
+    from services.cloud_tasks import dispatch
+
+    if dispatch.enabled():
+        dispatch.enqueue("pos.sheets", tenant_id, workspace_client_id, sale_id)
+        return
+
     async def _run():
         try:
             from services.pos import sheets_sync

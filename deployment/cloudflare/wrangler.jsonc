@@ -1,0 +1,11 @@
+{
+    "name": "pearnly-cloud-run",
+    "main": "worker.js",
+    "account_id": "7dc339bc60e52e97464b8eff4638b995",
+    "compatibility_date": "2026-09-05",
+    "workers_dev": true,
+    "routes": [
+        { "pattern": "pearnly.com/*", "zone_name": "pearnly.com" },
+        { "pattern": "www.pearnly.com/*", "zone_name": "pearnly.com" },
+    ],
+}

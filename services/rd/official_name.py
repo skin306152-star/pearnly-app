@@ -49,6 +49,8 @@ def schedule(pairs, user_id, tenant_id) -> None:
     if not pairs:
         return
     try:
-        asyncio.create_task(enrich_records(pairs, user_id, tenant_id))
+        from services.cloud_tasks import dispatch
+
+        dispatch.spawn("ocr.official_name", enrich_records, pairs, user_id, tenant_id)
     except RuntimeError:
         pass

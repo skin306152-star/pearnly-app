@@ -68,6 +68,20 @@ def _schedule_pdf_backfill(user: dict, content: bytes, raw_pages: list, history_
     """同步路由专用:有运行中的事件循环 → create_task 后台留底(worker 路径走内联,见 jobs/handler)。"""
     if not history_ids:
         return
+    from services.cloud_tasks import dispatch
+
+    if dispatch.enabled():
+        from services.ocr.pdf_backfill import generate_and_save_pdf
+
+        try:
+            rel, size = generate_and_save_pdf(content, raw_pages or [], str(user["id"]))
+            if rel:
+                db.update_ocr_history_pdf_storage(
+                    list(history_ids), rel, size, str(user["id"]), _tid(user)
+                )
+        except Exception:
+            logger.warning("[ocrperf] PDF backfill failed after OCR persisted", exc_info=True)
+        return
     try:
         import asyncio
 

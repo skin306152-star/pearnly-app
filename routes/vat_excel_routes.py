@@ -19,6 +19,7 @@ from core import file_crypto
 from core import workspace_context as wc
 from core.auth import get_current_user_from_request
 from core.route_helpers import content_disposition as _content_disposition
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.billing import account_status
 from services.ocr.entrypoints import policy_context_from_billing
 from services.vat.vat_excel_export import (
@@ -201,16 +202,15 @@ async def build_excel_endpoint(
         try:
             _billed_pages = len(ok_invoices) + len(reports)
             if _billed_pages > 0:
-                asyncio.create_task(
-                    asyncio.to_thread(
-                        db.charge_ocr_async,
-                        str(user_id),
-                        tenant_id,
-                        "pdf",
-                        _billed_pages,
-                        None,
-                        f"VAT 对账 · {len(ok_invoices)} 张发票 + {len(reports)} 份报告",
-                    )
+                cloud_dispatch.spawn_sync(
+                    "ocr.charge",
+                    db.charge_ocr_async,
+                    str(user_id),
+                    tenant_id,
+                    "pdf",
+                    _billed_pages,
+                    None,
+                    f"VAT 对账 · {len(ok_invoices)} 张发票 + {len(reports)} 份报告",
                 )
         except Exception as _ce:
             logger.warning(f"💳 vex.build async charge skip: {_ce}")

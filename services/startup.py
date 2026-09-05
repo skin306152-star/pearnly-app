@@ -295,6 +295,10 @@ async def run_startup() -> dict:
     """app 启动序列 · 返回 {email_task, erp_retry_task} 供 run_shutdown cancel。"""
     logger.info("🚀 Pearnly 启动中...")
 
+    if os.environ.get("PEARNLY_RUNTIME_ROLE") in {"web", "worker"}:
+        # Cloud instances never migrate schema or recover another instance's tasks.
+        return {"email_task": None, "erp_retry_task": None}
+
     # v118.35.0.28 P0 安全 self-check (体检 2026-05-21)
     # /internal/deploy 现在 fail-closed · secret 缺失会拒服务 ·
     # 启动时早期告警 · 不要等到 GitHub webhook 来才发现没配。

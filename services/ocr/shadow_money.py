@@ -99,7 +99,11 @@ def schedule(
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
-        if loop is not None:
+        from services.cloud_tasks import dispatch
+
+        if dispatch.enabled():
+            _run(*args)
+        elif loop is not None:
             loop.create_task(asyncio.to_thread(_run, *args))  # async 路由:后台线程,不堵 loop
         else:
             _run(*args)  # 缺口④ worker 线程(无运行中 loop)→ 直接同步

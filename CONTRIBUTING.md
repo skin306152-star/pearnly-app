@@ -1,5 +1,7 @@
 # Contributing to Pearnly
 
+> **部署状态正本（2026-09-05）**：先读 `docs/deployment/MIGRATION_STATUS.md`（实际状态）和 `docs/deployment/CLOUD_RUN.md`（操作规范）。Pearnly 正从 Vultr 迁到 Cloud Run；ERPNext 是独立仓库/项目，本次不动。旧 SSH/systemd/manual-deploy 流程不能用于 Cloud Run；是否已切流只以状态账本证据为准。
+
 > 这份文档是 Pearnly 项目的协作守则(对人 + 对 AI / Claude 窗口都适用)。完整的项目宪法见 `CLAUDE.md/CLAUDE.md`(450+ 行)· 本文件是它的"快速参考卡"。
 
 ---
@@ -8,66 +10,71 @@
 
 Pearnly 当前有 4 个屎山文件 · 改一处容易牵连其他:
 
-| 文件 | 行数 | 状态 |
-|---|---|---|
-| `app.py` | ~9450 | 渐进瘦身中(阶段 5 Task 5.1 抽走 11 个 billing 路由) |
-| `home.js` | ~30000 | 单函数 12,694 行 · 渐进翻新中(独立 `static/*.js` 替代) |
-| `home.css` | ~7000 | 视觉精修期 · 不再扩 |
-| `db.py` | ~4000 | 包装层 · 复杂业务搬 `services/` |
+| 文件       | 行数   | 状态                                                   |
+| ---------- | ------ | ------------------------------------------------------ |
+| `app.py`   | ~9450  | 渐进瘦身中(阶段 5 Task 5.1 抽走 11 个 billing 路由)    |
+| `home.js`  | ~30000 | 单函数 12,694 行 · 渐进翻新中(独立 `static/*.js` 替代) |
+| `home.css` | ~7000  | 视觉精修期 · 不再扩                                    |
+| `db.py`    | ~4000  | 包装层 · 复杂业务搬 `services/`                        |
 
 **新功能 = 必须独立模块**:
 
 1. **新后端路由 → 独立 `xxx_routes.py`**
-   ```python
-   # 新建 my_feature_routes.py
-   from fastapi import APIRouter
-   router = APIRouter()
 
-   @router.get("/api/my-feature")
-   async def my_feature():
-       ...
-   ```
-   ```python
-   # app.py 顶部
-   from my_feature_routes import router as my_feature_router
-   app.include_router(my_feature_router)
-   ```
-   现成参考:`billing_routes.py` · `report_routes.py` · `auth_signup.py` · `recon_routes.py` · `vat_excel_routes.py`
+    ```python
+    # 新建 my_feature_routes.py
+    from fastapi import APIRouter
+    router = APIRouter()
+
+    @router.get("/api/my-feature")
+    async def my_feature():
+        ...
+    ```
+
+    ```python
+    # app.py 顶部
+    from my_feature_routes import router as my_feature_router
+    app.include_router(my_feature_router)
+    ```
+
+    现成参考:`billing_routes.py` · `report_routes.py` · `auth_signup.py` · `recon_routes.py` · `vat_excel_routes.py`
 
 2. **新前端 JS → 独立 `static/xxx.js`**(IIFE 模式)
-   ```js
-   // static/my-feature.js
-   (function () {
-       const STATE = {};
-       function init() { ... }
-       document.addEventListener('DOMContentLoaded', init);
-   })();
-   ```
-   现成参考:`static/version-banner.js` · `static/admin/admin.js` · `static/admin/admin-i18n.js`
+
+    ```js
+    // static/my-feature.js
+    (function () {
+        const STATE = {};
+        function init() { ... }
+        document.addEventListener('DOMContentLoaded', init);
+    })();
+    ```
+
+    现成参考:`static/version-banner.js` · `static/admin/admin.js` · `static/admin/admin-i18n.js`
 
 3. **新 CSS → 独立 `static/xxx.css` 或 scoped 到组件 `.html`**
-   - 不再往 `home.css` 加新 class
-   - 独立 page(`/admin`)用独立 stylesheet
+    - 不再往 `home.css` 加新 class
+    - 独立 page(`/admin`)用独立 stylesheet
 
 4. **新业务 SQL → `services/<domain>/<feature>.py`**
-   - 简单 CRUD(数行)可以加 `db.py`
-   - 复杂业务逻辑(数十行 + 多次查询)封装 service
-   - 现成参考:`services/erp/mrerp_product_sync.py` · `services/monitoring.py`
+    - 简单 CRUD(数行)可以加 `db.py`
+    - 复杂业务逻辑(数十行 + 多次查询)封装 service
+    - 现成参考:`services/erp/mrerp_product_sync.py` · `services/monitoring.py`
 
 ---
-
 
 ## 🟡 例外条款 · 暂塞必须留迁出计划
 
 如果**真的**必须暂时塞老文件(罕见 · 比如 90% 改动在老模块上 · 抽出来工作量大于本身改动):
 
 1. **commit message 显式说**:
-   ```
-   feat(quick-fix): 临时在 home.js 加 X 函数
 
-   暂存原因:本次只改 5 行 · 抽独立 .js 要重写 100 行 IIFE
-   迁出 deadline: v118.40 OCR 模块重构时一并搬出
-   ```
+    ```
+    feat(quick-fix): 临时在 home.js 加 X 函数
+
+    暂存原因:本次只改 5 行 · 抽独立 .js 要重写 100 行 IIFE
+    迁出 deadline: v118.40 OCR 模块重构时一并搬出
+    ```
 
 2. **必须建 entry**:`CLAUDE.md/TECH_DEBT.md` 或 `CLAUDE.md/EXECUTION_PLAN.md`
 
@@ -104,15 +111,16 @@ python -m unittest discover -s tests/unit -p "test_*.py"
 npx playwright test
 ```
 
-全过 → push → 手动 pinned-SHA CD → 回读生产 HEAD/service/ready → 主控在精确 production SHA 做真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK。任何一个红 → 修了再 push；未完成最终用户验收不得称完成。
+全过 → push → 按部署正本发布精确 SHA → 回读实际部署身份/流量/ready → 主控在精确 production SHA 做真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK。任何一个红 → 修了再 push；未完成最终用户验收不得称完成。
 
 ---
 
-## 🚀 部署（手动 pinned-SHA）
+## 🚀 部署
 
-- GitHub `CI` workflow 当前停用；`git push origin master` 不自动部署。本地风险分层测试通过后，手动 dispatch `.github/workflows/manual-deploy.yml`，由 pinned SHA 调用现有精确部署端点；生产回读后再做真实站点/真实环境/ERP report 预验收与最终真机 OK。
-- **push 不等于上线** · 手动 CD 后必须回读生产 `git rev-parse HEAD`、服务时间戳和 `/api/ready`。
-- 改动前问自己:这 push 上去能不能马上让所有用户用?
+- 实际上线环境与待验收事项只读 `docs/deployment/MIGRATION_STATUS.md`；操作遵循 `docs/deployment/CLOUD_RUN.md`。
+- Pearnly 迁往 Cloud Run；ERPNext 仓库与 VM 不在此迁移范围。禁止向旧 Vultr 和新 Cloud Run 同时部署或运行双份周期任务。
+- 本地按风险验证后推送精确 SHA，走 GitHub WIF → Artifact Registry → Cloud Run；回读镜像 digest、revision、流量、health/ready，再验证真实消费路径。
+- push、workflow 绿、HTTP 200、用户真机验收分别记录，不能相互替代。
 
 ---
 
@@ -144,7 +152,7 @@ pearnly_project/                       # FastAPI 后端 + Vite/TypeScript 前端
 ├── AGENTS.md                          # 唯一一页入口 · 文档地图
 ├── docs/ · design-preview/ · design-reference/       # 文档 / 设计参考
 ├── .github/workflows/ci.yml           # 历史 CI 全闸配置（当前 workflow 已停用）
-└── .github/workflows/manual-deploy.yml # 手动 pinned-SHA CD
+└── .github/workflows/                  # 当前发布入口见部署正本
 ```
 
 ---
@@ -168,9 +176,9 @@ pearnly_project/                       # FastAPI 后端 + Vite/TypeScript 前端
 
 **两层文件**:
 
-| 文件 | 角色 | 谁改 |
-|---|---|---|
-| `requirements.txt` | **源** · 顶层依赖 + 大版本约束(`alembic>=1.13,<2.0`)· 人读 | 人 / Dependabot |
+| 文件                    | 角色                                                                            | 谁改                      |
+| ----------------------- | ------------------------------------------------------------------------------- | ------------------------- |
+| `requirements.txt`      | **源** · 顶层依赖 + 大版本约束(`alembic>=1.13,<2.0`)· 人读                      | 人 / Dependabot           |
 | `requirements.lock.txt` | **产物** · pip-compile 出 · 所有传递依赖钉死(`urllib3==2.5.0`)· 给 CI / prod 装 | pip-compile 自动 · 不手改 |
 
 **CI 装包**用 `requirements.lock.txt`(确定性)· **本机开发**装哪个都行(锁文件更稳)。
@@ -215,4 +223,4 @@ git commit -m "chore(deps): bump alembic to 2.x · REFACTOR-A7"
 
 ---
 
-*最后更新:2026-05-22 · 由 Task 5.3 铁律 #17 落地一并产出*
+_最后更新:2026-05-22 · 由 Task 5.3 铁律 #17 落地一并产出_

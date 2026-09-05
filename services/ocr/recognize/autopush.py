@@ -13,6 +13,7 @@ import logging
 
 from core import db
 from core.route_helpers import _plan_permissions, _tid
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp.auto_push import (
     _auto_push_history,
     _auto_push_smart_routed,
@@ -52,16 +53,20 @@ def dispatch_auto_push(*, history_ids, plan, user):
         if not (assigned_ids or express_only_ids):
             return False
 
-        import asyncio
-
         if assigned_ids:
             if _erp_seller_routing_enabled(user_id):
-                asyncio.create_task(_auto_push_smart_routed(user_id, assigned_ids, tid, auto_eps))
+                cloud_dispatch.spawn(
+                    "erp.smart_push", _auto_push_smart_routed, user_id, assigned_ids, tid, auto_eps
+                )
             else:
                 for hid in assigned_ids:
-                    asyncio.create_task(_auto_push_history(user_id, hid, auto_eps, tenant_id=tid))
+                    cloud_dispatch.spawn(
+                        "erp.auto_push", _auto_push_history, user_id, hid, auto_eps, tenant_id=tid
+                    )
         for hid in express_only_ids:
-            asyncio.create_task(_auto_push_history(user_id, hid, express_eps, tenant_id=tid))
+            cloud_dispatch.spawn(
+                "erp.auto_push", _auto_push_history, user_id, hid, express_eps, tenant_id=tid
+            )
 
         logger.info(
             "自动推送已入队 · 已归属 %d × %d 端点 · 现金/散客 %d × %d Express",

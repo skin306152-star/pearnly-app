@@ -161,7 +161,12 @@ def enqueue(
             return str(row["id"]) if row else None
 
     try:
-        return _insert()
+        inserted = _insert()
+        if inserted:
+            from services.cloud_tasks.dispatch import wake_queue
+
+            wake_queue("recon")
+        return inserted
     except Exception as e:
         # 自愈:表不存在(部署后首次/启动建表失败)→ 现场建表重试一次。
         msg = str(e).lower()

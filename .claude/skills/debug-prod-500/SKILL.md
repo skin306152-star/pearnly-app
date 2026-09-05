@@ -3,6 +3,9 @@ name: debug-prod-500
 description: 生产报 500 / 上传失败 / 前端报 "Unexpected token '<'" / 接口没反应 / push 了线上却没变时的排障顺序 —— 先查磁盘、再查 nginx、再查 journalctl,确认跑的是新进程。线上出故障、判断"到底哪一层挂了"时用。
 ---
 
+> 先读 `docs/deployment/MIGRATION_STATUS.md` 确认流量实际位置。下文是旧 Vultr 诊断；Cloud Run 问题应按 `docs/deployment/CLOUD_RUN.md` 查 revision、日志、内存和依赖，不可向旧机重发代码来修新服务。
+
+
 # 生产排障
 
 先抓真因再改码。禁止靠猜。

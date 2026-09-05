@@ -62,7 +62,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from services.erp._browser import BrowserSession  # noqa: E402
-from services.erp.session_lock import mrerp_session_lock  # noqa: E402
+from services.erp.session_lock import cloud_lock_required, mrerp_session_lock  # noqa: E402
 from services.erp.exceptions import (  # noqa: E402
     MRERPAuthError,
     MRERPBusinessError,
@@ -222,13 +222,15 @@ class MRERPAdapter(MRERPLoginMixin, MRERPMasterDataMixin):
     def __enter__(self) -> "MRERPAdapter":
         # 先拿账号级跨进程串行锁(在开浏览器之前 · 不持浏览器空等锁)·
         # 同一 MR.ERP 账号同一刻只允许一个会话登录 · 避免老 PHP 互踢 ERR_AUTH。
-        if self.serialize_sessions:
+        if self.serialize_sessions or cloud_lock_required():
             self._lock_cm = mrerp_session_lock(f"{self.login_url}|{self._username}")
             try:
                 self._lock_cm.__enter__()
             except Exception:
                 # 锁基础设施异常不应阻断推送 · 降级放行
                 self._lock_cm = None
+                if cloud_lock_required():
+                    raise
         secrets = [self._password]
         if len(self._username) >= 3:
             secrets.append(self._username)

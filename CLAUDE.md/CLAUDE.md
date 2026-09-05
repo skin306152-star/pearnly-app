@@ -1,5 +1,7 @@
 # CLAUDE.md · Pearnly 项目宪法(轻量版)
 
+> **部署状态正本（2026-09-05）**：先读 `docs/deployment/MIGRATION_STATUS.md`（实际状态）和 `docs/deployment/CLOUD_RUN.md`（操作规范）。Pearnly 正从 Vultr 迁到 Cloud Run；ERPNext 是独立仓库/项目，本次不动。旧 SSH/systemd/manual-deploy 流程不能用于 Cloud Run；是否已切流只以状态账本证据为准。
+
 > **不用通读。** 开工只要三样:`AGENTS.md` → STATE 顶部状态卡 → 跑 `python scripts/refactor_progress.py`。本页是"坑 + 硬线 + 索引",干活的具体做法在 `.claude/skills/`(按需自动装载)和 `docs/`(用 `@` 引用)。
 >
 > 2026-07-25 按 Anthropic《The new rules of context engineering for Claude 5 generation models》重写:1470 行 → 本页。删了什么、为什么删得掉 → `docs/context-engineering/2026-07-25-claude-md-simplify.md`;旧全文冻结在 `CLAUDE.md/ARCHIVE_CLAUDE_LEGACY.md`(别照它干活)。
@@ -16,7 +18,7 @@ FastAPI + 原生 JS/Vite + Supabase Postgres,一个仓库装多个入口壳(主�
 
 - `db.get_cursor()` 默认不 commit,DDL(ALTER/CREATE)在 with 块退出时静默回滚 → 必须 `get_cursor(commit=True)`。日志会骗你说"字段就绪",库里根本没建。
 - 改后端返回 dict 的字段(增/删/改名)必须同步改对应 Pydantic `response_model`,否则整个接口 500(`/api/me` 踩过)。删字段先 `Optional + default None` 一版,下版再真删。
-- 生产**不跑** `alembic upgrade`:schema 靠启动 `ensure_*` 生效,`alembic/versions` 只留档。
+- 不得擅自运行 `alembic upgrade`。旧单机通过启动 `ensure_*` 应用 schema；Cloud Run 通过发布流程串行初始化，遵循 `docs/deployment/CLOUD_RUN.md`，不能让每个新实例自行迁移。
 - 前端报"数据空 / 渲染异常 / 早退",第一步 `curl` 那个接口看 HTTP 状态,别 grep CSS —— 500 是后端在喊救命。
 - 钱用 `Decimal` 不用 float · 时间存 UTC · SQL 参数化 · 多租户查询必带 tenant 隔离(RLS 已在 ready 域启用)。
 
@@ -41,35 +43,35 @@ FastAPI + 原生 JS/Vite + Supabase Postgres,一个仓库装多个入口壳(主�
 - 破坏 git 历史:`push --force` 到 master / `reset --hard` / 删 tag / 删 branch。
 - `push --no-verify` 绕闸:永远不许。
 - 删表 / 删字段 / `DROP`。
-- **其余一切改动**:自己写 → 本地风险分层测试(UI可先本地真实浏览器)→ `git push origin master` → 手动 dispatch `manual-deploy.yml` 精确 SHA CD → 回读生产 HEAD/service/ready → 主控在该精确 production SHA 做真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK；GitHub CI workflow 当前停用，不因关闭自动闸降低真实验收质量，未完成最终用户验收不得称完成。改坏了自己 `git revert`,不把坏码留在 master。
+- **其余一切改动**:自己写 → 本地风险分层测试(UI可先本地真实浏览器)→ `git push origin master` → 按 `docs/deployment/CLOUD_RUN.md` 发布精确 SHA → 回读生产部署身份/流量/ready → 主控在该精确 production SHA 做真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK；GitHub CI workflow 当前停用，不因关闭自动闸降低真实验收质量，未完成最终用户验收不得称完成。改坏了自己 `git revert`,不把坏码留在 master。
 
 ## 4. 做法在 skills 里(按需装载,不用背)
 
-| 什么时候 | skill |
-|---|---|
-| 改完要验 / 要 push / 判 CI 是否真绿 | `verification` |
-| 动前端或任何用户可见 UI | `frontend-change` |
-| 接 ERP / 老 PHP 系统 / 小助手 companion | `erp-integration` |
-| 部署 + 写用户看的更新说明 | `deploy-release` |
-| 生产 500 / 上传失败 / push 了线上没变 | `debug-prod-500` |
-| 加或改任何用户可见文字 | `i18n-4lang` |
-| 动手写码之前 | `new-feature-discovery` |
-| Zihao 说"收尾 / 换窗口 / 今天到这" | `wrapup` |
+| 什么时候                                | skill                   |
+| --------------------------------------- | ----------------------- |
+| 改完要验 / 要 push / 判 CI 是否真绿     | `verification`          |
+| 动前端或任何用户可见 UI                 | `frontend-change`       |
+| 接 ERP / 老 PHP 系统 / 小助手 companion | `erp-integration`       |
+| 部署 + 写用户看的更新说明               | `deploy-release`        |
+| 生产 500 / 上传失败 / push 了线上没变   | `debug-prod-500`        |
+| 加或改任何用户可见文字                  | `i18n-4lang`            |
+| 动手写码之前                            | `new-feature-discovery` |
+| Zihao 说"收尾 / 换窗口 / 今天到这"      | `wrapup`                |
 
 机械闸清单 + 逐道自查命令 + 豁免语法:`docs/GATES.md`。棘轮豁免写在 commit message:`RATCHET-EXEMPT: <file> +<N> · <理由>`;新增 `ensure_*` 写 `NEW-DEBT-EXEMPT: <理由>`。
 
-⚠️ **本地 pre-push 钩子 2026-07-31 起已挂上**(`core.hooksPath` = `scripts/git-hooks`)→ 本地风险分层闸会当场拦错；GitHub CI workflow `281113573` 已手动停用，push 不再自动触发全量 CI/E2E 或部署。流程是本地分层测试→push→手动 dispatch `manual-deploy.yml` 精确 SHA CD→回读生产 HEAD/service/ready→在该 production SHA 做真实站点/真实环境/ERP report 预验收→Zihao 最终真机 OK。它在 `.git/config` 里,**所有共享 worktree 一起生效**。想提前知道会不会被拦,别等 push:`PYTHONIOENCODING=utf-8 sh scripts/git-hooks/pre-push`(不设编码变量会假红),或 `git push --dry-run`(照样触发,不会真推)。装法与影响面:`docs/GATES.md` 顶部「装钩子」。
+⚠️ **本地 pre-push 钩子 2026-07-31 起已挂上**(`core.hooksPath` = `scripts/git-hooks`)→ 本地风险分层闸会当场拦错；GitHub CI workflow `281113573` 已手动停用，push 不再自动触发全量 CI/E2E 或部署。流程是本地分层测试→push→按 `docs/deployment/CLOUD_RUN.md` 发布精确 SHA→回读生产部署身份/流量/ready→在该 production SHA 做真实站点/真实环境/ERP report 预验收→Zihao 最终真机 OK。它在 `.git/config` 里,**所有共享 worktree 一起生效**。想提前知道会不会被拦,别等 push:`PYTHONIOENCODING=utf-8 sh scripts/git-hooks/pre-push`(不设编码变量会假红),或 `git push --dry-run`(照样触发,不会真推)。装法与影响面:`docs/GATES.md` 顶部「装钩子」。
 
 ## 5. 文档地图(用 `@` 引用,别通读)
 
-| 想干啥 | 读哪个 |
-|---|---|
-| 现在在做什么(活地图) | `CLAUDE.md/STATE_PEARNLY.md` 顶部状态卡(≤30 行)· 历史在 `STATE_ARCHIVE.md` |
+| 想干啥                       | 读哪个                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------- |
+| 现在在做什么(活地图)         | `CLAUDE.md/STATE_PEARNLY.md` 顶部状态卡(≤30 行)· 历史在 `STATE_ARCHIVE.md`                  |
 | 业务概念 / 状态机 / 验收剧本 | `docs/agent/BUSINESS_GLOSSARY.md` · `ERROR_CODES_AND_STATES.md` · `ACCEPTANCE_PLAYBOOKS.md` |
-| 设计系统(令牌 / 按钮 / 四态) | `CLAUDE.md/DESIGN_SYSTEM.md` + `static/pearnly-ui.css` |
-| 什么算"完成" / 代码质量 | `docs/ENGINEERING_STANDARD.md` · `docs/CODE_QUALITY_CANON.md` |
-| 为什么这么决策 | `docs/refactor/adr-*.md` |
-| 远古历史 | `CLAUDE.md/ARCHIVE_CLAUDE_LEGACY.md` · `CLAUDE.md/BACKLOG.md` |
+| 设计系统(令牌 / 按钮 / 四态) | `CLAUDE.md/DESIGN_SYSTEM.md` + `static/pearnly-ui.css`                                      |
+| 什么算"完成" / 代码质量      | `docs/ENGINEERING_STANDARD.md` · `docs/CODE_QUALITY_CANON.md`                               |
+| 为什么这么决策               | `docs/refactor/adr-*.md`                                                                    |
+| 远古历史                     | `CLAUDE.md/ARCHIVE_CLAUDE_LEGACY.md` · `CLAUDE.md/BACKLOG.md`                               |
 
 ## 6. 数字只信脚本
 

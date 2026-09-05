@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs
 
 from core import db
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_platform import client as line_client
@@ -68,7 +69,9 @@ _spawn = _out.make_spawn("line_dms.flow")
 def handle_image(binding: dict, line_user_id: str, message_id: str) -> None:
     """绑定用户发图片:逐问/确认态消费凭证图;其余照旧走身份证 OCR(后台)。"""
     if message_id:
-        _spawn(_dispatch_image(binding, line_user_id, message_id))
+        cloud_dispatch.spawn(
+            "dms.image", _dispatch_image, binding, line_user_id, message_id, _legacy_spawn=_spawn
+        )
 
 
 async def _dispatch_image(binding: dict, line_user_id: str, message_id: str) -> None:
@@ -175,9 +178,13 @@ async def handle_postback(
         return
 
     if action == cards.ACT_CREATE:
-        _spawn(_write_create(binding, line_user_id, payload))
+        cloud_dispatch.spawn(
+            "dms.create", _write_create, binding, line_user_id, payload, _legacy_spawn=_spawn
+        )
     elif action == cards.ACT_UPDATE:
-        _spawn(_write_update(binding, line_user_id, payload))
+        cloud_dispatch.spawn(
+            "dms.update", _write_update, binding, line_user_id, payload, _legacy_spawn=_spawn
+        )
     elif action == cards.ACT_PICK:
         cid = pb.get("cid") or ""
         valid = {str(c.get("customer_id")) for c in (payload.get("candidates") or [])}
@@ -185,7 +192,14 @@ async def handle_postback(
             _reply(reply_token, cards.TXT_EXPIRED)
             return
         # 相似认领 = 无 diff 的 overwrite,认领到所选 customer_id;走 _write_update 特例(S9)。
-        _spawn(_write_update(binding, line_user_id, {**payload, "customer_id": cid}))
+        cloud_dispatch.spawn(
+            "dms.update",
+            _write_update,
+            binding,
+            line_user_id,
+            {**payload, "customer_id": cid},
+            _legacy_spawn=_spawn,
+        )
     else:
         _reply(reply_token, cards.TXT_EXPIRED)
 

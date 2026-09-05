@@ -1,5 +1,7 @@
 # 🛠️ Pearnly · 运维手册（RUNBOOK）
 
+> **历史 Vultr 单机运维手册**：本页保留旧 systemd/SSH 诊断与恢复知识，不是 Cloud Run 发布说明。先读 [当前状态](deployment/MIGRATION_STATUS.md) 和 [Cloud Run 正本](deployment/CLOUD_RUN.md)。只有当前状态明确旧机仍在服务或需要协调回退时，才适用下方旧机命令。
+
 > **整顿 REFACTOR-G2 · 2026-05-27 初版 · 2026-08-26 部署链路改版**（webhook 停用 → CI 精确部署）
 > 把散在 `CLAUDE.md/CLAUDE.md` 里的部署 / 回滚 / 紧急排查知识 consolidate 成一份可操作手册。
 > 出事时**先翻这里**,再动手。权威事实仍以 `CLAUDE.md/CLAUDE.md` 对应铁律为准。

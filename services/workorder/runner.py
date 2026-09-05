@@ -102,7 +102,11 @@ def request_run(
             payload=payload,
             actor=actor,
         )
-    if background is not None:
+    from services.cloud_tasks import dispatch
+
+    if dispatch.enabled():
+        dispatch.enqueue("workorder.advance", tenant_id, work_order_id, owner)
+    elif background is not None:
         background.add_task(advance, tenant_id, work_order_id, owner)
     else:
         _spawn_advance(tenant_id, work_order_id, owner)

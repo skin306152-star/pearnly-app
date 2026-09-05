@@ -362,5 +362,10 @@ async def erp_agent_ack(
     if notification_log_id and background_tasks is not None:
         from services.erp.line_push_notification import notify_success
 
-        background_tasks.add_task(notify_success, str(notification_log_id))
+        from services.cloud_tasks import dispatch
+
+        if dispatch.enabled():
+            dispatch.enqueue("erp.notify", str(notification_log_id))
+        else:
+            background_tasks.add_task(notify_success, str(notification_log_id))
     return result

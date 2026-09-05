@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +214,18 @@ def ensure_no_orphan_rls() -> list[str]:
     """
     from core import db
 
+    if os.environ.get("PEARNLY_RUNTIME_ROLE") == "schema":
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "SELECT c.relname FROM pg_class c "
+                "JOIN pg_namespace n ON n.oid=c.relnamespace "
+                "LEFT JOIN pg_policy p ON p.polrelid=c.oid "
+                "WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity "
+                "GROUP BY c.relname HAVING count(p.polname)=0"
+            )
+            preserved = [row["relname"] for row in cur.fetchall()]
+        logger.info("Cloud schema preserves existing deny-all RLS tables: %s", preserved)
+        return preserved
     with db.get_cursor(commit=True) as cur:
         orphans = disable_orphan_rls(cur)
     if orphans:

@@ -9,6 +9,7 @@ from urllib.parse import parse_qs
 
 from core import db  # noqa: F401 - compatibility seam for route tests
 from core.feature_flags import erp_line_enabled_for
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import team_access
 from services.intake_bridge import convert as convert_svc  # noqa: F401 - test seam
 from services.line_erp import (
@@ -240,7 +241,14 @@ async def _queue_document(
         message.get("id"),
     )
     if claimed:
-        _spawn(_process_document(message, binding, line_user_id))
+        cloud_dispatch.spawn(
+            "line_erp.document",
+            _process_document,
+            message,
+            binding,
+            line_user_id,
+            _legacy_spawn=_spawn,
+        )
         return
     session = await asyncio.to_thread(store.get_session, binding["tenant_id"], line_user_id) or {}
     if session.get("state") == "ocr_processing":

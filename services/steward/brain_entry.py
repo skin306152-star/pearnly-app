@@ -122,6 +122,10 @@ def _start(
             tool_trace=[],
             task_id=str(task["id"]),
         )
+    from services.cloud_tasks.dispatch import wake_queue
+
+    wake_queue("steward")
+
     return {
         "message_id": str(steward_msg["id"]),
         "user_message_id": str(user_msg["id"]),

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.cowork_line import webhook
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,14 @@ async def queue_document(
         message_id=str(message.get("id") or ""),
     )
     if claimed:
-        webhook._spawn(process_document(message, identity, lang))
+        cloud_dispatch.spawn(
+            "cowork.document",
+            process_document,
+            message,
+            identity,
+            lang,
+            _legacy_spawn=webhook._spawn,
+        )
         return
     session = await asyncio.to_thread(webhook._session, identity)
     state = session.get("state")

@@ -9,13 +9,13 @@ code / balance / estimated_cost / pages_used_this_month 一个都不能动。
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Tuple
 
 from fastapi import HTTPException
 
 from core import db
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.billing import account_status, pricing
 
 logger = logging.getLogger(__name__)
@@ -86,28 +86,26 @@ def schedule_parse_charges(user_id, tenant_id, pairs, desc_label: str) -> None:
     try:
         pdf_units, excel_chars = pricing.billed_units_for_parses(pairs)
         if pdf_units > 0:
-            asyncio.create_task(
-                asyncio.to_thread(
-                    db.charge_ocr_async,
-                    str(user_id),
-                    tenant_id,
-                    "pdf",
-                    pdf_units,
-                    None,
-                    f"{desc_label} PDF · {pdf_units} 页",
-                )
+            cloud_dispatch.spawn_sync(
+                "ocr.charge",
+                db.charge_ocr_async,
+                str(user_id),
+                tenant_id,
+                "pdf",
+                pdf_units,
+                None,
+                f"{desc_label} PDF · {pdf_units} 页",
             )
         if excel_chars > 0:
-            asyncio.create_task(
-                asyncio.to_thread(
-                    db.charge_ocr_async,
-                    str(user_id),
-                    tenant_id,
-                    "excel",
-                    excel_chars,
-                    None,
-                    f"{desc_label} Excel · {excel_chars} 字符",
-                )
+            cloud_dispatch.spawn_sync(
+                "ocr.charge",
+                db.charge_ocr_async,
+                str(user_id),
+                tenant_id,
+                "excel",
+                excel_chars,
+                None,
+                f"{desc_label} Excel · {excel_chars} 字符",
             )
     except Exception as e:  # noqa: BLE001
         logger.warning(f"💳 {desc_label} async charge skip: {e}")

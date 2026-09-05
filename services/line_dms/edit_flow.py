@@ -18,6 +18,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp.dms_id_validate import is_valid_thai_id, normalize_thai_id
 from services.line_platform import client as line_client
 from services.line_dms import cards, store
@@ -164,4 +165,14 @@ def _rerun(binding: dict, line_user_id: str, endpoint_id, id_card: dict, phone: 
     """改值后整体重跑查重(离主线程后台跑)。"""
     from services.line_dms import flow  # 延迟导入避免 flow ↔ edit_flow 环依赖
 
-    flow._spawn(flow._run_dedup(binding, line_user_id, None, id_card, phone, endpoint_id))
+    cloud_dispatch.spawn(
+        "dms.dedup",
+        flow._run_dedup,
+        binding,
+        line_user_id,
+        None,
+        id_card,
+        phone,
+        endpoint_id,
+        _legacy_spawn=flow._spawn,
+    )

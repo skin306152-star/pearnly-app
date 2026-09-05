@@ -9,9 +9,11 @@
 """
 
 import unittest
+import os
 from unittest import mock
 
 from services.erp.session_lock import (
+    MrerpSessionLockUnavailable,
     _account_lock_key,
     dms_booking_scope_key,
     mrerp_booking_lock,
@@ -51,6 +53,89 @@ class GracefulDegradeTests(unittest.TestCase):
                 self.assertFalse(got)
         # 连接必须被归还
         fake_pool.putconn.assert_called_once_with(fake_conn)
+
+
+class CloudFailClosedTests(unittest.TestCase):
+    def test_connection_failure_prevents_session_body(self):
+        for role in ("web", "worker"):
+            with self.subTest(role=role), mock.patch.dict(os.environ, PEARNLY_RUNTIME_ROLE=role):
+                with mock.patch("core.db.get_pool", side_effect=RuntimeError("no DB")):
+                    with self.assertRaises(MrerpSessionLockUnavailable):
+                        with mrerp_session_lock("test-account"):
+                            self.fail("browser must not start")
+
+    def test_query_failure_prevents_session_body_and_returns_connection(self):
+        pool = mock.MagicMock()
+        pool.getconn.return_value.cursor.side_effect = RuntimeError("query failed")
+        with (
+            mock.patch.dict(os.environ, PEARNLY_RUNTIME_ROLE="worker"),
+            mock.patch("core.db.get_pool", return_value=pool),
+        ):
+            with self.assertRaises(MrerpSessionLockUnavailable):
+                with mrerp_session_lock("test-account"):
+                    self.fail("browser must not start")
+        pool.putconn.assert_called_once_with(pool.getconn.return_value)
+
+    def test_timeout_prevents_session_body(self):
+        pool = mock.MagicMock()
+        pool.getconn.return_value.cursor.return_value.__enter__.return_value.fetchone.return_value = (
+            False,
+        )
+        with (
+            mock.patch.dict(os.environ, PEARNLY_RUNTIME_ROLE="worker"),
+            mock.patch("core.db.get_pool", return_value=pool),
+        ):
+            with self.assertRaisesRegex(MrerpSessionLockUnavailable, "timeout"):
+                with mrerp_session_lock("test-account", timeout_sec=0):
+                    self.fail("browser must not start")
+
+
+class CloudAdapterLockTests(unittest.TestCase):
+    def test_browser_adapter_cannot_swallow_lock_error_or_disable_cloud_lock(self):
+        from services.erp.mrerp_adapter import MRERPAdapter
+
+        for serialize in (True, False):
+            with (
+                self.subTest(serialize=serialize),
+                mock.patch.dict(os.environ, PEARNLY_RUNTIME_ROLE="worker"),
+            ):
+                with (
+                    mock.patch("services.erp.mrerp_adapter.mrerp_session_lock") as lock,
+                    mock.patch("services.erp.mrerp_adapter.BrowserSession") as browser,
+                ):
+                    lock.return_value.__enter__.side_effect = MrerpSessionLockUnavailable("blocked")
+                    adapter = MRERPAdapter(
+                        login_url="https://test.invalid",
+                        username="u",
+                        password="p",
+                        serialize_sessions=serialize,
+                    )
+                    with self.assertRaises(MrerpSessionLockUnavailable):
+                        adapter.__enter__()
+                    browser.assert_not_called()
+
+    def test_http_adapter_cannot_swallow_lock_error_or_disable_cloud_lock(self):
+        from services.erp.mrerp_http.adapter import MrErpHttpAdapter
+
+        for serialize in (True, False):
+            with (
+                self.subTest(serialize=serialize),
+                mock.patch.dict(os.environ, PEARNLY_RUNTIME_ROLE="worker"),
+            ):
+                with (
+                    mock.patch("services.erp.mrerp_http.adapter.mrerp_session_lock") as lock,
+                    mock.patch("services.erp.mrerp_http.adapter.MrErpSession") as session,
+                ):
+                    lock.return_value.__enter__.side_effect = MrerpSessionLockUnavailable("blocked")
+                    adapter = MrErpHttpAdapter(
+                        login_url="https://test.invalid",
+                        username="u",
+                        password="p",
+                        serialize_sessions=serialize,
+                    )
+                    with self.assertRaises(MrerpSessionLockUnavailable):
+                        adapter.__enter__()
+                    session.assert_not_called()
 
 
 class DmsBookingScopeKeyTests(unittest.TestCase):

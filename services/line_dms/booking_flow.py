@@ -18,6 +18,7 @@ import secrets
 from typing import Any, Dict, List, Optional, Tuple
 
 from core import db
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.session_lock import mrerp_booking_lock
 from services.line_platform import client as line_client
@@ -60,7 +61,9 @@ async def handle_postback(
         if payload is None:
             _reply(reply_token, cards.TXT_EXPIRED)
             return
-        _spawn(_execute_booking(binding, line_user_id, payload))
+        cloud_dispatch.spawn(
+            "dms.booking", _execute_booking, binding, line_user_id, payload, _legacy_spawn=_spawn
+        )
         return
 
     # 确认守卫(booking_review 态 + nonce 吻合)原子清 nonce 并回 payload;不符/过期 → 过期
@@ -71,7 +74,9 @@ async def handle_postback(
     if payload is None:
         _reply(reply_token, cards.TXT_EXPIRED)
         return
-    _spawn(_execute_booking(binding, line_user_id, payload))
+    cloud_dispatch.spawn(
+        "dms.booking", _execute_booking, binding, line_user_id, payload, _legacy_spawn=_spawn
+    )
 
 
 # ── 建订车单 ─────────────────────────────────────────────────────────────

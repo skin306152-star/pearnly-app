@@ -71,17 +71,28 @@ async def run_bank_sales(work_order_id: str, request: Request):
     if owner is None:
         return JSONResponse(status_code=409, content={"running": True})
     try:
-        threading.Thread(
-            target=bank_sales_brain.run_async,
-            kwargs={
-                "tenant_id": tenant_id,
-                "work_order_id": work_order_id,
-                "claimed": True,
-                "lease_owner": owner,
-            },
-            daemon=True,
-            name=f"bank-sales-{work_order_id[:8]}",
-        ).start()
+        from services.cloud_tasks import dispatch
+
+        if dispatch.enabled():
+            dispatch.enqueue(
+                "workorder.bank_sales",
+                tenant_id=tenant_id,
+                work_order_id=work_order_id,
+                claimed=True,
+                lease_owner=owner,
+            )
+        else:
+            threading.Thread(
+                target=bank_sales_brain.run_async,
+                kwargs={
+                    "tenant_id": tenant_id,
+                    "work_order_id": work_order_id,
+                    "claimed": True,
+                    "lease_owner": owner,
+                },
+                daemon=True,
+                name=f"bank-sales-{work_order_id[:8]}",
+            ).start()
     except Exception:
         bank_sales_brain.fail_start(tenant_id, work_order_id, owner)
         raise
@@ -96,6 +107,19 @@ async def bank_sales_progress(work_order_id: str, request: Request):
         _load_mutable_order(cur, request, _user, tenant_id, work_order_id)
         events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     pending = bank_sales_suggest.suggest(events).get("pending_count", 0)
+    from services.cloud_tasks import dispatch
+
+    if dispatch.enabled():
+        with db.get_cursor(commit=True) as cur:
+            holder = store.run_lease_holder(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+        running = bool(
+            holder and str(holder.get("run_lease_owner", "")).startswith("bank_sales_brain:")
+        )
+        return {
+            "running": running,
+            "status": "running" if running else "idle",
+            "pending_count": pending,
+        }
     return {
         **(bank_sales_brain.progress(work_order_id) or {"running": False}),
         "pending_count": pending,

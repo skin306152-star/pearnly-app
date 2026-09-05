@@ -6,6 +6,7 @@ auth_signup 启动时 import 并调用 _ensure_schema()(模块加载期跑 · �
 """
 
 import logging
+import os
 import traceback
 
 logger = logging.getLogger("mrpilot.signup")
@@ -13,6 +14,8 @@ logger = logging.getLogger("mrpilot.signup")
 
 def _ensure_schema():
     """v109.3.2 数据库迁移 · 每条独立事务 · 失败不影响后续"""
+    if os.environ.get("PEARNLY_RUNTIME_ROLE") in {"web", "worker"}:
+        return
     try:
         from core import db as _db
 

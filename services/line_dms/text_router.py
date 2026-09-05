@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.line_platform import client as line_client
 from services.line_dms import (
     booking_qa,
@@ -102,10 +103,16 @@ async def _capture_phone(
     if not payload.get("id_card"):
         _reply(reply_token, cards.TXT_ASK_CARD)
         return
-    flow._spawn(
-        flow._run_dedup(
-            binding, line_user_id, None, payload["id_card"], text, payload.get("endpoint_id")
-        )
+    cloud_dispatch.spawn(
+        "dms.dedup",
+        flow._run_dedup,
+        binding,
+        line_user_id,
+        None,
+        payload["id_card"],
+        text,
+        payload.get("endpoint_id"),
+        _legacy_spawn=flow._spawn,
     )
 
 

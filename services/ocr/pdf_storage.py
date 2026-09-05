@@ -107,7 +107,7 @@ def storage_health_check() -> dict:
     try:
         base.mkdir(parents=True, exist_ok=True)
         # 写一个测试文件
-        test = base / ".health_check"
+        test = base / f".health_check-{uuid.uuid4().hex}"
         test.write_text("ok")
         test.unlink()
         return {"ok": True, "path": str(base)}

@@ -362,7 +362,9 @@ def _release_lease(tenant_id: str, work_order_id: str, owner) -> None:
 def begin_run(tenant_id: str, work_order_id: str, total: int) -> Optional[str]:
     """占运行位:进程内 _PROGRESS + 跨进程 DB 租约都拿到才返 owner;任一被占 → None(有人在跑,
     拒绝)。工单 review 态时 runner 租约空闲,复用它免费得跨进程互斥 + 过期自愈,不另造第三套。"""
-    if not begin(work_order_id, total):
+    from services.cloud_tasks import dispatch
+
+    if not dispatch.enabled() and not begin(work_order_id, total):
         return None
     owner = f"{_LEASE_PREFIX}:{uuid.uuid4().hex}"
     try:

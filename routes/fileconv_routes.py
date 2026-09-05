@@ -22,6 +22,7 @@ from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from core.route_helpers import authorize_pearnly_ai, content_disposition, lang_or_default
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.billing import account_status, pricing
 from services.fileconv import pdf_out
 from services.fileconv.convert import convert_image, convert_pdf
@@ -166,22 +167,20 @@ async def convert_endpoint(
     # 转换成功后按同口径计费(豁免不扣 · fire-and-forget 与对账一致):PDF/图片按页 ·
     # Excel/CSV 按字符。拒绝件(OCR 读不出等)不收钱,同「失败不收钱」全站口径。
     if not billing.get("is_exempt") and result.status == STATUS_OK:
-        import asyncio
 
         from core import db as _db_chg
 
         _kind, _units, _desc = _conversion_charge_units(result, gate_units, file.filename)
         if _units > 0:
-            asyncio.create_task(
-                asyncio.to_thread(
-                    _db_chg.charge_ocr_async,
-                    str(user.get("id")),
-                    tenant_id,
-                    _kind,
-                    _units,
-                    None,
-                    _desc,
-                )
+            cloud_dispatch.spawn_sync(
+                "ocr.charge",
+                _db_chg.charge_ocr_async,
+                str(user.get("id")),
+                tenant_id,
+                _kind,
+                _units,
+                None,
+                _desc,
             )
 
     if fmt == "xlsx":

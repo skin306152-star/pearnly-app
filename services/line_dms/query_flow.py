@@ -7,6 +7,7 @@ import re
 from datetime import date
 from typing import Optional
 
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import mrerp_dms_sales_readback as sales_readback
 from services.line_dms import _out, cards, query_access, query_cards, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _send, _thr
@@ -275,7 +276,9 @@ async def _begin_records(
     }
     await _thr(store.set_session, binding["tenant_id"], line_user_id, "query_results", params)
     await _start_loading(line_user_id)
-    _spawn(_run_records(binding, line_user_id, params))
+    cloud_dispatch.spawn(
+        "dms.records", _run_records, binding, line_user_id, params, _legacy_spawn=_spawn
+    )
 
 
 async def _run_records(binding: dict, line_user_id: str, params: dict) -> None:
@@ -327,7 +330,7 @@ async def _begin_top(
     }
     await _thr(store.set_session, binding["tenant_id"], line_user_id, "query_results", params)
     await _start_loading(line_user_id)
-    _spawn(_run_top(binding, line_user_id, params))
+    cloud_dispatch.spawn("dms.top", _run_top, binding, line_user_id, params, _legacy_spawn=_spawn)
 
 
 async def _run_top(binding: dict, line_user_id: str, params: dict) -> None:

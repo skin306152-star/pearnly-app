@@ -10,6 +10,7 @@ import logging
 
 from core import db
 from core.route_helpers import _plan_permissions, _tid
+from services.cloud_tasks import dispatch as cloud_dispatch
 from services.exceptions.exception_checks import _async_run_exception_checks
 from services.erp.auto_push import (
     _auto_push_history,
@@ -29,19 +30,24 @@ def serve_cache_hit(cached, user, plan, file, monthly_quota, file_hash):
         try:
             auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
             if auto_eps:
-                import asyncio
 
                 if _erp_seller_routing_enabled(str(user["id"])):
-                    asyncio.create_task(
-                        _auto_push_smart_routed(
-                            str(user["id"]), [cached["id"]], _tid(user), auto_eps
-                        )
+                    cloud_dispatch.spawn(
+                        "erp.smart_push",
+                        _auto_push_smart_routed,
+                        str(user["id"]),
+                        [cached["id"]],
+                        _tid(user),
+                        auto_eps,
                     )
                 else:
-                    asyncio.create_task(
-                        _auto_push_history(
-                            str(user["id"]), cached["id"], auto_eps, tenant_id=_tid(user)
-                        )
+                    cloud_dispatch.spawn(
+                        "erp.auto_push",
+                        _auto_push_history,
+                        str(user["id"]),
+                        cached["id"],
+                        auto_eps,
+                        tenant_id=_tid(user),
                     )
                 cache_auto_pushed = True
                 logger.info(f"🚀 [Cache] 自动推送已入队 · history={cached['id']}")
@@ -51,8 +57,6 @@ def serve_cache_hit(cached, user, plan, file, monthly_quota, file_hash):
     # v118.20.1.7 · 缓存命中也跑异常检测(unique index 保证幂等 · 不会重写)
     # 这是关键 · 否则:历史已识别 + 这次重传 → 缓存命中 → 异常栏永远收不到这张
     try:
-        import asyncio as _asyncio_exc_c
-
         _cached_pages = cached.get("pages") or []
         _primary = next(
             (p for p in _cached_pages if not p.get("is_duplicate") and not p.get("is_copy")),
@@ -67,18 +71,18 @@ def serve_cache_hit(cached, user, plan, file, monthly_quota, file_hash):
                 _exc_total_c = float(str(_raw_t_c).replace(",", "").strip())
             except Exception as e:
                 logger.warning(f"[cache_hit] total_amount 解析失败: {e}")
-        _asyncio_exc_c.create_task(
-            _async_run_exception_checks(
-                history_id=str(cached["id"]),
-                user_id=str(user["id"]),
-                tenant_id=_tid(user),
-                seller_name=_cf.get("seller_name"),
-                invoice_no=_cf.get("invoice_number"),
-                total_amount=_exc_total_c,
-                confidence=cached.get("confidence"),
-                duplicate=None,  # 缓存命中说明 hash 全等 · 由专门的 duplicate 路径处理(本身已是同张)
-                fields=_cf,
-            )
+        cloud_dispatch.spawn(
+            "ocr.exception_checks",
+            _async_run_exception_checks,
+            history_id=str(cached["id"]),
+            user_id=str(user["id"]),
+            tenant_id=_tid(user),
+            seller_name=_cf.get("seller_name"),
+            invoice_no=_cf.get("invoice_number"),
+            total_amount=_exc_total_c,
+            confidence=cached.get("confidence"),
+            duplicate=None,
+            fields=_cf,
         )
         logger.info(f"  🛡  [Cache] 异常检测已入队 · hid={cached['id']}")
     except Exception as _e_c:

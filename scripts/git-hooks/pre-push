@@ -3,13 +3,13 @@
 # ║  pre-push 机械闸 · 推送前本地守门 · 在 CI 前快速拦截坏码           ║
 # ╚══════════════════════════════════════════════════════════════════════╝
 #
-# 为什么需要它(2026-05-30 血泪,2026-08-26 部署链已升级):
-#   旧链路是 push 上 master 后 webhook 立刻部署,CI 只能事后报警。现在改为
-#   push → CI 全闸 → deploy job 精确 SHA 部署,CI 已是上线前硬门。本钩子仍保留,
-#   让常见错误在占用远端 CI 之前就被本机快速拦下。
+# 当前发布链(2026-09-05):
+#   本地风险分层检查和本钩子 → push → 手动精确SHA Cloud Run CD。
+#   通用GitHub CI按项目决策停用，ci.yml仅保留验证配置；旧VM webhook/deploy已退役。
+#   部署状态及操作以docs/deployment/MIGRATION_STATUS.md与CLOUD_RUN.md为准。
 #
 # 本钩子把安全从「AI 记得看结果」改成「机器自己拦」:
-#   任一守门红 → exit 1 → push 中止 → 坏码不到 master,也不会进入 CI 部署链。
+#   任一守门红 → exit 1 → push 中止 → 坏码不到 master,也不会成为后续手动发布候选。
 #   不依赖任何人/AI 读输出 · 只认退出码 · 显示糊了也拦得住。
 #
 # 覆盖那 3 次翻车的【全部】根因:
@@ -93,7 +93,7 @@ E2E_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(tests/e2e/.*\.spec\.js|test
 # 视觉照搬闸触发面(docs/pos/12)· 2026-07-31 从 pos|inventory|purchase 三个前缀放宽到整个
 # src/home/ 与 dist:闸的 MAPPINGS 管着 dashboard/history/clients/sales-report/acct-* 等 20 条
 # route,旧写法对其中十几条本地完全不设防 —— dashboard 那条选择器烂了三周没人报警。
-# 现有 CI 是部署前硬门,本地仍保留快速反馈,避免占用远端 E2E 后才发现。代价:前端 push 多 21 秒。
+# 通用CI停用期间保留本地视觉检查；运行与用户验收仍分别记账。
 DESIGN_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(static/pos/|src/home/|static/dist/|tests/visual/design/)' || true)"
 
 fail() {

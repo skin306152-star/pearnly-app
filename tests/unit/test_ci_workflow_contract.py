@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-"""CI workflow 结构契约(2026-08-26 拆 unit/e2e + 精确部署 job)。
+"""CI workflow 结构契约：保留验证，禁止复活已退役的VM部署。
 
-防未来回归把拆分并回去 / deploy job 条件漂掉 / 秘密换成别的名字:
+防未来回归把拆分并回去或恢复旧VM发布：
   · unit 与 e2e 必须并存(并行 · 谁也不吞谁)
-  · deploy job 只跑 push 到 master · needs = 全部 FAIL 闸 + unit/e2e/pg-smoke ·
-    不含 WARN 闸(lint-routes / lint-model)
-  · deploy 调 /internal/deploy/manual 必须带 sha=${{ github.sha }} + secrets.DEPLOY_TOKEN
-  · concurrency 必须 cancel-in-progress(同 ref 新 push 取消旧 run → 旧 deploy job 不触发)
+  · 本workflow只验证，不包含部署job、旧令牌或旧VM发布端点
+  · concurrency取消同ref过时的验证；Cloud Run发布由独立Manual CD串行处理
   · push diff 闸只拉最近 2 commit;PR 保留全历史拿 origin/base,避免 243MB 全历史 fetch 超时
   · Playwright retries 不允许在这轮迁移里被调低(迁移纪律:不动 E2E 稳定性参数)
 
@@ -52,22 +50,6 @@ def _jobs_block(text: str) -> dict[str, str]:
     return jobs
 
 
-def _block_needs(block: str) -> list[str]:
-    """取 job 文本块里 needs: 后的 job 名列表。"""
-    m = re.search(r"^    needs:\s*$", block, re.M)
-    if not m:
-        return []
-    items = []
-    for line in block[m.end() :].splitlines():
-        if not line.strip():
-            continue
-        line = line.strip()
-        if not line.startswith("- "):
-            break
-        items.append(line[len("- ") :].strip())
-    return items
-
-
 class CiWorkflowContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -110,26 +92,15 @@ class CiWorkflowContractTests(unittest.TestCase):
         self.assertIn("playwright install-deps chromium webkit firefox", e2e)
         self.assertIn("playwright-all-browsers-v1-", e2e)
 
-    def test_deploy_job_exists_and_master_only(self):
-        self.assertIn("deploy", self.jobs)
-        deploy = self.jobs["deploy"]
-        self.assertIn(
-            "if: github.event_name == 'push' && github.ref == 'refs/heads/master'",
-            deploy,
-        )
+    def test_ci_cannot_reactivate_the_retired_vm_release_path(self):
+        self.assertNotIn("deploy", self.jobs)
+        for legacy in ("/internal/deploy/manual", "DEPLOY_TOKEN", "git-deploy.sh"):
+            self.assertNotIn(legacy, self.text)
+        self.assertIn("manual-deploy.yml", self.text)
 
-    def test_deploy_needs_all_fail_jobs_plus_unit_e2e_pg(self):
-        need = set(_block_needs(self.jobs["deploy"]))
-        self.assertEqual(need, FAIL_JOBS | {"unit", "e2e"}, "deploy needs 集合漂了")
-
-    def test_deploy_needs_excludes_warn_jobs(self):
-        need = set(_block_needs(self.jobs["deploy"]))
-        self.assertFalse(WARN_JOBS & need, "deploy 不该 depends on WARN 闸(lint-routes/lint-model)")
-
-    def test_deploy_calls_manual_with_pinned_sha_and_token(self):
-        deploy = self.jobs["deploy"]
-        self.assertIn("/internal/deploy/manual?sha=${{ github.sha }}", deploy)
-        self.assertIn("X-Internal-Token: ${{ secrets.DEPLOY_TOKEN }}", deploy)
+    def test_removing_legacy_deploy_preserves_all_validation_jobs(self):
+        for name in FAIL_JOBS | WARN_JOBS | {"unit", "e2e"}:
+            self.assertIn(name, self.jobs)
 
     def test_concurrency_cancels_older_master_runs(self):
         self.assertIn("cancel-in-progress: true", self.text)

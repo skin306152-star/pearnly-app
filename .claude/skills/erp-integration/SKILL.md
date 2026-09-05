@@ -42,7 +42,7 @@ description: 接 ERP / 老 PHP 系统 / 无 API 第三方(MR.ERP、Express DBF�
 
 ## 5. 小助手 companion:改了不发版 = 白改
 
-源码在私有仓 `skin306152-star/pearnly-companion`(不在本仓)。任何改动不算完,直到:**bump VERSION → 跑 `release.ps1` → 在真的在用的小助手上验到它自动更新了**。git commit / webhook 都不会发 companion。
+源码在独立私有仓 `skin306152-star/pearnly-companion`。发布正本见该仓 `docs/RELEASE.md` 和本仓 `docs/deployment/COMPANION_PUBLICATION.md`：Windows构建 → Ubuntu经WIF发布私有GCS → 正式域名完整回读。`release.ps1 -BuildOnly`仅构建；旧SSH/SCP发布已退役。客户端功能改动须更新VERSION，先完成staging与Windows设备验证，再正式发布并确认真实设备升级；安装包发布流程迁移本身不要求改VERSION或替换生产包。配置、构建、发布与用户升级分别记账。
 
 ## 6. Express(真 ERP)落点
 

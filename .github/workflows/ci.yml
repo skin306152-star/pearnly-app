@@ -1,7 +1,8 @@
 name: CI
 
 # 阶段 3-4 + REFACTOR-A1.2 · CI 自动化保险 · 防"v0.20 db pool 5 重演"
-# 每次 push / PR 跑 12 个 job(2026-08-26 拆 split + 精确部署 job):
+# 当前workflow按项目决策停用；若恢复，仅运行验证，发布独立走manual-deploy.yml。
+# 每次 push / PR 的验证job：
 #   lint        : black + ruff + bandit + pip-audit + prettier + eslint + npm audit(格式/真bug/安全/CVE)
 #   lint-size   : 防屎山闸(REFACTOR-WC-P1)· 文件 ≤500 行 + 行数棘轮只降不升(铁律 #27)· FAIL 模式(2026-06-03 整顿收官切硬门)
 #   lint-ui     : UI 一致性棘轮(REFACTOR-WC 审计#2)· 违规不许反弹超基线 · FAIL 模式(2026-06-05 拍板切硬门 · 存量 B 类视觉清理仍 Zihao-gated)
@@ -13,653 +14,621 @@ name: CI
 #   pg-smoke    : 真 Postgres 冒烟(台账精度/串行/RLS)· FAIL 模式
 #   unit        : import + i18n + authz + unit+coverage(--fail-under=40)+ Vite build + dist 一致 · FAIL
 #   e2e         : 视觉照搬闸 + Playwright E2E smoke(pearnly.com 公开页)+ 高敏 smoke(真账号)· FAIL
-#   deploy      : 仅 push refs/heads/master · 上面全部 FAIL 闸绿后,带 pin SHA 调
-#                 /internal/deploy/manual(DEPLOY_TOKEN)· 服务器只部署该精确 commit。
 # integ contract tests 全部 stub;e2e 分两档:smoke 只 GET 公开页(零 secret),
 # 高敏 smoke(计费安全/RLS/入口隔离)用 secrets 里的专用测试账号真跑 —— 2026-08-11 起,
 # 此前「仓库里有 E2E」≠ CI 有断言(凭据缺失全 skip)。
 
 on:
-  push:
-    branches: ["**"]
-  pull_request:
-    branches: [master]
+    push:
+        branches: ['**']
+    pull_request:
+        branches: [master]
 
-# 同一 ref 上有新 push 时取消旧 run · 省 CI 配额 · 对 master 还有一层含义:
-# 旧 run 的 deploy job 会被取消 → 不会拿旧 SHA 触发部署;最新 run 的 deploy job 才触发
-# 本次精确部署。服务器侧另有 TARGET_SHA 守卫,即使取消了也到不了服务器,双保险。
+# 同一ref有新push时取消过时的验证任务；本workflow不部署任何环境。
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  # REFACTOR-A5 · 代码规范守门(与 test 并行 · 独立信号)
-  #   black --check  : Python 格式化唯一权威
-  #   ruff check     : Python pyflakes 真 bug(未定义名/未用导入/format 参数等)
-  #   prettier --check: 前端代码格式(巨石 home.* 经 .prettierignore 豁免 · 阶段 C 拆解再纳入)
-  #   eslint         : 前端模块真 bug(0 error 放行 · warning 仅提示)
-  lint:
-    name: lint (black + ruff + prettier + eslint)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # REFACTOR-A5 · 代码规范守门(与 test 并行 · 独立信号)
+    #   black --check  : Python 格式化唯一权威
+    #   ruff check     : Python pyflakes 真 bug(未定义名/未用导入/format 参数等)
+    #   prettier --check: 前端代码格式(巨石 home.* 经 .prettierignore 豁免 · 阶段 C 拆解再纳入)
+    #   eslint         : 前端模块真 bug(0 error 放行 · warning 仅提示)
+    lint:
+        name: lint (black + ruff + prettier + eslint)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
 
-      - name: Install lint tools (REFACTOR-A5/A6 · pinned black/ruff/bandit/pip-audit)
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+            - name: Install lint tools (REFACTOR-A5/A6 · pinned black/ruff/bandit/pip-audit)
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements-dev.txt
 
-      - name: black --check (Python 格式化)
-        run: black --check .
+            - name: black --check (Python 格式化)
+              run: black --check .
 
-      - name: ruff check (Python lint)
-        run: ruff check .
+            - name: ruff check (Python lint)
+              run: ruff check .
 
-      - name: bandit (REFACTOR-A6 · Python 静态安全 · HIGH 拦门)
-        run: bandit -r . -c pyproject.toml --severity-level high -q
+            - name: bandit (REFACTOR-A6 · Python 静态安全 · HIGH 拦门)
+              run: bandit -r . -c pyproject.toml --severity-level high -q
 
-      - name: pip-audit (REFACTOR-A6 · 依赖 CVE · 锁文件已全 pin)
-        run: pip-audit -r requirements.lock.txt --no-deps --progress-spinner off
+            - name: pip-audit (REFACTOR-A6 · 依赖 CVE · 锁文件已全 pin)
+              run: pip-audit -r requirements.lock.txt --no-deps --progress-spinner off
 
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
+            - name: Setup Node 20
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: npm
 
-      - name: Install Node deps (npm ci)
-        run: npm ci
+            - name: Install Node deps (npm ci)
+              run: npm ci
 
-      - name: prettier --check (全仓 · 基于 HEAD 已提交字节 · 与 pre-push 同脚本)
-        run: node scripts/check_prettier_committed.mjs
+            - name: prettier --check (全仓 · 基于 HEAD 已提交字节 · 与 pre-push 同脚本)
+              run: node scripts/check_prettier_committed.mjs
 
-      - name: eslint (前端模块 lint)
-        run: npm run lint
+            - name: eslint (前端模块 lint)
+              run: npm run lint
 
-      # eslint 的 flat config 不收 src/**/*.ts(跑上去只报 "no matching configuration"),
-      # tsc 是 TypeScript 源唯一的机械闸。之前只挂在没人装的 pre-push 钩子上 → 20 条
-      # error 在 master 上躺了两周,含一条运行期 ReferenceError。
-      - name: tsc --noEmit (TypeScript 类型闸)
-        run: npm run typecheck
+            # eslint 的 flat config 不收 src/**/*.ts(跑上去只报 "no matching configuration"),
+            # tsc 是 TypeScript 源唯一的机械闸。之前只挂在没人装的 pre-push 钩子上 → 20 条
+            # error 在 master 上躺了两周,含一条运行期 ReferenceError。
+            - name: tsc --noEmit (TypeScript 类型闸)
+              run: npm run typecheck
 
-      # /ai 那套独立词典(static/ai/ai-i18n-*.js)不在 check_i18n 的射程里 —— 它只看
-      # static/i18n-data.js。2026-07-30 真浏览器验收因此在 402 卡上抓到生 key
-      # intake_failed_batch_n 原样上屏,而 check_i18n --strict 同时报「0 missing」。
-      - name: check_ai_i18n_refs (/ai 词典引用闸 · 取词的键必须有定义)
-        run: python scripts/check_ai_i18n_refs.py
+            # /ai 那套独立词典(static/ai/ai-i18n-*.js)不在 check_i18n 的射程里 —— 它只看
+            # static/i18n-data.js。2026-07-30 真浏览器验收因此在 402 卡上抓到生 key
+            # intake_failed_batch_n 原样上屏,而 check_i18n --strict 同时报「0 missing」。
+            - name: check_ai_i18n_refs (/ai 词典引用闸 · 取词的键必须有定义)
+              run: python scripts/check_ai_i18n_refs.py
 
-      # check_i18n 只比「某语言比别的语言少哪些键」—— 四语一起缺就没有参照物,它一眼都
-      # 看不出来。2026-07-31 的 sx-p-bc-dup-unit / posui.bscan.fails_n 正是这么把裸键名
-      # 送上界面的(check_i18n --strict 同时报 0 missing)。本闸补的是纵向那条轴:
-      # 源码 t()/POS.t()/data-i18n 用到的键,词典里必须存在。POS 那片只有它在看;/home
-      # 那片下面的 check_home_i18n_refs 扫得更深(还认 data-i18n 属性与常量键表)。
-      - name: check_i18n_refs (主 SPA + POS 词典引用闸 · 四语一起缺也拦得住)
-        run: python scripts/check_i18n_refs.py
+            # check_i18n 只比「某语言比别的语言少哪些键」—— 四语一起缺就没有参照物,它一眼都
+            # 看不出来。2026-07-31 的 sx-p-bc-dup-unit / posui.bscan.fails_n 正是这么把裸键名
+            # 送上界面的(check_i18n --strict 同时报 0 missing)。本闸补的是纵向那条轴:
+            # 源码 t()/POS.t()/data-i18n 用到的键,词典里必须存在。POS 那片只有它在看;/home
+            # 那片下面的 check_home_i18n_refs 扫得更深(还认 data-i18n 属性与常量键表)。
+            - name: check_i18n_refs (主 SPA + POS 词典引用闸 · 四语一起缺也拦得住)
+              run: python scripts/check_i18n_refs.py
 
-      # /home 那棵树有一模一样的洞:src/home/core.ts:109 的 t() 取不到就返回 key 本身,
-      # data-i18n 取不到则整个元素跳过 —— 模板里写死的中文原地不动,泰语用户永远看中文。
-      # check_i18n 只对拍四个语言块之间齐不齐,从没问过这 4989 条有没有人引、引的人写对没有。
-      - name: check_home_i18n_refs (/home 词典引用闸 · 取词的键必须有定义)
-        run: python scripts/check_home_i18n_refs.py
+            # /home 那棵树有一模一样的洞:src/home/core.ts:109 的 t() 取不到就返回 key 本身,
+            # data-i18n 取不到则整个元素跳过 —— 模板里写死的中文原地不动,泰语用户永远看中文。
+            # check_i18n 只对拍四个语言块之间齐不齐,从没问过这 4989 条有没有人引、引的人写对没有。
+            - name: check_home_i18n_refs (/home 词典引用闸 · 取词的键必须有定义)
+              run: python scripts/check_home_i18n_refs.py
 
-      # 桩比真后端少给一个键,验收截图拍的就是产品里不存在的界面 —— 2026-07-30/31 两天
-      # 栽两次(GET /sessions 漏 attachments、GET /status 漏 attachments),第三处还当
-      # 验收证据躺在仓库里。登记表 + 反证见 tests/unit/test_e2e_stub_contract_gate.py。
-      - name: check_e2e_stub_contracts (E2E 桩回包契约闸 · 桩的顶层键不得少于真后端)
-        run: python scripts/check_e2e_stub_contracts.py
+            # 桩比真后端少给一个键,验收截图拍的就是产品里不存在的界面 —— 2026-07-30/31 两天
+            # 栽两次(GET /sessions 漏 attachments、GET /status 漏 attachments),第三处还当
+            # 验收证据躺在仓库里。登记表 + 反证见 tests/unit/test_e2e_stub_contract_gate.py。
+            - name: check_e2e_stub_contracts (E2E 桩回包契约闸 · 桩的顶层键不得少于真后端)
+              run: python scripts/check_e2e_stub_contracts.py
 
-      # 2026-07-31 P0:测试里 `subprocess.run(["git","init"], cwd=tmp)` 看着无害,可 git 给
-      # 钩子注入的 GIT_DIR/GIT_INDEX_FILE 盖过 cwd —— pre-push 跑全量单测时,那两条造真
-      # commit 的用例把 init/add/commit 全打进了宿主仓(4838 files / -794172),再一步就
-      # push 到 master(本仓 push 即上线)。反证见 tests/unit/test_git_write_isolation.py。
-      - name: check_test_git_writes (测试禁止对当前仓库做 git 写操作)
-        run: python scripts/check_test_git_writes.py
+            # 2026-07-31 P0:测试里 `subprocess.run(["git","init"], cwd=tmp)` 看着无害,可 git 给
+            # 钩子注入的 GIT_DIR/GIT_INDEX_FILE 盖过 cwd —— pre-push 跑全量单测时,那两条造真
+            # commit 的用例把 init/add/commit 全打进了宿主仓(4838 files / -794172),再一步就
+            # push 到 master(本仓 push 即上线)。反证见 tests/unit/test_git_write_isolation.py。
+            - name: check_test_git_writes (测试禁止对当前仓库做 git 写操作)
+              run: python scripts/check_test_git_writes.py
 
-      # 2026-07-31:tests/integration 里 28 个模块在 setUpClass/tearDownClass 里
-      # `DROP TABLE IF EXISTS users, clients, ocr_history … CASCADE`,打的是 DATABASE_URL
-      # 指到哪就是哪。照它们自己 docstring 的跑法跑一遍就把本机开发库拆了(62 张表没了,
-      # clients 从 18 列剩 1 列);而这几张基础表从来没进过版本控制,alembic 从空库升不到
-      # head,掉了只能从 prod 拉 schema dump 灌回。运行期由 require_disposable_db() 的哨兵表
-      # 拦,本闸保证没有哪个新写的 DROP 忘了接上它。反证 tests/unit/test_destructive_db_test_gate.py。
-      - name: check_destructive_db_tests (DROP 真表的测试必须先验目标库可丢弃)
-        run: python scripts/check_destructive_db_tests.py
+            # 2026-07-31:tests/integration 里 28 个模块在 setUpClass/tearDownClass 里
+            # `DROP TABLE IF EXISTS users, clients, ocr_history … CASCADE`,打的是 DATABASE_URL
+            # 指到哪就是哪。照它们自己 docstring 的跑法跑一遍就把本机开发库拆了(62 张表没了,
+            # clients 从 18 列剩 1 列);而这几张基础表从来没进过版本控制,alembic 从空库升不到
+            # head,掉了只能从 prod 拉 schema dump 灌回。运行期由 require_disposable_db() 的哨兵表
+            # 拦,本闸保证没有哪个新写的 DROP 忘了接上它。反证 tests/unit/test_destructive_db_test_gate.py。
+            - name: check_destructive_db_tests (DROP 真表的测试必须先验目标库可丢弃)
+              run: python scripts/check_destructive_db_tests.py
 
-      - name: npm audit (REFACTOR-A6 · 生产依赖 CVE · high 拦门)
-        # --omit=dev:本项目 dependencies 为空,vite/esbuild/eslint 等全是 devDependencies
-        # (构建/测试工具 · 不随打包产物发给用户)。构建工具的安装期 CVE(如 esbuild
-        # GHSA-gv7w-rqvm-qjhr · 仅 vite 大版本升级可修)不该卡发布闸;仍全量拦生产依赖 CVE。
-        run: npm audit --omit=dev --audit-level=high
+            - name: npm audit (REFACTOR-A6 · 生产依赖 CVE · high 拦门)
+              # --omit=dev:本项目 dependencies 为空,vite/esbuild/eslint 等全是 devDependencies
+              # (构建/测试工具 · 不随打包产物发给用户)。构建工具的安装期 CVE(如 esbuild
+              # GHSA-gv7w-rqvm-qjhr · 仅 vite 大版本升级可修)不该卡发布闸;仍全量拦生产依赖 CVE。
+              run: npm audit --omit=dev --audit-level=high
 
-  # REFACTOR-WC-P1 · 防屎山闸(铁律 #27 · 窗口 C · 2026-05-28)
-  #   #1 check_file_size.py : 任何监控代码文件 > 500 行 → fail(存量基线在 scripts/file_size_baseline.json)
-  #   #2 check_line_ratchet.py: 任何监控文件净增长 > 0 → fail(透明豁免:commit 加 RATCHET-EXEMPT)
-  # 模式 = FAIL(2026-06-03 整顿收官 · 全文件 <500 · Zihao 拍板切硬门)·
-  # 任何监控文件 >500 行 或 行数净增长 → CI 红 → 挡合并 · 屎山不再复辟。
-  # 合理增长在 commit 写 RATCHET-EXEMPT: <file> +<N> · <理由> 透明豁免。
-  lint-size:
-    name: lint-size (REFACTOR-WC-P1 · anti-bigfile · FAIL mode)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # REFACTOR-WC-P1 · 防屎山闸(铁律 #27 · 窗口 C · 2026-05-28)
+    #   #1 check_file_size.py : 任何监控代码文件 > 500 行 → fail(存量基线在 scripts/file_size_baseline.json)
+    #   #2 check_line_ratchet.py: 任何监控文件净增长 > 0 → fail(透明豁免:commit 加 RATCHET-EXEMPT)
+    # 模式 = FAIL(2026-06-03 整顿收官 · 全文件 <500 · Zihao 拍板切硬门)·
+    # 任何监控文件 >500 行 或 行数净增长 → CI 红 → 挡合并 · 屎山不再复辟。
+    # 合理增长在 commit 写 RATCHET-EXEMPT: <file> +<N> · <理由> 透明豁免。
+    lint-size:
+        name: lint-size (REFACTOR-WC-P1 · anti-bigfile · FAIL mode)
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
 
-    steps:
-      - name: Checkout (PR 全历史 / push 最近 2 commit)
-        uses: actions/checkout@v4
-        with:
-          # PR 闸需 origin/<base> 看完整分支 diff;push 只比较 HEAD~1,拉全历史浪费且曾 5 分钟超时。
-          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '2' }}
+        steps:
+            - name: Checkout (PR 全历史 / push 最近 2 commit)
+              uses: actions/checkout@v4
+              with:
+                  # PR 闸需 origin/<base> 看完整分支 diff;push 只比较 HEAD~1,拉全历史浪费且曾 5 分钟超时。
+                  fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '2' }}
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
 
-      # 两个脚本只用标准库 · 不装任何依赖(故意 · 零依赖 · 任何环境跑得动)
+            # 两个脚本只用标准库 · 不装任何依赖(故意 · 零依赖 · 任何环境跑得动)
 
-      # 2026-08-01 扩面:`static/ai/**/*.js` 收进监控。/ai 是独立 SPA(不走 src/home 的 vite
-      # 打包),它 119 个 .js 从建站起整片在闸外,收进来当场 7 个越线。存量记
-      # scripts/file_size_baseline.json(只许降不许升),基线外越线即红 —— 新债一行都不许欠。
-      # 词典分片 ai-i18n-*.js 不算代码,豁免判据由 tests/unit/test_file_size_gate.py 兜。
-      - name: 防屎山闸 #1 · 文件行数 ≤ 500 + static/ai 存量基线(铁律 #27.1)
-        run: python scripts/check_file_size.py
+            # 2026-08-01 扩面:`static/ai/**/*.js` 收进监控。/ai 是独立 SPA(不走 src/home 的 vite
+            # 打包),它 119 个 .js 从建站起整片在闸外,收进来当场 7 个越线。存量记
+            # scripts/file_size_baseline.json(只许降不许升),基线外越线即红 —— 新债一行都不许欠。
+            # 词典分片 ai-i18n-*.js 不算代码,豁免判据由 tests/unit/test_file_size_gate.py 兜。
+            - name: 防屎山闸 #1 · 文件行数 ≤ 500 + static/ai 存量基线(铁律 #27.1)
+              run: python scripts/check_file_size.py
 
-      - name: 防屎山闸 #2 · 棘轮 · 监控文件只许减不许增(铁律 #27.2)
-        # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            python scripts/check_line_ratchet.py --base origin/${{ github.base_ref }} --head HEAD
-          else
-            python scripts/check_line_ratchet.py
-          fi
+            - name: 防屎山闸 #2 · 棘轮 · 监控文件只许减不许增(铁律 #27.2)
+              # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
+              run: |
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    python scripts/check_line_ratchet.py --base origin/${{ github.base_ref }} --head HEAD
+                  else
+                    python scripts/check_line_ratchet.py
+                  fi
 
-      - name: 防屎山闸 #3 · 大文件/sourcemap 禁入库(防 .git 膨胀)
-        # 新增/改动 blob > 2.5MB 或 dist/*.map → fail(逃生门:commit 加 BLOB-EXEMPT: <path>)
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            python scripts/check_blob_size.py --base origin/${{ github.base_ref }} --head HEAD
-          else
-            python scripts/check_blob_size.py
-          fi
+            - name: 防屎山闸 #3 · 大文件/sourcemap 禁入库(防 .git 膨胀)
+              # 新增/改动 blob > 2.5MB 或 dist/*.map → fail(逃生门:commit 加 BLOB-EXEMPT: <path>)
+              run: |
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    python scripts/check_blob_size.py --base origin/${{ github.base_ref }} --head HEAD
+                  else
+                    python scripts/check_blob_size.py
+                  fi
 
-      - name: 缓存破机械闸 · 产物变则源 HTML ?v= 必 bump(2026-07-10 事故固化 · FAIL 模式)
-        # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            python scripts/check_cachebust.py --base origin/${{ github.base_ref }} --head HEAD
-          else
-            python scripts/check_cachebust.py
-          fi
+            - name: 缓存破机械闸 · 产物变则源 HTML ?v= 必 bump(2026-07-10 事故固化 · FAIL 模式)
+              # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
+              run: |
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    python scripts/check_cachebust.py --base origin/${{ github.base_ref }} --head HEAD
+                  else
+                    python scripts/check_cachebust.py
+                  fi
 
-  # 使用教程内容闸(2026-07-26 从 lint-size 里挪出来独立成 job)
-  #   教程正文是纯数据,没有编译期检查:漏一段泰文、少一张泰文图、一章写到三屏,页面照样
-  #   渲染,只有泰籍会计打开时才发现看的是中文、图是空的。
-  #   独立成 job 的理由:查的是【内容完整性】,与 lint-size 的【防大文件/blob/缓存破】不是
-  #   一个轴 —— 挂在那里会让教程笔误在 PR 检查列表里显示成 "anti-bigfile" 失败,误导定位。
-  #   闸本身的覆盖率测试在 tests/unit/test_guide_gate.py(坏数据反证「闸真的在看」)。
-  lint-guide:
-    name: lint-guide (教程内容完整性 · 配图/双语/一屏 · FAIL mode)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 使用教程内容闸(2026-07-26 从 lint-size 里挪出来独立成 job)
+    #   教程正文是纯数据,没有编译期检查:漏一段泰文、少一张泰文图、一章写到三屏,页面照样
+    #   渲染,只有泰籍会计打开时才发现看的是中文、图是空的。
+    #   独立成 job 的理由:查的是【内容完整性】,与 lint-size 的【防大文件/blob/缓存破】不是
+    #   一个轴 —— 挂在那里会让教程笔误在 PR 检查列表里显示成 "anti-bigfile" 失败,误导定位。
+    #   闸本身的覆盖率测试在 tests/unit/test_guide_gate.py(坏数据反证「闸真的在看」)。
+    lint-guide:
+        name: lint-guide (教程内容完整性 · 配图/双语/一屏 · FAIL mode)
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
 
-      # 零依赖(只用标准库)· 任何环境跑得动
+            # 零依赖(只用标准库)· 任何环境跑得动
 
-      - name: 使用教程内容闸 · 配图两套齐 / 中泰双语齐 / 一章一屏
-        run: python scripts/check_guide.py
+            - name: 使用教程内容闸 · 配图两套齐 / 中泰双语齐 / 一章一屏
+              run: python scripts/check_guide.py
+              env:
+                  PYTHONIOENCODING: utf-8
+
+    # REFACTOR-WC · UI 一致性闸(审计发现 #2:check_ui_consistency 没接 CI · 1787 违规无人棘轮)
+    #   棘轮:违规总数 > BASELINE_TOTAL(脚本内)→ 非零退出。
+    #   FAIL 模式(2026-06-05 Zihao 拍板切硬门 · 见下方 job 注释)· UI 一致性反弹超基线 → CI 当场报红挡合并。
+    #   注:存量 B 类 legacy 视觉清理(把 baseline 继续往下棘轮)仍 Zihao-gated · 见 docs/ui/THEME_FOLLOWUP_BACKLOG.md #6。
+    lint-ui:
+        name: lint-ui (UI 一致性 + 弹窗/按钮硬规 · FAIL mode)
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        # FAIL 模式(2026-06-05 Zihao 拍板切硬门)· check_ui_consistency 非零 → CI 红挡合并:
+        #   D1 禁新增抽屉(.drawer · 新 UI 用 .modal)· D2 按钮/切换黑底=0(只导航栏可黑)· 存量违规棘轮基线 480。
+        #   与 pre-push 同闸 · 双层兜底(防 --no-verify 绕过)。
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+
+            # 零依赖(只用标准库)
+
+            - name: UI 一致性棘轮 · 违规不许反弹超基线(审计 #2)
+              run: python scripts/check_ui_consistency.py
+
+            # 暗夜模式 + 移动端兜底棘轮(2026-06-15)· 暗夜不翻面的写死色(3位hex/white·black/
+            # 不透明rgb)各类只许降不许升 + 入口页 viewport 必须在 · 基线 scripts/theme_responsive_baseline.json
+            - name: 暗夜/移动端棘轮(--gate · FAIL mode)
+              run: python scripts/check_theme_responsive.py --gate
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+
+            # 设计 lint 棘轮(2026-06-10 punch list 收官)· 旧蓝/emoji图标/自曝文案等
+            # 各类命中只许降不许升 · 基线 scripts/ui_lint_baseline.json · 与 pre-push 同闸双层兜底
+            - name: UI 设计 lint 棘轮(--gate · FAIL mode)
+              run: node scripts/ui_design_lint.mjs --gate
+
+    # REFACTOR-WC · 新债 diff 闸(封死铁律 #5/#17 · 审计发现「纸面规矩没机械执行」)
+    #   #5  db.py/services/** 不许新增 def ensure_*  (运行期建表反模式 · schema 只走 alembic)
+    #   #17 app.py 不许新增 @app.<verb> 路由         (路由必落 *_routes.py · 防巨石回潮)
+    # 只看本次 diff 的【新增行】· 命中即 fail · commit 加 NEW-DEBT-EXEMPT 透明豁免。
+    # 与 lint-size 不同:此闸 fail 模式(当前 HEAD 干净 · 不会误红存量)· push 只需最近 2 commit。
+    lint-debt:
+        name: lint-debt (REFACTOR-WC · new-debt diff gate · FAIL mode)
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+
+        steps:
+            - name: Checkout (PR 全历史 / push 最近 2 commit)
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '2' }}
+
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+
+            # 零依赖(只用标准库)· 任何环境跑得动
+
+            - name: 新债 diff 闸 · 禁新增 ensure_*/巨石路由(铁律 #5/#17)
+              # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
+              run: |
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    python scripts/check_new_debt.py --base origin/${{ github.base_ref }} --head HEAD
+                  else
+                    python scripts/check_new_debt.py
+                  fi
+
+    # REFACTOR-WC · 新路由契约软闸(审计 #4 · 铁律 #27.3/#28问3「新功能必带测试」)
+    #   只看本次 diff 【新增】的 *_routes.py · 缺配套 tests/unit/test_*_contract.py → 非零退出。
+    #   软闸:warning 模式(continue-on-error)· 只盯新增不误伤存量 · commit 加 ROUTES-CONTRACT-EXEMPT 豁免。
+    lint-routes:
+        name: lint-routes (REFACTOR-WC · new-route needs contract test · WARNING mode)
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        # ⚠️ 软闸 · 红但不挡 push · 团队稳定遵守后可改 false(fail 模式)
+        continue-on-error: true
+
+        steps:
+            - name: Checkout (PR 全历史 / push 最近 2 commit)
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '2' }}
+
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+
+            # 零依赖(只用标准库)
+
+            - name: 新路由契约软闸 · 新增 *_routes.py 必带契约测试(审计 #4)
+              # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
+              run: |
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    python scripts/check_new_routes_contract.py --base origin/${{ github.base_ref }} --head HEAD
+                  else
+                    python scripts/check_new_routes_contract.py
+                  fi
+
+    # Pearnly Agent · 能力防漏闸(2026-06-30 建 · 2026-07-02 切 FAIL 硬门)
+    #   从 routes/*.py 机械扒全部 API 入口 · 对照 docs/agent/agent_registry.json 的 A/B/C/D 分类。
+    #   新增路由文件未登记(=忘了决定进不进 Agent)→ 脚本非零 → 红,杜绝"漏接最后才发现"。
+    #   第二道核对:A 档功能区必须声明接法(tool:<名> / exempt:<原因>),防"已分 A 没人接"假覆盖。
+    lint-agent:
+        name: lint-agent (Agent 能力登记完整性 + A 档接法声明 · FAIL mode)
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+
+            # 零依赖(只用标准库)· 任何环境跑得动
+
+            - name: Agent 能力防漏闸 · 每个 routes/*.py 必在 agent_registry.json 分类
+              run: python scripts/agent_capability_audit.py
+
+    # 代码质量 Canon · 闸-Q4 · 换大脑不写死(依赖倒置 CQ-1 · 2026-07-08)
+    #   业务逻辑(services/routes/core)禁硬编码模型名(claude-*/gemini-N/gpt-N)· 模型名只许在
+    #   ai_gateway / gemini_models / cost / engine_policy(合法归属地)· 换大脑=改一处不改一堆。
+    #   WARN 模式(continue-on-error · 存量 4 处待清)· 清完后脚本挂 --fail 切硬门。见 docs/CODE_QUALITY_CANON.md。
+    lint-model:
+        name: lint-model (换大脑不写死 · WARN mode)
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        continue-on-error: true
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+
+            # 零依赖(只用标准库)
+
+            - name: 闸-Q4 · 业务逻辑禁硬编码模型名(依赖倒置 · 见 CODE_QUALITY_CANON.md)
+              run: python scripts/check_no_hardcoded_model.py
+
+    # 真库冒烟闸(2026-07-31 · 交接单 §二.7 拍板加 Postgres 服务)
+    #   mock 单测只能钉「SQL 字符串长这样」,钉不住方言、精度、锁、RLS —— 本仓踩过的坑。
+    #   这道闸给一台空 Postgres,让 tests/unit/test_*_pg_smoke.py 在上面真跑:
+    #     · steward 成本台账:numeric(12,6) 精度 / pg_advisory_xact_lock 真串行 / RLS 真隔离
+    #     · 桥任务信箱:make_interval(CASE WHEN) 等方言与按 kind 的租约/超龄语义
+    #   独立成 job 而不是塞进 test:DB 起不来时红的是这一条,不连坐 11000 条单测;
+    #   也不设 DATABASE_URL / PEARNLY_INTEGRATION_DB —— 那会把 tests/integration 那 70 份
+    #   从没在 CI 跑过的用例一起拉进来,是另一次拍板。
+    #   skip 即红:连不上库时用例会 clean skip,那正是「闸报绿≠闸看过」的形态,下面显式拦掉。
+    pg-smoke:
+        name: pg-smoke (真 Postgres · 台账精度/串行/RLS · FAIL mode)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+
+        services:
+            postgres:
+                image: postgres:16-alpine
+                env:
+                    POSTGRES_USER: pearnly
+                    POSTGRES_PASSWORD: pearnly_local_dev
+                    POSTGRES_DB: pearnly
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U pearnly -d pearnly"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 10
+
         env:
-          PYTHONIOENCODING: utf-8
+            PYTHONUNBUFFERED: '1'
+            PYTHONIOENCODING: utf-8
+            # 与 docker-compose.yml 的本地 DSN 同款;测试只认这个 env,绝不回落 DATABASE_URL。
+            PEARNLY_PG_SMOKE_URL: postgresql://pearnly:pearnly_local_dev@127.0.0.1:5432/pearnly
 
-  # REFACTOR-WC · UI 一致性闸(审计发现 #2:check_ui_consistency 没接 CI · 1787 违规无人棘轮)
-  #   棘轮:违规总数 > BASELINE_TOTAL(脚本内)→ 非零退出。
-  #   FAIL 模式(2026-06-05 Zihao 拍板切硬门 · 见下方 job 注释)· UI 一致性反弹超基线 → CI 当场报红挡合并。
-  #   注:存量 B 类 legacy 视觉清理(把 baseline 继续往下棘轮)仍 Zihao-gated · 见 docs/ui/THEME_FOLLOWUP_BACKLOG.md #6。
-  lint-ui:
-    name: lint-ui (UI 一致性 + 弹窗/按钮硬规 · FAIL mode)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # FAIL 模式(2026-06-05 Zihao 拍板切硬门)· check_ui_consistency 非零 → CI 红挡合并:
-    #   D1 禁新增抽屉(.drawer · 新 UI 用 .modal)· D2 按钮/切换黑底=0(只导航栏可黑)· 存量违规棘轮基线 480。
-    #   与 pre-push 同闸 · 双层兜底(防 --no-verify 绕过)。
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+                  cache: pip
+                  cache-dependency-path: requirements.lock.txt
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.lock.txt
 
-      # 零依赖(只用标准库)
+            - name: 真库冒烟 · tests/unit/test_*_pg_smoke.py(skip 也算红)
+              run: |
+                  python - <<'PY'
+                  import sys, unittest
 
-      - name: UI 一致性棘轮 · 违规不许反弹超基线(审计 #2)
-        run: python scripts/check_ui_consistency.py
+                  suite = unittest.defaultTestLoader.discover("tests/unit", pattern="test_*_pg_smoke.py")
+                  result = unittest.TextTestRunner(verbosity=2).run(suite)
+                  if result.skipped:
+                      sys.exit(f"::error::{len(result.skipped)} 条被 skip —— 连不上 Postgres 就等于这道闸没跑")
+                  if result.testsRun == 0:
+                      sys.exit("::error::零条 pg_smoke 用例被发现 —— 命名约定漂了,闸在空跑")
+                  sys.exit(0 if result.wasSuccessful() else 1)
+                  PY
 
-      # 暗夜模式 + 移动端兜底棘轮(2026-06-15)· 暗夜不翻面的写死色(3位hex/white·black/
-      # 不透明rgb)各类只许降不许升 + 入口页 viewport 必须在 · 基线 scripts/theme_responsive_baseline.json
-      - name: 暗夜/移动端棘轮(--gate · FAIL mode)
-        run: python scripts/check_theme_responsive.py --gate
+    # 单元/构建/静态检查 job(2026-08-26 从原单体 test job 拆出 · 与 e2e 并行)
+    #   保留原 test job 的:import 静态检查 / i18n 完整 / authz 覆盖 / 条码枪声明 /
+    #   unit+coverage(--fail-under=40) / Vite build + dist 一致性 / 资产打包清单。
+    #   慢重的 Playwright E2E(原 ~484s)拆到 e2e job —— 两 job 互不阻塞。
+    unit:
+        name: unit (import + i18n + authz + unit + coverage + vite-build)
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      # 设计 lint 棘轮(2026-06-10 punch list 收官)· 旧蓝/emoji图标/自曝文案等
-      # 各类命中只许降不许升 · 基线 scripts/ui_lint_baseline.json · 与 pre-push 同闸双层兜底
-      - name: UI 设计 lint 棘轮(--gate · FAIL mode)
-        run: node scripts/ui_design_lint.mjs --gate
-
-  # REFACTOR-WC · 新债 diff 闸(封死铁律 #5/#17 · 审计发现「纸面规矩没机械执行」)
-  #   #5  db.py/services/** 不许新增 def ensure_*  (运行期建表反模式 · schema 只走 alembic)
-  #   #17 app.py 不许新增 @app.<verb> 路由         (路由必落 *_routes.py · 防巨石回潮)
-  # 只看本次 diff 的【新增行】· 命中即 fail · commit 加 NEW-DEBT-EXEMPT 透明豁免。
-  # 与 lint-size 不同:此闸 fail 模式(当前 HEAD 干净 · 不会误红存量)· push 只需最近 2 commit。
-  lint-debt:
-    name: lint-debt (REFACTOR-WC · new-debt diff gate · FAIL mode)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout (PR 全历史 / push 最近 2 commit)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '2' }}
-
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      # 零依赖(只用标准库)· 任何环境跑得动
-
-      - name: 新债 diff 闸 · 禁新增 ensure_*/巨石路由(铁律 #5/#17)
-        # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            python scripts/check_new_debt.py --base origin/${{ github.base_ref }} --head HEAD
-          else
-            python scripts/check_new_debt.py
-          fi
-
-  # REFACTOR-WC · 新路由契约软闸(审计 #4 · 铁律 #27.3/#28问3「新功能必带测试」)
-  #   只看本次 diff 【新增】的 *_routes.py · 缺配套 tests/unit/test_*_contract.py → 非零退出。
-  #   软闸:warning 模式(continue-on-error)· 只盯新增不误伤存量 · commit 加 ROUTES-CONTRACT-EXEMPT 豁免。
-  lint-routes:
-    name: lint-routes (REFACTOR-WC · new-route needs contract test · WARNING mode)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # ⚠️ 软闸 · 红但不挡 push · 团队稳定遵守后可改 false(fail 模式)
-    continue-on-error: true
-
-    steps:
-      - name: Checkout (PR 全历史 / push 最近 2 commit)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '2' }}
-
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      # 零依赖(只用标准库)
-
-      - name: 新路由契约软闸 · 新增 *_routes.py 必带契约测试(审计 #4)
-        # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            python scripts/check_new_routes_contract.py --base origin/${{ github.base_ref }} --head HEAD
-          else
-            python scripts/check_new_routes_contract.py
-          fi
-
-  # Pearnly Agent · 能力防漏闸(2026-06-30 建 · 2026-07-02 切 FAIL 硬门)
-  #   从 routes/*.py 机械扒全部 API 入口 · 对照 docs/agent/agent_registry.json 的 A/B/C/D 分类。
-  #   新增路由文件未登记(=忘了决定进不进 Agent)→ 脚本非零 → 红,杜绝"漏接最后才发现"。
-  #   第二道核对:A 档功能区必须声明接法(tool:<名> / exempt:<原因>),防"已分 A 没人接"假覆盖。
-  lint-agent:
-    name: lint-agent (Agent 能力登记完整性 + A 档接法声明 · FAIL mode)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      # 零依赖(只用标准库)· 任何环境跑得动
-
-      - name: Agent 能力防漏闸 · 每个 routes/*.py 必在 agent_registry.json 分类
-        run: python scripts/agent_capability_audit.py
-
-  # 代码质量 Canon · 闸-Q4 · 换大脑不写死(依赖倒置 CQ-1 · 2026-07-08)
-  #   业务逻辑(services/routes/core)禁硬编码模型名(claude-*/gemini-N/gpt-N)· 模型名只许在
-  #   ai_gateway / gemini_models / cost / engine_policy(合法归属地)· 换大脑=改一处不改一堆。
-  #   WARN 模式(continue-on-error · 存量 4 处待清)· 清完后脚本挂 --fail 切硬门。见 docs/CODE_QUALITY_CANON.md。
-  lint-model:
-    name: lint-model (换大脑不写死 · WARN mode)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    continue-on-error: true
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      # 零依赖(只用标准库)
-
-      - name: 闸-Q4 · 业务逻辑禁硬编码模型名(依赖倒置 · 见 CODE_QUALITY_CANON.md)
-        run: python scripts/check_no_hardcoded_model.py
-
-  # 真库冒烟闸(2026-07-31 · 交接单 §二.7 拍板加 Postgres 服务)
-  #   mock 单测只能钉「SQL 字符串长这样」,钉不住方言、精度、锁、RLS —— 本仓踩过的坑。
-  #   这道闸给一台空 Postgres,让 tests/unit/test_*_pg_smoke.py 在上面真跑:
-  #     · steward 成本台账:numeric(12,6) 精度 / pg_advisory_xact_lock 真串行 / RLS 真隔离
-  #     · 桥任务信箱:make_interval(CASE WHEN) 等方言与按 kind 的租约/超龄语义
-  #   独立成 job 而不是塞进 test:DB 起不来时红的是这一条,不连坐 11000 条单测;
-  #   也不设 DATABASE_URL / PEARNLY_INTEGRATION_DB —— 那会把 tests/integration 那 70 份
-  #   从没在 CI 跑过的用例一起拉进来,是另一次拍板。
-  #   skip 即红:连不上库时用例会 clean skip,那正是「闸报绿≠闸看过」的形态,下面显式拦掉。
-  pg-smoke:
-    name: pg-smoke (真 Postgres · 台账精度/串行/RLS · FAIL mode)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    services:
-      postgres:
-        image: postgres:16-alpine
         env:
-          POSTGRES_USER: pearnly
-          POSTGRES_PASSWORD: pearnly_local_dev
-          POSTGRES_DB: pearnly
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U pearnly -d pearnly"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+            PYTHONUNBUFFERED: '1'
+            PYTHONDONTWRITEBYTECODE: '1'
 
-    env:
-      PYTHONUNBUFFERED: "1"
-      PYTHONIOENCODING: utf-8
-      # 与 docker-compose.yml 的本地 DSN 同款;测试只认这个 env,绝不回落 DATABASE_URL。
-      PEARNLY_PG_SMOKE_URL: postgresql://pearnly:pearnly_local_dev@127.0.0.1:5432/pearnly
+        steps:
+            # 单测里有一条拿本仓真 git 历史跑的用例(test_line_ratchet_gate.RealRepoStillJudges)——
+            # 默认 depth=1 的 checkout 上 HEAD~1 压根不存在,棘轮只能报「判不了」。那不是闸坏了,
+            # 是这次 checkout 没有可比的基线;基线该由环境给,不该靠把闸改回 fail-open 来绕。
+            - name: Checkout (最近 2 commit · 棘轮真仓用例需要 HEAD~1)
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 2
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+            - name: Setup Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+                  cache: pip
+                  cache-dependency-path: requirements.lock.txt
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: requirements.lock.txt
+            - name: Install dependencies (REFACTOR-A7 · 装 pip-compile 锁好的版本)
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.lock.txt
+                  pip install coverage==7.14.0  # REFACTOR-A8 · 覆盖率工具(dev · 不进 prod lock)
+                  # starlette>=1.3 的 TestClient 依赖 httpx2(测试用 · 对标 coverage · 不进 prod lock)
+                  pip install httpx2==2.4.0
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.lock.txt
+            - name: Static import check
+              run: python scripts/check_imports.py --quiet
 
-      - name: 真库冒烟 · tests/unit/test_*_pg_smoke.py(skip 也算红)
-        run: |
-          python - <<'PY'
-          import sys, unittest
+            - name: i18n completeness check (home.js · zh/en/th/ja)
+              run: python scripts/check_i18n.py --strict --quiet
 
-          suite = unittest.defaultTestLoader.discover("tests/unit", pattern="test_*_pg_smoke.py")
-          result = unittest.TextTestRunner(verbosity=2).run(suite)
-          if result.skipped:
-              sys.exit(f"::error::{len(result.skipped)} 条被 skip —— 连不上 Postgres 就等于这道闸没跑")
-          if result.testsRun == 0:
-              sys.exit("::error::零条 pg_smoke 用例被发现 —— 命名约定漂了,闸在空跑")
-          sys.exit(0 if result.wasSuccessful() else 1)
-          PY
+            # 第 8 道闸(docs/permissions/05)· 2026-07-25 起进 CI:此前它只挂 pre-push,而
+            # core.hooksPath 从没指过 scripts/git-hooks → 这道闸两边都没跑过,谁漏个门都没人拦。
+            # 每条路由必须有可见守门,或登记进 PUBLIC_ROUTES / DELEGATED_ROUTES / SEALED_ROUTES。
+            - name: 路由权限覆盖闸 · 每条路由必有守门或显式登记(FAIL mode)
+              run: python scripts/check_authz_coverage.py --quiet
+              env:
+                  PYTHONIOENCODING: utf-8
 
-  # 单元/构建/静态检查 job(2026-08-26 从原单体 test job 拆出 · 与 e2e 并行)
-  #   保留原 test job 的:import 静态检查 / i18n 完整 / authz 覆盖 / 条码枪声明 /
-  #   unit+coverage(--fail-under=40) / Vite build + dist 一致性 / 资产打包清单。
-  #   慢重的 Playwright E2E(原 ~484s)拆到 e2e job —— 两 job 互不阻塞。
-  unit:
-    name: unit (import + i18n + authz + unit + coverage + vite-build)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+            # 条码枪楔子默认让开输入框,要接枪的框必须写 data-enable-barcode="gun"。裸声明在运行期
+            # 看不出毛病(引擎按最安全那档兜底),但它等于「这个框接不接枪没人明写过」—— 引擎删掉
+            # 第二档之后,四处声明点漏写档位一处都不会红。本闸就是那道没人盯的缝。
+            - name: 条码枪 opt-in 声明闸 · 声明必须带显式档位值
+              run: python scripts/check_scan_optin.py --quiet
+              env:
+                  PYTHONIOENCODING: utf-8
 
-    env:
-      PYTHONUNBUFFERED: "1"
-      PYTHONDONTWRITEBYTECODE: "1"
+            # Node deps must be installed BEFORE unit tests: the *_frontend node
+            # gates (format-date / ui-templates / with-loading) require esbuild to
+            # compile the src/home TS, else they fail with "Cannot find module
+            # 'esbuild'". Build step below reuses this same install.
+            - name: Setup Node 20
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: npm
 
-    steps:
-      # 单测里有一条拿本仓真 git 历史跑的用例(test_line_ratchet_gate.RealRepoStillJudges)——
-      # 默认 depth=1 的 checkout 上 HEAD~1 压根不存在,棘轮只能报「判不了」。那不是闸坏了,
-      # 是这次 checkout 没有可比的基线;基线该由环境给,不该靠把闸改回 fail-open 来绕。
-      - name: Checkout (最近 2 commit · 棘轮真仓用例需要 HEAD~1)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
+            - name: Install Node deps (npm ci · 严格按 lockfile)
+              run: npm ci
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: requirements.lock.txt
+            - name: Run unit tests (under coverage · REFACTOR-A8)
+              run: coverage run -m unittest discover -s tests/unit -p "test_*.py"
 
-      - name: Install dependencies (REFACTOR-A7 · 装 pip-compile 锁好的版本)
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.lock.txt
-          pip install coverage==7.14.0  # REFACTOR-A8 · 覆盖率工具(dev · 不进 prod lock)
-          # starlette>=1.3 的 TestClient 依赖 httpx2(测试用 · 对标 coverage · 不进 prod lock)
-          pip install httpx2==2.4.0
+            - name: Coverage report + ratchet (REFACTOR-A8 · fail_under 只升不降 · WC 显式 CLI 闸)
+              run: |
+                  # REFACTOR-WC · 显式 --fail-under 防 pyproject 配置被删/改后覆盖率闸悄悄失效
+                  # (审计发现:纸面规矩要机械执行 · CLI 标志即便 [tool.coverage.report] 被动也照样拦门)
+                  # 棘轮 21 → 40(本地实测 46.6% · 留 6.6pt 余量 · 只升不降)
+                  coverage report --fail-under=40
+                  coverage xml
 
-      - name: Static import check
-        run: python scripts/check_imports.py --quiet
+            - name: Vite build + 打包一致性闸① (REFACTOR-A1.2/E7 · 防本地 build 产物没提交)
+              run: |
+                  npm run build
+                  # static/dist/main.js 是 A1.1 起的 Vite 产物 · 本地 build 后必须 commit
+                  # CI 这步重 build 一次 · 跑通 = 配置无脏 · 失败 = vite.config.mjs / src/main.js 有问题
+                  test -f static/dist/main.js || { echo "::error::vite build did not produce static/dist/main.js"; exit 1; }
+                  # 闸①打包一致性: CI 重 build 后 dist 必须 == 提交的 · 改前端源忘打包 = 这里红(防 prod 跑旧 bundle)
+                  # 排除 main.js* : vite 产物(上方已 test-f)· sourcemap 含路径/时间戳跨平台 build 有 drift
+                  # 长格式 :(exclude):git 2.54+ 对短 :! 排除不存在的 main.js.map 会 fatal(同 pre-push 7716032e 修)。
+                  git diff --exit-code static/dist/ ':(exclude)static/dist/main.js' ':(exclude)static/dist/main.js.map' \
+                    || { echo "::error::dist 与源的 build 不一致 · 改了前端源但没 git add static/dist · 跑 npm run build 后提交"; exit 1; }
 
-      - name: i18n completeness check (home.js · zh/en/th/ja)
-        run: python scripts/check_i18n.py --strict --quiet
+            - name: 前端打包闸②③ (源页只引 bundle · 资产全在打包清单 · 防 view-source 退化)
+              run: python scripts/check_asset_bundling.py
 
-      # 第 8 道闸(docs/permissions/05)· 2026-07-25 起进 CI:此前它只挂 pre-push,而
-      # core.hooksPath 从没指过 scripts/git-hooks → 这道闸两边都没跑过,谁漏个门都没人拦。
-      # 每条路由必须有可见守门,或登记进 PUBLIC_ROUTES / DELEGATED_ROUTES / SEALED_ROUTES。
-      - name: 路由权限覆盖闸 · 每条路由必有守门或显式登记(FAIL mode)
-        run: python scripts/check_authz_coverage.py --quiet
+    # E2E job(2026-08-26 从原单体 test job 拆出 · 与 unit 并行)
+    #   视觉照搬闸(重 build + chromium)+ Playwright smoke + 高敏 smoke(真账号)。
+    #   specs 里 `python -m http.server`(stdlib 静态服)需要 `python` 命令 —— ubuntu 默认只有
+    #   python3,setup-python 补上它。
+    #   本地规格(ps5_cashier_route 等)spawn `python -m uvicorn app:app` 起真 FastAPI app ——
+    #   app 全量导入依赖 requirements.lock.txt 的应用依赖,所以必须装锁文件(与 unit 同款
+    #   setup-python pip cache)。2026-08-25 拆 job 时只装了 python 没装依赖 → e2e 全红
+    #   ("server not up"),这条就是那道 implicit dependency 的显式化。
+    #   注意:高敏 spec 必须独立进程顺序跑(连跑共用登录会话会互踢)· 凭据缺失 hasCreds() 自动 skip。
+    e2e:
+        name: e2e (visual fidelity + playwright smoke + 高敏 smoke)
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+
         env:
-          PYTHONIOENCODING: utf-8
+            PYTHONUNBUFFERED: '1'
 
-      # 条码枪楔子默认让开输入框,要接枪的框必须写 data-enable-barcode="gun"。裸声明在运行期
-      # 看不出毛病(引擎按最安全那档兜底),但它等于「这个框接不接枪没人明写过」—— 引擎删掉
-      # 第二档之后,四处声明点漏写档位一处都不会红。本闸就是那道没人盯的缝。
-      - name: 条码枪 opt-in 声明闸 · 声明必须带显式档位值
-        run: python scripts/check_scan_optin.py --quiet
-        env:
-          PYTHONIOENCODING: utf-8
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      # Node deps must be installed BEFORE unit tests: the *_frontend node
-      # gates (format-date / ui-templates / with-loading) require esbuild to
-      # compile the src/home TS, else they fail with "Cannot find module
-      # 'esbuild'". Build step below reuses this same install.
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
+            - name: Setup Python 3.11 (specs 起 stdlib http.server / uvicorn app:app 用)
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+                  cache: pip
+                  cache-dependency-path: requirements.lock.txt
 
-      - name: Install Node deps (npm ci · 严格按 lockfile)
-        run: npm ci
+            - name: Install dependencies (锁文件 · 本地 spec 的 uvicorn app:app 全量导入需要)
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.lock.txt
 
-      - name: Run unit tests (under coverage · REFACTOR-A8)
-        run: coverage run -m unittest discover -s tests/unit -p "test_*.py"
+            - name: Setup Node 20
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: npm
 
-      - name: Coverage report + ratchet (REFACTOR-A8 · fail_under 只升不降 · WC 显式 CLI 闸)
-        run: |
-          # REFACTOR-WC · 显式 --fail-under 防 pyproject 配置被删/改后覆盖率闸悄悄失效
-          # (审计发现:纸面规矩要机械执行 · CLI 标志即便 [tool.coverage.report] 被动也照样拦门)
-          # 棘轮 21 → 40(本地实测 46.6% · 留 6.6pt 余量 · 只升不降)
-          coverage report --fail-under=40
-          coverage xml
+            - name: Install Node deps (npm ci · 严格按 lockfile)
+              run: npm ci
 
-      - name: Vite build + 打包一致性闸① (REFACTOR-A1.2/E7 · 防本地 build 产物没提交)
-        run: |
-          npm run build
-          # static/dist/main.js 是 A1.1 起的 Vite 产物 · 本地 build 后必须 commit
-          # CI 这步重 build 一次 · 跑通 = 配置无脏 · 失败 = vite.config.mjs / src/main.js 有问题
-          test -f static/dist/main.js || { echo "::error::vite build did not produce static/dist/main.js"; exit 1; }
-          # 闸①打包一致性: CI 重 build 后 dist 必须 == 提交的 · 改前端源忘打包 = 这里红(防 prod 跑旧 bundle)
-          # 排除 main.js* : vite 产物(上方已 test-f)· sourcemap 含路径/时间戳跨平台 build 有 drift
-          # 长格式 :(exclude):git 2.54+ 对短 :! 排除不存在的 main.js.map 会 fatal(同 pre-push 7716032e 修)。
-          git diff --exit-code static/dist/ ':(exclude)static/dist/main.js' ':(exclude)static/dist/main.js.map' \
-            || { echo "::error::dist 与源的 build 不一致 · 改了前端源但没 git add static/dist · 跑 npm run build 后提交"; exit 1; }
+            - name: Vite build (视觉照搬闸渲染本地 dist 真 bundle)
+              run: npm run build
 
-      - name: 前端打包闸②③ (源页只引 bundle · 资产全在打包清单 · 防 view-source 退化)
-        run: python scripts/check_asset_bundling.py
+            - name: Cache Playwright browsers
+              id: playwright-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-all-browsers-v1-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-  # E2E job(2026-08-26 从原单体 test job 拆出 · 与 unit 并行)
-  #   视觉照搬闸(重 build + chromium)+ Playwright smoke + 高敏 smoke(真账号)。
-  #   specs 里 `python -m http.server`(stdlib 静态服)需要 `python` 命令 —— ubuntu 默认只有
-  #   python3,setup-python 补上它。
-  #   本地规格(ps5_cashier_route 等)spawn `python -m uvicorn app:app` 起真 FastAPI app ——
-  #   app 全量导入依赖 requirements.lock.txt 的应用依赖,所以必须装锁文件(与 unit 同款
-  #   setup-python pip cache)。2026-08-25 拆 job 时只装了 python 没装依赖 → e2e 全红
-  #   ("server not up"),这条就是那道 implicit dependency 的显式化。
-  #   注意:高敏 spec 必须独立进程顺序跑(连跑共用登录会话会互踢)· 凭据缺失 hasCreds() 自动 skip。
-  e2e:
-    name: e2e (visual fidelity + playwright smoke + 高敏 smoke)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+            - name: Install Playwright browsers
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              run: npx playwright install chromium webkit firefox
 
-    env:
-      PYTHONUNBUFFERED: "1"
+            - name: Install Playwright system deps
+              run: npx playwright install-deps chromium webkit firefox
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+            # 视觉照搬闸 + 基准过期检测 · 2026-07-31 起进 CI(此前只挂 pre-push)。
+            # 触发面本来只有 static/pos/ · src/home/{pos,inventory,purchase}- · tests/visual/design/,
+            # 而它的 MAPPINGS 管着 dashboard/history/clients/sales-report/acct-* 等 20 条 route ——
+            # dashboard 那条选择器 6-28 就烂了,直到有人碰巧改 purchase-settings.ts 才撞出来,三周零报警。
+            # 无条件跑(复用上面的 npm run build 与 Playwright 浏览器 · 本机实测 21 秒)。
+            - name: 视觉照搬闸 · 关键令牌全等设计稿 + 基准不过期(FAIL mode)
+              run: node tests/visual/test_design_fidelity.spec.js
 
-      - name: Setup Python 3.11 (specs 起 stdlib http.server / uvicorn app:app 用)
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: requirements.lock.txt
+            - name: E2E smoke (Playwright · pearnly.com)
+              run: npx playwright test
+              env:
+                  PEARNLY_E2E_BASE_URL: https://pearnly.com
 
-      - name: Install dependencies (锁文件 · 本地 spec 的 uvicorn app:app 全量导入需要)
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.lock.txt
+            # 高敏 E2E · 2026-08-11 起带凭据真跑(此前 PEARNLY_E2E_USER 全 .github 无一处,
+            # 20+ 个高敏 spec 从建站起永久 skip,CI 绿 ≠ 覆盖)。只挑三个安全关键且单独跑
+            # 稳绿的 spec;每个独立进程顺序跑——连跑共用登录会话会互踢/撞限流,联跑必 flake
+            # (2026-08-11 实测)。凭据缺失时 hasCreds() 自动 skip,不红。
+            - name: E2E 高敏 smoke (计费安全 / RLS 隔离 / 入口令牌隔离 · 真账号)
+              run: |
+                  npx playwright test tests/e2e/11-billing-security.spec.js
+                  npx playwright test tests/e2e/12-rls-isolation.spec.js
+                  npx playwright test tests/e2e/26-entrance-token-isolation.spec.js
+              env:
+                  PEARNLY_E2E_BASE_URL: https://pearnly.com
+                  PEARNLY_E2E_USER: ${{ secrets.PEARNLY_E2E_USER }}
+                  PEARNLY_E2E_PASS: ${{ secrets.PEARNLY_E2E_PASS }}
 
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-
-      - name: Install Node deps (npm ci · 严格按 lockfile)
-        run: npm ci
-
-      - name: Vite build (视觉照搬闸渲染本地 dist 真 bundle)
-        run: npm run build
-
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-all-browsers-v1-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install chromium webkit firefox
-
-      - name: Install Playwright system deps
-        run: npx playwright install-deps chromium webkit firefox
-
-      # 视觉照搬闸 + 基准过期检测 · 2026-07-31 起进 CI(此前只挂 pre-push)。
-      # 触发面本来只有 static/pos/ · src/home/{pos,inventory,purchase}- · tests/visual/design/,
-      # 而它的 MAPPINGS 管着 dashboard/history/clients/sales-report/acct-* 等 20 条 route ——
-      # dashboard 那条选择器 6-28 就烂了,直到有人碰巧改 purchase-settings.ts 才撞出来,三周零报警。
-      # 无条件跑(复用上面的 npm run build 与 Playwright 浏览器 · 本机实测 21 秒)。
-      - name: 视觉照搬闸 · 关键令牌全等设计稿 + 基准不过期(FAIL mode)
-        run: node tests/visual/test_design_fidelity.spec.js
-
-      - name: E2E smoke (Playwright · pearnly.com)
-        run: npx playwright test
-        env:
-          PEARNLY_E2E_BASE_URL: https://pearnly.com
-
-      # 高敏 E2E · 2026-08-11 起带凭据真跑(此前 PEARNLY_E2E_USER 全 .github 无一处,
-      # 20+ 个高敏 spec 从建站起永久 skip,CI 绿 ≠ 覆盖)。只挑三个安全关键且单独跑
-      # 稳绿的 spec;每个独立进程顺序跑——连跑共用登录会话会互踢/撞限流,联跑必 flake
-      # (2026-08-11 实测)。凭据缺失时 hasCreds() 自动 skip,不红。
-      - name: E2E 高敏 smoke (计费安全 / RLS 隔离 / 入口令牌隔离 · 真账号)
-        run: |
-          npx playwright test tests/e2e/11-billing-security.spec.js
-          npx playwright test tests/e2e/12-rls-isolation.spec.js
-          npx playwright test tests/e2e/26-entrance-token-isolation.spec.js
-        env:
-          PEARNLY_E2E_BASE_URL: https://pearnly.com
-          PEARNLY_E2E_USER: ${{ secrets.PEARNLY_E2E_USER }}
-          PEARNLY_E2E_PASS: ${{ secrets.PEARNLY_E2E_PASS }}
-
-      - name: Upload Playwright report on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
-          if-no-files-found: ignore
-
-  # 精确部署 job(2026-08-26) · 只跑 push 到 refs/heads/master。
-  #   需要全部 FAIL 模式闸 + unit/e2e/pg-smoke 全绿才触发;WARN 模式闸(lint-routes /
-  #   lint-model · continue-on-error)不进 needs —— 它们的失败本就不影响成功结论。
-  #   带本次 push 的 40-hex SHA 调 /internal/deploy/manual(DEPLOY_TOKEN = 服务器
-  #   GITHUB_WEBHOOK_SECRET 原值)—— 服务器 flock 串行化、只部署该精确 commit、
-  #   被更新的 push 取代时跳过(见 services/deploy_script.py)。
-  deploy:
-    name: deploy (master push · pinned-SHA manual deploy)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs:
-      - lint
-      - lint-size
-      - lint-ui
-      - lint-guide
-      - lint-debt
-      - lint-agent
-      - pg-smoke
-      - unit
-      - e2e
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    steps:
-      - name: Trigger pinned-SHA manual deploy
-        run: |
-          curl -fsS --max-time 30 \
-            -H "X-Internal-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-            "https://pearnly.com/internal/deploy/manual?sha=${{ github.sha }}"
+            - name: Upload Playwright report on failure
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-report
+                  path: |
+                      playwright-report/
+                      test-results/
+                  retention-days: 7
+                  if-no-files-found: ignore

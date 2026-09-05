@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-05 18:25（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，迁移技术验证通过；旧Vultr已销毁，用户业务验收单列**。
+更新时间：2026-09-05 22:20（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，OCR 重构已发布；旧Vultr已销毁，用户业务验收单列**。
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,9 +27,12 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`674909a0bd51e1a3c76b3656c3ac0449373aba4a`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:d62dee259067a14eeebd7f6aa55858939be21bebb2147d136b0430294e3e07e3`。
-- Web revision：`pearnly-web-674909a0bd51-s1`，100%流量；Worker revision：`pearnly-worker-674909a0bd51-s1`，100%流量。
+- 完整 SHA：`7dc72a7550755d88784f48682854757294bb542e`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:2fd9ffa9f94a2aabbe126789fa418030fe36c67bd7f3b74ede35e54b9d4b25aa`。
+- Web revision：`pearnly-web-7dc72a755075-s2`，100%流量；Worker revision：`pearnly-worker-7dc72a755075-s2`，100%流量。
+- OCR 发布 [33974005122](https://github.com/skin306152-star/pearnly-app/actions/runs/33974005122) 成功，schema execution `pearnly-schema-m6928`、两端候选/正式安装包完整校验通过。正式域名 health/ready 均 200，nonce `ocr_release=7dc72a755075` 的请求日志命中新 Web revision。旧镜像 674909a0 为迁移基线，以下记录保留作历史证据。
+- 22:19:52 Bangkok 原子更新 OCR 策略并写操作审计：invoice=economy（3.1-lite→3.8 LOW）；其余现有 OCR task=enterprise。银行/GL/VAT 扫描件使用冻结 Enterprise 财务适配器；ID、SalesVAT 发票、通用网格保留专用 Schema 使用 3.8；结构化文件保留原生解析。不能将选 A 档解读为每个文件都会收费调用 Document AI。
+- Web/Worker 各自 runtime secret v2 新增 Enterprise 四项配置：项目112074003592、处理器6c7dfffac937fcd9、新加坡、共享9 RPM；代码固定 v2.1.1，不用处理器默认 v1.0。两 SA 新增 Document AI API User，其他运行配置不变。Worker 身份单页合成探针成功；不代表全部业务文件人工验收。详细边界见 [OCR 记录](../ocr-integration-progress-2026-09-05.md)。
 - [成功的 GitHub 发布运行33962463833](https://github.com/skin306152-star/pearnly-app/actions/runs/33962463833)。同镜像schema execution `pearnly-schema-mmsws`于11:11:11 UTC确认完成；Web/Worker候选及正式流量均通过完整安装包校验，18:13 Bangkok完成切流回读。上一已验证版本为85cc56b4（CD33956960191）；它尚有大文件传输限制，不作为当前传输能力基线。
 - 服务地址：`https://pearnly-web-112074003592.asia-southeast1.run.app`；私有 Worker `https://pearnly-worker-112074003592.asia-southeast1.run.app`。
 - 2026-09-05 15:28 左右切流。正式域名 readiness nonce `cutover-20260905-0828` 的 Cloud Run 请求日志确认命中初次接管的 `pearnly-web-c3797e182785-s1`，HTTP 200；www health 也为200。

@@ -24,6 +24,7 @@ from routes.line_erp_routes import router as line_erp_router
 SHELL_ROUTES = [
     "/",
     "/home",
+    "/home?flow=cowork-stocktake&draft=list",
     "/cowork",
     "/erp",
     "/admin/cost",

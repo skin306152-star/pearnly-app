@@ -29,6 +29,9 @@ def migrate() -> None:
         ensure_user_profile_columns()
         ensure_table()
         migrate_queue_schema()
+        from services.stocktake.schema import migrate as migrate_stocktake
+
+        migrate_stocktake()
     finally:
         root.removeHandler(failures)
     if failures.failures:

@@ -23,6 +23,7 @@ import './home/drawer-events.js'; // REFACTOR-C1-home-batch9g1 · 识别抽屉�
 import './home/misc-bindings.js'; // REFACTOR-C1-home-batch9g1 · 杂项绑定(data-upgrade/自定义模板/断网横幅装载)
 import './home/confirm-modals-html.js'; // REFACTOR-WB-C3 · 两个全局确认弹窗 inner 注入(home.html 空壳 · 须在 pearnly-confirm.js/confirm-modal.js 前 · 二者均 on-demand 调用时读·带守卫)
 import './home/pearnly-confirm.js'; // REFACTOR-C1-home-batch9g1 · 全局确认弹窗 window.pearnlyConfirm(从 home.js 抽出)
+import './home/stocktake.js';
 import './home/page-reconcile.js'; // REFACTOR-WB-C3 · 对账中心骨架运行期注入(home.html section 抽出 · 须最前 · 6 模块在其后绑定)
 import './home/page-integrations.js'; // REFACTOR-WB-C3 · 集成页骨架运行期注入(home.html section 抽出 · 早于 erp-integration 等模块)
 import './home/page-push-logs.js'; // 推送日志独立页骨架注入(2026-07-01 · 从集成页 Tab2 抽出 · 早于 erp-integration 绑定)

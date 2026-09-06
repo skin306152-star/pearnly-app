@@ -28,10 +28,6 @@
       "why": "OCR 重构只改共享后台缓存键与 OCR 文案，未改 ERP 邀请行为；OCR 页中泰语真实浏览器已验证，按用户要求不扩大到邀请测试；2026-09-05 开发工具清理仅替换脚本第3行的文档链接；对比 ab6bec3e 与候选，除整行注释外逐字一致，未重跑真实 ERP 邀请。若脚本行为变化须重验。",
       "until": "2026-09-05"
     },
-    "_erp_cowork_split_verify.cjs": {
-      "why": "本批只改 POS 与库存扫码，ERP/Cowork 入口未受影响；当前未启本地 8765 应用",
-      "until": "2026-09-04"
-    },
     "_hostile_scan_cam_verify.cjs": {
       "why": "本批只改商品名呈现与成交快照，扫码引擎未改；候选版本的销售扫码与相机验收已通过",
       "until": "2026-09-04"
@@ -66,6 +62,22 @@
     }
   },
   "scripts": {
+    "_stocktake_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/stocktake",
+      "covers": [
+        "src/home/stocktake.ts",
+        "static/stocktake/ui.js",
+        "static/stocktake/mobile.js",
+        "static/stocktake/mobile.html",
+        "static/stocktake/stocktake.css"
+      ],
+      "fixtures": ["venv/bin/python scripts/_scan_ean_y4m.py /tmp/stocktake-camera.y4m"],
+      "only_e2e": [
+        "真实 cowork 壳首次深链、对账下方导航、新建弹窗居中和手机布局只能由浏览器布局验证",
+        "真实共享 POS 引擎读取 EAN 视频并自动关闭摄像头；权限拒绝后保留手输，需要真实媒体与 DOM 生命周期",
+        "手机 LINE 入口和桌面请求携带各自凭证与公司头，保存零数量、冲突保留输入、结束锁定及中泰切换在真实事件链验证；LINE SDK 为桩，不代表真机验收"
+      ]
+    },
     "_pos_vat_summary_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_vat_summary",
       "covers": ["src/home/sales-report.ts", "static/home-43-pos-report.css"],

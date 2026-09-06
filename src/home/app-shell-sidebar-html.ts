@@ -73,6 +73,10 @@ export const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-reconcile">对账中心</span>
             </div>
+            <div class="nav-item nav-sub-item" data-route="stocktake" data-module="recon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4zM8 9h8M8 14h5"/></svg>
+                <span class="nav-label" data-i18n="st-title">库存盘点</span>
+            </div>
         </div>
     </div>
 

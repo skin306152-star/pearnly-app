@@ -29,6 +29,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 认不出来的误报 —— 闸自己不准比没有闸更坏(逼人怀疑真报警)。加门的判据 = 那个函数
 # 内部真的做"登录 + 权限 + 租户/账套归属",不是名字像。
 GATE_NAMES = [
+    # Cowork stocktake: web permission or bound LINE identity, plus workspace scope.
+    (
+        "stocktake_gate",
+        ("stocktake_access.scope_for", "stocktake_access.authorize", "stocktake_access.workspaces"),
+    ),
     (
         "require_perm",
         ("require_perm", "require_perm_pos", "require_perm_tid", "require_perm_pos_tid"),

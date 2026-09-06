@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 from urllib.parse import urlencode
 
@@ -76,6 +77,25 @@ def menu_card(lang: str = "th") -> dict[str, Any]:
         copy["start_desc"],
         action,
     )
+    liff_id = os.getenv("LINE_COWORK_LIFF_ID") or os.getenv("LINE_LIFF_ID", "")
+    stocktake_title = {"th": "ตรวจนับสต็อก", "en": "Stocktake", "zh": "库存盘点", "ja": "棚卸"}[
+        _language(lang)
+    ]
+    stocktake_row = (
+        menu_item(
+            "2",
+            "menu-3",
+            THEME_BLUE,
+            stocktake_title,
+            stocktake_title,
+            {
+                "type": "uri",
+                "uri": f"https://liff.line.me/{liff_id}?flow=cowork-stocktake&draft=list",
+            },
+        )
+        if liff_id
+        else None
+    )
     return {
         "type": "flex",
         "altText": copy["alt"],
@@ -119,6 +139,7 @@ def menu_card(lang: str = "th") -> dict[str, Any]:
                     },
                     {"type": "separator", "color": "#ECEAF0", "margin": "lg"},
                     row,
+                    *([stocktake_row] if stocktake_row else []),
                     {
                         "type": "text",
                         "text": copy["hint"],

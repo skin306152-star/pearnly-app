@@ -35,6 +35,7 @@ from routes.clients_routes import router as clients_router
 from routes.companion_installer_routes import router as companion_installer_router
 from routes.cowork_line_binding_routes import router as cowork_line_binding_router
 from routes.cowork_line_intake_routes import router as cowork_line_intake_router
+from routes.stocktake_routes import router as stocktake_router
 from routes.cowork_line_webhook_routes import router as cowork_line_webhook_router
 from routes.dms_roster_routes import router as dms_roster_router
 from routes.dms_routes import router as dms_router
@@ -186,6 +187,7 @@ ROUTERS = (
     me_router,
     cowork_line_binding_router,
     cowork_line_intake_router,
+    stocktake_router,
     cowork_line_webhook_router,
     erp_router,  # ERP 推送
     erp_team_router,  # ERP 业主邀请采购/销售成员

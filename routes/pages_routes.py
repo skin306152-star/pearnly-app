@@ -178,6 +178,7 @@ def _line_intake_shell(liff_state: str, flow: str, draft: str) -> FileResponse |
         return None
     shells = {
         "cowork-intake": "static/dist/cowork-line-intake.html",
+        "cowork-stocktake": "static/dist/stocktake-mobile.html",
         "erp-intake": "static/dist/erp-line-intake.html",
     }
     path = shells.get(selected_flow)

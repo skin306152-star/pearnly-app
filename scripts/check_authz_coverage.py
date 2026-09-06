@@ -21,6 +21,8 @@ from scripts.authz_route_inventory import collect_routes  # noqa: E402
 
 # 真公开面:每条必须带"为何公开"注释。新增公开路由必须在这里登记。
 PUBLIC_ROUTES = {
+    # LINE ID token verified against the existing Cowork channel and active membership.
+    ("POST", "/api/cowork/stocktakes/line/auth"),
     # 页面服务(SPA 外壳,鉴权在前端 boot + 后端 API)
     ("GET", "/"),
     ("GET", "/login"),

@@ -1,0 +1,160 @@
+.stocktake {
+  color: var(--ink);
+  padding: 20px;
+  max-width: 1440px;
+  margin: auto;
+}
+.stocktake h1 {
+  font-size: 24px;
+  margin: 0;
+}
+.st-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+}
+.stocktake input,
+.stocktake select {
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  max-width: 100%;
+}
+.stocktake label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.stocktake button {
+  cursor: pointer;
+  min-height: 44px;
+}
+.stocktake button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.stocktake progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.st-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.st-card {
+  display: grid;
+  gap: 12px;
+  text-align: start;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  font: inherit;
+}
+.st-table {
+  overflow-x: auto;
+}
+.st-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.st-table th,
+.st-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: start;
+}
+.st-table th {
+  color: var(--ink2);
+  white-space: nowrap;
+}
+.st-count {
+  max-width: 520px;
+  margin: 16px 0;
+}
+dialog.st-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  animation: none;
+  transform: none;
+  opacity: 1;
+  width: min(480px, 90vw);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+}
+.st-dialog[open] {
+  display: block;
+}
+.st-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+.st-camera:not(:empty) {
+  position: relative;
+  max-width: 540px;
+  height: 280px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.st-camera video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.stocktake [data-message] {
+  color: var(--ink2);
+  white-space: pre-line;
+}
+@media (max-width: 640px) {
+  .stocktake {
+    padding: 12px;
+  }
+  .st-table thead {
+    display: none;
+  }
+  .st-table tr {
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin: 12px 0;
+    padding: 8px;
+    background: var(--card);
+  }
+  .st-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    border: 0;
+    padding: 6px;
+    overflow-wrap: anywhere;
+  }
+  .st-table td::before {
+    content: attr(data-label);
+    color: var(--ink2);
+    flex-shrink: 0;
+  }
+  .st-table td:last-child {
+    justify-content: end;
+  }
+  .stocktake [data-query] {
+    flex: 1;
+    min-width: 160px;
+  }
+}
+
+.stocktake [hidden] {
+  display: none;
+}

@@ -45,4 +45,4 @@ LINE 在现有 Cowork 菜单卡「上传单据到 ERP」之后增加「库存盘
 - `scripts/_stocktake_verify.cjs` 在本地真实页面路由和生产构建产物中验证首次深链、导航位置、新建弹窗、筛选、冲突输入保留、零数量、结束、导出、中泰语言、手机布局、真实 EAN 视频解码、相机释放及拒绝权限回落。业务 API 与 LINE SDK 在浏览器测试中使用桩；后端 SQL 和 HTTP 由独立 PostgreSQL 用例验证。
 - 浏览器截图在 `tests/e2e/_artifacts/stocktake/`。扫码视频用 `venv/bin/python scripts/_scan_ean_y4m.py /tmp/stocktake-camera.y4m` 生成。
 
-代码包含 `0123_cowork_stocktake` 迁移，以及现有 Cloud Run 串行 schema job 的接入。本次没有执行线上迁移、推送或部署。发布时应遵循现有 Cloud Run 流程。LINE iOS／Android 真机相机与实际成员登录验收仍待发布后完成。
+代码包含 `0123_cowork_stocktake` 迁移，以及现有 Cloud Run 串行 schema job 的接入。已于 2026-09-06 合并到 master 并按 Cloud Run 流程发布：SHA `ea1d3e1607ccae3e05ab6a4ba60c20e0ee70dbed`，CD [34018589884](https://github.com/skin306152-star/pearnly-app/actions/runs/34018589884)，schema execution `pearnly-schema-sxww8` 成功。Web／Worker 新 revision 各承接 100% 流量，正式域名健康／就绪与手机资源精确字节回读通过。完整 pre-push 1156 个测试模块及静态闸通过；首次检查发现手机缓存依赖清单漏项，已补齐并重新通过。LINE iOS／Android 真机相机、实际成员登录和真实业务验收由用户自行进行，尚未记为通过。完整上线身份见 [部署账本](../deployment/MIGRATION_STATUS.md)。

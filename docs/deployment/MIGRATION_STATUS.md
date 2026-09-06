@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-05 22:20（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，OCR 重构已发布；旧Vultr已销毁，用户业务验收单列**。
+更新时间：2026-09-06 14:22（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，Cowork 库存盘点已发布；用户自行进行业务与真机验收**。
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,10 +27,11 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`7dc72a7550755d88784f48682854757294bb542e`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:2fd9ffa9f94a2aabbe126789fa418030fe36c67bd7f3b74ede35e54b9d4b25aa`。
-- Web revision：`pearnly-web-7dc72a755075-s2`，100%流量；Worker revision：`pearnly-worker-7dc72a755075-s2`，100%流量。
-- OCR 发布 [33974005122](https://github.com/skin306152-star/pearnly-app/actions/runs/33974005122) 成功，schema execution `pearnly-schema-m6928`、两端候选/正式安装包完整校验通过。正式域名 health/ready 均 200，nonce `ocr_release=7dc72a755075` 的请求日志命中新 Web revision。旧镜像 674909a0 为迁移基线，以下记录保留作历史证据。
+- 完整 SHA：`ea1d3e1607ccae3e05ab6a4ba60c20e0ee70dbed`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:fb9150f1f997e65e01be79cc13d2a43e63cde37133c1d4ad80523b7927baffa4`。
+- Web revision：`pearnly-web-ea1d3e1607cc-s2`，100%流量；Worker revision：`pearnly-worker-ea1d3e1607cc-s2`，100%流量。
+- 盘点发布 [34018589884](https://github.com/skin306152-star/pearnly-app/actions/runs/34018589884) 成功；schema execution `pearnly-schema-sxww8` 成功，两端候选与正式服务的健康、就绪、精确 SHA/镜像及安装包完整下载校验通过。正式域名 health/ready 200，`stocktake_release=ea1d3e1607cc` 请求日志命中新 Web revision；手机入口壳、mobile.js、ui.js 与本地发布字节一致。本地 pre-push 1156 个测试模块及静态闸通过。网页入口 `/cowork#/stocktake`，LINE 沿用现有 Cowork 菜单；实际成员登录、真实业务与 iOS/Android 相机验收由用户自行进行，见 [盘点记录](../cowork/STOCKTAKE-V1.md)。
+- 上一 OCR 发布 [33974005122](https://github.com/skin306152-star/pearnly-app/actions/runs/33974005122) 成功，schema execution `pearnly-schema-m6928`、两端候选/正式安装包完整校验通过。正式域名 health/ready 均 200，nonce `ocr_release=7dc72a755075` 的请求日志命中新 Web revision。旧镜像 674909a0 为迁移基线，以下记录保留作历史证据。
 - 22:19:52 Bangkok 原子更新 OCR 策略并写操作审计：invoice=economy（3.1-lite→3.8 LOW）；其余现有 OCR task=enterprise。银行/GL/VAT 扫描件使用冻结 Enterprise 财务适配器；ID、SalesVAT 发票、通用网格保留专用 Schema 使用 3.8；结构化文件保留原生解析。不能将选 A 档解读为每个文件都会收费调用 Document AI。
 - Web/Worker 各自 runtime secret v2 新增 Enterprise 四项配置：项目112074003592、处理器6c7dfffac937fcd9、新加坡、共享9 RPM；代码固定 v2.1.1，不用处理器默认 v1.0。两 SA 新增 Document AI API User，其他运行配置不变。Worker 身份单页合成探针成功；不代表全部业务文件人工验收。详细边界见 [OCR 记录](../ocr-integration-progress-2026-09-05.md)。
 - [成功的 GitHub 发布运行33962463833](https://github.com/skin306152-star/pearnly-app/actions/runs/33962463833)。同镜像schema execution `pearnly-schema-mmsws`于11:11:11 UTC确认完成；Web/Worker候选及正式流量均通过完整安装包校验，18:13 Bangkok完成切流回读。上一已验证版本为85cc56b4（CD33956960191）；它尚有大文件传输限制，不作为当前传输能力基线。
@@ -76,7 +77,7 @@ Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均
 ## 验证与告警边界
 
 - 启动修复：40个聚焦测试及24个subtest通过；真实PG副本12种安全结构破坏均阻断启动，只读线上目录预检通过。
-- 本地：当前发布的完整 pre-push 已通过（1149个测试模块与静态闸）；定向真实 PostgreSQL 任务状态测试与备份恢复分别执行。GitHub通用CI仍停用，不把本地通过写成远程CI通过。
+- 本地：当前发布的完整 pre-push 已通过（1156个测试模块与静态闸）；定向真实 PostgreSQL 任务状态测试与备份恢复分别执行。GitHub通用CI仍停用，不把本地通过写成远程CI通过。
 - 远程：上述 GitHub CD成功；镜像内 Python compileall、Chromium启动、schema Job、候选健康/就绪/精确版本及最终流量检查通过。
 - 线上：正式域名健康/就绪、页面与静态文件检查通过；保留登录态的管理后台可读取；真实历史记录详情和迁移前PDF在浏览器中正确渲染，未保存修改或推送ERP。真实 Cloud Tasks OIDC 探针到私有 Worker 返回200。
 - Scheduler启用后，数据库已回读 `maintenance`、`queue.ocr`、`queue.recon`、`queue.steward` 各10次 succeeded。这里只证明调度/消费；无待处理业务时不等于完成一次真实OCR或外部ERP交易。

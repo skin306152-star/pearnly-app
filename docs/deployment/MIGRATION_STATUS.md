@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-06 14:43（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，Cowork 盘点 LINE 菜单补齐与泰语模板已发布；用户自行进行业务与真机验收**。
+更新时间：2026-09-06 15:02（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，Cowork 盘点模板与结果导出均已统一泰语；用户自行进行业务与真机验收**。
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,9 +27,10 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`c96e24294d566956e1c5bb91efff09eb6d7e8091`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:51490c1f4a30b1522346b90f2f3b7ed9ef7d33fa3d7d3f62f0a29df4e2e6a149`。
-- Web revision：`pearnly-web-c96e24294d56-s2`，100%流量；Worker revision：`pearnly-worker-c96e24294d56-s2`，100%流量。
+- 完整 SHA：`70f63424b93be4c5ad35815cf0997a1b22e338b6`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:daf5cd73954de5f8c08dcc180877cf548cb0efbdef2ce985f82a9f64e32f459d`。
+- Web revision：`pearnly-web-70f63424b93b-s2`，100%流量；Worker revision：`pearnly-worker-70f63424b93b-s2`，100%流量。
+- 泰语结果导出修正 [34020406001](https://github.com/skin306152-star/pearnly-app/actions/runs/34020406001) 成功；schema execution `pearnly-schema-vj7fk` 成功，两端候选及正式版本/健康/就绪/完整安装包检查通过。正式域名 readiness 200。结果导出接口统一泰语，旧网页发送 `lang=zh/en/ja` 也不改变表头；定向 15 项通过，其中实际 HTTP 响应 XLSX 验证全部 11 列泰语及差异数值，完整 pre-push 1156 个模块通过。真实用户再次导出验收待用户确认。
 - 菜单与泰语模板发布 [34019557598](https://github.com/skin306152-star/pearnly-app/actions/runs/34019557598) 成功；schema execution `pearnly-schema-k2s7s` 成功，两端候选及正式版本/健康/就绪/安装包完整下载检查通过。正式域名 readiness 200，`stocktake_menu=c96e24294d56` 日志命中新 revision；浏览器回读两种新菜单图标均 200 且字节一致。LINE 默认 Rich Menu 已更新为 `richmenu-0aa42f054b8a47a8d1d9e7db9012e8be`，两个区域和图片回读一致，旧 v1 菜单保留；四语 Flex validate API 通过。模板默认泰语，保留英文列标识兼容；本地五条真实条码测试模板通过实际导入解析器。前一运行 34019375397 在镜像构建阶段取消，以合并新增的泰语表头要求，未进入生产变更。
 - 首版盘点发布 [34018589884](https://github.com/skin306152-star/pearnly-app/actions/runs/34018589884) 成功；schema execution `pearnly-schema-sxww8` 成功，两端候选与正式服务的健康、就绪、精确 SHA/镜像及安装包完整下载校验通过。正式域名 health/ready 200，`stocktake_release=ea1d3e1607cc` 请求日志命中新 Web revision；手机入口壳、mobile.js、ui.js 与本地发布字节一致。本地 pre-push 1156 个测试模块及静态闸通过。网页入口 `/cowork#/stocktake`，LINE 沿用现有 Cowork 菜单；实际成员登录、真实业务与 iOS/Android 相机验收由用户自行进行，见 [盘点记录](../cowork/STOCKTAKE-V1.md)。
 - 上一 OCR 发布 [33974005122](https://github.com/skin306152-star/pearnly-app/actions/runs/33974005122) 成功，schema execution `pearnly-schema-m6928`、两端候选/正式安装包完整校验通过。正式域名 health/ready 均 200，nonce `ocr_release=7dc72a755075` 的请求日志命中新 Web revision。旧镜像 674909a0 为迁移基线，以下记录保留作历史证据。

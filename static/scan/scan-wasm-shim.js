@@ -16,17 +16,17 @@
                 if (!api || !api.BarcodeDetector || !api.prepareZXingModule) {
                     throw new Error('barcode-detector API missing');
                 }
-                return api
-                    .prepareZXingModule({
+                return Promise.resolve(
+                    api.prepareZXingModule({
                         overrides: {
                             locateFile: function (name) {
                                 return name.slice(-5) === '.wasm' ? shell.assetUrl(WASM) : name;
                             },
                         },
                     })
-                    .then(function () {
-                        return api.BarcodeDetector;
-                    });
+                ).then(function () {
+                    return api.BarcodeDetector;
+                });
             })
             .catch(function (err) {
                 pending = null;

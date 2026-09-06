@@ -1,3 +1,5 @@
+import '../../static/stocktake/camera.js';
+import '../../static/stocktake/counter.js';
 import '../../static/stocktake/ui.js';
 import '../../static/stocktake/stocktake.css';
 

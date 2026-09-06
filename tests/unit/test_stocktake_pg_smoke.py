@@ -15,7 +15,7 @@ from psycopg2.extras import RealDictCursor
 from core import db
 from core.workspace_context import WorkspaceScope
 from routes.stocktake_routes import router
-from services.stocktake import store, schema, access
+from services.stocktake import store, schema, access, entry_schema
 from tests.unit._pg_smoke import connect_or_skip, connect, require_disposable_db
 from tests.unit.test_stocktake import ROW, xlsx
 
@@ -31,9 +31,10 @@ class StocktakePgSmoke(TestCase):
             cur.execute(f"CREATE SCHEMA {cls.schema}")
             cur.execute(f"SET search_path TO {cls.schema}")
             cur.execute(
-                "CREATE TABLE tenants (id UUID PRIMARY KEY); CREATE TABLE users (id UUID PRIMARY KEY); CREATE TABLE workspace_clients (id BIGINT PRIMARY KEY, tenant_id UUID)"
+                "CREATE TABLE tenants (id UUID PRIMARY KEY); CREATE TABLE users (id UUID PRIMARY KEY, username TEXT, full_name TEXT); CREATE TABLE workspace_clients (id BIGINT PRIMARY KEY, tenant_id UUID)"
             )
             cur.execute(schema.DDL)
+            entry_schema.apply(cur)
             from core.rls import apply_tenant_workspace_rls
 
             apply_tenant_workspace_rls(
@@ -88,7 +89,7 @@ class StocktakePgSmoke(TestCase):
         self.ws = int(uuid4().int % 1000000000)
         with self.cursor(commit=True) as cur:
             cur.execute("INSERT INTO tenants VALUES (%s),(%s)", (self.tenant, self.other_tenant))
-            cur.execute("INSERT INTO users VALUES (%s),(%s)", (self.user, self.other_user))
+            cur.execute("INSERT INTO users (id) VALUES (%s),(%s)", (self.user, self.other_user))
             cur.execute(
                 "INSERT INTO workspace_clients VALUES (%s,%s),(%s,%s),(%s,%s)",
                 (self.ws, self.tenant, self.ws + 1, self.tenant, self.ws + 2, self.other_tenant),
@@ -101,15 +102,21 @@ class StocktakePgSmoke(TestCase):
         self.item = store.detail(self.scope, self.task_id)["items"][0]
 
     def create(self, request_id=None, digest="original"):
-        from services.stocktake.excel import parse
+        from services.stocktake.excel import FIELDS
 
-        return store.create(
+        items = [dict(zip(FIELDS, row)) for row in [ROW, [*ROW[:4], "02", *ROW[5:]]]]
+        for item in items:
+            item["book_qty"] = Decimal(item["book_qty"])
+        result = store.create(
             self.scope,
             "Warehouse count",
-            parse(xlsx([ROW, [*ROW[:4], "02", *ROW[5:]]])),
+            items,
             request_id or uuid4(),
             digest,
         )["id"]
+        with self.cursor(commit=True) as cur:
+            cur.execute("UPDATE cowork_stocktakes SET count_mode='legacy' WHERE id=%s", (result,))
+        return result
 
     def test_counts_preserve_zero_and_null_with_exact_difference(self):
         store.count(self.scope, self.task_id, self.item["id"], Decimal(0), 0)
@@ -223,6 +230,11 @@ class StocktakePgSmoke(TestCase):
             )
             self.assertEqual(response.status_code, 200, response.text)
             path = "/api/cowork/stocktakes/" + response.json()["id"]
+            with self.cursor(commit=True) as cur:
+                cur.execute(
+                    "UPDATE cowork_stocktakes SET count_mode='legacy' WHERE id=%s",
+                    (response.json()["id"],),
+                )
             item = client.get(path).json()["items"][0]
             self.assertEqual(item["book_qty"], "2.500001")
             response = client.put(

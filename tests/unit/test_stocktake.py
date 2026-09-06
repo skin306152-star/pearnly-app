@@ -29,17 +29,19 @@ ROW = ["0012", "สินค้า / 商品", "000012345678", "A", "01", "EA", "
 
 class StocktakeExcel(TestCase):
     def test_precision_identifiers_and_optional_location(self):
-        result = excel.parse(xlsx([ROW, [*ROW[:4], "", *ROW[5:]]]))
+        other = ["002", "Other", "QR-002", "", "", "EA", "0"]
+        result = excel.parse(xlsx([ROW, other]))
         self.assertEqual(result[0]["book_qty"], Decimal("2.500001"))
         self.assertEqual(result[0]["barcode"], "000012345678")
         self.assertEqual(result[1]["location"], "")
 
-    def test_duplicate_tuple_rejected_but_different_warehouse_allowed(self):
+    def test_duplicate_product_rejected_even_in_different_warehouse(self):
         with self.assertRaisesRegex(HTTPException, "duplicate:3"):
             excel.parse(xlsx([ROW, ROW]))
         other = ROW.copy()
         other[3] = "B"
-        self.assertEqual(len(excel.parse(xlsx([ROW, other]))), 2)
+        with self.assertRaisesRegex(HTTPException, "duplicate:3"):
+            excel.parse(xlsx([ROW, other]))
 
     def test_numeric_codes_formulas_and_bad_quantities_rejected(self):
         for column, value in [
@@ -100,12 +102,26 @@ class StocktakeExcel(TestCase):
 
     def test_template_can_be_filled_without_header_changes(self):
         wb = load_workbook(BytesIO(excel.workbook()))
-        self.assertEqual([cell.value for cell in wb.active[1]], excel.LABELS["th"][:7])
-        for index, value in enumerate(ROW, 1):
+        self.assertEqual([cell.value for cell in wb.active[1]], excel.TEMPLATE_HEADERS)
+        item = dict(zip(excel.FIELDS, ROW))
+        for index, value in enumerate((item[k] for k in excel.TEMPLATE_FIELDS), 1):
             wb.active.cell(2, index, value)
         data = BytesIO()
         wb.save(data)
         self.assertEqual(len(excel.parse(data.getvalue())), 1)
+
+    def test_five_column_template_and_internal_qr_match_exactly(self):
+        row = ["0001", "QR product", "Company/QR?ID=0001", "EA", "10"]
+        for headers in (excel.TEMPLATE_HEADERS[:5], excel.TEMPLATE_FIELDS[:5]):
+            result = excel.parse(xlsx([row], headers))[0]
+            self.assertEqual(result["barcode"], "Company/QR?ID=0001")
+            self.assertEqual((result["warehouse"], result["location"]), ("", ""))
+        for second in (
+            ["0002", "Other", row[2], "EA", "5"],
+            [row[2], "Other", "Distinct QR", "EA", "5"],
+        ):
+            with self.assertRaisesRegex(HTTPException, "ambiguous_code"):
+                excel.parse(xlsx([row, second], excel.TEMPLATE_FIELDS[:5]))
 
     def test_export_http_uses_thai_even_with_legacy_page_language(self):
         app = FastAPI()

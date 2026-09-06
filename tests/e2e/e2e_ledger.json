@@ -67,15 +67,20 @@
       "covers": [
         "src/home/stocktake.ts",
         "static/stocktake/ui.js",
+        "static/stocktake/camera.js",
+        "static/stocktake/counter.js",
         "static/stocktake/mobile.js",
         "static/stocktake/mobile.html",
         "static/stocktake/stocktake.css"
       ],
-      "fixtures": ["venv/bin/python scripts/_scan_ean_y4m.py /tmp/stocktake-camera.y4m"],
+      "fixtures": [
+        "venv/bin/python scripts/_scan_ean_y4m.py /tmp/stocktake-camera.y4m",
+        "venv/bin/python scripts/_stocktake_qr_y4m.py"
+      ],
       "only_e2e": [
         "真实 cowork 壳首次深链、对账下方导航、新建弹窗居中和手机布局只能由浏览器布局验证",
-        "真实共享 POS 引擎读取 EAN 视频并自动关闭摄像头；权限拒绝后保留手输，需要真实媒体与 DOM 生命周期",
-        "手机 LINE 入口和桌面请求携带各自凭证与公司头，保存零数量、冲突保留输入、结束锁定及中泰切换在真实事件链验证；LINE SDK 为桩，不代表真机验收"
+        "真实共享 POS 引擎和已发布 WASM 读取 EAN 与内部编号 QR 视频，商品自动出现、相机释放、提交后自动继续扫描及权限拒绝手输，需要真实媒体与 DOM 生命周期",
+        "手机 LINE 与网页携带各自凭证和公司头，零数量、逐笔累计、响应丢失后的同 ID 重试、修改撤销、仓库库位记忆、语言切换保留输入及结束锁定在真实事件链验证；业务 API 与 LINE SDK 为桩，SQL 另由独立真库测试验证，不代表真机验收"
       ]
     },
     "_pos_vat_summary_verify.cjs": {
@@ -114,7 +119,8 @@
         "static/scan/scan-camera.js",
         "static/scan/scan-track.js",
         "static/scan/scan-loader.js",
-        "static/scan/scan-zxing-shim.js"
+        "static/scan/scan-zxing-shim.js",
+        "static/scan/scan-wasm-shim.js"
       ],
       "fixtures": [
         "python scripts/_scan_ean_y4m.py .scan_fixture.y4m",

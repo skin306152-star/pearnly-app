@@ -56,9 +56,11 @@ CREATE TABLE IF NOT EXISTS cowork_stocktake_counts (
 def migrate():
     from core import db
     from core.rls import apply_tenant_workspace_rls
+    from services.stocktake.entry_schema import apply
 
     with db.get_cursor(commit=True) as cur:
         cur.execute(DDL)
         apply_tenant_workspace_rls(
             cur, "cowork_stocktakes", "cowork_stocktake_items", "cowork_stocktake_counts"
         )
+        apply(cur)

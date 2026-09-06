@@ -158,3 +158,31 @@ dialog.st-dialog {
 .stocktake [hidden] {
   display: none;
 }
+
+.stocktake details {
+  margin: 20px 0;
+}
+.stocktake summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+  font-weight: 600;
+}
+.stocktake [data-entry-editor] .st-count {
+  margin: 0 auto 20px;
+}
+.stocktake [data-entry-form] label {
+  margin: 4px 0;
+}
+.stocktake [data-entry-form] .st-toolbar {
+  margin: 4px 0 0;
+}
+.stocktake [data-code],
+.stocktake [data-report-query] {
+  flex: 1;
+  min-width: 150px;
+}
+.stocktake [data-scan-message] {
+  color: var(--ink2);
+  white-space: pre-line;
+}

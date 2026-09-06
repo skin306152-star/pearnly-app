@@ -16,7 +16,8 @@
             keyword = '',
             filter = 'all',
             selected = null;
-        let cameraTicket = 0;
+        let cameraTicket = 0,
+            counter = null;
         let warehouse = '',
             location = '',
             camera = null,
@@ -39,6 +40,8 @@
             );
         }
         async function stopCamera() {
+            counter?.destroy();
+            counter = null;
             cameraTicket++;
             if (camera) {
                 camera.destroy();
@@ -95,8 +98,30 @@
             void stopCamera();
             base();
             const counted = task.items.filter((r) => r.actual_qty !== null).length;
+            if (task.count_mode === 'scan') {
+                const overview = () =>
+                    `${t(task.status)} · ${task.items.filter((r) => r.actual_qty !== null).length}/${task.items.length} ${t('counted')}`;
+                $('[data-body]').innerHTML =
+                    `<h2>${esc(task.name)}</h2><p data-overview>${esc(overview())}</p><progress data-overview-progress value="${counted}" max="${task.items.length || 1}"></progress>
+                    <div class="st-toolbar">${options.mobile ? '' : button('export', 'export')}${task.status === 'active' && !options.mobile ? button('close', 'close') : ''}${button('refresh', 'refresh')}</div><div data-scan-session></div>`;
+                counter = window.PearnlyStocktakeCounter($('[data-scan-session]'), {
+                    task,
+                    api,
+                    t,
+                    esc,
+                    mobile: options.mobile,
+                    onChanged(next) {
+                        task = next;
+                        $('[data-overview]').textContent = overview();
+                        $('[data-overview-progress]').value = task.items.filter(
+                            (r) => r.actual_qty !== null
+                        ).length;
+                    },
+                });
+                return;
+            }
             $('[data-body]').innerHTML =
-                `<h2>${esc(task.name)}</h2><p>${esc(t(task.status))} · ${counted}/${task.items.length} ${esc(t('counted'))}</p><progress value="${counted}" max="${task.items.length || 1}"></progress>
+                `<h2>${esc(task.name)}</h2><p>${esc(t('legacy-task'))}</p><p>${esc(t(task.status))} · ${counted}/${task.items.length} ${esc(t('counted'))}</p><progress value="${counted}" max="${task.items.length || 1}"></progress>
                 <div class="st-toolbar">${options.mobile ? '' : button('export', 'export')}${task.status === 'active' && !options.mobile ? button('close', 'close') : ''}${button('refresh', 'refresh')}</div>
                 ${task.status === 'active' ? `<div class="st-toolbar">${button('scan', 'scan')}${button('stop', 'stop')}</div><div data-camera class="st-camera"></div>` : ''}
                 <form data-search class="st-toolbar"><input data-query aria-label="${esc(t('search'))}" placeholder="${esc(t('search'))}" value="${esc(keyword)}"><button class="pu-btn pu-btn--primary">${esc(t('search-button'))}</button><select data-filter aria-label="${esc(t('filter'))}">${['all', 'uncounted', 'differences'].map((k) => `<option value="${k}" ${filter === k ? 'selected' : ''}>${esc(t(k))}</option>`).join('')}</select></form>
@@ -345,7 +370,16 @@
         return {
             load,
             refreshLanguage() {
-                if (task) detailView();
+                if (counter) {
+                    host.querySelector('h1').textContent = t('title');
+                    for (const action of ['back', 'export', 'close', 'refresh']) {
+                        const node = $(`[data-action="${action}"]`);
+                        if (node) node.textContent = t(action);
+                    }
+                    $('[data-overview]').textContent =
+                        `${t(task.status)} · ${task.items.filter((r) => r.actual_qty !== null).length}/${task.items.length} ${t('counted')}`;
+                    counter.refreshLanguage();
+                } else if (task) detailView();
                 else listView();
             },
             destroy() {

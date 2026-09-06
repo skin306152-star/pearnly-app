@@ -134,6 +134,7 @@ _ENTRY_ASSETS = {
         "/static/cowork-line-intake/app.js",
     ),
     "static/stocktake/mobile.html": (
+        "/static/dist/scan.js",
         "/static/pearnly-ui.css",
         "/static/home-01-base.css",
         "/static/stocktake/stocktake.css",
@@ -141,6 +142,8 @@ _ENTRY_ASSETS = {
         "/static/line-intake-review/liff-runtime.js",
         "/static/scan/scan-loader.js",
         "/static/stocktake/ui.js",
+        "/static/stocktake/camera.js",
+        "/static/stocktake/counter.js",
         "/static/stocktake/mobile.js",
     ),
     "static/daily/daily.html": (

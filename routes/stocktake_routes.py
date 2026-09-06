@@ -4,13 +4,13 @@ import hashlib
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from services.stocktake import access as stocktake_access
-from services.stocktake import excel, store
+from services.stocktake import excel, store, entries, reports
 
 router = APIRouter(prefix="/api/cowork/stocktakes", tags=["stocktake"])
 
@@ -34,6 +34,18 @@ class LineLogin(BaseModel):
 class Count(BaseModel):
     quantity: str = Field(max_length=40)
     version: int = Field(ge=0)
+
+
+class Entry(BaseModel):
+    request_id: UUID
+    quantity: str = Field(max_length=40)
+    warehouse: str = Field(min_length=1, max_length=300)
+    location: str = Field(default="", max_length=300)
+
+
+class EntryEdit(Entry):
+    version: int = Field(ge=0)
+    voided: bool = False
 
 
 @router.post("/line/auth")
@@ -92,7 +104,48 @@ def close(task_id: UUID, request: Request):
     return store.close(stocktake_access.scope_for(request, "recon.create"), task_id)
 
 
+@router.post("/{task_id}/items/{item_id}/entries")
+def add_entry(task_id: UUID, item_id: UUID, body: Entry, request: Request):
+    scope = stocktake_access.scope_for(request, "recon.create")
+    return entries.write(
+        scope, task_id, item_id, body.request_id, body.quantity, body.warehouse, body.location
+    )
+
+
+@router.get("/{task_id}/entries")
+def list_entries(
+    task_id: UUID,
+    request: Request,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    return output(
+        entries.listing(stocktake_access.scope_for(request, "recon.view"), task_id, limit, offset)
+    )
+
+
+@router.patch("/{task_id}/entries/{entry_id}")
+def edit_entry(task_id: UUID, entry_id: UUID, body: EntryEdit, request: Request):
+    scope = stocktake_access.scope_for(request, "recon.create")
+    return entries.write(
+        scope,
+        task_id,
+        entry_id,
+        body.request_id,
+        body.quantity,
+        body.warehouse,
+        body.location,
+        version=body.version,
+        voided=body.voided,
+    )
+
+
 @router.get("/{task_id}/export")
 def export(task_id: UUID, request: Request):
-    task = store.detail(stocktake_access.scope_for(request, "recon.export"), task_id)
-    return download(excel.workbook(task["items"], lang="th"), f"stocktake-{task_id}")
+    task = store.detail(stocktake_access.scope_for(request, "recon.export"), task_id, export=True)
+    data = (
+        reports.workbook(task)
+        if task.get("count_mode") == "scan"
+        else excel.workbook(task["items"])
+    )
+    return download(data, f"stocktake-{task_id}")

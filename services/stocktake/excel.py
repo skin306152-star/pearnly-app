@@ -10,6 +10,24 @@ from openpyxl.comments import Comment
 from xml.etree.ElementTree import ParseError
 
 FIELDS = ("product_code", "product_name", "barcode", "warehouse", "location", "unit", "book_qty")
+TEMPLATE_FIELDS = (
+    "product_code",
+    "product_name",
+    "barcode",
+    "unit",
+    "book_qty",
+    "warehouse",
+    "location",
+)
+TEMPLATE_HEADERS = [
+    "รหัสสินค้า",
+    "ชื่อสินค้า",
+    "บาร์โค้ด / รหัส QR",
+    "หน่วย",
+    "จำนวนตามบัญชี",
+    "คลังสินค้าเริ่มต้น (ไม่บังคับ)",
+    "ตำแหน่งเริ่มต้น (ไม่บังคับ)",
+]
 LABELS = {
     "zh": [
         "商品编号",
@@ -98,21 +116,32 @@ def parse(data):
         rows = sheet.iter_rows()
         header = next(rows, ())
         header_names = tuple(str(c.value or "").strip() for c in header)
-        if header_names not in (FIELDS, tuple(LABELS["th"][:7])):
+        layouts = {
+            FIELDS: FIELDS,
+            tuple(LABELS["th"][:7]): FIELDS,
+            TEMPLATE_FIELDS: TEMPLATE_FIELDS,
+            tuple(TEMPLATE_HEADERS): TEMPLATE_FIELDS,
+            TEMPLATE_FIELDS[:5]: TEMPLATE_FIELDS[:5],
+            tuple(TEMPLATE_HEADERS[:5]): TEMPLATE_FIELDS[:5],
+        }
+        layout = layouts.get(header_names)
+        if layout is None:
             raise HTTPException(422, detail="stocktake.headers_invalid")
-        result, seen = [], set()
+        result, seen, identifiers = [], set(), {}
         for number, cells in enumerate(rows, 2):
             if number > MAX_ROWS + 1:
                 raise HTTPException(422, detail="stocktake.too_many_rows")
             if all(c.value is None for c in cells):
                 continue
-            if len(cells) != len(FIELDS) or any(c.data_type == "f" for c in cells):
+            if len(cells) != len(layout) or any(c.data_type == "f" for c in cells):
                 raise HTTPException(422, detail=f"stocktake.row_invalid:{number}")
             item = {
                 key: str(c.value if c.value is not None else "").strip()
-                for key, c in zip(FIELDS, cells)
+                for key, c in zip(layout, cells)
             }
-            if any(not item[k] for k in ("product_code", "product_name", "warehouse", "unit")):
+            item.setdefault("warehouse", "")
+            item.setdefault("location", "")
+            if any(not item[k] for k in ("product_code", "product_name", "unit")):
                 raise HTTPException(422, detail=f"stocktake.row_invalid:{number}")
             if any(len(v) > 300 for v in item.values()):
                 raise HTTPException(422, detail=f"stocktake.row_invalid:{number}")
@@ -120,10 +149,14 @@ def parse(data):
             if any(cells[i].value is not None and cells[i].data_type != "s" for i in (0, 2)):
                 raise HTTPException(422, detail=f"stocktake.code_as_text:{number}")
             item["book_qty"] = quantity(item["book_qty"])
-            key = tuple(item[k] for k in ("product_code", "warehouse", "location"))
+            key = item["product_code"]
             if key in seen:
                 raise HTTPException(422, detail=f"stocktake.duplicate:{number}")
             seen.add(key)
+            for code in {key, item["barcode"]} - {""}:
+                if code in identifiers and identifiers[code] != key:
+                    raise HTTPException(422, detail=f"stocktake.ambiguous_code:{number}")
+                identifiers[code] = key
             result.append(item)
         if not result:
             raise HTTPException(422, detail="stocktake.empty")
@@ -137,15 +170,18 @@ def parse(data):
 def workbook(rows=None, lang="th"):
     wb = Workbook()
     sheet = wb.active
-    sheet.title = "Stocktake"
-    headers = LABELS["th"][:7]
+    sheet.title = "ข้อมูลสินค้า" if rows is None else "Stocktake"
+    headers = TEMPLATE_HEADERS
     if rows is not None:
         headers = LABELS.get(lang, LABELS["th"])
     sheet.append(headers)
     sheet.freeze_panes = "A2"
     if rows is None:
         for i, cell in enumerate(sheet[1]):
-            cell.comment = Comment(" / ".join(values[i] for values in LABELS.values()), "Pearnly")
+            index = FIELDS.index(TEMPLATE_FIELDS[i])
+            cell.comment = Comment(
+                " / ".join(values[index] for values in LABELS.values()), "Pearnly"
+            )
     for row in rows or []:
         values = [row[k] for k in FIELDS]
         actual = row["actual_qty"]
@@ -167,7 +203,7 @@ def workbook(rows=None, lang="th"):
     if rows is None:
         for row in sheet.iter_rows(min_row=2, max_row=1001, max_col=7):
             for cell in row:
-                cell.number_format = "@" if cell.column != 7 else "0.######"
+                cell.number_format = "@" if cell.column != 5 else "0.######"
     sheet.auto_filter.ref = sheet.dimensions
     out = BytesIO()
     wb.save(out)

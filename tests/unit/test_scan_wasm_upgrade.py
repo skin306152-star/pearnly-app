@@ -111,6 +111,7 @@ class WasmDecodeTests(unittest.TestCase):
     def test_real_wasm_decodes_the_demo_barcode(self):
         js = json.dumps(str(DIST / "barcode-detector.js"))
         wasm = json.dumps(str(DIST / "zxing_reader.wasm"))
+        shim = json.dumps(str(SCAN / "scan-wasm-shim.js"))
         got = _run_node(
             f"""
             const fs = require('fs');
@@ -152,10 +153,10 @@ class WasmDecodeTests(unittest.TestCase):
                 return new ImageData(data, width, height);
             }}
             (async () => {{
-                await BarcodeDetectionAPI.prepareZXingModule({{
-                    overrides: {{ locateFile: () => '/static/dist/zxing_reader.wasm' }},
-                }});
-                const detector = new BarcodeDetectionAPI.BarcodeDetector({{ formats: ['ean_13'] }});
+                global.PearnlyScanCamera = {{ loadScript: async () => {{}}, assetUrl: path => path }};
+                const loader = require({shim});
+                const Ctor = await loader.load();
+                const detector = new Ctor({{ formats: ['ean_13'] }});
                 const codes = await detector.detect(image('4891338050333'));
                 process.stdout.write(JSON.stringify(codes.map((c) => [c.rawValue, c.format])));
             }})().catch((e) => {{ process.stderr.write(String(e.stack || e)); process.exit(1); }});

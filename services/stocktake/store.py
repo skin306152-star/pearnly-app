@@ -38,8 +38,8 @@ def create(scope, name, items, request_id, source_digest):
         assert_scope(cur, scope)
         cur.execute(
             "INSERT INTO cowork_stocktakes "
-            "(id, tenant_id, workspace_client_id, name, created_by, source_digest) "
-            "VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING RETURNING id",
+            "(id, tenant_id, workspace_client_id, name, created_by, source_digest, count_mode) "
+            "VALUES (%s,%s,%s,%s,%s,%s,'scan') ON CONFLICT (id) DO NOTHING RETURNING id",
             (
                 task_id,
                 scope.tenant_id,
@@ -87,9 +87,9 @@ def listing(scope):
         return {"tasks": [dict(row) for row in cur.fetchall()]}
 
 
-def detail(scope, task_id):
+def detail(scope, task_id, *, export=False):
     with cursor(scope) as cur:
-        task = _task(cur, scope, task_id)
+        task = _task(cur, scope, task_id, lock=True)
         cur.execute(
             "SELECT *, actual_qty - book_qty AS difference FROM cowork_stocktake_items "
             "WHERE stocktake_id=%s AND tenant_id=%s AND workspace_client_id=%s "
@@ -97,12 +97,26 @@ def detail(scope, task_id):
             (str(task_id), scope.tenant_id, scope.workspace_client_id),
         )
         task["items"] = [dict(row) for row in cur.fetchall()]
+        if task["count_mode"] == "scan":
+            from services.stocktake.entries import fetch, total
+
+            task["entries"] = fetch(cur, scope, task_id, limit=None if export else 100)
+            task["entry_total"] = total(cur, scope, task_id)
+            cur.execute(
+                "SELECT DISTINCT warehouse, location FROM cowork_stocktake_entries "
+                "WHERE stocktake_id=%s AND tenant_id=%s AND workspace_client_id=%s AND NOT voided "
+                "ORDER BY warehouse, location",
+                (str(task_id), scope.tenant_id, scope.workspace_client_id),
+            )
+            task["places"] = [dict(row) for row in cur.fetchall()]
         return task
 
 
 def count(scope, task_id, item_id, qty, version):
     with cursor(scope, commit=True) as cur:
         task = _task(cur, scope, task_id, lock=True)
+        if task["count_mode"] != "legacy":
+            raise HTTPException(409, detail="stocktake.refresh_required")
         if task["status"] != "active":
             raise HTTPException(409, detail="stocktake.closed")
         cur.execute(

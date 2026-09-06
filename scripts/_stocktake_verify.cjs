@@ -221,6 +221,9 @@ async function main() {
             await expect(host.locator('[data-entry-quantity]')).toHaveValue('');
         }
         await identify('0012');
+        await expect(host.locator('[data-entry-warehouse]')).toHaveValue('Main');
+        await expect(host.locator('[data-entry-location]')).toHaveValue('A01');
+        await expect(host.locator('[data-book-place]')).toContainText('Main');
         await host.locator('[data-entry-quantity]').fill('0');
         await host.locator('[data-entry-warehouse]').fill('New warehouse');
         await host.locator('[data-entry-location]').fill('Shelf Z');
@@ -235,9 +238,16 @@ async function main() {
         assert.equal(state.requests[0], state.requests[1]);
         assert.equal(state.task.entry_total, 1);
         assert.equal(state.task.items[0].actual_qty, '0');
+        state.task.items[1].warehouse = '';
+        state.task.items[1].location = '';
+        await host.locator('[data-action="refresh"]').click();
+        await identify(qrCode);
+        await expect(host.locator('[data-entry-warehouse]')).toHaveValue('');
+        await expect(host.locator('[data-entry-location]')).toHaveValue('');
+        await host.locator('[data-scan-action="cancel"]').click();
         await identify(barcode);
-        await expect(host.locator('[data-entry-warehouse]')).toHaveValue('New warehouse');
-        await expect(host.locator('[data-entry-location]')).toHaveValue('Shelf Z');
+        await expect(host.locator('[data-entry-warehouse]')).toHaveValue('Main');
+        await expect(host.locator('[data-entry-location]')).toHaveValue('A01');
         await host.locator('[data-entry-quantity]').fill('5');
         await host.locator('[data-entry-submit]').click();
         await expect(host.locator('[data-reader]')).toBeVisible();
@@ -308,6 +318,7 @@ async function main() {
             })
         );
         const mobileState = { task: initial() };
+        mobileState.task.items[0].book_qty = '12312312.000000';
         await stub(mobile, mobileState, true);
         const phone = await mobile.newPage();
         await phone.goto(BASE + '/home?flow=cowork-stocktake&draft=list');
@@ -320,9 +331,10 @@ async function main() {
             timeout: 30000,
         });
         await expect(body.locator('[data-scan-camera] video')).toHaveCount(0);
-        await body.locator('[data-entry-quantity]').fill('12.5');
+        await body.locator('[data-entry-quantity]').fill('34649487');
         await phone.screenshot({ path: path.join(ART, '03-mobile-count-th.png'), fullPage: true });
         assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await body.locator('[data-entry-quantity]').fill('12.5');
         await body.locator('[data-entry-submit]').click();
         // Same physical video is still in frame: a new blank entry opens after the successful save.
         await expect(body.locator('[data-entry-quantity]')).toHaveValue('', { timeout: 30000 });
@@ -346,6 +358,8 @@ async function main() {
         await phone.keyboard.type(qrCode, { delay: 30 });
         await phone.keyboard.press('Enter');
         await expect(body.locator('[data-entry-form] h3')).toHaveText('Internal QR product');
+        await expect(body.locator('[data-entry-warehouse]')).toHaveValue('Main');
+        await expect(body.locator('[data-entry-location]')).toHaveValue('A02');
         await phone.screenshot({ path: path.join(ART, '04-mobile-manual-zh.png'), fullPage: true });
         await mobile.close();
         const qrBrowser = await chromium.launch({

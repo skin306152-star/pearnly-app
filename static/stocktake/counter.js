@@ -12,9 +12,7 @@
             pending = null,
             busy = false,
             draft = null;
-        let warehouse = '',
-            location = '',
-            reportPage = 0,
+        let reportPage = 0,
             reportQuery = '',
             reportFilter = 'all';
         let entryPage = 0,
@@ -125,8 +123,8 @@
             editing = null;
             pending = null;
             draft = {
-                warehouse: warehouse || item.warehouse || '',
-                location: warehouse ? location : item.location || '',
+                warehouse: item.warehouse || '',
+                location: item.location || '',
                 quantity: '',
             };
             $('[data-reader]').hidden = true;
@@ -139,6 +137,7 @@
             $('[data-entry-editor]').innerHTML = `<form data-entry-form class="st-card st-count">
                 <h3>${esc(selected.product_name)}</h3><p>${esc(selected.product_code)} · ${esc(selected.unit)}</p>
                 <p>${esc(t('book_qty'))}: ${esc(quantity(selected.book_qty))} · ${esc(t('actual-total'))}: ${esc(selected.actual_qty === null ? t('uncounted') : quantity(selected.actual_qty))}</p>
+                <p data-book-place>${esc(t('book-warehouse'))}: ${esc(selected.warehouse || '—')} · ${esc(t('book-location'))}: ${esc(selected.location || '—')}</p>
                 <label>${esc(t('warehouse'))}<input data-entry-warehouse list="st-warehouses" maxlength="300" required placeholder="${esc(t('choose-or-type'))}" value="${esc(values.warehouse)}"></label>
                 <datalist id="st-warehouses">${warehouseOptions()
                     .map((v) => `<option value="${esc(v)}"></option>`)
@@ -205,11 +204,7 @@
                     pending.confirmed = true;
                 }
                 if (disposed) return;
-                const savedWarehouse = pending.body.warehouse,
-                    savedLocation = pending.body.location;
                 if (!(await refresh())) return;
-                warehouse = savedWarehouse;
-                location = savedLocation;
                 selected = null;
                 editing = null;
                 draft = null;

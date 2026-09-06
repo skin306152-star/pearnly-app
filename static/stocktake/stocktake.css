@@ -50,6 +50,8 @@
 }
 .st-card {
   display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
   gap: 12px;
   text-align: start;
   color: var(--ink);
@@ -77,6 +79,8 @@
   white-space: nowrap;
 }
 .st-count {
+  box-sizing: border-box;
+  width: 100%;
   max-width: 520px;
   margin: 16px 0;
 }
@@ -172,7 +176,16 @@ dialog.st-dialog {
   margin: 0 auto 20px;
 }
 .stocktake [data-entry-form] label {
+  min-width: 0;
   margin: 4px 0;
+}
+.stocktake [data-entry-form] input {
+  min-width: 0;
+  width: 100%;
+}
+.stocktake [data-entry-form] button {
+  max-width: 100%;
+  white-space: normal;
 }
 .stocktake [data-entry-form] .st-toolbar {
   margin: 4px 0 0;

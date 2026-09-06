@@ -3,7 +3,6 @@
 import hashlib
 from decimal import Decimal
 from uuid import UUID
-from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
@@ -94,6 +93,6 @@ def close(task_id: UUID, request: Request):
 
 
 @router.get("/{task_id}/export")
-def export(task_id: UUID, request: Request, lang: Literal["en", "th", "zh", "ja"] = "en"):
+def export(task_id: UUID, request: Request):
     task = store.detail(stocktake_access.scope_for(request, "recon.export"), task_id)
-    return download(excel.workbook(task["items"], lang=lang), f"stocktake-{task_id}")
+    return download(excel.workbook(task["items"], lang="th"), f"stocktake-{task_id}")

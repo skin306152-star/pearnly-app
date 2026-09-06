@@ -134,13 +134,13 @@ def parse(data):
         wb.close()
 
 
-def workbook(rows=None, lang="en"):
+def workbook(rows=None, lang="th"):
     wb = Workbook()
     sheet = wb.active
     sheet.title = "Stocktake"
     headers = LABELS["th"][:7]
     if rows is not None:
-        headers = LABELS.get(lang, LABELS["en"])
+        headers = LABELS.get(lang, LABELS["th"])
     sheet.append(headers)
     sheet.freeze_panes = "A2"
     if rows is None:

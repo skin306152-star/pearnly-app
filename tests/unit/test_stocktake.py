@@ -107,6 +107,27 @@ class StocktakeExcel(TestCase):
         wb.save(data)
         self.assertEqual(len(excel.parse(data.getvalue())), 1)
 
+    def test_export_http_uses_thai_even_with_legacy_page_language(self):
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+        item = dict(zip(excel.FIELDS, ROW))
+        item.update(
+            book_qty=Decimal("10"), actual_qty=Decimal("9"), counted_at=None, counted_by=None
+        )
+        with (
+            mock.patch("routes.stocktake_routes.stocktake_access.scope_for", return_value={}),
+            mock.patch("routes.stocktake_routes.store.detail", return_value={"items": [item]}),
+        ):
+            for query in ("", "?lang=zh", "?lang=en", "?lang=ja"):
+                with self.subTest(query=query):
+                    response = client.get(f"/api/cowork/stocktakes/{uuid4()}/export{query}")
+                    self.assertEqual(response.status_code, 200)
+                    wb = load_workbook(BytesIO(response.content))
+                    self.assertEqual([cell.value for cell in wb.active[1]], excel.LABELS["th"])
+                    self.assertEqual(wb.active["I2"].value, -1)
+                    wb.close()
+
 
 class StocktakeAccess(TestCase):
     def request(self, headers=()):

@@ -34,18 +34,30 @@ def centered(draw, text: str, x: float, y: float, face, fill) -> None:
     draw.text((x - (left + right) / 2, y - (top + bottom) / 2), text, font=face, fill=fill)
 
 
-def document_icon(draw, x: float, y: float) -> None:
+def document_icon(draw, x: float, y: float, color=WHITE) -> None:
     draw.rounded_rectangle(
         (x - 84, y - 106, x + 66, y + 106),
         radius=22,
-        outline=WHITE,
+        outline=color,
         width=12,
     )
-    draw.line((x - 48, y - 46, x + 30, y - 46), fill=WHITE, width=10)
-    draw.line((x - 48, y - 5, x + 30, y - 5), fill=WHITE, width=10)
-    draw.line((x - 48, y + 36, x + 5, y + 36), fill=WHITE, width=10)
-    draw.line((x + 2, y + 82, x + 102, y + 82), fill=WHITE, width=14)
-    draw.line((x + 70, y + 49, x + 102, y + 82, x + 70, y + 115), fill=WHITE, width=14)
+    draw.line((x - 48, y - 46, x + 30, y - 46), fill=color, width=10)
+    draw.line((x - 48, y - 5, x + 30, y - 5), fill=color, width=10)
+    draw.line((x - 48, y + 36, x + 5, y + 36), fill=color, width=10)
+    draw.line((x + 2, y + 82, x + 102, y + 82), fill=color, width=14)
+    draw.line((x + 70, y + 49, x + 102, y + 82, x + 70, y + 115), fill=color, width=14)
+
+
+def stocktake_icon(draw, x: float, y: float, color=WHITE) -> None:
+    draw.rounded_rectangle((x - 78, y - 92, x + 78, y + 104), radius=16, outline=color, width=12)
+    draw.rounded_rectangle((x - 35, y - 112, x + 35, y - 73), radius=10, fill=color)
+    for offset in (-32, 25, 78):
+        draw.line(
+            (x - 49, y + offset - 7, x - 37, y + offset + 6, x - 18, y + offset - 15),
+            fill=color,
+            width=9,
+        )
+        draw.line((x + 3, y + offset, x + 48, y + offset), fill=color, width=9)
 
 
 def lock_icon(draw, x: float, y: float) -> None:
@@ -79,9 +91,12 @@ def card(draw, col: int, row: int, *, active: bool) -> None:
         fill=ACTIVE if active else (225, 222, 232),
     )
     if active:
-        document_icon(draw, center_x, top + 282)
-        centered(draw, "ส่งเอกสารเข้า ERP", center_x, top + 520, font(62, bold=True), INK)
-        centered(draw, "อัปโหลด · ตรวจสอบ · เลือกปลายทาง", center_x, top + 622, font(38), MUTED)
+        glyph = document_icon if col == 0 else stocktake_icon
+        glyph(draw, center_x, top + 282)
+        title = "ส่งเอกสารเข้า ERP" if col == 0 else "ตรวจนับสต็อก"
+        desc = "อัปโหลด · ตรวจสอบ · เลือกปลายทาง" if col == 0 else "สแกนบาร์โค้ด · บันทึกจำนวน"
+        centered(draw, title, center_x, top + 520, font(62, bold=True), INK)
+        centered(draw, desc, center_x, top + 622, font(38), MUTED)
     else:
         lock_icon(draw, center_x, top + 282)
         centered(draw, "เร็ว ๆ นี้", center_x, top + 532, font(58, bold=True), MUTED)
@@ -93,9 +108,15 @@ def build() -> Image.Image:
     draw = ImageDraw.Draw(image)
     for row in range(2):
         for col in range(3):
-            card(draw, col, row, active=row == 0 and col == 0)
+            card(draw, col, row, active=row == 0 and col < 2)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     image.save(OUTPUT, "PNG", optimize=True)
+    icon_dir = ROOT / "static" / "stocktake" / "line-icons"
+    icon_dir.mkdir(parents=True, exist_ok=True)
+    for name, glyph in (("document-send", document_icon), ("stocktake", stocktake_icon)):
+        icon = Image.new("RGBA", (320, 320))
+        glyph(ImageDraw.Draw(icon), 160, 160, ACTIVE)
+        icon.save(icon_dir / f"{name}.png", "PNG", optimize=True)
     return image
 
 

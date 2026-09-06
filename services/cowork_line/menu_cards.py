@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from services.line_dms.menu_cards import (
     THEME_BLUE,
     menu_icon_disc,
-    menu_item,
+    menu_item as shared_menu_item,
 )
 
 ACTION_ERP_START = "cowork_erp_start"
@@ -62,6 +62,19 @@ def _language(lang: str) -> str:
     return "th"
 
 
+def stocktake_url() -> str:
+    liff_id = os.getenv("LINE_COWORK_LIFF_ID") or os.getenv("LINE_LIFF_ID", "")
+    return f"https://liff.line.me/{liff_id}?flow=cowork-stocktake&draft=list" if liff_id else ""
+
+
+def menu_item(num, icon, theme, title, desc, action):
+    row = shared_menu_item(num, icon, theme, title, desc, action)
+    row["contents"][0]["contents"][0][
+        "url"
+    ] = f"https://pearnly.com/static/stocktake/line-icons/{icon}.png?v=1"
+    return row
+
+
 def menu_card(lang: str = "th") -> dict[str, Any]:
     copy = _COPY[_language(lang)]
     action = {
@@ -71,29 +84,34 @@ def menu_card(lang: str = "th") -> dict[str, Any]:
     }
     row = menu_item(
         "1",
-        "menu-3",
+        "document-send",
         THEME_BLUE,
         copy["start"],
         copy["start_desc"],
         action,
     )
-    liff_id = os.getenv("LINE_COWORK_LIFF_ID") or os.getenv("LINE_LIFF_ID", "")
+    uri = stocktake_url()
     stocktake_title = {"th": "ตรวจนับสต็อก", "en": "Stocktake", "zh": "库存盘点", "ja": "棚卸"}[
         _language(lang)
     ]
     stocktake_row = (
         menu_item(
             "2",
-            "menu-3",
+            "stocktake",
             THEME_BLUE,
             stocktake_title,
-            stocktake_title,
+            {
+                "th": "สแกนบาร์โค้ดและบันทึกจำนวน",
+                "en": "Scan barcodes and record quantities",
+                "zh": "扫描条码并记录实盘数量",
+                "ja": "バーコードを読み取り数量を記録",
+            }[_language(lang)],
             {
                 "type": "uri",
-                "uri": f"https://liff.line.me/{liff_id}?flow=cowork-stocktake&draft=list",
+                "uri": uri,
             },
         )
-        if liff_id
+        if uri
         else None
     )
     return {

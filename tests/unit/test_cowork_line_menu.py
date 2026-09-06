@@ -35,6 +35,7 @@ def texts(value) -> list[str]:
     return []
 
 
+@patch.dict("os.environ", {"LINE_COWORK_LIFF_ID": "test-cowork"})
 class CoworkLineMenuTests(unittest.TestCase):
     def test_each_language_shows_only_the_available_entry(self):
         unavailable_copy = {
@@ -47,14 +48,19 @@ class CoworkLineMenuTests(unittest.TestCase):
             with self.subTest(lang=lang):
                 card = menu_cards.menu_card(lang)
                 menu_cells = cells(card)
-                self.assertEqual(len(menu_cells), 1)
+                self.assertEqual(len(menu_cells), 2)
+                self.assertEqual(menu_cells[1]["action"]["uri"], menu_cards.stocktake_url())
+                self.assertIn(
+                    "/stocktake.png?v=1", menu_cells[1]["contents"][0]["contents"][0]["url"]
+                )
                 self.assertEqual(
                     menu_cells[0]["action"]["data"],
                     "action=cowork_erp_start",
                 )
                 self.assertNotIn(unavailable, texts(card))
                 self.assertIn(
-                    "/static/dms/line-icons/", menu_cells[0]["contents"][0]["contents"][0]["url"]
+                    "/static/stocktake/line-icons/document-send.png",
+                    menu_cells[0]["contents"][0]["contents"][0]["url"],
                 )
                 self.assertEqual(menu_cells[0]["contents"][-1]["text"], "›")
 
@@ -63,10 +69,17 @@ class CoworkLineMenuTests(unittest.TestCase):
             menu_cards.menu_card("fr")["altText"], menu_cards.menu_card("th")["altText"]
         )
 
-    def test_rich_menu_has_only_first_cell_action(self):
+    def test_rich_menu_has_two_actions_matching_flex_menu(self):
         payload = rich_menu.build_payload()
         self.assertEqual(payload["size"], {"width": 2500, "height": 1686})
-        self.assertEqual(len(payload["areas"]), 1)
+        self.assertEqual(len(payload["areas"]), 2)
+        self.assertEqual(
+            payload["areas"][1],
+            {
+                "bounds": {"x": 833, "y": 0, "width": 833, "height": 843},
+                "action": {"type": "uri", "uri": menu_cards.stocktake_url()},
+            },
+        )
         self.assertEqual(
             payload["areas"][0],
             {

@@ -1,4 +1,4 @@
-"""Cowork LINE six-cell Rich Menu with one active workflow entry."""
+"""Cowork LINE six-cell Rich Menu with document and stocktake entries."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ from pathlib import Path
 import urllib.request
 from typing import Any
 
-from services.cowork_line.menu_cards import ACTION_ERP_START
+from services.cowork_line.menu_cards import ACTION_ERP_START, stocktake_url
 from services.line_platform import client as line_client
 
 logger = logging.getLogger(__name__)
 
-MENU_NAME = "pearnly-cowork-v1"
+MENU_NAME = "pearnly-cowork-stocktake-v2"
 IMAGE_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
@@ -27,6 +27,9 @@ CHANNEL = "cowork"
 
 
 def build_payload() -> dict[str, Any]:
+    uri = stocktake_url()
+    if not uri:
+        raise ValueError("Cowork LIFF ID is required to publish the stocktake menu")
     return {
         "size": {"width": WIDTH, "height": HEIGHT},
         "selected": False,
@@ -45,7 +48,11 @@ def build_payload() -> dict[str, Any]:
                     "data": f"action={ACTION_ERP_START}",
                     "displayText": "ส่งเอกสารเข้า ERP",
                 },
-            }
+            },
+            {
+                "bounds": {"x": 833, "y": 0, "width": 833, "height": ROW_HEIGHT},
+                "action": {"type": "uri", "uri": uri},
+            },
         ],
     }
 

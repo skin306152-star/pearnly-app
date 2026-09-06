@@ -2,7 +2,7 @@
 (function () {
     'use strict';
     window.PearnlyStocktakeCounter = function (host, options) {
-        const { t, esc, api } = options;
+        const { t, esc, api, quantity } = options;
         let task = options.task,
             camera = null,
             cameraMode = !!options.mobile,
@@ -138,7 +138,7 @@
             const values = draft;
             $('[data-entry-editor]').innerHTML = `<form data-entry-form class="st-card st-count">
                 <h3>${esc(selected.product_name)}</h3><p>${esc(selected.product_code)} · ${esc(selected.unit)}</p>
-                <p>${esc(t('book_qty'))}: ${esc(selected.book_qty)} · ${esc(t('actual-total'))}: ${esc(selected.actual_qty === null ? t('uncounted') : selected.actual_qty)}</p>
+                <p>${esc(t('book_qty'))}: ${esc(quantity(selected.book_qty))} · ${esc(t('actual-total'))}: ${esc(selected.actual_qty === null ? t('uncounted') : quantity(selected.actual_qty))}</p>
                 <label>${esc(t('warehouse'))}<input data-entry-warehouse list="st-warehouses" maxlength="300" required placeholder="${esc(t('choose-or-type'))}" value="${esc(values.warehouse)}"></label>
                 <datalist id="st-warehouses">${warehouseOptions()
                     .map((v) => `<option value="${esc(v)}"></option>`)
@@ -277,11 +277,11 @@
                 'difference',
             ];
             $('[data-product-summary]').innerHTML =
-                `<div class="st-table"><table><thead><tr>${fields.map((k) => `<th>${esc(t(k === 'actual_qty' ? 'actual-total' : k))}</th>`).join('')}</tr></thead><tbody>${visible.map((r) => `<tr>${fields.map((k) => `<td data-label="${esc(t(k === 'actual_qty' ? 'actual-total' : k))}">${esc(r[k] === null ? t('uncounted') : r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="st-toolbar">${reportPage ? action('report-prev', 'prev') : ''}<span>${items.length ? reportPage * 50 + 1 : 0}–${reportPage * 50 + visible.length} / ${items.length}</span>${(reportPage + 1) * 50 < items.length ? action('report-next', 'next') : ''}</div>`;
+                `<div class="st-table"><table><thead><tr>${fields.map((k) => `<th>${esc(t(k === 'actual_qty' ? 'actual-total' : k))}</th>`).join('')}</tr></thead><tbody>${visible.map((r) => `<tr>${fields.map((k) => `<td data-label="${esc(t(k === 'actual_qty' ? 'actual-total' : k))}">${esc(r[k] === null ? t('uncounted') : ['book_qty', 'actual_qty', 'difference'].includes(k) ? quantity(r[k]) : r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="st-toolbar">${reportPage ? action('report-prev', 'prev') : ''}<span>${items.length ? reportPage * 50 + 1 : 0}–${reportPage * 50 + visible.length} / ${items.length}</span>${(reportPage + 1) * 50 < items.length ? action('report-next', 'next') : ''}</div>`;
         }
         function history() {
             $('[data-entries]').innerHTML =
-                `<div class="st-list">${displayedEntries.map((e) => `<article class="st-card"><strong>${esc(e.product_name)}</strong><span>${esc(e.product_code)} · ${esc(e.warehouse)} / ${esc(e.location || '—')}</span><span>${esc(e.quantity)} ${esc(e.unit)} · ${esc(e.voided ? t('entry-voided') : t('entry-included'))}</span><small>${esc(e.counted_by_name)} · ${esc(new Date(e.counted_at).toLocaleString())}</small>${task.status === 'active' && !e.voided ? `<div class="st-toolbar"><button type="button" class="pu-btn pu-btn--secondary" data-edit-entry="${esc(e.id)}">${esc(t('edit-entry'))}</button><button type="button" class="pu-btn pu-btn--secondary" data-void-entry="${esc(e.id)}">${esc(t('void-entry'))}</button></div>` : ''}</article>`).join('') || `<p>${esc(t('no-entries'))}</p>`}</div><div class="st-toolbar">${entryPage ? action('entries-prev', 'prev') : ''}<span>${entryTotal ? entryPage * 50 + 1 : 0}–${entryPage * 50 + displayedEntries.length} / ${entryTotal}</span>${(entryPage + 1) * 50 < entryTotal ? action('entries-next', 'next') : ''}</div>`;
+                `<div class="st-list">${displayedEntries.map((e) => `<article class="st-card"><strong>${esc(e.product_name)}</strong><span>${esc(e.product_code)} · ${esc(e.warehouse)} / ${esc(e.location || '—')}</span><span>${esc(quantity(e.quantity))} ${esc(e.unit)} · ${esc(e.voided ? t('entry-voided') : t('entry-included'))}</span><small>${esc(e.counted_by_name)} · ${esc(new Date(e.counted_at).toLocaleString())}</small>${task.status === 'active' && !e.voided ? `<div class="st-toolbar"><button type="button" class="pu-btn pu-btn--secondary" data-edit-entry="${esc(e.id)}">${esc(t('edit-entry'))}</button><button type="button" class="pu-btn pu-btn--secondary" data-void-entry="${esc(e.id)}">${esc(t('void-entry'))}</button></div>` : ''}</article>`).join('') || `<p>${esc(t('no-entries'))}</p>`}</div><div class="st-toolbar">${entryPage ? action('entries-prev', 'prev') : ''}<span>${entryTotal ? entryPage * 50 + 1 : 0}–${entryPage * 50 + displayedEntries.length} / ${entryTotal}</span>${(entryPage + 1) * 50 < entryTotal ? action('entries-next', 'next') : ''}</div>`;
         }
         async function pageEntries(delta) {
             const target = entryPage + delta;
@@ -308,7 +308,7 @@
                     );
                     selected = task.items.find((r) => r.id === editing.item_id);
                     draft = {
-                        quantity: editing.quantity,
+                        quantity: quantity(editing.quantity),
                         warehouse: editing.warehouse,
                         location: editing.location,
                     };

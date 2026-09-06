@@ -3,6 +3,10 @@
     'use strict';
     window.PearnlyStocktake = function (host, options) {
         const t = (key) => options.t('st-' + key);
+        const quantity = (value) => {
+            const text = String(value ?? '').replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+            return text === '-0' ? '0' : text;
+        };
         const esc = (s) =>
             String(s == null ? '' : s).replace(
                 /[&<>"']/g,
@@ -109,6 +113,7 @@
                     api,
                     t,
                     esc,
+                    quantity,
                     mobile: options.mobile,
                     onChanged(next) {
                         task = next;
@@ -178,7 +183,7 @@
                 'difference',
             ];
             $('[data-rows]').innerHTML = matches.length
-                ? `<div class="st-table"><table><thead><tr>${headers.map((k) => `<th>${esc(t(k))}</th>`).join('')}<th></th></tr></thead><tbody>${visible.map((r) => `<tr>${headers.map((k) => `<td data-label="${esc(t(k))}">${esc(r[k] === null ? t('uncounted') : r[k])}</td>`).join('')}<td>${task.status === 'active' ? `<button class="pu-btn pu-btn--secondary" data-item="${esc(r.id)}">${esc(t(r.actual_qty === null ? 'count' : 'recount'))}</button>` : ''}</td></tr>`).join('')}</tbody></table></div><div class="st-toolbar">${page ? button('prev', 'prev') : ''}<span>${page * 50 + 1}–${page * 50 + visible.length} / ${matches.length}</span>${(page + 1) * 50 < matches.length ? button('next', 'next') : ''}</div>`
+                ? `<div class="st-table"><table><thead><tr>${headers.map((k) => `<th>${esc(t(k))}</th>`).join('')}<th></th></tr></thead><tbody>${visible.map((r) => `<tr>${headers.map((k) => `<td data-label="${esc(t(k))}">${esc(r[k] === null ? t('uncounted') : ['book_qty', 'actual_qty', 'difference'].includes(k) ? quantity(r[k]) : r[k])}</td>`).join('')}<td>${task.status === 'active' ? `<button class="pu-btn pu-btn--secondary" data-item="${esc(r.id)}">${esc(t(r.actual_qty === null ? 'count' : 'recount'))}</button>` : ''}</td></tr>`).join('')}</tbody></table></div><div class="st-toolbar">${page ? button('prev', 'prev') : ''}<span>${page * 50 + 1}–${page * 50 + visible.length} / ${matches.length}</span>${(page + 1) * 50 < matches.length ? button('next', 'next') : ''}</div>`
                 : `<p>${esc(t('no-matches'))}</p>`;
             if (exact && matches.length) {
                 const preferred = matches.filter(
@@ -194,7 +199,7 @@
             selected = task.items.find((r) => r.id === id);
             const variants = task.items.filter((r) => r.product_code === selected.product_code);
             $('[data-count]').innerHTML =
-                `<form class="st-card st-count"><h3>${esc(selected.product_name)}</h3><p>${esc(selected.product_code)} · ${esc(selected.unit)}</p><label>${esc(t('choose-location'))}<select data-variant>${variants.map((r) => `<option value="${esc(r.id)}" ${r.id === id ? 'selected' : ''}>${esc(r.warehouse)} / ${esc(r.location || '—')}</option>`).join('')}</select></label><label>${esc(t('actual_qty'))}<input data-qty type="number" inputmode="decimal" min="0" step="0.000001" required value="${esc(selected.actual_qty)}"></label><p>${esc(t('book_qty'))}: ${esc(selected.book_qty)} · ${esc(t('actual_qty'))}: ${esc(selected.actual_qty === null ? t('uncounted') : selected.actual_qty)}</p><div class="st-toolbar"><button class="pu-btn pu-btn--primary">${esc(t('save-next'))}</button>${button('cancel-count', 'cancel')}</div></form>`;
+                `<form class="st-card st-count"><h3>${esc(selected.product_name)}</h3><p>${esc(selected.product_code)} · ${esc(selected.unit)}</p><label>${esc(t('choose-location'))}<select data-variant>${variants.map((r) => `<option value="${esc(r.id)}" ${r.id === id ? 'selected' : ''}>${esc(r.warehouse)} / ${esc(r.location || '—')}</option>`).join('')}</select></label><label>${esc(t('actual_qty'))}<input data-qty type="number" inputmode="decimal" min="0" step="0.000001" required value="${esc(quantity(selected.actual_qty))}"></label><p>${esc(t('book_qty'))}: ${esc(quantity(selected.book_qty))} · ${esc(t('actual_qty'))}: ${esc(selected.actual_qty === null ? t('uncounted') : quantity(selected.actual_qty))}</p><div class="st-toolbar"><button class="pu-btn pu-btn--primary">${esc(t('save-next'))}</button>${button('cancel-count', 'cancel')}</div></form>`;
             if (options.mobile) {
                 $('[data-rows]').hidden = true;
                 $('[data-search]').hidden = true;

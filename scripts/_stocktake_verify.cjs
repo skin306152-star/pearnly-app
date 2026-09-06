@@ -211,6 +211,8 @@ async function main() {
         await expect(host.locator('dialog')).toHaveCount(0);
         assert.equal(state.imported, true);
         await expect(host.locator('tbody tr')).toHaveCount(2);
+        await expect(host.locator('[data-product-summary]')).toContainText('12.5');
+        await expect(host.locator('[data-product-summary]')).not.toContainText('12.500000');
         await expect(host.locator('[data-item]')).toHaveCount(0);
         async function identify(code) {
             await host.locator('[data-code]').click();
@@ -270,6 +272,28 @@ async function main() {
         await expect(host.locator('[data-item]')).toHaveCount(0);
         await page.evaluate(() => window.applyLang('th'));
         await expect(host.locator('h1')).toHaveText(await text(page, 'st-title', 'th'));
+        // Existing legacy tasks use the same quantity display without changing identifier text.
+        state.task.count_mode = 'legacy';
+        Object.assign(state.task.items[0], {
+            book_qty: '10.000000',
+            actual_qty: '9.000000',
+            difference: '-1.000000',
+        });
+        Object.assign(state.task.items[1], {
+            book_qty: '12345678901234.123456',
+            actual_qty: '0.000000',
+            difference: '-12345678901234.123456',
+        });
+        await host.locator('[data-action="refresh"]').click();
+        await expect(host.locator('[data-rows] tbody tr')).toHaveCount(2);
+        const cells = await host.locator('tbody tr').allTextContents();
+        assert.ok(cells[0].includes('0012'));
+        assert.ok(!cells.join('').includes('.000000'));
+        assert.ok(cells[1].includes('12345678901234.123456'));
+        await page.screenshot({
+            path: path.join(ART, '06-legacy-quantity-display.png'),
+            fullPage: true,
+        });
         await context.close();
 
         const mobile = await browser.newContext({

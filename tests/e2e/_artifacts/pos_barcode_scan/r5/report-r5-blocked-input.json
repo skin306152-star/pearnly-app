@@ -5,8 +5,8 @@
     "staleToastText": "เพิ่มแล้ว โค้ก / Coke / 可乐 / コーラ",
     "burst": {
       "n": 14,
-      "stampMax": 7.6,
-      "perfMax": 7.9
+      "stampMax": 8.3,
+      "perfMax": 8.4
     },
     "toast": {
       "shown": true,
@@ -140,8 +140,8 @@
     "ok": true,
     "ruler": {
       "n": 14,
-      "stampMax": 103.5,
-      "perfMax": 103.5
+      "stampMax": 103.1,
+      "perfMax": 103.2
     },
     "inHandBand": true,
     "toast": {

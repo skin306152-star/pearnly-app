@@ -97,7 +97,8 @@ def parse(data):
         sheet = wb.worksheets[0]
         rows = sheet.iter_rows()
         header = next(rows, ())
-        if tuple(str(c.value or "").strip() for c in header) != FIELDS:
+        header_names = tuple(str(c.value or "").strip() for c in header)
+        if header_names not in (FIELDS, tuple(LABELS["th"][:7])):
             raise HTTPException(422, detail="stocktake.headers_invalid")
         result, seen = [], set()
         for number, cells in enumerate(rows, 2):
@@ -137,7 +138,7 @@ def workbook(rows=None, lang="en"):
     wb = Workbook()
     sheet = wb.active
     sheet.title = "Stocktake"
-    headers = list(FIELDS)
+    headers = LABELS["th"][:7]
     if rows is not None:
         headers = LABELS.get(lang, LABELS["en"])
     sheet.append(headers)

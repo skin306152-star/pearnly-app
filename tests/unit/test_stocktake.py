@@ -100,6 +100,7 @@ class StocktakeExcel(TestCase):
 
     def test_template_can_be_filled_without_header_changes(self):
         wb = load_workbook(BytesIO(excel.workbook()))
+        self.assertEqual([cell.value for cell in wb.active[1]], excel.LABELS["th"][:7])
         for index, value in enumerate(ROW, 1):
             wb.active.cell(2, index, value)
         data = BytesIO()

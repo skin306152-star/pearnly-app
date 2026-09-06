@@ -4,7 +4,7 @@
 
 网页入口是 `/cowork#/stocktake`，位于 Cowork「对账中心」下面。网页只包含列表、新建弹窗和详情。新建时上传统一 `.xlsx` 模板，校验通过后立即开始；不提供覆盖账面数据的接口。导入失败整批不落库。
 
-LINE 在现有 Cowork 菜单卡「上传单据到 ERP」之后增加「库存盘点」跳转按钮。沿用 `LINE_COWORK_LIFF_ID`（以及现有 `LINE_LIFF_ID` 回落）和已绑定的 Cowork 成员身份；无需新增 LIFF 应用。菜单 URI 为既有 LIFF ID 加 `flow=cowork-stocktake&draft=list`，既有 `/home`、`/login` 主重定向选择手机盘点壳。没有修改或发布 LINE Rich Menu 图片，也没有向客户发送消息。
+LINE 在现有 Cowork 菜单卡「上传单据到 ERP」之后增加「库存盘点」跳转按钮。沿用 `LINE_COWORK_LIFF_ID`（以及现有 `LINE_LIFF_ID` 回落）和已绑定的 Cowork 成员身份；无需新增 LIFF 应用。菜单 URI 为既有 LIFF ID 加 `flow=cowork-stocktake&draft=list`，既有 `/home`、`/login` 主重定向选择手机盘点壳。LINE 底部 Rich Menu 第一格为上传单据，第二格为库存盘点；菜单卡与底部菜单分别使用单据发送和盘点清单图标。2026-09-06 已发布并回读默认菜单 `richmenu-0aa42f054b8a47a8d1d9e7db9012e8be`，两个点击区域及上传图片字节一致；旧默认 `richmenu-c25aa3ffb5478c93253fcb42299ade25` 保留用于回退。四语 Flex 卡通过 LINE validate API，不发送测试消息。
 
 手机选择公司和盘点任务，扫描条形码或搜索商品编号，选择商品所在仓库／库位，输入数量后保存并继续。同码多库位必须选定具体记录；成功盘点后记住当前仓库／库位。商品记录匹配仅使用本次导入的数据，不访问 POS 商品或 ERP 库存。二维码不在本版范围。
 
@@ -12,17 +12,17 @@ LINE 在现有 Cowork 菜单卡「上传单据到 ERP」之后增加「库存盘
 
 ## Excel 约定
 
-模板表头固定为：
+下载模板默认使用泰语表头，导入同时兼容旧版英文标识表头。列顺序固定为：
 
-| 字段 | 内容 | 必填 |
-| --- | --- | --- |
-| product_code | 商品编号，Excel 文本格式，保留前导零 | 是 |
-| product_name | 商品名称 | 是 |
-| barcode | 条形码，Excel 文本格式 | 否 |
-| warehouse | 仓库 | 是 |
-| location | 库位；空值代表未细分库位 | 否 |
-| unit | 单位 | 是 |
-| book_qty | 账面数量，可负数，最多 6 位小数 | 是 |
+| 默认泰语表头 | 兼容英文表头 | 内容 | 必填 |
+| --- | --- | --- | --- |
+| รหัสสินค้า | product_code | 商品编号，Excel 文本格式，保留前导零 | 是 |
+| ชื่อสินค้า | product_name | 商品名称 | 是 |
+| บาร์โค้ด | barcode | 条形码，Excel 文本格式 | 否 |
+| คลังสินค้า | warehouse | 仓库 | 是 |
+| ช่องเก็บ | location | 库位；空值代表未细分库位 | 否 |
+| หน่วย | unit | 单位 | 是 |
+| จำนวนตามบัญชี | book_qty | 账面数量，可负数，最多 6 位小数 | 是 |
 
 表头批注提供中、泰、英、日说明。单次最大 5 MB、10,000 行，解压总量上限 40 MB；拒绝公式、无效数量、数字格式的编号和条码，以及重复的「商品编号＋仓库＋库位」。匹配保留大小写，不模糊归一化商品身份。
 
@@ -46,3 +46,6 @@ LINE 在现有 Cowork 菜单卡「上传单据到 ERP」之后增加「库存盘
 - 浏览器截图在 `tests/e2e/_artifacts/stocktake/`。扫码视频用 `venv/bin/python scripts/_scan_ean_y4m.py /tmp/stocktake-camera.y4m` 生成。
 
 代码包含 `0123_cowork_stocktake` 迁移，以及现有 Cloud Run 串行 schema job 的接入。已于 2026-09-06 合并到 master 并按 Cloud Run 流程发布：SHA `ea1d3e1607ccae3e05ab6a4ba60c20e0ee70dbed`，CD [34018589884](https://github.com/skin306152-star/pearnly-app/actions/runs/34018589884)，schema execution `pearnly-schema-sxww8` 成功。Web／Worker 新 revision 各承接 100% 流量，正式域名健康／就绪与手机资源精确字节回读通过。完整 pre-push 1156 个测试模块及静态闸通过；首次检查发现手机缓存依赖清单漏项，已补齐并重新通过。LINE iOS／Android 真机相机、实际成员登录和真实业务验收由用户自行进行，尚未记为通过。完整上线身份见 [部署账本](../deployment/MIGRATION_STATUS.md)。
+
+
+2026-09-06 后续修正已发布：SHA `c96e24294d566956e1c5bb91efff09eb6d7e8091`，CD [34019557598](https://github.com/skin306152-star/pearnly-app/actions/runs/34019557598)。补齐底部盘点入口、修正两种菜单图标、补充四语盘点说明，下载模板默认泰语并兼容旧英文列标识。菜单定向 5 项、盘点定向 14 项和完整 pre-push 1156 个模块通过。真实 LINE API 回读默认菜单、两区域及图片一致，四语 Flex validate 通过；正式图标通过浏览器 HTTP 及字节检查。用户提供的五个实物条码已生成本地测试 Excel，校验位和实际导入解析通过；没有向真实账套导入测试任务，也没有发送测试 LINE 消息。

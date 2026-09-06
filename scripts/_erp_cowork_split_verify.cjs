@@ -21,7 +21,7 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
-const BASE = 'http://127.0.0.1:8765';
+const BASE = process.env.ENTRY_BASE || 'http://127.0.0.1:8765';
 const ROOT = path.resolve(__dirname, '..');
 const ART = path.join(ROOT, 'tests', 'e2e', '_artifacts', 'erp-cowork-split');
 
@@ -447,6 +447,7 @@ async function run() {
     await verifyLogin302();
     await verifyCoworkLogin(browser);
     await verifyErpLogin(browser);
+    await verifySuperAdminCowork(browser);
 
     // 共享 home SPA(带 token + API 桩)
     await verifyHome(browser, 'cowork', 'cowork');
@@ -485,6 +486,62 @@ async function run() {
     });
 
     return summary();
+}
+
+async function verifySuperAdminCowork(browser) {
+    for (const returning of [true, false]) {
+        const ctx = await browser.newContext({ viewport: DESKTOP });
+        await ctx.addInitScript((existing) => {
+            if (localStorage.getItem('entry-fixture-seeded')) return;
+            localStorage.setItem('entry-fixture-seeded', '1');
+            localStorage.setItem('mrpilot_token', 'stale-admin-session');
+            if (existing) localStorage.setItem('mrpilot_token_cowork', 'tok');
+            localStorage.setItem('mrpilot_lang', 'zh');
+            localStorage.setItem('pearnly_active_workspace_client_id_cowork', '1');
+        }, returning);
+        const page = await ctx.newPage();
+        const navigations = [];
+        page.on('framenavigated', (frame) => {
+            if (frame === page.mainFrame()) navigations.push(new URL(frame.url()).pathname);
+        });
+        await page.route('**/api/**', (route) => {
+            const req = route.request();
+            const pathname = new URL(req.url()).pathname;
+            if (pathname === '/api/login') {
+                chk('Cowork 新登录请求保持 cowork 入口', req.postDataJSON().entry === 'cowork');
+                return route.fulfill(json({ access_token: 'tok', is_super_admin: true }));
+            }
+            if (pathname === '/api/me') {
+                const token = req.headers().authorization;
+                if (token !== 'Bearer tok') return route.fulfill(json({}, 401));
+                return route.fulfill(json({ ...ME, is_super_admin: true }));
+            }
+            return routeStub('cowork')(route);
+        });
+        await page.goto(BASE + '/cowork/');
+        if (!returning) {
+            await page.locator('#li-username').fill('super-admin-fixture');
+            await page.locator('#li-password').fill('test-only-password');
+            await page.locator('#btn-login').click();
+        }
+        await page.waitForFunction(() => window._userInfo?.is_super_admin === true);
+        await page.waitForTimeout(1200);
+        chk(
+            `超管 ${returning ? '快捷进入' : '新登录'} 留在 Cowork`,
+            new URL(page.url()).pathname === '/cowork' &&
+                !navigations.some((p) => p === '/earn' || p.startsWith('/admin'))
+        );
+        chk(
+            'Cowork 不覆盖已有管理后台会话',
+            (await page.evaluate(() => localStorage.getItem('mrpilot_token'))) ===
+                'stale-admin-session'
+        );
+        await shot(page, `cowork-super-${returning ? 'returning' : 'login'}.png`);
+        await page.goto(BASE + '/admin/cost');
+        await page.waitForURL('**/earn');
+        chk('管理后台失效会话仍需在 Earn 登录', new URL(page.url()).pathname === '/earn');
+        await ctx.close();
+    }
 }
 
 let browser;

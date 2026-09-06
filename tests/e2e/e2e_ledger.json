@@ -80,7 +80,7 @@
       "only_e2e": [
         "真实 cowork 壳首次深链、对账下方导航、新建弹窗居中和手机布局只能由浏览器布局验证",
         "真实共享 POS 引擎和已发布 WASM 读取 EAN 与内部编号 QR 视频，商品自动出现、相机释放、提交后自动继续扫描及权限拒绝手输，需要真实媒体与 DOM 生命周期",
-        "手机 LINE 与网页携带各自凭证和公司头，零数量、逐笔累计、响应丢失后的同 ID 重试、修改撤销、每次扫码按商品映射账面仓库库位及空值、语言切换保留输入及结束锁定在真实事件链验证；业务 API 与 LINE SDK 为桩，SQL 另由独立真库测试验证，不代表真机验收"
+        "手机 LINE 与网页携带各自凭证和公司头，零数量、逐笔累计、响应丢失后的同 ID 重试、修改撤销、每次扫码按商品映射账面仓库库位及空值、卡片删除确认与取消及失败保留、语言切换保留输入及结束锁定在真实事件链验证；业务 API 与 LINE SDK 为桩，SQL 另由独立真库测试验证，不代表真机验收"
       ]
     },
     "_pos_vat_summary_verify.cjs": {
@@ -736,7 +736,7 @@
         "桌面与手机(390×844)两套登录门各自真渲染(cowork=旧 auth-shell/#form-login,erp=独立 #p-form/#p-email):isVisible + getComputedStyle 双证,且输入框用 keyboard.type 验焦点与键入值",
         "cowork 顶级菜单严格 = 首页/Pearnly Cowork/主数据/使用教程、erp 严格 = 首页/商品/采购系统/销售系统/主数据:DOM 顺序 + isVisible + display!==none 逐条量,非白名单项必须 display:none;手机抽屉打开后同结构复验",
         "全局 topbar 无搜索输入、按 Cmd/Ctrl+K 不弹任何命令面板/遮罩/不改 URL(overlaySig 前后一致);但账套切换器(orgsw-pop)内部搜索框真获焦、收下键盘输入、按词过滤主体列表 —— 两条路在同一跑里互证",
-        "跨壳深链 allowlist:stock-card 在 cowork 被拦回 dashboard、在 erp 放行到 page-stock-card;history 在 cowork 放行、在 erp 被拦回 dashboard —— 同一路由两壳行为相反,只有真 _entryGuardRoute + COWORK/ERP_ALLOWED_ROUTES 走得出"
+        "超级管理员 Cowork 快捷进入与新登录留在 Cowork，保持旧管理后台会话不变且失效管理会话仍回 Earn；跨壳深链 allowlist:stock-card 在 cowork 被拦回 dashboard、在 erp 放行到 page-stock-card;history 在 cowork 放行、在 erp 被拦回 dashboard —— 同一路由两壳行为相反,只有真 _entryGuardRoute + COWORK/ERP_ALLOWED_ROUTES 走得出"
       ]
     },
     "_erp_admin_invite_verify.cjs": {

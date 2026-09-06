@@ -91,6 +91,11 @@ def detail(task_id: UUID, request: Request):
     return output(store.detail(stocktake_access.scope_for(request, "recon.view"), task_id))
 
 
+@router.delete("/{task_id}")
+def delete_task(task_id: UUID, request: Request):
+    return store.delete_task(stocktake_access.scope_for(request, "recon.create"), task_id)
+
+
 @router.put("/{task_id}/items/{item_id}")
 def count(task_id: UUID, item_id: UUID, body: Count, request: Request):
     scope = stocktake_access.scope_for(request, "recon.create")

@@ -65,7 +65,7 @@
             base();
             $('[data-body]').innerHTML =
                 `${options.mobile ? '' : `<div class="st-toolbar">${button('template', 'template')}${button('new', 'new')}</div><p>${esc(t('intro'))}</p>`}
-                <div class="st-list">${tasks.length ? tasks.map((r) => `<button class="st-card" data-task="${esc(r.id)}"><strong>${esc(r.name)}</strong><span>${esc(t(r.status))} · ${r.counted}/${r.total} ${esc(t('counted'))}</span><progress value="${r.counted}" max="${r.total || 1}"></progress><span>${esc(t('differences'))}: ${r.differences}</span></button>`).join('') : `<p>${esc(t('empty'))}</p>`}</div>`;
+                <div class="st-list">${tasks.length ? tasks.map((r) => `<article class="st-card"><button class="st-task-open" data-task="${esc(r.id)}"><strong>${esc(r.name)}</strong><span>${esc(t(r.status))} · ${r.counted}/${r.total} ${esc(t('counted'))}</span><progress value="${r.counted}" max="${r.total || 1}"></progress><span>${esc(t('differences'))}: ${r.differences}</span></button>${options.mobile ? '' : `<button type="button" class="pu-btn pu-btn--secondary" data-delete-task="${esc(r.id)}">${esc(t('delete'))}</button>`}</article>`).join('') : `<p>${esc(t('empty'))}</p>`}</div>`;
         }
         async function load() {
             const seq = ++generation;
@@ -326,6 +326,23 @@
         host.onclick = async (event) => {
             const target = event.target.closest('button');
             if (!target) return;
+            if (target.dataset.deleteTask) {
+                const record = tasks.find((r) => r.id === target.dataset.deleteTask);
+                if (!record) return;
+                const seq = generation;
+                dialog(
+                    `<h2>${esc(t('delete'))}</h2><p><strong>${esc(record.name)}</strong></p><p>${esc(t('delete-confirm'))}</p>`,
+                    async () => {
+                        await api('/' + record.id, { method: 'DELETE' });
+                        if (seq === generation) {
+                            tasks = tasks.filter((r) => r.id !== record.id);
+                            listView();
+                            message(t('deleted'));
+                        }
+                    }
+                );
+                return;
+            }
             if (target.dataset.task) {
                 await open(target.dataset.task);
                 return;

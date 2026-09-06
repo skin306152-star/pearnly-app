@@ -78,18 +78,32 @@ async function stub(context, state, mobile = false) {
             }
             return route.fulfill(
                 json({
-                    tasks: [
-                        {
-                            ...state.task,
-                            total: 2,
-                            counted: state.task.items.filter((r) => r.actual_qty !== null).length,
-                            differences: 1,
-                        },
-                    ],
+                    tasks: state.deleted
+                        ? []
+                        : [
+                              {
+                                  ...state.task,
+                                  total: 2,
+                                  counted: state.task.items.filter((r) => r.actual_qty !== null)
+                                      .length,
+                                  differences: 1,
+                              },
+                          ],
                 })
             );
         }
-        if (p === '/api/cowork/stocktakes/' + taskId) return route.fulfill(json(state.task));
+        if (p === '/api/cowork/stocktakes/' + taskId) {
+            if (req.method() === 'DELETE') {
+                state.deleteRequests = (state.deleteRequests || 0) + 1;
+                if (state.failDelete) {
+                    state.failDelete = false;
+                    return route.fulfill(json({ detail: 'authz.forbidden' }, 403));
+                }
+                state.deleted = true;
+                return route.fulfill(json({ ok: true }));
+            }
+            return route.fulfill(json(state.task));
+        }
         if (p.endsWith('/entries') && req.method() === 'GET')
             return route.fulfill(
                 json({ entries: state.task.entries, total: state.task.entry_total })
@@ -304,6 +318,26 @@ async function main() {
             path: path.join(ART, '06-legacy-quantity-display.png'),
             fullPage: true,
         });
+        await host.locator('[data-action="back"]').click();
+        await host.locator('[data-delete-task]').click();
+        await expect(host.locator('dialog')).toContainText(state.task.name);
+        await page.screenshot({ path: path.join(ART, '07-delete-confirm.png'), fullPage: true });
+        await host.locator('dialog [data-cancel]').click();
+        assert.equal(state.deleteRequests || 0, 0);
+        await expect(host.locator('[data-task]')).toHaveCount(1);
+        await host.locator('[data-delete-task]').click();
+        state.failDelete = true;
+        await host.locator('dialog button:not([type])').click();
+        await expect(host.locator('[data-dialog-message]')).not.toBeEmpty();
+        await expect(host.locator('[data-task]')).toHaveCount(1);
+        await host.locator('dialog button:not([type])').click();
+        await expect(host.locator('dialog')).toHaveCount(0);
+        await expect(host.locator('[data-task]')).toHaveCount(0);
+        assert.equal(state.deleteRequests, 2);
+        await page.reload();
+        await page.locator('[data-route="stocktake"]').click();
+        await expect(host.locator('[data-body]')).toContainText(await text(page, 'st-empty'));
+        await expect(host.locator('[data-task]')).toHaveCount(0);
         await context.close();
 
         const mobile = await browser.newContext({

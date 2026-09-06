@@ -108,8 +108,7 @@
         localStorage.setItem('pearnly_entry', _entry);
     } catch (_e) {}
 
-    function canonicalAfterLogin(entry, isSuperAdmin) {
-        if (isSuperAdmin) return '/admin/cost';
+    function canonicalAfterLogin(entry) {
         return '/home?canonical=' + (entry === 'erp' ? 'erp' : 'cowork');
     }
 
@@ -330,13 +329,11 @@
                 return;
             }
             localStorage.setItem(_slotKey, data.access_token);
-            // 超管:镜像 legacy token —— admin SPA(/admin/cost)只读 legacy mrpilot_token,不走本槽。
-            if (data.is_super_admin) localStorage.setItem('mrpilot_token', data.access_token);
             localStorage.setItem('mrpilot_lang', currentLang());
             localStorage.setItem('pearnly_entry', _entry);
             setMessage(T('loginSuccess'), 'success');
             window.setTimeout(() => {
-                window.location.href = canonicalAfterLogin(_entry, data.is_super_admin);
+                window.location.href = canonicalAfterLogin(_entry);
             }, 400);
         } catch (_err) {
             setMessage(T('netError'), 'error');

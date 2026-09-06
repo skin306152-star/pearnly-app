@@ -55,14 +55,16 @@ class LandingEntryRoutingTests(unittest.TestCase):
 
     def test_canonical_for_maps_erp_else_cowork(self):
         text = _read("static/landing/landing.js")
-        self.assertIn("canonicalAfterLogin(entry, isSuperAdmin)", text)
+        self.assertIn("canonicalAfterLogin(entry)", text)
         self.assertIn("entry === 'erp' ? 'erp' : 'cowork'", text)
 
     def test_canoniical_after_login_defaults_cowork(self):
-        # 登录成功落 /home?canonical=cowork(erp 落 /home?canonical=erp;超管 /admin/cost)。
+        # 超管也留在选定的业务入口，不覆盖独立管理后台的会话。
         text = _read("static/landing/landing.js")
         self.assertIn("canonicalAfterLogin", text)
-        self.assertIn("return '/admin/cost'", text)
+        self.assertNotIn("return '/admin/cost'", text)
+        self.assertNotIn("setItem('mrpilot_token', data.access_token)", text)
+        self.assertNotIn("window.location.replace('/admin/cost')", _read("src/home/core-boot.ts"))
         self.assertIn("'/home?canonical=' + (entry === 'erp' ? 'erp' : 'cowork')", text)
 
     def test_signup_lands_on_cowork_canonical(self):

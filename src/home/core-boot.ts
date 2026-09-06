@@ -356,7 +356,7 @@ async function loadAll() {
         // v118.28.2 · 超管 /admin URL 独立(对齐 Stripe / Xero / QuickBooks)
         // 规则:
         //   - 普通用户 → 只能进 /cowork · 偷偷输 /admin 自动弹回(2026-08-26 /home 退居内部入口)
-        //   - 超管 → 永远只看 /admin · 误进 /cowork 自动跳走
+        //   - 超管在当前业务入口正常使用；只有主动打开 /admin 才进入管理后台
         // v118.44.0 · _isAdminPath 加 startsWith('/admin/')· 新 /admin/cost · /admin/users 也算 admin path
         // ============================================================
         try {
@@ -367,15 +367,10 @@ async function loadAll() {
                 window.location.replace('/cowork');
                 return;
             }
-            if (!_isAdminPath && _isSuper) {
-                // v118.44.0 · 超管默认跳新 admin layout(独立 SPA)· 不再跳 /admin(老 home.html 兜底)
-                window.location.replace('/admin/cost');
-                return;
-            }
             window.PEARNLY_ADMIN_MODE = _isAdminPath;
             // REFACTOR-C1 · 老 home.html admin 布局(_isAdminPath 强制 #/admin-users)已下线 ·
             //   home.js 永不在 /admin* 加载(server: /admin/* → admin.html SPA)· _isAdminPath 恒 false ·
-            //   仅保留上面「超管误进 /home → 弹回 /admin/cost」的活逻辑。
+            //   业务入口不因超级管理员身份改变登录入口或会话槽。
         } catch (_e) {
             window.PEARNLY_ADMIN_MODE = false;
         }

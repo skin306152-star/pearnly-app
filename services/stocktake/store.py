@@ -167,3 +167,44 @@ def close(scope, task_id):
                 (scope.user_id, str(task_id)),
             )
         return {"ok": True}
+
+
+def delete_task(scope, task_id):
+    """Delete the scoped snapshot and its children under the count/close task lock."""
+    with cursor(scope, commit=True) as cur:
+        try:
+            _task(cur, scope, task_id, lock=True)
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                return {"ok": True}
+            raise
+        params = (str(task_id), scope.tenant_id, scope.workspace_client_id)
+        cur.execute(
+            "DELETE FROM cowork_stocktake_entry_events v USING cowork_stocktake_entries e "
+            "WHERE v.entry_id=e.id AND v.tenant_id=e.tenant_id "
+            "AND v.workspace_client_id=e.workspace_client_id "
+            "AND e.stocktake_id=%s AND e.tenant_id=%s AND e.workspace_client_id=%s",
+            params,
+        )
+        cur.execute(
+            "DELETE FROM cowork_stocktake_counts c USING cowork_stocktake_items i "
+            "WHERE c.item_id=i.id AND c.tenant_id=i.tenant_id "
+            "AND c.workspace_client_id=i.workspace_client_id "
+            "AND i.stocktake_id=%s AND i.tenant_id=%s AND i.workspace_client_id=%s",
+            params,
+        )
+        cur.execute(
+            "DELETE FROM cowork_stocktake_entries "
+            "WHERE stocktake_id=%s AND tenant_id=%s AND workspace_client_id=%s",
+            params,
+        )
+        cur.execute(
+            "DELETE FROM cowork_stocktake_items "
+            "WHERE stocktake_id=%s AND tenant_id=%s AND workspace_client_id=%s",
+            params,
+        )
+        cur.execute(
+            "DELETE FROM cowork_stocktakes WHERE id=%s AND tenant_id=%s AND workspace_client_id=%s",
+            params,
+        )
+    return {"ok": True}

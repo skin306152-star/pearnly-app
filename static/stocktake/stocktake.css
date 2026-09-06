@@ -64,6 +64,17 @@
 .st-table {
   overflow-x: auto;
 }
+.stocktake .st-task-open {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
 .st-table table {
   width: 100%;
   border-collapse: collapse;

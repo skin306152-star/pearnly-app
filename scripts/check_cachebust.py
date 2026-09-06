@@ -133,6 +133,16 @@ _ENTRY_ASSETS = {
         "/static/cowork-line-intake/field-editor.js",
         "/static/cowork-line-intake/app.js",
     ),
+    "static/stocktake/mobile.html": (
+        "/static/pearnly-ui.css",
+        "/static/home-01-base.css",
+        "/static/stocktake/stocktake.css",
+        "/static/i18n-data.js",
+        "/static/line-intake-review/liff-runtime.js",
+        "/static/scan/scan-loader.js",
+        "/static/stocktake/ui.js",
+        "/static/stocktake/mobile.js",
+    ),
     "static/daily/daily.html": (
         "/static/daily/daily.webmanifest",
         "/static/dist/daily.css",

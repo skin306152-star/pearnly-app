@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-06 16:36（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，Cowork 盘点已上线先扫实物、逐笔累计和泰语双页导出；用户真机与业务验收待确认**。
+更新时间：2026-09-06 16:51（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，盘点数量已去掉末尾补零；扫描逐笔流程与泰语双页导出保持**。
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,9 +27,10 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`1741b99b9c79da25eb1e42bb7a7abf0f5c216b61`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:cb6afd58e31dc99429239dcd1c58cd636b6e45f326671c5dfd044a2efd16cd60`。
-- Web revision：`pearnly-web-1741b99b9c79-s2`，100%流量；Worker revision：`pearnly-worker-1741b99b9c79-s2`，100%流量。
+- 完整 SHA：`b816f291146f0d8b506c3af8e67fd62831231a39`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:88cda4f7c81274ee96a67c61a8a3d814422d0a64094b6821a400d08ff8179e90`。
+- Web revision：`pearnly-web-b816f291146f-s2`，100%流量；Worker revision：`pearnly-worker-b816f291146f-s2`，100%流量。
+- 数量显示修正 [34025488705](https://github.com/skin306152-star/pearnly-app/actions/runs/34025488705) 成功；schema execution `pearnly-schema-slgdb` 成功，两端候选与正式身份／就绪／完整下载检查通过。盘点网页与手机、新旧任务的账面、实盘、差异、逐笔数量及修改输入去掉末尾补零，10.000000 显示 10，2.500000 显示 2.5；保留实际小数精度和编号前导零，不改数据库数值。定向浏览器与前端推送闸通过。正式域名 readiness 200，`stocktake_numbers=b816f291146f` 日志命中新 Web，ui.js?v=3、counter.js?v=2、main.js?v=12060025 回读字节一致。
 - 扫描逐笔盘点发布 [34024627136](https://github.com/skin306152-star/pearnly-app/actions/runs/34024627136) 成功；schema execution `pearnly-schema-rzxsq` 于 09:29:56 UTC 成功，新 Web／Worker 候选与正式版本的精确 SHA、镜像、健康／就绪和完整安装包检查通过。两服务已各接管 100% 流量；正式域名 `stocktake_v2=1741b99b9c79` readiness 请求日志命中新 Web revision，HTTP 200。手机壳内容一致（Cloudflare 追加的统计脚本单独识别），camera.js、counter.js、ui.js、CSS、共享扫码 bundle、main.js 与词典按页面实际缓存参数回读字节一致。
 - 本次新增 0124 逐笔记录与审计结构，新任务一行一个商品、条形码或内部 QR 精确匹配、实际仓库库位自由选择／输入、累计与修改撤销、泰语商品汇总／位置明细导出。旧任务保留 legacy 数据与行为。修正 WASM 同步初始化返回值兼容并同步 POS 离线缓存版本；真实 EAN／QR、连续扫码、网络重试、修改撤销、位置记忆、语言草稿、POS 扫码与离线回归通过，独立 PostgreSQL 验证累计、审计、并发和 RLS。最终完整 pre-push 1157 模块与所有静态／构建闸通过。此前缓存版本格式与离线缓存指纹闸曾拦截，修正后重新通过；没有绕过检查。发布运行 34024613313 因输入 SHA 错误在云端变更前取消，实际成功运行以上述 34024627136 为准。
 - 泰语结果导出修正 [34020406001](https://github.com/skin306152-star/pearnly-app/actions/runs/34020406001) 成功；schema execution `pearnly-schema-vj7fk` 成功，两端候选及正式版本/健康/就绪/完整安装包检查通过。正式域名 readiness 200。结果导出接口统一泰语，旧网页发送 `lang=zh/en/ja` 也不改变表头；定向 15 项通过，其中实际 HTTP 响应 XLSX 验证全部 11 列泰语及差异数值，完整 pre-push 1156 个模块通过。真实用户再次导出验收待用户确认。

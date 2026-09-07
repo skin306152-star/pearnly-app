@@ -43,6 +43,25 @@ class VerifyIdTokenTests(unittest.TestCase):
         os.environ.pop("LINE_LOGIN_CHANNEL_ID", None)
         self.assertIsNone(liff.verify_id_token("tok", "LINE_LIFF_ID"))
 
+    def test_dms_invalid_line_token_requires_line_login_before_binding_lookup(self):
+        from core.pos_api import PosError
+
+        for claims in (None, {}):
+            with (
+                self.subTest(claims=claims),
+                mock.patch.object(dms_edit, "verify_id_token", return_value=claims),
+                mock.patch("services.line_dms.store.get_binding_by_line_user") as lookup,
+                mock.patch.object(dms_edit, "create_access_token") as issue,
+            ):
+                with self.assertRaises(PosError) as caught:
+                    asyncio.run(
+                        dms_edit.dms_booking_liff_auth(dms_edit.LiffAuthIn(id_token="expired"))
+                    )
+                self.assertEqual(caught.exception.http_status, 401)
+                self.assertEqual(caught.exception.code, "dms_booking.line_auth_required")
+                lookup.assert_not_called()
+                issue.assert_not_called()
+
     def test_dms_bound_user_gets_dms_scoped_token(self):
         binding = {"id": "epoch-1", "line_user_id": "L1", "user_id": "u1", "tenant_id": "t1"}
         user = {

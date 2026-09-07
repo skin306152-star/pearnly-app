@@ -58,8 +58,12 @@ async def dms_booking_liff_auth(req: LiffAuthIn):
     from services.line_dms import store
 
     claims = await asyncio.to_thread(verify_id_token, req.id_token, "LINE_DMS_LIFF_ID")
-    binding = await asyncio.to_thread(store.get_binding_by_line_user, (claims or {}).get("sub"))
+    if not claims or not claims.get("sub"):
+        logger.warning("DMS browser authentication rejected: line_token_invalid")
+        raise PosError("dms_booking.line_auth_required", 401, detail="line_token_invalid")
+    binding = await asyncio.to_thread(store.get_binding_by_line_user, claims["sub"])
     if not binding:
+        logger.warning("DMS browser authentication rejected: line_not_bound")
         raise PosError("dms_booking.not_bound", 403, detail="line_not_bound")
     user = await asyncio.to_thread(db.find_user_by_id, str(binding["user_id"]))
     if not user or not user.get("is_active", True):

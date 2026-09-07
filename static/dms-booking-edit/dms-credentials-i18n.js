@@ -3,6 +3,10 @@
 
     window.DMS_CREDENTIALS_TEXT = {
         th: {
+            lineAuthRequired: 'ยืนยันบัญชี LINE อีกครั้งเพื่อเปิดหน้ารหัสผ่าน DMS',
+            reconnect: 'ยืนยัน LINE อีกครั้ง',
+            retry: 'ลองโหลดอีกครั้ง',
+            loadFailed: 'เปิดข้อมูลบัญชีไม่สำเร็จ กรุณาลองโหลดอีกครั้ง',
             title: 'เปลี่ยนบัญชีและรหัสผ่าน DMS',
             subtitle:
                 'กรอกชื่อผู้ใช้และรหัสผ่านที่ใช้งานอยู่ใน MR.ERP DMS เพื่ออัปเดตข้อมูลเชื่อมต่อของ Pearnly',
@@ -29,6 +33,10 @@
             loading: 'กำลังโหลดข้อมูลบัญชี…',
         },
         en: {
+            lineAuthRequired: 'Verify your LINE account again to open DMS credential settings.',
+            reconnect: 'Verify LINE again',
+            retry: 'Try loading again',
+            loadFailed: 'Could not load account details. Please try again.',
             title: 'Update DMS credentials',
             subtitle:
                 'Enter the username and password currently used in MR.ERP DMS to update Pearnly’s connection.',
@@ -55,6 +63,10 @@
             loading: 'Loading account details…',
         },
         zh: {
+            lineAuthRequired: '请重新验证 LINE 身份，再打开 DMS 密码设置。',
+            reconnect: '重新验证 LINE',
+            retry: '重新加载',
+            loadFailed: '账号信息加载失败，请重新加载。',
             title: '更改 DMS 账号密码',
             subtitle: '填写目前在 MR.ERP DMS 使用的用户名和密码，更新 Pearnly 的连接凭证。',
             username: 'DMS 用户名',
@@ -79,6 +91,10 @@
             loading: '正在加载账号信息…',
         },
         ja: {
+            lineAuthRequired: 'DMSの接続情報を開くには、LINEアカウントを再認証してください。',
+            reconnect: 'LINEを再認証',
+            retry: '再読み込み',
+            loadFailed: 'アカウント情報を読み込めませんでした。再読み込みしてください。',
             title: 'DMSのアカウント情報を変更',
             subtitle:
                 'MR.ERP DMSで現在使用しているユーザー名とパスワードを入力し、Pearnlyの接続情報を更新します。',

@@ -64,3 +64,13 @@
 - 线上回读：三个DMS入口样本均200/no-store/DYNAMIC；首页、AI、ERP、Cowork、Daily、POS、cashier、health均200并恢复原max-age=14400；DMS版本脚本仍HIT。真实iPhone在17:51认证与读取200，用户随后反馈“可以了”；未将此反馈扩写为无日志的PUT成功。
 - 另用真实 cashier/pos/daily Service Worker 和隔离浏览器验证 no-store 外壳仍能写入 CacheStorage 并离线重新打开，3项通过。此检查只覆盖离线外壳，不是离线销售/同步验收；最终方案已恢复这些入口原策略。
 - 全局缓存设计若需后续治理，应单独确定范围与验收，不包含在本次DMS补丁中。
+
+## 2026-09-07 菜单4手机恢复LINE内打开
+
+用户要求菜单4在LINE内修改DMS账号密码，保留之前已解决的问题。历史提交`7da4b2d2`先将菜单3改为系统浏览器；`0f450a33`修复LIFF主回跳与桌面入口时，把菜单4也改成了外部链接。两者没有必须共用打开方式的业务依赖。
+
+本次候选`3a9db541e7b16345212c485a05989a97f02c65b2`只为手机菜单4使用独立`credentials_liff_url()`，入口为`https://liff.line.me/<DMS_LIFF_ID>/dms-booking?credentials=dms`。菜单3的外部地址、桌面Flex地址、主回跳处理、登录中继、凭据保存/RLS/认证恢复均未改动；Cloudflare仍使用已发布的DMS局部规则`bd70ddb6`。新菜单采用`pearnly-dms-basic-v3-liff`和`pearnly-dms-query-v3-liff`名称，避免旧菜单重复名称影响权限同步；权限判断逻辑不变。
+
+验证：16项定向单测通过；现有跨平台浏览器脚本6项通过，覆盖iOS WebKit与Android Chromium模拟，以及macOS Chromium、Windows Firefox/Chromium浏览器模型。手机菜单4桩明确设为LINE内环境，主回跳HTTP200且OAuth参数保留、认证后读取账号；菜单3仍完整走auth/ticket/relay，桌面地址保持一致。浏览器使用模拟LINE SDK/API，不能替代手机LINE真机验收。完整pre-push通过，含1163个单测模块及静态、格式、构建和权限检查。
+
+LINE API已创建并回读两个新菜单：默认四项`richmenu-4fabd60b180dd4e0dd08cc0d5bbc05ae`。发布前逐字段比较新旧菜单，只有名称及菜单4 URI变化；旧菜单保留。后端发布与现有绑定菜单同步的最终证据见部署账本。

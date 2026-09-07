@@ -56,7 +56,7 @@ class DmsRichMenuTests(unittest.TestCase):
 
     def test_payload_has_query_in_fifth_cell(self):
         with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=False):
-            payload = rich_menu.build_payload()
+            payload = rich_menu.build_payload(can_query=True)
         self.assertEqual(payload["size"], {"width": 2500, "height": 1686})
         self.assertLessEqual(len(payload["chatBarText"]), 14)
         self.assertEqual(len(payload["areas"]), 5)
@@ -98,37 +98,28 @@ class DmsRichMenuTests(unittest.TestCase):
         self.addCleanup(lambda: os.path.exists(tmp.name) and os.unlink(tmp.name))
         return tmp.name
 
-    def test_replacement_sets_new_default_before_deleting_old(self):
+    def test_publish_both_variants_then_sets_safe_default(self):
         events = []
         with (
             patch.object(
-                rich_menu,
-                "_list_menus",
-                return_value=[{"name": rich_menu.MENU_NAME, "richMenuId": "OLD"}],
-            ),
-            patch.object(
-                rich_menu.line_client,
-                "create_rich_menu",
-                side_effect=lambda *a, **k: events.append("create") or "NEW",
-            ),
+                rich_menu.line_client, "create_rich_menu", side_effect=["BASIC", "QUERY"]
+            ) as create,
             patch.object(
                 rich_menu,
                 "_upload_image",
-                side_effect=lambda *a, **k: events.append("upload") or True,
+                side_effect=lambda menu_id, *_: events.append(("upload", menu_id)) or True,
             ),
             patch.object(
                 rich_menu,
                 "_set_default",
-                side_effect=lambda menu_id: events.append(f"default:{menu_id}") or True,
+                side_effect=lambda menu_id: events.append(("default", menu_id)) or True,
             ),
-            patch.object(
-                rich_menu,
-                "_delete_menu",
-                side_effect=lambda menu_id: events.append(f"delete:{menu_id}") or True,
-            ),
+            patch.object(rich_menu, "_delete_menu") as delete,
         ):
-            self.assertEqual(rich_menu.setup_default_menu(self._image_path()), "NEW")
-        self.assertEqual(events, ["create", "upload", "default:NEW", "delete:OLD"])
+            self.assertEqual(rich_menu.setup_default_menu(self._image_path()), "BASIC")
+        self.assertEqual(events, [("upload", "BASIC"), ("upload", "QUERY"), ("default", "BASIC")])
+        self.assertEqual([len(c.args[0]["areas"]) for c in create.call_args_list], [4, 5])
+        delete.assert_not_called()
 
     def test_failed_upload_deletes_only_new_menu(self):
         deleted = []
@@ -151,26 +142,12 @@ class DmsRichMenuTests(unittest.TestCase):
         self.assertEqual(deleted, ["NEW"])
         set_default.assert_not_called()
 
-    def test_failed_default_deletes_only_new_menu(self):
-        deleted = []
+    def test_uncertain_default_does_not_delete_possibly_active_menu(self):
         with (
-            patch.object(
-                rich_menu,
-                "_list_menus",
-                return_value=[{"name": rich_menu.MENU_NAME, "richMenuId": "OLD"}],
-            ),
-            patch.object(rich_menu.line_client, "create_rich_menu", return_value="NEW"),
+            patch.object(rich_menu.line_client, "create_rich_menu", side_effect=["BASIC", "QUERY"]),
             patch.object(rich_menu, "_upload_image", return_value=True),
             patch.object(rich_menu, "_set_default", return_value=False),
-            patch.object(
-                rich_menu,
-                "_delete_menu",
-                side_effect=lambda menu_id: deleted.append(menu_id) or True,
-            ),
+            patch.object(rich_menu, "_delete_menu") as delete,
         ):
             self.assertIsNone(rich_menu.setup_default_menu(self._image_path()))
-        self.assertEqual(deleted, ["NEW"])
-
-
-if __name__ == "__main__":
-    unittest.main()
+        delete.assert_not_called()

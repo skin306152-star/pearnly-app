@@ -47,6 +47,21 @@ def _reply(reply_token: str, text: str) -> None:
 
 
 async def _handle_dms_event(ev: dict) -> None:
+    from services.line_dms import binding_guard
+
+    line_id = (ev.get("source") or {}).get("userId")
+    binding = await asyncio.to_thread(store.get_binding_by_line_user, line_id) if line_id else None
+    if binding and ev.get("type") != "unfollow":
+        if not await asyncio.to_thread(binding_guard.current, binding):
+            return
+    with binding_guard.scope(binding):
+        try:
+            await _handle_dms_event_bound(ev, binding)
+        except binding_guard.BindingChanged:
+            logger.warning("DMS event stopped after binding changed")
+
+
+async def _handle_dms_event_bound(ev: dict, binding) -> None:
     """单个 DMS LINE 事件处理:闸 → follow/text/unfollow 分发。
 
     闸判定域必须在「能知道租户是谁」之后:
@@ -59,8 +74,6 @@ async def _handle_dms_event(ev: dict) -> None:
     src = ev.get("source") or {}
     line_user_id = src.get("userId")
     reply_token = ev.get("replyToken")
-
-    binding = store.get_binding_by_line_user(line_user_id) if line_user_id else None
 
     # 未绑用户的绑定码:闸判定域是「码所属租户」,须在核销前按码判闸。
     if not binding and ev_type == "message":

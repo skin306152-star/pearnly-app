@@ -238,7 +238,7 @@ def build_icon(path, glyph, color):
     return image
 
 
-def build_menu():
+def build_menu(can_query=True):
     image = Image.new("RGB", (MENU_WIDTH, MENU_HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
     dot_color = blend(BACKGROUND, PURPLE, 0.05)
@@ -261,8 +261,12 @@ def build_menu():
         ),
         (1, 1, ORANGE, "ค้นหาข้อมูล", "ยอดขายล่าสุดจาก DMS", draw_search, 68),
     )
+    edges = COLUMN_EDGES
+    if not can_query:
+        edges = (0, 1250, 2500)
+        active_cells = tuple((i % 2, i // 2, *cell[2:]) for i, cell in enumerate(active_cells[:4]))
     for col, row, color, title, subtitle, glyph, title_size in active_cells:
-        left, right = COLUMN_EDGES[col], COLUMN_EDGES[col + 1]
+        left, right = edges[col], edges[col + 1]
         top = row * ROW_EDGE
         bottom = (row + 1) * ROW_EDGE
         center_x = (left + right) / 2
@@ -291,7 +295,7 @@ def build_menu():
             top + 640,
         )
 
-    for index in range(2, 3):
+    for index in (range(2, 3) if can_query else []):
         left, right = COLUMN_EDGES[index], COLUMN_EDGES[index + 1]
         center_x = (left + right) / 2
         rounded_card(
@@ -310,7 +314,10 @@ def build_menu():
             )
 
     MENU_PATH.parent.mkdir(parents=True, exist_ok=True)
-    image.save(MENU_PATH, "PNG", optimize=True)
+    path = (
+        MENU_PATH if can_query else MENU_PATH.with_name(MENU_PATH.name.replace("v1-", "basic-v2-"))
+    )
+    image.save(path, "PNG", optimize=True)
     return image
 
 
@@ -320,6 +327,7 @@ def main():
         (CREDENTIAL_ICON_PATH, build_icon(CREDENTIAL_ICON_PATH, draw_lock, GREEN)),
         (QUERY_ICON_PATH, build_icon(QUERY_ICON_PATH, draw_search, ORANGE)),
         (MENU_PATH, build_menu()),
+        (MENU_PATH.with_name(MENU_PATH.name.replace("v1-", "basic-v2-")), build_menu(False)),
     )
     for path, image in assets:
         print(f"{path} {image.width}x{image.height} {image.mode}")

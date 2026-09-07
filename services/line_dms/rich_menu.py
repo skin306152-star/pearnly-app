@@ -14,7 +14,8 @@ from services.line_platform import client as line_client
 
 logger = logging.getLogger(__name__)
 
-MENU_NAME = "pearnly-dms-v1"
+MENU_NAME = "pearnly-dms-basic-v2"
+QUERY_MENU_NAME = "pearnly-dms-query-v2"
 _IMAGE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "static",
@@ -71,11 +72,11 @@ def credentials_desktop_url() -> str:
     return _entry_url("credentials", external=False)
 
 
-def build_payload() -> dict:
-    return {
+def build_payload(can_query: bool = False) -> dict:
+    payload = {
         "size": {"width": _W, "height": _H},
         "selected": False,
-        "name": MENU_NAME,
+        "name": QUERY_MENU_NAME if can_query else MENU_NAME,
         "chatBarText": "เมนู DMS",
         "areas": [
             _area(
@@ -118,6 +119,17 @@ def build_payload() -> dict:
             ),
         ],
     }
+
+    if not can_query:
+        payload["areas"] = payload["areas"][:4]
+        for index, area in enumerate(payload["areas"]):
+            area["bounds"] = {
+                "x": (index % 2) * 1250,
+                "y": (index // 2) * _ROW_H,
+                "width": 1250,
+                "height": _ROW_H,
+            }
+    return payload
 
 
 def _list_menus() -> list:
@@ -190,26 +202,27 @@ def _set_default(rich_menu_id: str) -> bool:
 
 
 def setup_default_menu(image_path: str = None) -> Optional[str]:
-    """安全替换 DMS 默认菜单；新菜单生效前不删除旧菜单。"""
-    path = image_path or _IMAGE_PATH
-    try:
-        with open(path, "rb") as image_file:
-            image = image_file.read()
-    except OSError as exc:
-        logger.error("DMS Rich Menu image read failed: %s", exc)
+    """Publish both variants; the global default never includes privileged queries."""
+    menus = {}
+    for allowed, path in (
+        (False, image_path or _IMAGE_PATH.replace("v1-", "basic-v2-")),
+        (True, _IMAGE_PATH),
+    ):
+        try:
+            with open(path, "rb") as image_file:
+                image = image_file.read()
+        except OSError:
+            logger.exception("DMS Rich Menu image unavailable")
+            return None
+        menu_id = line_client.create_rich_menu(build_payload(allowed), channel="dms")
+        if not menu_id:
+            return None
+        if not _upload_image(menu_id, image):
+            _delete_menu(menu_id)
+            return None
+        menus[allowed] = menu_id
+    if not _set_default(menus[False]):
         return None
-
-    old_ids = [menu.get("richMenuId") for menu in _list_menus() if menu.get("name") == MENU_NAME]
-    rich_menu_id = line_client.create_rich_menu(build_payload(), channel="dms")
-    if not rich_menu_id:
-        return None
-    mime = "image/jpeg" if path.lower().endswith((".jpg", ".jpeg")) else "image/png"
-    if not _upload_image(rich_menu_id, image, mime) or not _set_default(rich_menu_id):
-        _delete_menu(rich_menu_id)
-        return None
-
-    for old_id in old_ids:
-        if old_id and old_id != rich_menu_id:
-            _delete_menu(old_id)
-    logger.info("DMS Rich Menu published: %s", rich_menu_id)
-    return rich_menu_id
+    # Existing linked menus remain until reconciliation; never delete another run's menu.
+    logger.info("DMS permission menus published")
+    return menus[False]

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from services.line_dms.binding_guard import browser_call
+
 import asyncio
 
 from fastapi import APIRouter, Request
@@ -36,7 +38,9 @@ async def _authorize(request: Request) -> dict:
     user = await asyncio.to_thread(authorize_dms, request)
     if not dms_line_enabled_for(user.get("tenant_id"), user.get("id")):
         raise PosError("dms_credentials.unavailable", 403)
-    return user
+    from services.line_dms import binding_guard
+
+    return await asyncio.to_thread(binding_guard.authorize_browser, request, user)
 
 
 def _raise(exc: self_credentials.SelfCredentialError):
@@ -47,7 +51,7 @@ def _raise(exc: self_credentials.SelfCredentialError):
 async def get_dms_credentials(request: Request):
     user = await _authorize(request)
     try:
-        return ok(await asyncio.to_thread(self_credentials.load, user))
+        return ok(await asyncio.to_thread(browser_call, user, self_credentials.load, user))
     except self_credentials.SelfCredentialError as exc:
         _raise(exc)
 
@@ -58,6 +62,8 @@ async def update_dms_credentials(request: Request, body: DmsCredentialsIn):
     try:
         return ok(
             await asyncio.to_thread(
+                browser_call,
+                user,
                 self_credentials.update,
                 user,
                 username=body.username,

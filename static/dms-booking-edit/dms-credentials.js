@@ -30,6 +30,7 @@
 
     function errorKey(error) {
         var code = error && error.code;
+        if (code === 'dms_booking.not_bound') return 'bindingChanged';
         if (code === 'dms_credentials.operator_inactive') return 'operatorInactive';
         if (code === 'dms_credentials.endpoint_missing') return 'endpointMissing';
         if (code === 'dms_credentials.unavailable') return 'unavailable';
@@ -37,13 +38,8 @@
     }
 
     async function request(path, options) {
-        try {
-            return await gateway.api(path, options);
-        } catch (error) {
-            if (error.status !== 401) throw error;
-            await gateway.authenticate();
-            return gateway.api(path, options);
-        }
+        // Never switch identity and replay a form submitted by the old identity.
+        return gateway.api(path, options);
     }
 
     function render(username) {
@@ -131,7 +127,7 @@
         closePage = options.close;
         document.getElementById('loading').querySelector('p').textContent = t('loading');
         try {
-            if (!gateway.hasDmsToken()) await gateway.authenticate();
+            await gateway.authenticate();
             var data = await request('/api/line/dms-credentials');
             render(data.username || '');
         } catch (error) {

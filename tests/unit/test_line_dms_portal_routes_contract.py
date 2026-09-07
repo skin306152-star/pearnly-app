@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from datetime import datetime, timezone
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -37,6 +38,20 @@ class LineDmsPortalRouteContractTests(unittest.TestCase):
 
 
 class LineDmsPortalRouteTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(
+            patch(
+                "services.line_dms.store.get_binding_by_user",
+                return_value={
+                    "id": "epoch",
+                    "line_user_id": "line",
+                    "tenant_id": "tenant-2",
+                    "bound_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
+                },
+            )
+        )
+        self.enterContext(patch.object(portal_routes.binding_guard, "current", return_value=True))
+
     @patch.object(portal_routes.login_tickets, "issue_login_ticket")
     @patch.object(portal_routes, "_authorize", new_callable=AsyncMock)
     def test_issue_ticket_is_bound_to_authenticated_identity(self, authorize, issue):
@@ -67,7 +82,11 @@ class LineDmsPortalRouteTests(unittest.TestCase):
     @patch.object(portal_routes.db, "find_user_by_id")
     @patch.object(portal_routes.login_tickets, "consume_login_ticket")
     def test_success_returns_uncached_relay(self, consume, find_user, load_credentials):
-        consume.return_value = {"tenant_id": "tenant-2", "user_id": "user-1"}
+        consume.return_value = {
+            "tenant_id": "tenant-2",
+            "user_id": "user-1",
+            "created_at": datetime(2026, 1, 2, tzinfo=timezone.utc),
+        }
         find_user.return_value = {
             "id": "user-1",
             "tenant_id": "tenant-2",
@@ -88,7 +107,11 @@ class LineDmsPortalRouteTests(unittest.TestCase):
     @patch.object(portal_routes.db, "find_user_by_id")
     @patch.object(portal_routes.login_tickets, "consume_login_ticket")
     def test_missing_credentials_is_conflict(self, consume, find_user, _load):
-        consume.return_value = {"tenant_id": "tenant-2", "user_id": "user-1"}
+        consume.return_value = {
+            "tenant_id": "tenant-2",
+            "user_id": "user-1",
+            "created_at": datetime(2026, 1, 2, tzinfo=timezone.utc),
+        }
         find_user.return_value = {"tenant_id": "tenant-2", "is_active": True}
         response = asyncio.run(portal_routes.consume_mrerp_login_ticket("opaque"))
         self.assertEqual(response.status_code, 409)
@@ -97,7 +120,11 @@ class LineDmsPortalRouteTests(unittest.TestCase):
     @patch.object(portal_routes.db, "find_user_by_id")
     @patch.object(portal_routes.login_tickets, "consume_login_ticket")
     def test_ticket_identity_cannot_cross_tenants(self, consume, find_user):
-        consume.return_value = {"tenant_id": "tenant-2", "user_id": "user-1"}
+        consume.return_value = {
+            "tenant_id": "tenant-2",
+            "user_id": "user-1",
+            "created_at": datetime(2026, 1, 2, tzinfo=timezone.utc),
+        }
         find_user.return_value = {"tenant_id": "tenant-other", "is_active": True}
         response = asyncio.run(portal_routes.consume_mrerp_login_ticket("opaque"))
         self.assertEqual(response.status_code, 410)

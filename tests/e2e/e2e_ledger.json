@@ -1612,6 +1612,18 @@
         "tests/e2e/_helpers/**"
       ],
       "only_e2e": ["销项每屏+向导走查截图,无 console error"]
+    },
+    "55-dms-binding-integrity.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/dms-binding-integrity/*.png",
+      "covers": [
+        "static/dms-booking-edit/dms-booking-api.js",
+        "static/dms-booking-edit/dms-credentials.js",
+        "static/dms-booking-edit/dms-credentials-i18n.js"
+      ],
+      "only_e2e": [
+        "真实浏览器保留旧共享 JWT 时仍交换当前 LINE 身份，密码 PUT 使用本页令牌且不污染网页登录态",
+        "打开表单后重新绑定，四语页面显示失效提示且不自动重试保存；菜单 3 也重新交换 LINE 身份"
+      ]
     }
   },
   "_stale_ack_rule": [

@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+from services.line_dms import binding_guard
+
 import re
+import logging
 from datetime import date
 from typing import Optional
 
@@ -38,6 +41,7 @@ _TEXT_FIELDS = frozenset(
         "engine_no",
     }
 )
+logger = logging.getLogger(__name__)
 _DATE_RE = re.compile(r"^(\d{2}/\d{2}/\d{4})\s*-\s*(\d{2}/\d{2}/\d{4})\s+(\d{1,2})$")
 _spawn = _out.make_spawn("line_dms.query_flow")
 
@@ -281,7 +285,10 @@ async def _begin_records(
     )
 
 
+@binding_guard.bound_task
 async def _run_records(binding: dict, line_user_id: str, params: dict) -> None:
+    if not await _can_query(binding):
+        return
     result = await _thr(
         sales_readback.fetch_sales_records,
         str(binding["user_id"]),
@@ -295,12 +302,15 @@ async def _run_records(binding: dict, line_user_id: str, params: dict) -> None:
         _push(line_user_id, query_cards.TXT_DENIED)
         return
     if not result.get("ok"):
+        logger.warning("DMS query failed: code=%s", result.get("error_code") or "unknown")
         _push(
             line_user_id,
             (
                 query_cards.TXT_NO_ENDPOINT
                 if result.get("error_code") == "ERR_NO_CREDS"
-                else query_cards.TXT_QUERY_FAILED
+                else (
+                    (result.get("error_friendly") or {}).get("th") or query_cards.TXT_QUERY_FAILED
+                )
             ),
         )
         return
@@ -333,7 +343,10 @@ async def _begin_top(
     cloud_dispatch.spawn("dms.top", _run_top, binding, line_user_id, params, _legacy_spawn=_spawn)
 
 
+@binding_guard.bound_task
 async def _run_top(binding: dict, line_user_id: str, params: dict) -> None:
+    if not await _can_query(binding):
+        return
     result = await _thr(
         sales_readback.fetch_top_sales,
         str(binding["user_id"]),
@@ -348,12 +361,15 @@ async def _run_top(binding: dict, line_user_id: str, params: dict) -> None:
         _push(line_user_id, query_cards.TXT_DENIED)
         return
     if not result.get("ok"):
+        logger.warning("DMS query failed: code=%s", result.get("error_code") or "unknown")
         _push(
             line_user_id,
             (
                 query_cards.TXT_NO_ENDPOINT
                 if result.get("error_code") == "ERR_NO_CREDS"
-                else query_cards.TXT_QUERY_FAILED
+                else (
+                    (result.get("error_friendly") or {}).get("th") or query_cards.TXT_QUERY_FAILED
+                )
             ),
         )
         return

@@ -259,6 +259,10 @@ def update_operator(
         # 而操作员仍拿旧密码推单失败(状态诚实)。
         if not db.update_erp_endpoint(str(user_id), str(ep["id"]), config=cfg):
             return {"error": "dms_roster.endpoint_update_failed"}
+    if can_query_dms is not None:
+        from services.line_dms.menu_sync import sync_user
+
+        sync_user(str(user_id))
     return {"ok": True}
 
 

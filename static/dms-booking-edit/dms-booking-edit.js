@@ -284,7 +284,7 @@
         }
         if (portalMode) {
             try {
-                if (!gateway.hasDmsToken()) await gateway.authenticate();
+                await gateway.authenticate();
                 var portal = await gateway.api('/api/line/dms-portal/ticket', {
                     method: 'POST',
                     body: '{}',
@@ -311,7 +311,7 @@
         }
         if (!nonce) return showError('expired');
         try {
-            if (!gateway.hasDmsToken()) await gateway.authenticate();
+            await gateway.authenticate();
             model = await gateway.api(
                 '/api/line/dms-booking/draft?nonce=' + encodeURIComponent(nonce)
             );

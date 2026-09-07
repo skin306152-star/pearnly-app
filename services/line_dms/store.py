@@ -15,7 +15,6 @@ DMS 使用独立 LINE OA 与专属表，不复用 Cowork / ERP 的绑定状态�
 
 from __future__ import annotations
 
-import json
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -203,9 +202,17 @@ def create_or_update_binding(
     同一 user 换到新 LINE 账号 → 先删其旧绑定;重复绑同一对 → 更新昵称/活跃时间。
     """
     from core import db
+    from services.line_dms import binding_state
+
+    old_lines = []
 
     def _run():
         with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                ("dms-binding-user:" + str(user_id),),
+            )
+            binding_state.lock_line(cur, line_user_id)
             cur.execute(
                 "SELECT user_id FROM line_dms_bindings WHERE line_user_id = %s LIMIT 1",
                 (line_user_id,),
@@ -217,6 +224,14 @@ def create_or_update_binding(
                 )
                 return False
             cur.execute(
+                "SELECT line_user_id FROM line_dms_bindings WHERE user_id=%s", (str(user_id),)
+            )
+            for old in cur.fetchall():
+                old_lines.append(old["line_user_id"])
+                binding_state.lock_line(cur, old["line_user_id"])
+                binding_state.invalidate(cur, old["line_user_id"], user_id)
+            binding_state.invalidate(cur, line_user_id, user_id)
+            cur.execute(
                 "DELETE FROM line_dms_bindings WHERE user_id = %s AND line_user_id != %s",
                 (str(user_id), line_user_id),
             )
@@ -225,13 +240,20 @@ def create_or_update_binding(
                 "(line_user_id, tenant_id, user_id, display_name, last_active_at) "
                 "VALUES (%s, %s, %s, %s, now()) "
                 "ON CONFLICT (line_user_id) DO UPDATE SET "
+                "  id = gen_random_uuid(), bound_at = now(), "
                 "  tenant_id = EXCLUDED.tenant_id, user_id = EXCLUDED.user_id, "
                 "  display_name = EXCLUDED.display_name, last_active_at = now()",
                 (line_user_id, str(tenant_id), str(user_id), display_name),
             )
             return True
 
-    return bool(_dal("create_or_update_binding", False)(_run))
+    changed = bool(_dal("create_or_update_binding", False)(_run))
+    if changed:
+        from services.line_dms.menu_sync import request_sync
+
+        for line_id in set(old_lines + [line_user_id]):
+            request_sync(line_id)
+    return changed
 
 
 def get_binding_by_line_user(line_user_id: str) -> Optional[dict]:
@@ -244,7 +266,7 @@ def get_binding_by_line_user(line_user_id: str) -> Optional[dict]:
     def _run():
         with db.get_cursor() as cur:
             cur.execute(
-                "SELECT tenant_id, user_id, display_name, bound_at "
+                "SELECT id, tenant_id, user_id, display_name, bound_at "
                 "FROM line_dms_bindings WHERE line_user_id = %s LIMIT 1",
                 (line_user_id,),
             )
@@ -261,7 +283,7 @@ def get_binding_by_user(user_id: str) -> Optional[dict]:
     def _run():
         with db.get_cursor() as cur:
             cur.execute(
-                "SELECT line_user_id, tenant_id, display_name, bound_at "
+                "SELECT id, line_user_id, tenant_id, display_name, bound_at "
                 "FROM line_dms_bindings WHERE user_id = %s LIMIT 1",
                 (str(user_id),),
             )
@@ -272,15 +294,35 @@ def get_binding_by_user(user_id: str) -> Optional[dict]:
 
 
 def unbind_by_user(user_id: str) -> bool:
-    """App 侧主动解绑。"""
+    """Revoke the binding and its pending browser tickets and conversation together."""
     from core import db
+    from services.line_dms import binding_state
+
+    removed_lines = []
 
     def _run():
         with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                ("dms-binding-user:" + str(user_id),),
+            )
+            cur.execute(
+                "SELECT line_user_id FROM line_dms_bindings WHERE user_id=%s", (str(user_id),)
+            )
+            for row in cur.fetchall():
+                removed_lines.append(row["line_user_id"])
+                binding_state.lock_line(cur, row["line_user_id"])
+                binding_state.invalidate(cur, row["line_user_id"], user_id)
             cur.execute("DELETE FROM line_dms_bindings WHERE user_id = %s", (str(user_id),))
             return True
 
-    return bool(_dal("unbind_by_user", False)(_run))
+    changed = bool(_dal("unbind_by_user", False)(_run))
+    if changed:
+        from services.line_dms.menu_sync import request_sync
+
+        for line_id in removed_lines:
+            request_sync(line_id)
+    return changed
 
 
 def void_bind_codes_for_user(user_id: str) -> bool:
@@ -298,20 +340,34 @@ def void_bind_codes_for_user(user_id: str) -> bool:
 def unbind_by_line_user(line_user_id: str) -> bool:
     """LINE 侧解绑(unfollow / 解绑命令)。返回是否真删到一行。"""
     from core import db
+    from services.line_dms import binding_state
 
     if not line_user_id:
         return False
 
     def _run():
         with db.get_cursor(commit=True) as cur:
-            cur.execute("DELETE FROM line_dms_bindings WHERE line_user_id = %s", (line_user_id,))
-            return cur.rowcount > 0
+            binding_state.lock_scope(cur, line_user_id)
+            cur.execute(
+                "DELETE FROM line_dms_bindings WHERE line_user_id=%s RETURNING user_id",
+                (line_user_id,),
+            )
+            row = cur.fetchone()
+            if row:
+                binding_state.invalidate(cur, line_user_id, row["user_id"])
+            return bool(row)
 
-    return bool(_dal("unbind_by_line_user", False)(_run))
+    changed = bool(_dal("unbind_by_line_user", False)(_run))
+    if changed:
+        from services.line_dms.menu_sync import request_sync
+
+        request_sync(line_user_id)
+    return changed
 
 
 def _binding_dict(row, line_user_id: str) -> dict:
     out = dict(row)
+    out["id"] = str(out["id"])
     out["line_user_id"] = line_user_id
     out["tenant_id"] = str(out["tenant_id"])
     out["user_id"] = str(out["user_id"])
@@ -346,130 +402,10 @@ def verify_nonce(
     )
 
 
-def set_session(
-    tenant_id, line_user_id: str, state: str, payload=None, ttl_minutes: Optional[int] = None
-):
-    """存/覆盖会话态(upsert)。ttl_minutes 缺省按 state 查表(见 _STATE_TTL_MINUTES)。
-
-    哨兵用 None 不用 0:0 是「立刻过期」这个合法值(测试与强制失效都在用)。
-    """
-    from core import db
-
-    ttl = state_ttl_minutes(state) if ttl_minutes is None else int(ttl_minutes)
-
-    def _run():
-        with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
-            cur.execute(
-                "INSERT INTO dms_line_sessions "
-                "(tenant_id, line_user_id, state, payload, expires_at) "
-                "VALUES (%s, %s, %s, %s::jsonb, now() + make_interval(mins => %s)) "
-                "ON CONFLICT (tenant_id, line_user_id) DO UPDATE SET "
-                "  state = EXCLUDED.state, payload = EXCLUDED.payload, "
-                "  expires_at = EXCLUDED.expires_at",
-                (
-                    str(tenant_id),
-                    str(line_user_id),
-                    state,
-                    json.dumps(payload or {}, ensure_ascii=False),
-                    ttl,
-                ),
-            )
-
-    try:
-        _with_heal(_run)
-    except Exception as e:
-        logger.warning(f"[line_dms] set_session failed: {e}")
-
-
-def get_session(tenant_id, line_user_id: str) -> Optional[dict]:
-    """读未过期会话态(过期视为无)。返回 {state, payload} 或 None。"""
-    from core import db
-
-    def _run():
-        with db.get_cursor_rls(str(tenant_id)) as cur:
-            cur.execute(
-                "SELECT state, payload FROM dms_line_sessions "
-                "WHERE tenant_id = %s AND line_user_id = %s AND expires_at > now()",
-                (str(tenant_id), str(line_user_id)),
-            )
-            return cur.fetchone()
-
-    try:
-        row = _with_heal(_run)
-    except Exception:
-        logger.warning("[line_dms] get_session failed; treat as none", exc_info=True)
-        return None
-    if not row:
-        return None
-    payload = row.get("payload")
-    return {
-        "state": row.get("state"),
-        "payload": payload if isinstance(payload, dict) else json.loads(payload or "{}"),
-    }
-
-
-def clear_session(tenant_id, line_user_id: str) -> None:
-    """删会话态(会话结束/取消)。"""
-    from core import db
-
-    def _run():
-        with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
-            cur.execute(
-                "DELETE FROM dms_line_sessions WHERE tenant_id = %s AND line_user_id = %s",
-                (str(tenant_id), str(line_user_id)),
-            )
-
-    try:
-        _with_heal(_run)
-    except Exception as e:
-        logger.warning(f"[line_dms] clear_session failed: {e}")
-
-
-def consume_nonce(tenant_id, line_user_id: str, expect_state: str, nonce: str) -> Optional[dict]:
-    """确认执行守卫:会话须在 expect_state 且 payload.nonce 吻合 nonce → 原子清 nonce
-    并返回 payload;态不符 / 无会话 / 无 nonce / 不吻合 → None(绝不写)。
-
-    token 一次性:清 nonce 后同一 nonce 的二次确认必然 mismatch(防双击双写 / 双建单)。
-    """
-    sess = get_session(tenant_id, line_user_id)
-    payload = (sess or {}).get("payload") or {}
-    if not sess or sess.get("state") != expect_state:
-        return None
-    if not payload.get("nonce") or payload.get("nonce") != nonce:
-        return None
-    set_session(tenant_id, line_user_id, expect_state, {**payload, "nonce": None})
-    return payload
-
-
-def replace_review_payload(
-    tenant_id, line_user_id: str, expected_nonce: str, payload: dict
-) -> bool:
-    """Replace one booking review draft and rotate its nonce in one guarded write."""
-    from core import db
-
-    if not expected_nonce or not payload.get("nonce"):
-        return False
-
-    def _run():
-        with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
-            cur.execute(
-                "UPDATE dms_line_sessions SET payload = %s::jsonb, "
-                "expires_at = now() + make_interval(mins => %s) "
-                "WHERE tenant_id = %s AND line_user_id = %s "
-                "AND state = 'booking_review' AND expires_at > now() "
-                "AND payload->>'nonce' = %s",
-                (
-                    json.dumps(payload, ensure_ascii=False),
-                    state_ttl_minutes("booking_review"),
-                    str(tenant_id),
-                    str(line_user_id),
-                    expected_nonce,
-                ),
-            )
-            return cur.rowcount == 1
-
-    try:
-        return bool(_with_heal(_run))
-    except Exception:
-        logger.warning("[line_dms] replace review failed", exc_info=True)
-        return False
+from services.line_dms.session_store import (  # noqa: E402,F401
+    set_session,
+    get_session,
+    clear_session,
+    consume_nonce,
+    replace_review_payload,
+)

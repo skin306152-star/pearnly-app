@@ -93,6 +93,11 @@ def issue_login_ticket(
 
     def _run():
         with db.get_cursor(commit=True) as cur:
+            from services.line_dms import binding_guard, binding_state
+
+            binding = binding_guard.snapshot()
+            if binding is not None:
+                binding_state.lock_scope(cur, binding["line_user_id"])
             cur.execute("DELETE FROM line_dms_login_tickets WHERE expires_at <= now()")
             cur.execute(
                 "INSERT INTO line_dms_login_tickets "
@@ -126,7 +131,7 @@ def consume_login_ticket(ticket: str) -> Optional[dict]:
             cur.execute(
                 "DELETE FROM line_dms_login_tickets "
                 "WHERE ticket_hash = %s AND expires_at > now() "
-                "RETURNING tenant_id, user_id",
+                "RETURNING tenant_id, user_id, created_at",
                 (_ticket_hash(ticket),),
             )
             return cur.fetchone()
@@ -134,4 +139,8 @@ def consume_login_ticket(ticket: str) -> Optional[dict]:
     row = _dal("consume_login_ticket", None)(_run)
     if not row:
         return None
-    return {"tenant_id": str(row["tenant_id"]), "user_id": str(row["user_id"])}
+    return {
+        "tenant_id": str(row["tenant_id"]),
+        "user_id": str(row["user_id"]),
+        "created_at": row["created_at"],
+    }

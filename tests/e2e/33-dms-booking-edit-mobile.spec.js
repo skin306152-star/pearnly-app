@@ -212,6 +212,11 @@ async function setupPortalTest(page, os, inClient = true) {
     };
 }
 
+// Browser editors now always exchange the current LINE identity, even with a stored web JWT.
+test.beforeEach(async ({ page }) => {
+    await setupPortalTest(page, 'web', false);
+});
+
 test('Android opens MRERP DMS externally without cancelling the browser handoff', async ({
     page,
 }) => {
@@ -474,6 +479,8 @@ test('mobile payment and attachment controls stay aligned', async ({ page }) => 
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         const url = route.request().url();
         const data = url.includes('/draft') ? DRAFT : [];
         return route.fulfill({
@@ -532,6 +539,8 @@ test('payment editor keeps bank, account and company destination as separate fie
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', async (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         if (route.request().method() === 'POST') {
             submitted = route.request().postDataJSON();
             return route.fulfill({
@@ -640,6 +649,8 @@ test('booking editor exposes every live DMS title option', async ({ page }) => {
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         const data = route.request().url().includes('/draft') ? PREFIX_DRAFT : [];
         return route.fulfill({
             status: 200,
@@ -700,6 +711,8 @@ test('save errors are actionable on mobile and desktop', async ({ page }) => {
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         if (route.request().method() === 'POST') {
             return route.fulfill({
                 status: 400,
@@ -765,6 +778,8 @@ test('geo master selects stay populated through the cascade', async ({ page }) =
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         const url = new URL(route.request().url());
         let data = [];
         if (url.pathname.endsWith('/draft')) data = GEO_DRAFT;

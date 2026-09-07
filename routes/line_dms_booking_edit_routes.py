@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from services.line_dms.binding_guard import browser_call
+
 import asyncio
 import logging
 import os
@@ -62,6 +64,10 @@ async def dms_booking_liff_auth(req: LiffAuthIn):
     user = await asyncio.to_thread(db.find_user_by_id, str(binding["user_id"]))
     if not user or not user.get("is_active", True):
         raise PosError("dms_booking.not_bound", 403, detail="line_not_bound")
+    from services.line_dms import binding_guard
+
+    if not await asyncio.to_thread(binding_guard.current, binding):
+        raise PosError("dms_booking.not_bound", 403, detail="line_not_bound")
     token = await asyncio.to_thread(
         create_access_token,
         user_id=str(user["id"]),
@@ -70,6 +76,7 @@ async def dms_booking_liff_auth(req: LiffAuthIn):
         tenant_id=str(user.get("tenant_id") or "") or None,
         role=user.get("role") or "owner",
         entry="dms",
+        dms_binding=binding,
     )
     return ok({"token": token})
 
@@ -77,7 +84,10 @@ async def dms_booking_liff_auth(req: LiffAuthIn):
 async def _authorize(request: Request) -> dict:
     from routes.dms_routes import _authorize as authorize_dms
 
-    return await asyncio.to_thread(authorize_dms, request)
+    from services.line_dms import binding_guard
+
+    user = await asyncio.to_thread(authorize_dms, request)
+    return await asyncio.to_thread(binding_guard.authorize_browser, request, user)
 
 
 def _booking_error(exc):
@@ -95,7 +105,7 @@ async def dms_booking_draft(request: Request, nonce: str):
 
     user = await _authorize(request)
     try:
-        return ok(await asyncio.to_thread(booking_edit.load, user, nonce))
+        return ok(await asyncio.to_thread(browser_call, user, booking_edit.load, user, nonce))
     except booking_edit.BookingEditError as exc:
         _booking_error(exc)
 
@@ -106,7 +116,9 @@ async def dms_booking_paints(request: Request, nonce: str, car_id: str):
 
     user = await _authorize(request)
     try:
-        return ok(await asyncio.to_thread(booking_edit.paints, user, nonce, car_id))
+        return ok(
+            await asyncio.to_thread(browser_call, user, booking_edit.paints, user, nonce, car_id)
+        )
     except booking_edit.BookingEditError as exc:
         _booking_error(exc)
 
@@ -117,7 +129,11 @@ async def dms_booking_geo(request: Request, nonce: str, level: str, parent_id: s
 
     user = await _authorize(request)
     try:
-        return ok(await asyncio.to_thread(booking_edit.geo, user, nonce, level, parent_id))
+        return ok(
+            await asyncio.to_thread(
+                browser_call, user, booking_edit.geo, user, nonce, level, parent_id
+            )
+        )
     except booking_edit.BookingEditError as exc:
         _booking_error(exc)
 
@@ -128,7 +144,9 @@ async def dms_booking_save(request: Request, req: DmsBookingSaveIn):
 
     user = await _authorize(request)
     try:
-        next_nonce = await asyncio.to_thread(booking_edit.save, user, req.nonce, req.form)
+        next_nonce = await asyncio.to_thread(
+            browser_call, user, booking_edit.save, user, req.nonce, req.form
+        )
         return ok({"nonce": next_nonce})
     except booking_edit.BookingEditError as exc:
         _booking_error(exc)

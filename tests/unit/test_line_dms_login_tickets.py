@@ -54,6 +54,7 @@ class FakeTicketCursor:
                 "tenant_id": tenant_id,
                 "user_id": user_id,
                 "expires_at": expires_at,
+                "created_at": self.now,
             }
             self._ret = {"ticket_hash": ticket_hash, "expires_at": expires_at}
         elif "WHERE expires_at <= now()" in sql:
@@ -63,7 +64,11 @@ class FakeTicketCursor:
             row = self.rows.get(params[0])
             if row and row["expires_at"] > self.now:
                 self.rows.pop(params[0])
-                self._ret = {"tenant_id": row["tenant_id"], "user_id": row["user_id"]}
+                self._ret = {
+                    "tenant_id": row["tenant_id"],
+                    "user_id": row["user_id"],
+                    "created_at": row["created_at"],
+                }
             else:
                 self._ret = None
 
@@ -174,7 +179,7 @@ class ConsumeTicketTests(unittest.TestCase):
             out = lt.issue_login_ticket("t1", "u9")
             first = lt.consume_login_ticket(out["ticket"])
             second = lt.consume_login_ticket(out["ticket"])
-        self.assertEqual(first, {"tenant_id": "t1", "user_id": "u9"})
+        self.assertEqual(first, {"tenant_id": "t1", "user_id": "u9", "created_at": cur.now})
         self.assertIsNone(second)
         self.assertEqual(cur.rows, {})
 

@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+from services.line_dms import binding_guard
+
 import asyncio
 import json
 import logging
@@ -249,8 +251,13 @@ async def _decide(
     )
 
 
+@binding_guard.bound_task
 async def _execute_approved(binding: dict, admin_line_user_id: str, req: dict) -> None:
     """以批准人自己的 endpoint 凭据执行 overwrite;成功 approved,失败回炉 pending。"""
+    profile = await _thr(roster_store.get_profile, binding["tenant_id"], binding["user_id"])
+    if not _is_active_admin(profile):
+        await _thr(approval_store.finish, binding["tenant_id"], str(req["id"]), "pending")
+        return
     tenant, approver_id = binding["tenant_id"], str(binding["user_id"])
     await _thr(line_client.start_loading, admin_line_user_id, 30, channel=_CHANNEL)
 

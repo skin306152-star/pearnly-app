@@ -262,6 +262,16 @@ class DecideTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ExecuteTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Domain behavior after authentication; rejection cases live in binding_guard regressions.
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+        self.enterContext(
+            mock.patch(
+                "services.dms_roster.store.get_profile",
+                return_value={"status": "active", "dms_role": "admin"},
+            )
+        )
+
     _EP = {"id": "ep-admin", "adapter": "mrerp_dms", "enabled": True, "config": {}}
 
     async def test_success_uses_approver_endpoint_and_snapshot(self):

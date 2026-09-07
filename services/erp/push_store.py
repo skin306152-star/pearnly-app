@@ -274,6 +274,13 @@ def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
         return False
     try:
         with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
+            from services.line_dms import binding_guard, binding_state
+
+            binding = binding_guard.snapshot()
+            if binding is not None:
+                if str(binding["user_id"]) != str(user_id):
+                    return False
+                binding_state.lock_scope(cur, binding["line_user_id"])
             # Confirm and lock the legacy row before touching any secondary defaults.
             # A managed row must be invisible to this old mutation path, including
             # its unrelated endpoints' flags.

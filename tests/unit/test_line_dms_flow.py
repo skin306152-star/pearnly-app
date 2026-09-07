@@ -134,6 +134,14 @@ class FakeStore:
     def set_session(self, tenant, luid, state, payload=None, ttl_minutes=30):
         self.data[(str(tenant), str(luid))] = {"state": state, "payload": payload or {}}
 
+    def consume_nonce(self, tenant, luid, state, nonce):
+        sess = self.get_session(tenant, luid)
+        payload = (sess or {}).get("payload") or {}
+        if not sess or sess["state"] != state or not nonce or payload.get("nonce") != nonce:
+            return None
+        self.set_session(tenant, luid, state, {**payload, "nonce": None})
+        return payload
+
     def clear_session(self, tenant, luid):
         self.data.pop((str(tenant), str(luid)), None)
 
@@ -159,6 +167,13 @@ class _Env:
     def __enter__(self):
         es = self._es
         p = lambda *a, **k: es.enter_context(mock.patch.object(*a, **k))  # noqa: E731
+        # These are domain-flow fixtures; real epoch/rebind and SQL concurrency have separate tests.
+        p(
+            __import__("services.line_dms.binding_guard", fromlist=["current"]),
+            "current",
+            return_value=True,
+        )
+        p(flow.store, "consume_nonce", side_effect=self.store.consume_nonce)
         p(flow.store, "get_session", side_effect=self.store.get_session)
         p(flow.store, "set_session", side_effect=self.store.set_session)
         p(flow.store, "clear_session", side_effect=self.store.clear_session)

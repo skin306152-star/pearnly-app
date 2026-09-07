@@ -13,6 +13,7 @@ import asyncio
 import logging
 
 from services.line_platform import client as line_client
+from services.line_dms.binding_guard import require_current
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +40,13 @@ def make_spawn(tag: str):
 
 
 def _reply(reply_token: str, text: str) -> None:
+    require_current()
     if reply_token:
         line_client.reply_text(reply_token, text, channel=_CHANNEL)
 
 
 def _push(line_user_id: str, text: str) -> None:
+    require_current()
     line_client.push_text(line_user_id, text, channel=_CHANNEL)
 
 
@@ -52,6 +55,7 @@ def _send(line_user_id: str, msg, reply_token: str = "") -> None:
 
     有 reply_token 就 reply,没有就 push —— 逐问既可能应答 postback,也可能由后台任务发起。
     """
+    require_current()
     if msg is None:
         return
     if reply_token:

@@ -32,6 +32,9 @@ class FakeCursor:
             return self._seq.pop(0) if self._seq else None
         return self._fetchone
 
+    def fetchall(self):
+        return []
+
     def all_sql(self):
         return " ".join(c[0] for c in self.calls)
 
@@ -117,6 +120,9 @@ class PeekBindCodeTenantTests(unittest.TestCase):
 
 
 class CreateBindingTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(mock.patch("services.line_dms.menu_sync.request_sync"))
+
     def test_conflict_line_bound_other_rejected(self):
         cur = FakeCursor(fetchone_seq=[{"user_id": "other"}])
         with _patch_via_db(cur):
@@ -142,7 +148,9 @@ class GetBindingTests(unittest.TestCase):
         self.assertEqual(out["line_user_id"], "L1")
 
     def test_by_line_user_normalizes_ids(self):
-        cur = FakeCursor(fetchone={"tenant_id": "t1", "user_id": "u1", "display_name": "N"})
+        cur = FakeCursor(
+            fetchone={"id": "epoch-1", "tenant_id": "t1", "user_id": "u1", "display_name": "N"}
+        )
         with _patch_via_db(cur):
             out = store.get_binding_by_line_user("L1")
         self.assertEqual(out["tenant_id"], "t1")
@@ -154,8 +162,11 @@ class GetBindingTests(unittest.TestCase):
 
 
 class UnbindTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(mock.patch("services.line_dms.menu_sync.request_sync"))
+
     def test_unbind_by_line_user_rowcount(self):
-        with _patch_via_db(FakeCursor(rowcount=1)):
+        with _patch_via_db(FakeCursor(fetchone={"user_id": "u1"}, rowcount=1)):
             self.assertTrue(store.unbind_by_line_user("L1"))
         with _patch_via_db(FakeCursor(rowcount=0)):
             self.assertFalse(store.unbind_by_line_user("L1"))

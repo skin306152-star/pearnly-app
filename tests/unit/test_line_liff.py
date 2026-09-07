@@ -44,7 +44,7 @@ class VerifyIdTokenTests(unittest.TestCase):
         self.assertIsNone(liff.verify_id_token("tok", "LINE_LIFF_ID"))
 
     def test_dms_bound_user_gets_dms_scoped_token(self):
-        binding = {"line_user_id": "L1", "user_id": "u1", "tenant_id": "t1"}
+        binding = {"id": "epoch-1", "line_user_id": "L1", "user_id": "u1", "tenant_id": "t1"}
         user = {
             "id": "u1",
             "username": "sale02",
@@ -57,12 +57,14 @@ class VerifyIdTokenTests(unittest.TestCase):
             mock.patch.object(dms_edit, "verify_id_token", return_value={"sub": "L1"}) as verify,
             mock.patch("services.line_dms.store.get_binding_by_line_user", return_value=binding),
             mock.patch.object(dms_edit.db, "find_user_by_id", return_value=user),
+            mock.patch("services.dms_roster.store.get_profile", return_value={"status": "active"}),
             mock.patch.object(dms_edit, "create_access_token", return_value="DMS-JWT") as issue,
         ):
             res = asyncio.run(dms_edit.dms_booking_liff_auth(dms_edit.LiffAuthIn(id_token="ok")))
         verify.assert_called_once_with("ok", "LINE_DMS_LIFF_ID")
         self.assertEqual(res["data"]["token"], "DMS-JWT")
         self.assertEqual(issue.call_args.kwargs["entry"], "dms")
+        self.assertEqual(issue.call_args.kwargs["dms_binding"], binding)
 
 
 class LiffEntryTests(unittest.TestCase):

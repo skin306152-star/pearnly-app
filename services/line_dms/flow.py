@@ -13,6 +13,8 @@ _IDENTITY_MAP、地址键取自 _ADDR_MAP,绝不自造键名。
 
 from __future__ import annotations
 
+from services.line_dms import binding_guard
+
 import json
 import logging
 import secrets
@@ -74,6 +76,7 @@ def handle_image(binding: dict, line_user_id: str, message_id: str) -> None:
         )
 
 
+@binding_guard.bound_task
 async def _dispatch_image(binding: dict, line_user_id: str, message_id: str) -> None:
     """图片事件分发:逐问/确认态先于 OCR。
 
@@ -248,6 +251,7 @@ async def process_image(binding: dict, line_user_id: str, message_id: str) -> No
 
 
 # ── collecting → reviewing:查重四分支 ──────────────────────────────────────
+@binding_guard.bound_task
 async def _run_dedup(
     binding: dict,
     line_user_id: str,
@@ -264,8 +268,8 @@ async def _run_dedup(
     _sess = await _thr(store.get_session, tenant, line_user_id)
     mode = str(((_sess or {}).get("payload") or {}).get("mode") or "")
     id_card_mid = ((_sess or {}).get("payload") or {}).get("id_card_mid")
-    if ep is None:
-        ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
+    # Queued work must not reuse a credential/config snapshot from before menu 4.
+    ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id or (ep or {}).get("id"))
     if not ep:
         _push(line_user_id, cards.TXT_NO_ENDPOINT)
         return
@@ -352,6 +356,7 @@ async def _run_dedup(
 
 
 # ── reviewing → 执行写档 ────────────────────────────────────────────────────
+@binding_guard.bound_task
 async def _write_create(binding: dict, line_user_id: str, payload: dict) -> None:
     d = payload.get("draft") or {}
     fields = {k: d.get(k, "") for k in _CREATE_ID_KEYS}
@@ -369,6 +374,7 @@ async def _write_create(binding: dict, line_user_id: str, payload: dict) -> None
     )
 
 
+@binding_guard.bound_task
 async def _write_update(binding: dict, line_user_id: str, payload: dict) -> None:
     d = payload.get("draft") or {}
     field_diffs = payload.get("field_diffs") or []

@@ -44,6 +44,9 @@ def _err(code: str, raw: str = "") -> Dict[str, Any]:
 def _run_logged_in(endpoint: Dict[str, Any], fn):
     """Build adapter → login → fn(client, adapter). Maps DMS errors to friendly
     dicts. NEVER raises. 会话随 adapter 退出即注销,不缓存 cookie 复用。"""
+    from services.line_dms.binding_guard import BindingChanged, require_current
+
+    require_current()
     cfg = endpoint.get("config") or {}
     adapter, build_err = _build_mrerp_dms_adapter(cfg)
     if build_err:
@@ -68,6 +71,7 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
                         )
                     raise
                 try:
+                    require_current()
                     out = fn(adapter._client(), adapter)
                 except DMSClientError as e:
                     if getattr(adapter, "concurrent_login_detected", False):
@@ -91,6 +95,8 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
             return _err("ERR_DMS_TECHNICAL", f"{type(e).__name__}: {e}")
         except DMSClientError as e:
             return _err(e.error_code or "ERR_DMS_TECHNICAL", str(e))
+    except BindingChanged:
+        raise
     except Exception as e:
         logger.exception("dms intake op failed")
         return _err("ERR_UNEXPECTED", f"{type(e).__name__}: {e}")

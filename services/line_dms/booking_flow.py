@@ -11,6 +11,8 @@ A4 定义形状),顶层 payload 只有 nonce 与 collecting 残留键。
 
 from __future__ import annotations
 
+from services.line_dms import binding_guard
+
 import dataclasses
 import json
 import logging
@@ -80,6 +82,7 @@ async def handle_postback(
 
 
 # ── 建订车单 ─────────────────────────────────────────────────────────────
+@binding_guard.bound_task
 async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> None:
     tenant, user_id = binding["tenant_id"], binding["user_id"]
     qa = payload.get("qa") or {}

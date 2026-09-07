@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse
 
 from core import db
 from core.pos_api import PosError, ok
-from services.line_dms import login_tickets, mrerp_portal
+from services.line_dms import binding_guard, login_tickets, mrerp_portal
 
 router = APIRouter(tags=["line-dms-portal"])
 
@@ -21,7 +21,10 @@ router = APIRouter(tags=["line-dms-portal"])
 async def _authorize(request: Request) -> dict:
     from routes.dms_routes import _authorize as authorize_dms
 
-    return await asyncio.to_thread(authorize_dms, request)
+    from services.line_dms import binding_guard
+
+    user = await asyncio.to_thread(authorize_dms, request)
+    return await asyncio.to_thread(binding_guard.authorize_browser, request, user)
 
 
 def _error_page(message: str, status_code: int) -> HTMLResponse:
@@ -48,7 +51,9 @@ async def issue_mrerp_login_ticket(request: Request):
     user_id = str(user.get("id") or "").strip()
     if not tenant_id or not user_id:
         raise PosError("dms_portal.identity_missing", 403)
-    issued = await asyncio.to_thread(login_tickets.issue_login_ticket, tenant_id, user_id)
+    issued = await asyncio.to_thread(
+        binding_guard.browser_call, user, login_tickets.issue_login_ticket, tenant_id, user_id
+    )
     if not issued:
         raise PosError("dms_portal.unavailable", 503)
     ticket = urllib.parse.quote(issued["ticket"], safe="")
@@ -74,6 +79,19 @@ async def consume_mrerp_login_ticket(ticket: str = ""):
     ):
         return _error_page("ไม่สามารถยืนยันผู้ใช้งานได้ กรุณาเปิดเมนูใหม่", 410)
 
+    from services.line_dms import store
+
+    binding = await asyncio.to_thread(store.get_binding_by_user, str(identity["user_id"]))
+    if binding:
+        binding = {**binding, "user_id": str(identity["user_id"])}
+    if (
+        not binding
+        or not identity.get("created_at")
+        or binding["bound_at"] > identity["created_at"]
+        or not await asyncio.to_thread(binding_guard.current, binding)
+    ):
+        return _error_page("ลิงก์หมดอายุ กรุณาเปิดเมนูใหม่", 410)
+
     try:
         username, password = await asyncio.to_thread(
             mrerp_portal.load_credentials, str(identity["user_id"])
@@ -82,6 +100,9 @@ async def consume_mrerp_login_ticket(ticket: str = ""):
         return _error_page("ยังไม่ได้ตั้งค่าบัญชี DMS ใน Pearnly", 409)
     except mrerp_portal.PortalUnavailable:
         return _error_page("ไม่สามารถเข้าสู่ DMS ได้ในขณะนี้ กรุณาลองใหม่", 503)
+
+    if not await asyncio.to_thread(binding_guard.current, binding):
+        return _error_page("ลิงก์หมดอายุ กรุณาเปิดเมนูใหม่", 410)
 
     content, nonce = mrerp_portal.render_login_relay(username, password)
     return HTMLResponse(content, headers=mrerp_portal.security_headers(nonce))

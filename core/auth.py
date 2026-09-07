@@ -85,6 +85,7 @@ def create_access_token(
     is_super_admin: bool = False,
     remember_me: bool = False,
     entry: str = "main",
+    dms_binding: Optional[Dict[str, str]] = None,
 ) -> str:
     """生成最小声明 JWT。
 
@@ -107,6 +108,10 @@ def create_access_token(
         "iat": now,
         "exp": expires_at,
     }
+    if dms_binding is not None:
+        if entry != "dms" or not all(dms_binding.get(k) for k in ("id", "line_user_id")):
+            raise ValueError("invalid_dms_binding")
+        payload["dms_binding"] = {k: str(dms_binding[k]) for k in ("id", "line_user_id")}
     token = jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM)
     # 写入 users.active_jti(失败不阻塞登录 · 老用户兼容)
     try:

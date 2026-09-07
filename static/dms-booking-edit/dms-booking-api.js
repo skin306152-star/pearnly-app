@@ -1,7 +1,8 @@
 (function () {
     'use strict';
 
-    var token = localStorage.getItem('mrpilot_token') || '';
+    // This page belongs to the current LINE binding, never the shared web login.
+    var token = '';
 
     async function api(path, opts) {
         opts = opts || {};
@@ -42,21 +43,10 @@
         });
         if (!body || !body.ok) throw new Error('auth');
         token = body.data.token;
-        localStorage.setItem('mrpilot_token', token);
     }
 
     window.DmsBookingApi = {
         api: api,
         authenticate: authenticate,
-        hasDmsToken: function () {
-            try {
-                var encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-                encoded += '='.repeat((4 - (encoded.length % 4)) % 4);
-                var payload = JSON.parse(atob(encoded));
-                return payload.entry === 'dms' && Number(payload.exp || 0) * 1000 > Date.now();
-            } catch (_) {
-                return false;
-            }
-        },
     };
 })();

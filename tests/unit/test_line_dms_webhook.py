@@ -128,6 +128,10 @@ class GateClosedSilentTests(unittest.TestCase):
 
 
 class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Domain behavior after authentication; rejection cases live in binding_guard regressions.
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+
     async def test_unbind_command(self):
         with (
             mock.patch.object(w.store, "unbind_by_line_user", return_value=True) as unbind,
@@ -181,6 +185,10 @@ class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BindCodeGateOrderingTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Domain behavior after authentication; rejection cases live in binding_guard regressions.
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+
     """R1 闸序缺陷根治:未绑用户的绑定码须按「码所属租户」判闸,不能拿 None 判。
 
     dms_line_enabled_for 用 side_effect 模拟 allowlist 灰度(仅名单内租户 True),坐实闸对
@@ -297,6 +305,10 @@ class BindCodeGateOrderingTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BoundUserFlowRoutingTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Domain behavior after authentication; rejection cases live in binding_guard regressions.
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+
     """DL-3:已绑用户的 image/text/postback 转 flow;闸关一切静默(C7)。"""
 
     _BOUND = {"tenant_id": "T1", "user_id": "U1"}

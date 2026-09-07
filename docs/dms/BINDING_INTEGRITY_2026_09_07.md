@@ -17,3 +17,15 @@
 - 前端产物已构建，缓存版本与源码同批变更。完整推送闸和生产结果在发布完成后追加。
 
 操作员 A 的原密码没有可恢复的审计值；用户已确认自行重新录入。不会猜测或复制其他操作员的密码。生产验收不往真实账套写测试单据，不主动发送测试 LINE 消息。
+
+## 发布验证
+
+- 候选源码：`efaff0d51fdee2d7f83e5f24dd6196f710f193a1`。完整 pre-push 通过，包含 1,162 个测试模块、格式/权限/产物检查；通用 GitHub CI 未启用。
+- 2026-09-07 生产回查：原 A、B 用户记录均已停用，操作员档案移除，原 LINE 绑定已解除；没有向这两个旧账号回填或猜测凭据。
+- LINE 菜单已发布：默认四项 `richmenu-0414060aa04e7164370495af0576e440`，有查询权限的五项 `richmenu-a24f1195b1706ebd34c899c5477b2fe0`。三个当前绑定回读结果为四项/五项/五项，与实时权限全部相符。旧默认菜单 `richmenu-a60183b2d306faaf15ca3ee90537573b` 保留。
+
+- [Manual CD 34104299567](https://github.com/skin306152-star/pearnly-app/actions/runs/34104299567) 成功。schema execution `pearnly-schema-vhlzn` 成功；Web/Worker revision 分别为 `pearnly-web-efaff0d51fde-s2`、`pearnly-worker-efaff0d51fde-s2`，两端 Ready 且 100% 流量。
+- 两端镜像 digest 相同：`sha256:9722166534e520dbf830f101dcda347dfd55520767b31c72c228423ee8f5e276`。发布流程对候选/正式服务的 runtime SHA、健康/就绪和安装包完整下载均验证通过。
+- 正式域名 health/ready 成功，凭据页 API、凭据脚本、四语词典与候选逐字节一致。线上只读探针：旧共享令牌及旧绑定令牌访问凭据/草稿均 401；当前有效绑定读取自身凭据配置为 200。探针没有轮换用户会话、修改用户行或发送 LINE 消息。
+- 用户手机上的 LINE 登录、重新绑定及真实 DMS 写单仍未验收，不标记 USER_ACCEPTED。临时本地 HTTP 服务和 PostgreSQL 测试容器已回收。
+- 新版本的周期维护已产生并完成 3 个 `dms.menu_sync` 任务，均为 `succeeded`；菜单同步不只是在本机调用 API 成功。

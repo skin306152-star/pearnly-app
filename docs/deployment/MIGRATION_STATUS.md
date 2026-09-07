@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-06 18:14（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，Cowork超管入口跳转修正与盘点整卡删除已发布并复验通过**。
+更新时间：2026-09-07 16:18（Asia/Bangkok，UTC+7）。状态：**Cloud Run 已接管，LINE DMS 绑定身份与查询菜单权限修复已发布并回读通过**。
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,9 +27,10 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`1856fdbe316a390989b1e5ff5c534a5cca26f90a`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:600a3fe01ba16783d354721444326d59446538d51ff1e843bda729686da486fb`。
-- Web revision：`pearnly-web-1856fdbe316a-s2`，100%流量；Worker revision：`pearnly-worker-1856fdbe316a-s2`，100%流量。
+- 完整 SHA：`efaff0d51fdee2d7f83e5f24dd6196f710f193a1`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:9722166534e520dbf830f101dcda347dfd55520767b31c72c228423ee8f5e276`。
+- Web revision：`pearnly-web-efaff0d51fde-s2`，100%流量；Worker revision：`pearnly-worker-efaff0d51fde-s2`，100%流量。
+- LINE DMS 修复发布 [34104299567](https://github.com/skin306152-star/pearnly-app/actions/runs/34104299567) 成功；schema execution `pearnly-schema-vhlzn` 成功，Web/Worker 候选和正式服务的版本、健康/就绪、流量及安装包完整校验通过。本地完整 pre-push 含 1,162 个测试模块通过，DMS 浏览器回归 19 项通过，另有真实 PostgreSQL 重绑与并发确认测试。正式凭据和草稿 API 拒绝旧令牌/旧绑定（401），当前绑定可只读取得自身配置（200）；三份关键前端脚本与候选字节一致。默认底部菜单四项，当前三个绑定的四项/五项/五项分配与实时权限一致。用户手机及真实 DMS 写单未验收；原测试 A/B 已停用解绑，未恢复或猜测密码。详见 [绑定修复记录](../dms/BINDING_INTEGRITY_2026_09_07.md)。
 - Cowork 入口与盘点删除发布 [34029239117](https://github.com/skin306152-star/pearnly-app/actions/runs/34029239117)：schema execution `pearnly-schema-955g8` 成功，两端候选验证及正式 Worker 验证通过并各切到 100%。最后正式 Web 的 `/api/ready` 探针发生 TLS 握手 `Connection reset by peer`，因此 workflow 状态为失败；随后对同一 SHA／digest 使用仓库原 `verify_release.py` 分别复跑正式 Web、Worker，两次均 exit 0，完整版本／镜像／流量／健康／就绪／安装包大小和 MD5 校验通过，无放宽条件或重新部署。正式域名 readiness 200，`cowork_delete=1856fdbe316a` 命中新 Web；Cowork 与 home HTML 引用新版 landing26／main12060027，ui4／CSS4／词典stocktake4和 bundle 字节一致。Cowork 超管快捷进入和新登录不再强制跳 Earn，也不覆盖管理后台会话；盘点网页卡片可确认后永久删除该任务及全部关联记录，权限为 recon.create，事务锁与租户／账套隔离保持。74 项定向单元和真库测试、67 项入口浏览器、5 项会话隔离、盘点删除与扫描浏览器、1159 模块完整推送闸通过。未删除真实用户盘点；普通 Chrome 与用户实际删除验收待确认。
 - 账面位置映射与对比发布 [34027810317](https://github.com/skin306152-star/pearnly-app/actions/runs/34027810317) 成功，schema execution `pearnly-schema-8fxjl` 成功，候选与正式身份／就绪／完整下载检查通过。每次扫码重新带出该商品账面仓库／位置，空值保留空白，不沿用上一笔；历史修改仍保留该笔实际值。泰语汇总新增账面／实际仓库和位置及各自对比，逐笔明细保留配对；撤销记录不参与汇总，未盘点和账面未提供分别标记。修正手机表单横向溢出。17 项定向单元、真实 EAN／QR 浏览器、1158 模块完整推送闸通过。本次无 SQL／schema 变更；沿用已有权限与逐笔记录。正式域名 health／ready 200，`stocktake_places=30afc1a3a3f9` 日志命中新 Web；counter.js?v=3、CSS?v=3、词典 stocktake-3、main.js?v=12060026 与 main.css stocktake-3 回读字节一致。真实 LINE 真机验收仍待用户确认。
 - 数量显示修正 [34025488705](https://github.com/skin306152-star/pearnly-app/actions/runs/34025488705) 成功；schema execution `pearnly-schema-slgdb` 成功，两端候选与正式身份／就绪／完整下载检查通过。盘点网页与手机、新旧任务的账面、实盘、差异、逐笔数量及修改输入去掉末尾补零，10.000000 显示 10，2.500000 显示 2.5；保留实际小数精度和编号前导零，不改数据库数值。定向浏览器与前端推送闸通过。正式域名 readiness 200，`stocktake_numbers=b816f291146f` 日志命中新 Web，ui.js?v=3、counter.js?v=2、main.js?v=12060025 回读字节一致。

@@ -44,3 +44,12 @@
 - 镜像 digest `sha256:b131901e702fb9f1810859a13c5bc0fc22d325fa1d66ef86766bf20f099be58c`；Web/Worker revision 分别为 `pearnly-web-bc6ce06f574a-s2`、`pearnly-worker-bc6ce06f574a-s2`，均 Ready 且100%流量。流水线候选和正式版本/健康/就绪/安装包校验通过。
 - 完整推送闸1,163模块通过；325项 DMS 测试、27项浏览器回归通过。正式域名 api6/credentials4/i18n3 脚本字节及 HTML 引用一致，空 LINE token 实测401和明确的重新认证错误码。
 - 发布后只读确认用户仍 active 且仍绑定，但 active_jti 为空；没有可复用会话，带身份 GET 探针因此停止，未签发新会话或写真实密码。此前生产只读 RLS 诊断与本次真库保存回归证明修复路径，实际手机重新登录与改密仍待用户验收。
+
+## 17:50 Cloudflare 缓存阻止手机取得认证恢复修复
+
+- 用户继续报告失败。17:37、17:41 iPhone Chrome 的真实请求均停在 `/api/line/dms-booking/auth` 401 `line_token_invalid`，未进入密码保存 PUT。17:31最后一次旧页面加载命中 `efaff0d51fde-s2`；后续重复只有认证请求，不能把这一阶段认定为保存事务失败。
+- LINE Server API 只读回读确认当前 LIFF `2010411313-K4TWQwYo` 的 endpoint 为 `https://pearnly.com/home`，scope 包含 `openid` 和 `profile`。电脑当前 LINE 会话真实登录后，认证和配置读取均200，表单可见；未填写/提交真实密码。
+- 对同一正式入口实测：Cloud Run 源站 `Cache-Control: no-cache, no-store, must-revalidate`，正式域名却返回 `CF-Cache-Status: EXPIRED` 和 `Cache-Control: max-age=14400`；认证 config GET 同样被改成4小时浏览器缓存。线上 Worker `c2d015f8` 的非静态分支使用 `cf.cacheTtl: 0`，这不是禁止存储，导致手机可继续加载旧页面。
+- 已将非版本静态资源的请求改为 `fetch(..., {cache: 'no-store'})`，响应也设置 `Cache-Control: no-store`。仅 `/static/` 下有版本参数且非 `latest.json` 的 GET 保留原缓存行为。Cloudflare Dashboard 发布版本 `efb574fb`，回读 Active Latest；Cloud Run 镜像保持 `bc6ce06f574a`。
+- 正式域名回读密码页面、认证配置、未认证配置读取均为 `DYNAMIC` / `no-store`，版本脚本仍为 HIT。`node --test deployment/cloudflare/worker.test.mjs` 两组测试通过，涵盖页面/API/POST/latest.json、静态缓存和禁止路径。Node 的流式 Request 需要 duplex，仅测试适配，未改生产传输逻辑。
+- 为避开手机已保存的旧 URL，提供带 `refresh=20260907-1750` 的当前页面链接。17:51:17 UTC+7 手机实际认证200，17:51:18配置读取200；保存结果继续以真实 PUT/用户反馈为准。

@@ -28,13 +28,15 @@ export default {
             body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
             redirect: 'manual',
         });
-        const response = await fetch(upstream, {
-            cf: cacheable
-                ? { cacheEverything: true, cacheTtlByStatus: { '200-299': 86400, '400-599': -1 } }
-                : { cacheTtl: 0 },
-        });
+        // cacheTtl: 0 still stores/revalidates and can replace origin no-store headers.
+        const response = await fetch(
+            upstream,
+            cacheable
+                ? { cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 86400, '400-599': -1 } } }
+                : { cache: 'no-store' }
+        );
         const result = new Response(response.body, response);
-        if (original.pathname.endsWith('/latest.json')) {
+        if (!cacheable) {
             result.headers.set('cache-control', 'no-store');
         }
         const location = result.headers.get('location');

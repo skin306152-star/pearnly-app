@@ -13,9 +13,16 @@ export default {
         const state = original.searchParams.get('liff.state') || '';
         const stateQuery = new URLSearchParams(state.slice(state.indexOf('?') + 1));
         const dmsCredentials =
-            ['/home/dms-booking', '/login/dms-booking', '/liff/dms-booking'].includes(original.pathname) ||
-            (['/home', '/login'].includes(original.pathname) && stateQuery.get('credentials') === 'dms') ||
-            ['/api/line/dms-booking/auth', '/api/line/dms-booking/config', '/api/line/dms-credentials'].includes(original.pathname);
+            ['/home/dms-booking', '/login/dms-booking', '/liff/dms-booking'].includes(
+                original.pathname
+            ) ||
+            (['/home', '/login'].includes(original.pathname) &&
+                stateQuery.get('credentials') === 'dms') ||
+            [
+                '/api/line/dms-booking/auth',
+                '/api/line/dms-booking/config',
+                '/api/line/dms-credentials',
+            ].includes(original.pathname);
         const target = new URL(original.pathname + original.search, ORIGIN);
         const headers = new Headers(request.headers);
         headers.delete('host');
@@ -40,7 +47,10 @@ export default {
                 ? { cache: 'no-store' }
                 : {
                       cf: cacheable
-                          ? { cacheEverything: true, cacheTtlByStatus: { '200-299': 86400, '400-599': -1 } }
+                          ? {
+                                cacheEverything: true,
+                                cacheTtlByStatus: { '200-299': 86400, '400-599': -1 },
+                            }
                           : { cacheTtl: 0 },
                   }
         );

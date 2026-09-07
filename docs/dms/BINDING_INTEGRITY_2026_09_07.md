@@ -53,3 +53,14 @@
 - 已将非版本静态资源的请求改为 `fetch(..., {cache: 'no-store'})`，响应也设置 `Cache-Control: no-store`。仅 `/static/` 下有版本参数且非 `latest.json` 的 GET 保留原缓存行为。Cloudflare Dashboard 发布版本 `efb574fb`，回读 Active Latest；Cloud Run 镜像保持 `bc6ce06f574a`。
 - 正式域名回读密码页面、认证配置、未认证配置读取均为 `DYNAMIC` / `no-store`，版本脚本仍为 HIT。`node --test deployment/cloudflare/worker.test.mjs` 两组测试通过，涵盖页面/API/POST/latest.json、静态缓存和禁止路径。Node 的流式 Request 需要 duplex，仅测试适配，未改生产传输逻辑。
 - 为避开手机已保存的旧 URL，提供带 `refresh=20260907-1750` 的当前页面链接。17:51:17 UTC+7 手机实际认证200，17:51:18配置读取200；保存结果继续以真实 PUT/用户反馈为准。
+
+## 18:02 撤回全局范围，只保留 DMS 修复
+
+用户确认“可以了”后追问其他产品影响，并明确质疑为何修改全局。此前将全部非版本静态请求改为 no-store 的范围超出了 DMS 修复所需；随后短暂发布保留源站显式 TTL 的 `1b4f4fab`，仍属于全局修改。两版均已被本节的限定版本替代。
+
+- 最终 Worker `bd70ddb6` Active Latest，仅 `/home/dms-booking`、`/login/dms-booking`、`/liff/dms-booking`，以及 `/home`、`/login` 上 liff.state 的 credentials=dms 回跳；API 仅 `/api/line/dms-booking/auth`、`/api/line/dms-booking/config`、`/api/line/dms-credentials` 使用真正的 no-store 请求与响应。版本静态缓存和 latest.json 原行为保持。
+- 其他路径直接恢复 `51a96cd7` 中的原始 Worker 分支，包括 cf.cacheTtl=0 和原始响应处理。不修改 Cloudflare Cache Rules、Browser Cache TTL 或其他产品业务代码。
+- 对 routes 下129个处理器文件的694条HTTP/WebSocket声明作范围盘点；排除7条DMS声明后，687条声明的原/新Worker差分测试通过。验证请求URL/方法/请求头/体、fetch缓存选项、响应状态/头/体，不请求真实业务接口、不计作全功能验收。持久测试命令 `node --test deployment/cloudflare/worker.test.mjs` 两组通过，覆盖限定DMS路径和其他产品原策略。
+- 线上回读：三个DMS入口样本均200/no-store/DYNAMIC；首页、AI、ERP、Cowork、Daily、POS、cashier、health均200并恢复原max-age=14400；DMS版本脚本仍HIT。真实iPhone在17:51认证与读取200，用户随后反馈“可以了”；未将此反馈扩写为无日志的PUT成功。
+- 另用真实 cashier/pos/daily Service Worker 和隔离浏览器验证 no-store 外壳仍能写入 CacheStorage 并离线重新打开，3项通过。此检查只覆盖离线外壳，不是离线销售/同步验收；最终方案已恢复这些入口原策略。
+- 全局缓存设计若需后续治理，应单独确定范围与验收，不包含在本次DMS补丁中。

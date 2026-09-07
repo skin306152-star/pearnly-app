@@ -4,7 +4,6 @@ import test from 'node:test';
 
 const source = await readFile(new URL('./worker.js', import.meta.url));
 const worker = (await import('data:text/javascript;base64,' + source.toString('base64'))).default;
-
 // Node requires a duplex hint for streams; Workers accepts them without it.
 const NativeRequest = globalThis.Request;
 globalThis.Request = class extends NativeRequest {
@@ -13,50 +12,52 @@ globalThis.Request = class extends NativeRequest {
     }
 };
 
-test('dynamic pages and API responses bypass edge and browser caches', async () => {
-    let observed;
-    const previous = globalThis.fetch;
-    globalThis.fetch = async (request, options) => {
-        observed = { request, options };
-        return new Response('ok', { headers: { 'Cache-Control': 'max-age=14400' } });
-    };
-    try {
-        for (const path of [
-            '/home/dms-booking?credentials=dms',
-            '/api/line/dms-booking/config',
-            '/api/line/dms-credentials',
-            '/static/installers/latest.json',
-        ]) {
-            const response = await worker.fetch(new Request('https://pearnly.com' + path));
-            assert.equal(observed.options.cache, 'no-store', path);
-            assert.equal(response.headers.get('cache-control'), 'no-store', path);
-        }
-        const response = await worker.fetch(new Request('https://pearnly.com/api/line/dms-booking/auth', {
-            method: 'POST', body: '{}', headers: { 'Content-Type': 'application/json' },
-        }));
-        assert.equal(observed.request.method, 'POST');
-        assert.equal(await observed.request.text(), '{}');
-        assert.equal(observed.options.cache, 'no-store');
-        assert.equal(response.headers.get('cache-control'), 'no-store');
-    } finally {
-        globalThis.fetch = previous;
-    }
-});
-
-test('versioned assets retain caching and private origin paths remain blocked', async () => {
+test('only DMS page, credentials and LIFF auth bypass cache', async () => {
     let options;
     const previous = globalThis.fetch;
     globalThis.fetch = async (_request, value) => {
         options = value;
-        return new Response('asset');
+        return new Response('ok', { headers: { 'cache-control': 'max-age=14400' } });
     };
     try {
-        await worker.fetch(new Request('https://pearnly.com/static/dms-booking-edit/dms-booking-api.js?v=6'));
+        for (const path of [
+            '/home/dms-booking?credentials=dms', '/login/dms-booking', '/liff/dms-booking',
+            '/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms',
+            '/login?liff.state=%3Fcredentials%3Ddms',
+            '/api/line/dms-booking/config', '/api/line/dms-booking/auth', '/api/line/dms-credentials',
+        ]) {
+            const response = await worker.fetch(new Request('https://pearnly.com' + path));
+            assert.equal(options.cache, 'no-store', path);
+            assert.equal(response.headers.get('cache-control'), 'no-store', path);
+        }
+    } finally { globalThis.fetch = previous; }
+});
+
+test('other products retain original fetch options and response headers', async () => {
+    let options;
+    const previous = globalThis.fetch;
+    try {
+        for (const header of [undefined, 'private, max-age=300', 'public, max-age=31536000, immutable', 'no-store']) {
+            globalThis.fetch = async (_request, value) => {
+                options = value;
+                return new Response('ok', { headers: header ? { 'cache-control': header } : {} });
+            };
+            for (const path of ['/', '/home', '/login', '/erp', '/cowork', '/ai', '/daily', '/pos', '/cashier', '/earn',
+                '/api/history', '/api/uploads/image', '/api/erp/agent/lease', '/api/billing',
+                '/home?liff.state=%3Fflow%3Derp-intake%26draft%3Dx', '/static/brand/logo.png']) {
+                for (const method of ['GET', 'POST']) {
+                    const response = await worker.fetch(new Request('https://pearnly.com' + path, { method }));
+                    assert.deepEqual(options, { cf: { cacheTtl: 0 } }, path);
+                    assert.equal(response.headers.get('cache-control'), header ?? null, path);
+                }
+            }
+        }
+        await worker.fetch(new Request('https://pearnly.com/static/dist/pos.js?v=1'));
         assert.equal(options.cf.cacheTtlByStatus['200-299'], 86400);
         assert.equal(options.cf.cacheTtlByStatus['400-599'], -1);
+        const latest = await worker.fetch(new Request('https://pearnly.com/static/installers/latest.json'));
+        assert.deepEqual(options, { cf: { cacheTtl: 0 } });
+        assert.equal(latest.headers.get('cache-control'), 'no-store');
         assert.equal((await worker.fetch(new Request('https://pearnly.com/internal/x'))).status, 404);
-        assert.equal((await worker.fetch(new Request('https://pearnly.com/config.env'))).status, 404);
-    } finally {
-        globalThis.fetch = previous;
-    }
+    } finally { globalThis.fetch = previous; }
 });

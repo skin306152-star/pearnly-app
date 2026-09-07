@@ -52,7 +52,7 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 域名与旧发布入口
 
-2026-09-07 17:50 Cloudflare Worker 缓存修复：Dashboard 版本 `efb574fb` Active Latest，取代 `c2d015f8`。非版本静态请求由 `cf.cacheTtl: 0` 改为 `cache: no-store`，并明确返回 `Cache-Control: no-store`；修复源站禁止缓存被改写成浏览器4小时缓存、手机持续使用旧 DMS 页面的问题。正式域名密码页/认证配置/API 回读 DYNAMIC/no-store，版本静态脚本仍HIT。17:51手机实际 LINE 认证和账号配置读取200。Cloud Run镜像仍为上方 `bc6ce06f574a`，此次不重发业务容器。详见[诊断与修复证据](../dms/BINDING_INTEGRITY_2026_09_07.md)。
+2026-09-07 18:02 Cloudflare Worker 最终限定修复：Dashboard 版本 `bd70ddb6` Active Latest。此前本任务发布的全局禁缓存版本 `efb574fb` 及保留源站头的全局版本 `1b4f4fab` 已撤回；**仅 DMS 密码页面三个别名、带 credentials=dms 的 /home 与 /login LIFF 回跳、DMS auth/config/credentials 三个 API 路径使用 no-store**。其他路径恢复到本任务前 `c2d015f8` 的转发和缓存逻辑，未修改域名 Cache Rules 或 Browser Cache TTL 配置。正式 DMS 页/config/回跳均 DYNAMIC/no-store，AI/ERP/Cowork/Daily/POS/cashier/首页和健康接口已回读原缓存行为，均200。687条非DMS路由声明的离线差分测试确认转发请求、cache选项、响应头/体与旧Worker相同；这不是687项真实业务验收。Cloud Run镜像仍为 `bc6ce06f574a`。详见[诊断与范围纠正](../dms/BINDING_INTEGRITY_2026_09_07.md)。
 
 
 Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均 fail closed。没有新增 `*.pearnly.com/*`，避免接管其他租户子域名。源站在 Worker 中明确指定 Cloud Run Web。

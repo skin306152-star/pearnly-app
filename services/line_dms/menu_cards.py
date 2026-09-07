@@ -31,7 +31,7 @@ from services.line_dms.cards import (
 )
 from services.line_dms.rich_menu import (
     credentials_desktop_url,
-    credentials_external_url,
+    credentials_liff_url,
     portal_desktop_url,
     portal_external_url,
 )
@@ -208,7 +208,7 @@ def menu_card(can_query: bool = False) -> Dict[str, Any]:
             {
                 "type": "uri",
                 "label": TXT_MENU_ITEM4,
-                "uri": credentials_external_url(),
+                "uri": credentials_liff_url(),
                 "altUri": {"desktop": credentials_desktop_url()},
             },
         ),

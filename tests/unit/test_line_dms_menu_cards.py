@@ -38,7 +38,7 @@ class DmsMenuCardTests(unittest.TestCase):
             {
                 "type": "uri",
                 "label": cards.TXT_MENU_ITEM4,
-                "uri": "https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1",
+                "uri": "https://liff.line.me/DMS-LIFF/dms-booking?credentials=dms",
                 "altUri": {
                     "desktop": "https://pearnly.com/home/dms-booking?credentials=dms",
                 },

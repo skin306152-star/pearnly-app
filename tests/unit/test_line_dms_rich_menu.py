@@ -27,16 +27,29 @@ class DmsRichMenuTests(unittest.TestCase):
                 "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
             )
 
-    def test_credentials_external_and_desktop_urls(self):
+    def test_credentials_liff_and_desktop_urls(self):
         with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=True):
             self.assertEqual(
-                rich_menu.credentials_external_url(),
-                "https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1",
+                rich_menu.credentials_liff_url(),
+                "https://liff.line.me/DMS-LIFF/dms-booking?credentials=dms",
             )
             self.assertEqual(
                 rich_menu.credentials_desktop_url(),
                 "https://pearnly.com/home/dms-booking?credentials=dms",
             )
+
+    def test_credentials_liff_fallback_does_not_change_portal(self):
+        with patch.dict(os.environ, {"LINE_LIFF_ID": "SHARED-LIFF"}, clear=True):
+            self.assertEqual(
+                rich_menu.credentials_liff_url(),
+                "https://liff.line.me/SHARED-LIFF/dms-booking?credentials=dms",
+            )
+            self.assertEqual(
+                rich_menu.portal_external_url(),
+                "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
+            )
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(rich_menu.credentials_liff_url(), "https://pearnly.com/dms")
 
     def test_portal_external_url_falls_back_to_shared_liff_id(self):
         with patch.dict(os.environ, {"LINE_LIFF_ID": "SHARED-LIFF"}, clear=True):
@@ -83,7 +96,7 @@ class DmsRichMenuTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["areas"][3]["action"]["uri"],
-            "https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1",
+            "https://liff.line.me/DMS-LIFF/dms-booking?credentials=dms",
         )
         self.assertEqual(
             payload["areas"][4]["bounds"],

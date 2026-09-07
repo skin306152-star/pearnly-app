@@ -14,8 +14,8 @@ from services.line_platform import client as line_client
 
 logger = logging.getLogger(__name__)
 
-MENU_NAME = "pearnly-dms-basic-v2"
-QUERY_MENU_NAME = "pearnly-dms-query-v2"
+MENU_NAME = "pearnly-dms-basic-v3-liff"
+QUERY_MENU_NAME = "pearnly-dms-query-v3-liff"
 _IMAGE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "static",
@@ -62,9 +62,14 @@ def portal_desktop_url() -> str:
     return _entry_url("portal", external=False)
 
 
-def credentials_external_url() -> str:
-    """Open menu 4 in the system browser on Android and iOS."""
-    return _entry_url("credentials", external=True)
+def credentials_liff_url() -> str:
+    """Open only the mobile credential editor inside LINE; portal stays external."""
+    liff_id = (os.environ.get("LINE_DMS_LIFF_ID") or "").strip() or (
+        os.environ.get("LINE_LIFF_ID") or ""
+    ).strip()
+    if liff_id:
+        return f"https://liff.line.me/{liff_id}/dms-booking?credentials=dms"
+    return "https://pearnly.com/dms"
 
 
 def credentials_desktop_url() -> str:
@@ -104,7 +109,7 @@ def build_payload(can_query: bool = False) -> dict:
                 {
                     "type": "uri",
                     "label": "เปลี่ยนรหัสผ่าน",
-                    "uri": credentials_external_url(),
+                    "uri": credentials_liff_url(),
                 },
                 row=1,
             ),

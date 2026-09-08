@@ -165,11 +165,13 @@ class _Env:
         p(bf.store, "set_session", side_effect=self.store.set_session)
         p(bf.store, "clear_session", side_effect=self.store.clear_session)
         p(bf, "_spawn", side_effect=self.spawned.append)
-        self.reply = p(bf.line_client, "reply_text")
-        self.push_text = p(bf.line_client, "push_text")
-        self.push_msgs = p(bf.line_client, "push_messages")
-        p(bf.line_client, "start_loading")
-        self.download = p(bf.line_client, "download_message_content", return_value=self._download)
+        self.reply = p(bf._out.line_client, "reply_text")
+        self.push_text = p(bf._out.line_client, "push_text")
+        self.push_msgs = p(bf._out.line_client, "push_messages")
+        p(bf._out.line_client, "start_loading")
+        self.download = p(
+            bf._out.line_client, "download_message_content", return_value=self._download
+        )
         p(bf._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
         self.insert_log = p(bf.db, "insert_push_log", return_value="LOG1")
         if self._book_result is not None:

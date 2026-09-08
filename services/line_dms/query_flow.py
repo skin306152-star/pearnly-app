@@ -13,8 +13,7 @@ from typing import Optional
 from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import mrerp_dms_sales_readback as sales_readback
 from services.line_dms import _out, cards, query_access, query_cards, store
-from services.line_dms._out import _CHANNEL, _push, _reply, _send, _thr
-from services.line_platform import client as line_client
+from services.line_dms._out import _push, _reply, _send, _thr
 
 QUERY_ACTIONS = frozenset(
     {
@@ -256,7 +255,7 @@ async def _pick_top_period(
 
 
 async def _start_loading(line_user_id: str) -> None:
-    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, line_user_id)
 
 
 async def _begin_records(

@@ -85,13 +85,18 @@ def list_advisors(owner_user: dict) -> dict:
 
 def list_operators(owner_user: dict) -> dict:
     """列表:档案 + 用户名 + LINE 绑定态 + endpoint 配置态(四态诚实由前端按字段渲染)。"""
+    from services.line_dms import account_channel
+    from services.line_platform import channels as line_channels
+
     tenant_id = _tenant(owner_user)
     if not tenant_id:
         return {"error": "dms_roster.no_tenant"}
+    account_channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
     rows = store.list_profiles(tenant_id)
     items = []
     for r in rows:
         bound_at = r.get("bound_at")
+        line_channel_key = line_channels.normalize(r.get("line_channel_key"))
         items.append(
             {
                 "user_id": str(r["user_id"]),
@@ -101,6 +106,13 @@ def list_operators(owner_user: dict) -> dict:
                 "username": r.get("username") or "",
                 "line_bound": bool(r.get("bound_at")),
                 "line_display_name": r.get("line_name") or "",
+                "line_user_id": r.get("line_user_id") or "",
+                "line_channel_key": line_channel_key if r.get("bound_at") else "",
+                "line_channel_name": (
+                    line_channels.public(line_channel_key)["channel_name"]
+                    if r.get("bound_at")
+                    else ""
+                ),
                 "line_bound_at": (
                     bound_at.isoformat() if hasattr(bound_at, "isoformat") else bound_at
                 ),
@@ -111,7 +123,11 @@ def list_operators(owner_user: dict) -> dict:
                 "advisor_name": r.get("advisor_name") or "",
             }
         )
-    return {"ok": True, "items": items}
+    return {
+        "ok": True,
+        "channel": line_channels.public(account_channel_key),
+        "items": items,
+    }
 
 
 def create_operator(
@@ -328,16 +344,28 @@ def set_status(owner_user: dict, user_id: str, status: str) -> dict:
 def issue_bind_code(owner_user: dict, user_id: str) -> dict:
     """为某操作员发 LINE 绑定码(复用 line_dms store · 老板逐行发码给该销售)。
 
+    码绑定该账号被分配的 OA(channel key),并回传该 OA 的公开信息(名称/Basic ID/加好友链接/
+    QR),前端连接码弹窗只渲染这份数据 —— LINE ID、二维码、链接必然同源。
+
     停用的操作员拒发(前端已置灰,这里是 API 层收权闸——停用语义不能被直连 API 绕开)。"""
+    from services.line_dms import account_channel
+    from services.line_dms import store as line_dms_store
+    from services.line_platform import channels as line_channels
+
     ctx = _require_profile(owner_user, user_id)
     if not ctx:
         return {"error": "dms_roster.not_found"}
     tenant_id, prof = ctx
     if (prof.get("status") or "active") != "active":
         return {"error": "dms_roster.inactive"}
-    from services.line_dms import store as line_dms_store
 
-    out = line_dms_store.generate_bind_code(tenant_id, user_id)
+    channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
+    out = line_dms_store.generate_bind_code(tenant_id, user_id, channel_key)
     if not out:
         return {"error": "dms_roster.bind_code_failed"}
-    return {"ok": True, "code": out["code"], "expires_at": out["expires_at"]}
+    return {
+        "ok": True,
+        "code": out["code"],
+        "expires_at": out["expires_at"],
+        "line": line_channels.public(out.get("channel_key") or channel_key),
+    }

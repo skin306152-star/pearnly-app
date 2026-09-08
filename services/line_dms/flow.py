@@ -25,7 +25,6 @@ from core import db
 from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
-from services.line_platform import client as line_client
 from services.line_dms import (
     _out,
     approval_flow,
@@ -41,7 +40,7 @@ from services.line_dms import (
     store,
     text_router,
 )
-from services.line_dms._out import _CHANNEL, _push, _reply, _thr
+from services.line_dms._out import _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +62,6 @@ _ADDR_BLOCK_KEYS = (
 # 新建客户的身份字段键(与网页 create 分支 fields 同形)。
 _CREATE_ID_KEYS = ("prefix_id", "name", "people_id", "tax_id", "birthday_be", "phone")
 
-# 后台调度 + LINE 出口(_CHANNEL/_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
 _spawn = _out.make_spawn("line_dms.flow")
 
 
@@ -211,13 +209,13 @@ async def handle_postback(
 async def process_image(binding: dict, line_user_id: str, message_id: str) -> None:
     """下载 + 身份证 OCR(计费走真实用户行)。成功存 id_card;齐料自动查重。"""
     tenant, user_id = binding["tenant_id"], binding["user_id"]
-    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, line_user_id)
 
     user = await _thr(db.find_user_by_id, user_id)
     if not user:
         _push(line_user_id, cards.TXT_NO_ENDPOINT)
         return
-    content = await _thr(line_client.download_message_content, message_id, channel=_CHANNEL)
+    content = await _thr(_out.download_content, message_id)
     if not content:
         _push(line_user_id, cards.TXT_BLURRY)
         return
@@ -261,7 +259,7 @@ async def _run_dedup(
     endpoint_id: Optional[str],
 ) -> None:
     tenant, user_id = binding["tenant_id"], binding["user_id"]
-    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, line_user_id)
     # 菜单层(波2)的 mode 决定写档后是否自动串联订车;缺省=老直拍行为不变。会话是权威源
     # (采集路径都先写会话再进这里),避免多签名穿参。id_card_mid 同样从会话回读:它是
     # 订车逐问的身份证附件源,必须活到客户档落定(见 _run_dedup base)。
@@ -409,7 +407,7 @@ async def _execute(
     tenant, user_id = binding["tenant_id"], binding["user_id"]
     name = str(fields.get("name") or "")
     people_id = str(fields.get("people_id") or "")
-    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, line_user_id)
 
     ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, payload.get("endpoint_id"))
     if not ep:

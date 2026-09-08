@@ -185,12 +185,12 @@ class _Env:
             self.store.clear_session(str(tenant_id), luid)
 
         self.qa_start = p(flow.menu_flow.booking_qa, "start", side_effect=_qa_start)
-        self.reply = p(flow.line_client, "reply_text")
-        self.reply_msgs = p(flow.line_client, "reply_messages")
-        self.push_text = p(flow.line_client, "push_text")
-        self.push_msgs = p(flow.line_client, "push_messages")
-        p(flow.line_client, "start_loading")
-        p(flow.line_client, "download_message_content", return_value=b"imgbytes")
+        self.reply = p(flow._out.line_client, "reply_text")
+        self.reply_msgs = p(flow._out.line_client, "reply_messages")
+        self.push_text = p(flow._out.line_client, "push_text")
+        self.push_msgs = p(flow._out.line_client, "push_messages")
+        p(flow._out.line_client, "start_loading")
+        p(flow._out.line_client, "download_message_content", return_value=b"imgbytes")
         p(flow.db, "find_user_by_id", return_value={"id": "U1", "tenant_id": "T1"})
         self.insert_log = p(flow.db, "insert_push_log", return_value="LOG1")
         if self._ocr_error is not None:

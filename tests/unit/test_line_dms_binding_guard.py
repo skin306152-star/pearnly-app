@@ -22,7 +22,7 @@ class BindingGuardTests(unittest.TestCase):
         self.user = {"id": "user-a", "tenant_id": "tenant", "role": "member", "is_active": True}
         self.profile = {"status": "active", "can_query_dms": True, "dms_role": "admin"}
         for target, replacement in (
-            ("services.line_dms.store.get_binding_by_line_user", lambda _: self.live),
+            ("services.line_dms.store.get_binding_by_line_user", lambda *_: self.live),
             ("core.db.find_user_by_id", lambda _: self.user),
             ("services.dms_roster.store.get_profile", lambda *_: self.profile),
         ):

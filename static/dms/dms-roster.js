@@ -263,6 +263,7 @@
                     valEl.textContent = d.code || '······';
                     valEl.classList.remove('expired');
                 }
+                renderLineBlock(d.line);
                 S.expiresAt = d.expires_at ? new Date(d.expires_at) : null;
                 startCountdown();
             })
@@ -270,6 +271,12 @@
                 if (regen) regen.disabled = false;
                 toast(t('dms-op-code-fail'), 'error');
             });
+    }
+    // LINE ID/QR/加好友链接同源于后端该账号被分配的 OA;缺数据留空,绝不回落到写死的旧 OA。
+    function renderLineBlock(line) {
+        var box = byId('dms-op-code-line');
+        if (!box) return;
+        box.innerHTML = line ? H().lineBlock(line) : '';
     }
     function startCountdown() {
         clearTimer();

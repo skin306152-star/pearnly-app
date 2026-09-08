@@ -259,28 +259,51 @@ def _tenant_user(user: Dict[str, Any]) -> tuple[str, str]:
 
 @router.post("/api/dms/line/bind-code")
 async def dms_line_bind_code(request: Request):
-    """发 6 位 LINE 绑定码(用户在 DMS LINE OA 发该码完成绑定)。"""
+    """发 6 位 LINE 绑定码(用户在 DMS LINE OA 发该码完成绑定)。
+
+    码绑定该账号被分配的 OA;响应带该 OA 的公开信息,前端只用它渲染 LINE ID/QR/链接。
+    """
+    from services.line_dms import account_channel
+    from services.line_platform import channels as line_channels
+
     user = _authorize(request)
     tenant_id, user_id = _tenant_user(user)
-    out = await asyncio.to_thread(line_dms_store.generate_bind_code, tenant_id, user_id)
+    channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
+    out = await asyncio.to_thread(
+        line_dms_store.generate_bind_code, tenant_id, user_id, channel_key
+    )
     if not out:
         raise HTTPException(500, detail="dms.bind_code_failed")
-    return {"code": out["code"], "expires_at": out["expires_at"]}
+    return {
+        "code": out["code"],
+        "expires_at": out["expires_at"],
+        "line": line_channels.public(out.get("channel_key") or channel_key),
+    }
 
 
 @router.get("/api/dms/line/binding")
 async def dms_line_binding(request: Request):
-    """查当前用户的 DMS LINE 绑定状态。"""
+    """查当前用户的 DMS LINE 绑定状态 + 所属 OA 的公开信息。"""
+    from services.line_dms import account_channel
+    from services.line_platform import channels as line_channels
+
     user = _authorize(request)
-    _, user_id = _tenant_user(user)
+    tenant_id, user_id = _tenant_user(user)
+    account_channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
     row = await asyncio.to_thread(line_dms_store.get_binding_by_user, user_id)
     if not row:
-        return {"bound": False, "display_name": None, "bound_at": None}
+        return {
+            "bound": False,
+            "display_name": None,
+            "bound_at": None,
+            "line": line_channels.public(account_channel_key),
+        }
     bound_at = row.get("bound_at")
     return {
         "bound": True,
         "display_name": row.get("display_name"),
         "bound_at": bound_at.isoformat() if hasattr(bound_at, "isoformat") else bound_at,
+        "line": line_channels.public(row.get("channel_key") or account_channel_key),
     }
 
 

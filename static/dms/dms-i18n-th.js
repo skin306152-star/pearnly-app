@@ -373,6 +373,7 @@ window.__DMS_I18N_TH__ = {
     'dms-op-code-title': 'รหัสเชื่อมต่อ',
     'dms-op-code-step1': 'ให้ผู้ปฏิบัติงานเพิ่มเพื่อน Pearnly DMS ใน LINE',
     'dms-op-code-step2': 'ส่งรหัสเชื่อมต่อนี้ในแชท LINE เพื่อเชื่อมต่อ',
+    'dms-op-code-line-id': 'LINE ID',
     'dms-op-code-regen': 'สร้างใหม่',
     'dms-op-code-expires': 'เหลือเวลา',
     'dms-op-code-expired': 'รหัสหมดอายุแล้ว กรุณาสร้างใหม่',

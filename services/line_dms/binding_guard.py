@@ -27,9 +27,10 @@ def current(binding: dict, line_user_id: str = "") -> bool:
     line_id = line_user_id or binding.get("line_user_id")
     if not line_id or line_id != binding.get("line_user_id"):
         return False
-    live = store.get_binding_by_line_user(line_id)
+    live = store.get_binding_by_line_user(line_id, binding.get("channel_key"))
     if not live or any(
-        str(live.get(k) or "") != str(binding.get(k) or "") for k in ("id", "user_id", "tenant_id")
+        str(live.get(k) or "") != str(binding.get(k) or "")
+        for k in ("id", "user_id", "tenant_id", "channel_key")
     ):
         return False
     user = db.find_user_by_id(str(binding["user_id"]))
@@ -54,6 +55,20 @@ def current(binding: dict, line_user_id: str = "") -> bool:
 
 def snapshot():
     return _binding.get()
+
+
+def current_channel() -> str:
+    """OA key of the binding in scope; legacy default when no binding is scoped.
+
+    Every DMS outbound call resolves its channel through this, so a reply/push/rich-menu
+    operation always uses the same OA the event arrived on.
+    """
+    from services.line_platform import channels as line_channels
+
+    binding = snapshot()
+    if binding and binding.get("channel_key"):
+        return line_channels.normalize(binding.get("channel_key"))
+    return line_channels.DEFAULT_DMS_CHANNEL
 
 
 def require_current() -> None:
@@ -99,7 +114,8 @@ def authorize_browser(request, user: dict) -> dict:
     header = request.headers.get("Authorization", "")
     claims = decode_access_token(header[7:].strip()) if header.startswith("Bearer ") else None
     identity = (claims or {}).get("dms_binding") or {}
-    binding = store.get_binding_by_line_user(identity.get("line_user_id"))
+    token_channel = str(identity.get("channel_key") or "")
+    binding = store.get_binding_by_line_user(identity.get("line_user_id"), token_channel or None)
     if (
         not claims
         or claims.get("entry") != "dms"
@@ -109,6 +125,7 @@ def authorize_browser(request, user: dict) -> dict:
         or str(binding.get("id")) != str(identity["id"])
         or str(binding.get("user_id")) != str(user.get("id"))
         or str(claims.get("sub")) != str(user.get("id"))
+        or (token_channel and str(binding.get("channel_key") or "") != token_channel)
         or not current(binding)
     ):
         raise PosError("dms_booking.not_bound", 401, detail="line_binding_changed")

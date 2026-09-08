@@ -120,12 +120,12 @@ class DmsRichMenuTests(unittest.TestCase):
             patch.object(
                 rich_menu,
                 "_upload_image",
-                side_effect=lambda menu_id, *_: events.append(("upload", menu_id)) or True,
+                side_effect=lambda menu_id, *_, **__: events.append(("upload", menu_id)) or True,
             ),
             patch.object(
                 rich_menu,
                 "_set_default",
-                side_effect=lambda menu_id: events.append(("default", menu_id)) or True,
+                side_effect=lambda menu_id, *_, **__: events.append(("default", menu_id)) or True,
             ),
             patch.object(rich_menu, "_delete_menu") as delete,
         ):
@@ -148,7 +148,7 @@ class DmsRichMenuTests(unittest.TestCase):
             patch.object(
                 rich_menu,
                 "_delete_menu",
-                side_effect=lambda menu_id: deleted.append(menu_id) or True,
+                side_effect=lambda menu_id, *_: deleted.append(menu_id) or True,
             ),
         ):
             self.assertIsNone(rich_menu.setup_default_menu(self._image_path()))

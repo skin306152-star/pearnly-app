@@ -83,10 +83,12 @@
 
 ## 6. 已知限制
 
-- A/B LIFF 未配置时,绑定码弹窗不受影响,但依赖 LIFF 的订车/凭据入口对 A/B 退化为 `/dms`。
+- A/B 未配 `LINE_DMS_A/B_LIFF_ID` 时:绑定码弹窗与回复不受影响;订车预览卡的「แก้ไข」编辑入口按
+  该 OA 的 LIFF 解析,未配则**省略按钮**(绝不回落到 legacy OA 的 LIFF);凭据入口退化为 `/dms`。
+- LIFF 浏览器授权页本身(`/api/line/dms-booking/config` + `verify_id_token`)仍只读
+  `LINE_DMS_LIFF_ID`/`LINE_LIFF_ID`;A/B 用户不会从应用内被导向它,但多 LIFF 化(按 channel
+  选 config/验签)需另立任务。
 - A/B rich menu 需发布(`setup_default_menu(channel=...)`)后 per-user 同步才有菜单。
-- LIFF 浏览器授权(`line_dms_booking_edit_routes`)按 LINE user id 查找,未带 channel(单 LIFF
-  场景);多 LIFF 化需另立任务。
 - 同一个人在不同 OA 的 userId 是否相同取决于 LINE provider 行为;实现按「可能相同」做 channel 隔离,
   两种情况下都正确。
 

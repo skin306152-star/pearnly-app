@@ -11,10 +11,10 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from decimal import Decimal
-import os
 from typing import Any, Dict, List, Optional
 
 from services.erp.erp_dms_push import _DMS_FRIENDLY
+from services.line_dms import edit_link
 from services.line_dms.cards import (
     ACT_CANCEL_BOOKING,
     ACT_CONFIRM_BOOKING,
@@ -35,7 +35,9 @@ from services.line_dms.qa_util import car_label as _car_label
 from services.line_dms.qa_util import row_name as _name
 
 # ── 文案(业主逐条确认 · 逐字不改) ─────────────────────────────────────────
-TXT_ASK_SLIP = "ส่งสลิปโอนเงินจอง (ใบโอนเงิน) ได้เลยครับ · ถ้าลูกค้าจ่ายเงินสด พิมพ์ เงินสด เพื่อข้ามขั้นนี้"
+TXT_ASK_SLIP = (
+    "ส่งสลิปโอนเงินจอง (ใบโอนเงิน) ได้เลยครับ · ถ้าลูกค้าจ่ายเงินสด พิมพ์ เงินสด เพื่อข้ามขั้นนี้"
+)
 TXT_ASK_PLACE = "สถานที่รับจอง — กดเลือกด้านล่าง"
 TXT_ASK_CAR = "รุ่นรถ — พิมพ์ชื่อรุ่นสั้น ๆ เพื่อค้นหา เช่น dmax"
 TXT_CAR_PICK = "เลือกรุ่นรถ (พบ {n} รายการ)"
@@ -59,9 +61,13 @@ PAY_LABELS = {
 }
 TXT_ASK_AMOUNT = "ยอดเงิน ({channel}) — พิมพ์จำนวนเงิน เช่น 5000"
 TXT_BAD_AMOUNT = "จำนวนเงินไม่ถูกต้อง พิมพ์เป็นตัวเลข เช่น 5000 หรือ 5,000.50"
-TXT_ASK_PAY_SRC = "บัญชีต้นทาง — พิมพ์ ธนาคาร | เลขบัญชี เช่น SCB | 1234567890 หรือพิมพ์ - เพื่อข้าม"
+TXT_ASK_PAY_SRC = (
+    "บัญชีต้นทาง — พิมพ์ ธนาคาร | เลขบัญชี เช่น SCB | 1234567890 หรือพิมพ์ - เพื่อข้าม"
+)
 TXT_ASK_PAY_DST = "บัญชีปลายทาง (บัญชีบริษัท) — กดเลือกจากธนาคารของบริษัทด้านล่าง"
-TXT_NO_COMPANY_BANK = "ยังไม่มีข้อมูลธนาคารของบริษัท กรุณาให้ผู้ดูแลตั้งค่าใน DMS แล้วลองใหม่อีกครั้ง"
+TXT_NO_COMPANY_BANK = (
+    "ยังไม่มีข้อมูลธนาคารของบริษัท กรุณาให้ผู้ดูแลตั้งค่าใน DMS แล้วลองใหม่อีกครั้ง"
+)
 TXT_MASTER_UNAVAILABLE = _DMS_FRIENDLY["ERR_DMS_MASTER_UNAVAILABLE"]["th"]
 TXT_MASTER_EMPTY = _DMS_FRIENDLY["ERR_DMS_MASTER_EMPTY"]["th"]
 TXT_MASTER_CHANGED = _DMS_FRIENDLY["ERR_DMS_MASTER_CHANGED"]["th"]
@@ -74,7 +80,9 @@ TXT_ASK_MORE = "มีช่องทางอื่นอีกไหม"
 BTN_MORE_DONE = "ครบแล้ว"
 BTN_MORE_ADD = "เพิ่มช่องทาง"
 TXT_NEED_SLIP = "มีช่องทางเงินโอน กรุณาส่งสลิปโอนเงินก่อนดูสรุปครับ"
-TXT_SLIP_CONFLICT = "พบสลิปโอนเงินแนบอยู่ แต่ยังไม่มีช่องทางเงินโอน กรุณาเพิ่มเงินโอนหรือลบสลิปก่อนดูสรุปครับ"
+TXT_SLIP_CONFLICT = (
+    "พบสลิปโอนเงินแนบอยู่ แต่ยังไม่มีช่องทางเงินโอน กรุณาเพิ่มเงินโอนหรือลบสลิปก่อนดูสรุปครับ"
+)
 BTN_ADD_TRANSFER = "เพิ่มเงินโอน"
 BTN_REMOVE_SLIP = "ลบสลิปแล้วไปต่อ"
 TXT_PREVIEW_TITLE = "สรุปใบจอง — ตรวจสอบก่อนยืนยัน"
@@ -93,10 +101,14 @@ TXT_ATTACH_FAIL = "แนบไฟล์ไม่ครบ กรุณาแน
 _TH_ADVISOR_UNMATCHED = _DMS_FRIENDLY["ERR_DMS_ADVISOR_UNMATCHED"]["th"]
 _TH_RETRY = " แล้วลองใหม่อีกครั้ง"
 TXT_ADVISOR_BLOCK = (
-    "ยังเปิดใบจองไม่ได้ครับ · บัญชี DMS ที่ใช้อยู่คือ «{username}»\n" + _TH_ADVISOR_UNMATCHED + _TH_RETRY
+    "ยังเปิดใบจองไม่ได้ครับ · บัญชี DMS ที่ใช้อยู่คือ «{username}»\n"
+    + _TH_ADVISOR_UNMATCHED
+    + _TH_RETRY
 )
 TXT_ADVISOR_BLOCK_NO_USER = (
-    "ยังเปิดใบจองไม่ได้ครับ · ระบบยังอ่านบัญชี DMS ของผู้ใช้นี้ไม่ได้\n" + _TH_ADVISOR_UNMATCHED + _TH_RETRY
+    "ยังเปิดใบจองไม่ได้ครับ · ระบบยังอ่านบัญชี DMS ของผู้ใช้นี้ไม่ได้\n"
+    + _TH_ADVISOR_UNMATCHED
+    + _TH_RETRY
 )
 
 # 预览卡行标签(与确认后建单要回显的字段一一对应)。客户资料区不在此列:
@@ -368,12 +380,9 @@ def _regis_line(answers: Dict[str, Any]) -> str:
     return regis or name or "—"
 
 
-def _edit_url(nonce: str) -> str:
-    liff_id = os.getenv("LINE_DMS_LIFF_ID", "").strip() or os.getenv("LINE_LIFF_ID", "").strip()
-    if liff_id:
-        return f"https://liff.line.me/{liff_id}?draft={nonce}"
-    base = (os.getenv("PEARNLY_BASE_URL") or "https://pearnly.com").rstrip("/")
-    return f"{base}/liff/dms-booking?draft={nonce}"
+def _edit_url(nonce: str, channel_key: Optional[str] = None) -> str:
+    """当前绑定 OA 的 LIFF 编辑深链(见 edit_link);未配则空,调用方省略按钮。"""
+    return edit_link.url(nonce, channel_key)
 
 
 def _uri_btn(label: str, uri: str) -> Dict[str, Any]:
@@ -454,9 +463,10 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     rows.append({"type": "separator", "margin": "sm"})
     rows.append(_kv_row(LBL_ATTACH_CARD, VAL_ATTACHED if files.get("id_card_mid") else "—"))
     rows.append(_kv_row(LBL_ATTACH_SLIP, VAL_ATTACHED if files.get("slip_mid") else "—"))
+    edit_url = _edit_url(nonce)
     footer = [
         _btn(BTN_CONFIRM, _data(ACT_CONFIRM_BOOKING, nonce=nonce), "primary"),
-        _uri_btn(BTN_EDIT, _edit_url(nonce)),
+        *([_uri_btn(BTN_EDIT, edit_url)] if edit_url else []),
         _btn(BTN_DISCARD, _data(ACT_CANCEL_BOOKING), "secondary"),
     ]
     return _bubble(TXT_PREVIEW_TITLE, rows, footer, TXT_PREVIEW_TITLE)

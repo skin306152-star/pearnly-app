@@ -2,7 +2,7 @@
 
 目标:Earn 后台为每个 DMS 账号选定一个 LINE OA(A/B 或现有 OA),`/dms/` 连接码弹窗、
 绑定/兑换、webhook 验签、账号查找、回复 token 全部沿同一个 OA;任何阶段不许串 OA、串租户。
-本文件记录实现结论、数据/兼容策略、验证证据与发布步骤。**本阶段不发布、不启用 A/B webhook。**
+本文件记录实现结论、数据/兼容策略、验证证据与发布记录。**2026-09-09 已发布(见 §7),A/B webhook 端点已设置并 verify;Use webhook 开关待 LINE 控制台开启。**
 
 > **2026-09-09 更正(验收缺陷修复)**:首版实现(`4efba7ed`/`b0329d5e`)在验收中发现六类
 > 跨 OA 缺陷,已修复。原文把「首个请求触发 `ensure_tables`」当作发布路径、并声称浏览器 LIFF
@@ -101,8 +101,12 @@
 - 真库(隔离)用例已写入 `test_line_dms_binding_pg_smoke`(复合唯一、会话 PK 含 channel、
   改配原子性、旧码不恢复旧 OA、票据 channel/epoch)。**本机 Docker/Colima 守护进程不可达,
   本轮未执行**,不得声称已通过;有 disposable DSN 时按该文件 `setUpClass` 条件自动跑。
+  2026-09-09 发布后改以**生产库只读**核对:四张表都有 `channel_key`、票据有 `binding_id`、
+  `dms_account_line_channels` 存在、会话主键含 channel、唯一索引 `(channel_key, line_user_id)` 生效;
+  4 条现有绑定全部仍是 `channel_key='dms'`。这是结构回读,不等于真库冒烟用例已跑。
 - 前端:`npm run build` 已重跑,`static/dist/dms-booking-edit.html` 与源 HTML 的 `?v=` 同步。
-- 未做且不得当作已完成:真实 LINE A/B 消息、真实库迁移执行、浏览器/手机真机验收。
+- 未做且不得当作已完成:真实 LINE A/B 消息(含加好友/发码绑定)、浏览器/手机真机验收。真实库迁移
+  已于 2026-09-09 由 Cloud Run schema Job 执行并只读回读结构(见 §7),但真库 pg smoke 用例仍未跑。
 
 ### 5.1 本轮修复的六类缺陷
 
@@ -128,27 +132,47 @@
 - LIFF 浏览器授权页(`/api/line/dms-booking/config` + `verify_id_token` + `/auth`)已按
   `channel` 选对应 OA 的 LIFF env、按 `channel` 查绑定并校验当前分配;`dms-booking-api.js`
   同时从 URL 与 `liff.state` 读取 `channel`,config/auth 都带上它。未知非空 channel 拒绝。
-- A/B rich menu 需发布(`setup_default_menu(channel=...)`)后 per-user 同步才有菜单。
+- A/B rich menu 已于 2026-09-09 发布(`setup_default_menu(channel="dms_a"/"dms_b")`,见 §7);
+  新绑定用户的 per-user 同步仍要走 `menu_sync`,且只有 Use webhook 打开后才会由真实事件触发。
 - 同一个人在不同 OA 的 userId 是否相同取决于 LINE provider 行为;实现按「可能相同」做 channel 隔离,
   两种情况下都正确。
 
-## 7. 发布阶段精确步骤(本阶段禁止执行)
+## 7. 发布记录与剩余事项(2026-09-09 已执行)
 
-1. **挂载 A/B 凭据**(只读,不落仓库/日志):
-   `gcloud run services update <web|worker> --region <r> --update-secrets=LINE_DMS_A_CREDENTIALS=pearnly-line-dms-a:1,LINE_DMS_B_CREDENTIALS=pearnly-line-dms-b:1`
-   (若 secret 为单值,改挂 `LINE_DMS_A_CHANNEL_SECRET=...` / `LINE_DMS_A_CHANNEL_ACCESS_TOKEN=...`)。
+发布身份:SHA `ffc4bf091acd9c1ae8969a8576540a4ac89fa441`(PR #86 rebase 并入 master),
+镜像 `asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:12817198e7295278ac211b2c965c2ccf4965ee1a2e063b7b4152e259e62ade5f`,
+Web/Worker revision `pearnly-{web,worker}-ffc4bf091acd-s2` 各 100% 流量,
+[Manual CD 34264466160](https://github.com/skin306152-star/pearnly-app/actions/runs/34264466160),
+schema execution `pearnly-schema-7hq2v`(18:44:40 UTC 成功)。文档 HEAD 晚于该镜像 SHA,文档更新不重发容器。
+
+1. **挂载 A/B 凭据**:未用一次性 `--update-secrets`。`gcloud run services replace` 会整体重写服务,
+   手工挂载会在下次发布消失,因此改为在 `deployment/cloud-run/render_service.py` 声明
+   `LINE_DMS_A_CREDENTIALS=pearnly-line-dms-a:1` / `LINE_DMS_B_CREDENTIALS=pearnly-line-dms-b:1`
+   (`secretKeyRef`,版本钉死),Web、Worker 与 schema Job 都带;服务回读确认两个 `secretKeyRef` 在位。
+   两个 secret 的 `secretAccessor` 只授 `pearnly-web`/`pearnly-worker` 运行账号,未改动共享 runtime secrets。
 2. **schema**:发布流程先跑 Cloud Run schema Job(`pearnly-schema`,单并发)——
    `PEARNLY_RUNTIME_ROLE=schema` → `services/cloud_runtime/schema.py::migrate()` →
    `services/startup.py::_boot_schema_ddl()`;该块**已显式包含** `services.line_dms.schema.ensure_tables()`
    (multi-OA 列/约束/账号表)与 `services.line_dms.login_tickets.ensure_table()`(票据
    `channel_key`/`binding_id`)。Job 失败则候选版本不切流。`alembic 0125/0126` 是留档记录,
    **不能**把「首个请求触发 `ensure_tables`」当作发布步骤。
-3. **部署** Web + Worker 到同一候选版本;确认 `/api/line/dms/webhook` 现有 OA 仍 200 且能回复。
-4. **A/B webhook**:在 LINE 控制台把 A/B 的 Use webhook 指向 `https://pearnly.com/api/line/dms/webhook/a|b`
-   并开启;用 LINE Verify 确认 200;错 secret 应 400。
-5. **验收**:Earn 为某账号选 `dms_a` → `/dms/` 发码弹窗显示 A DMS / `@260oecde` / A 的二维码与链接;
+   Job 已成功;生产只读核对见 §5。
+3. **部署**:Web + Worker 到同一镜像摘要并各接管 100% 流量;正式域名 `/api/health`、`/api/ready` 200,
+   Web 运行期身份为 `ffc4bf09…`/`pearnly-web-ffc4bf091acd-s2`。legacy 入口空 `events` 签名请求 200,
+   错签名 400,现有 OA 行为未变。
+4. **A/B webhook**:已用官方 API 把 A/B 端点分别设为 `https://pearnly.com/api/line/dms/webhook/a|b`
+   并回读,`POST /v2/bot/channel/webhook/test` 两次均 `success:true, statusCode:200`;错 secret/跨 OA
+   secret 实测 400,未知 OA 路径 404。**剩余一步**:`GET …/webhook/endpoint` 仍 `active=false`,
+   Messaging API 没有打开「Use webhook」的写接口,必须在 LINE Developers Console(或 OA Manager)
+   手动开启;开启前 A/B 不会真正投递事件。空 `events` 签名请求只验证验签与端点连通,不代表真实消息链路已验收。
+5. **验收(部分完成)**:A/B 基础/权限富菜单已发布并回读(A 默认 `richmenu-c97def834b597a1c2dd2761956df3341`,
+   B 默认 `richmenu-2bf651f21047bdf138a94eb85eba4f84`,图片与源 MD5 一致),legacy v3 菜单与默认菜单未变。
+   A/B 未配 LIFF,菜单入口降级到 `https://pearnly.com/dms`,`/api/line/dms-booking/config` 对 A/B 返回
+   `available:false` 且不回落 legacy LIFF。**未做**:真实 A/B 加好友/发码绑定、跨 OA 提交码无响应、
+   改配后旧码失效的真机验证,以及手机 LINE 自动登录验收 —— 没有真实用户操作,不得写成已验收。
+   原计划「Earn 为某账号选 `dms_a` → `/dms/` 发码弹窗显示 A DMS / `@260oecde` / A 的二维码与链接;
    用 A 加好友发码绑定成功;在 B 提交该码应无响应;回执/推送来自 A OA;改配 `dms_b` 后旧绑定消失、
-   旧码失效,重新绑定走 B。
+   旧码失效,重新绑定走 B」仍待有真实账号时按此执行。
 6. **回退**:先关 A/B webhook,再切回上一版本镜像。schema 变更为加法(新列默认 `dms`、
    旧票 `binding_id IS NULL` 只对 legacy 有效),旧镜像忽略新列即可继续服务 legacy OA;
    但**不要**回退成「未跑过 schema Job 的镜像」并期望 A/B 可用 —— 新列不存在时多 OA 写入会失败。

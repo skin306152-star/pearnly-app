@@ -47,6 +47,8 @@ _PASSWORD_GEN_ATTEMPTS = 50
 _CHANNEL_ERRORS = {
     "dms_channel.invalid_channel": (422, "admin.dms_invalid_channel"),
     "dms_channel.missing_subject": (400, "admin.dms_missing_subject"),
+    "dms_channel.unknown_channel": (409, "admin.dms_channel_unknown"),
+    "dms_channel.unavailable": (503, "admin.dms_channel_unavailable"),
     "dms_channel.save_failed": (500, "admin.dms_channel_failed"),
 }
 
@@ -214,7 +216,10 @@ async def dms_overview(request: Request):
 
     info_by_id = _enrich_subjects([r["subject_id"] for r in rows])
     subject_ids = [r["subject_id"] for r in rows]
-    channel_by_subject = line_account_channel.get_channels(subject_ids)
+    try:
+        channel_by_subject = line_account_channel.get_channels(subject_ids)
+    except line_account_channel.AccountChannelError:
+        raise HTTPException(503, detail="admin.dms_channel_unavailable")
     bindings_by_subject = _bindings_for_subjects(subject_ids)
     allowlist = []
     for r in rows:

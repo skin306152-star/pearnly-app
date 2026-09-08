@@ -91,7 +91,12 @@ def list_operators(owner_user: dict) -> dict:
     tenant_id = _tenant(owner_user)
     if not tenant_id:
         return {"error": "dms_roster.no_tenant"}
-    account_channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
+    try:
+        account_channel_key = account_channel.get_channel(
+            account_channel.subject_for(tenant_id, None)
+        )
+    except account_channel.AccountChannelError:
+        return {"error": "dms_roster.channel_unavailable"}
     rows = store.list_profiles(tenant_id)
     items = []
     for r in rows:
@@ -359,7 +364,10 @@ def issue_bind_code(owner_user: dict, user_id: str) -> dict:
     if (prof.get("status") or "active") != "active":
         return {"error": "dms_roster.inactive"}
 
-    channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
+    try:
+        channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
+    except account_channel.AccountChannelError:
+        return {"error": "dms_roster.channel_unavailable"}
     out = line_dms_store.generate_bind_code(tenant_id, user_id, channel_key)
     if not out:
         return {"error": "dms_roster.bind_code_failed"}

@@ -96,12 +96,14 @@ def exact_diff_card(
 def _bound_approvers(tenant_id: str) -> List[Dict[str, str]]:
     """本租户可收审批卡的管理员:dms_role='admin' + 启用 + 已绑 LINE。
 
-    line_user_id 直接取自 list_profiles 的 JOIN 列(不再逐人 get_binding_by_user·消 N+1)。"""
+    line_user_id / channel_key 直接取自 list_profiles 的 JOIN 列(不再逐人 get_binding_by_user·
+    消 N+1);channel_key 让推送按收件人自己的 OA 发出,绝不借发件人的 OA 串线。"""
     return [
         {
             "user_id": str(p["user_id"]),
             "display_name": p.get("display_name") or "",
             "line_user_id": p.get("line_user_id") or "",
+            "channel_key": p.get("line_channel_key") or "",
         }
         for p in roster_store.list_profiles(tenant_id)
         if _is_active_admin(p) and p.get("line_user_id")
@@ -205,7 +207,7 @@ async def _target(binding: dict, line_user_id: str, reply_token: str, pb: dict) 
                 line_client.push_messages,
                 t["line_user_id"],
                 [card],
-                channel=binding_guard.current_channel(),
+                channel=t.get("channel_key") or binding_guard.current_channel(),
             )
             for t in targets
         )
@@ -370,4 +372,4 @@ def _operator_display_name(tenant_id: str, user_id: str) -> str:
 async def _notify_operator(tenant_id: str, req: dict, text: str) -> None:
     b = await _thr(store.get_binding_by_user, str(req.get("operator_user_id") or ""))
     if b and b.get("line_user_id"):
-        _push(b["line_user_id"], text)
+        _push(b["line_user_id"], text, channel=b.get("channel_key") or "")

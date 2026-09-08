@@ -47,16 +47,24 @@ class FakeTicketCursor:
 
     def execute(self, sql, params=None):
         self.calls.append((sql, params))
+        self._ret = None
         if "INSERT INTO line_dms_login_tickets" in sql:
-            ticket_hash, tenant_id, user_id, ttl = params
+            ticket_hash, tenant_id, user_id, channel_key, binding_id, ttl = params
             expires_at = self.now + timedelta(seconds=ttl)
             self.rows[ticket_hash] = {
                 "tenant_id": tenant_id,
                 "user_id": user_id,
+                "channel_key": channel_key,
+                "binding_id": binding_id,
                 "expires_at": expires_at,
                 "created_at": self.now,
             }
-            self._ret = {"ticket_hash": ticket_hash, "expires_at": expires_at}
+            self._ret = {
+                "ticket_hash": ticket_hash,
+                "channel_key": channel_key,
+                "binding_id": binding_id,
+                "expires_at": expires_at,
+            }
         elif "WHERE expires_at <= now()" in sql:
             self.rows = {key: row for key, row in self.rows.items() if row["expires_at"] > self.now}
             self._ret = None
@@ -67,10 +75,14 @@ class FakeTicketCursor:
                 self._ret = {
                     "tenant_id": row["tenant_id"],
                     "user_id": row["user_id"],
+                    "channel_key": row["channel_key"],
+                    "binding_id": row["binding_id"],
                     "created_at": row["created_at"],
                 }
             else:
                 self._ret = None
+        elif "FROM line_dms_bindings" in sql:
+            self._ret = {"id": "epoch-match"}
 
     def fetchone(self):
         return self._ret
@@ -90,7 +102,7 @@ class IssueTicketTests(unittest.TestCase):
             out = lt.issue_login_ticket("t1", "u1")
         ticket = out["ticket"]
         digest = hashlib.sha256(ticket.encode("utf-8")).hexdigest()
-        flat = [v for params in cur.all_params() for v in params]
+        flat = [v for params in cur.all_params() for v in params if v is not None]
         self.assertIn(digest, flat)
         self.assertNotIn(ticket, flat)
         self.assertEqual(set(cur.rows), {digest})
@@ -179,7 +191,16 @@ class ConsumeTicketTests(unittest.TestCase):
             out = lt.issue_login_ticket("t1", "u9")
             first = lt.consume_login_ticket(out["ticket"])
             second = lt.consume_login_ticket(out["ticket"])
-        self.assertEqual(first, {"tenant_id": "t1", "user_id": "u9", "created_at": cur.now})
+        self.assertEqual(
+            first,
+            {
+                "tenant_id": "t1",
+                "user_id": "u9",
+                "channel_key": "dms",
+                "binding_id": None,
+                "created_at": cur.now,
+            },
+        )
         self.assertIsNone(second)
         self.assertEqual(cur.rows, {})
 
@@ -229,6 +250,46 @@ class ConsumeTicketTests(unittest.TestCase):
         self.assertIn("RETURNING tenant_id, user_id", sql)
         self.assertIn("expires_at > now()", sql)
         self.assertNotIn("SELECT", sql)
+
+
+class ChannelScopedTicketTests(unittest.TestCase):
+    """Multi-OA: the ticket is pinned to the binding's OA and epoch at issue time."""
+
+    BINDING = {
+        "id": "epoch-a",
+        "line_user_id": "L1",
+        "tenant_id": "t1",
+        "user_id": "u1",
+        "channel_key": "dms_a",
+    }
+
+    def test_issue_uses_scoped_channel_and_epoch(self):
+        from services.line_dms import binding_guard
+
+        cur = FakeTicketCursor()
+        with _patch(cur), binding_guard.scope(self.BINDING):
+            out = lt.issue_login_ticket("t1", "u1")
+        insert = [c for c in cur.calls if "INSERT INTO line_dms_login_tickets" in c[0]][0]
+        self.assertEqual(insert[1][3], "dms_a")
+        self.assertEqual(insert[1][4], "epoch-a")
+        self.assertEqual(out["channel_key"], "dms_a")
+        self.assertEqual(out["binding_id"], "epoch-a")
+
+    def test_issue_rejects_unknown_explicit_channel(self):
+        cur = FakeTicketCursor()
+        with _patch(cur):
+            self.assertIsNone(lt.issue_login_ticket("t1", "u1", channel_key="nope"))
+        self.assertEqual(cur.calls, [])
+
+    def test_consume_returns_channel_and_epoch(self):
+        from services.line_dms import binding_guard
+
+        cur = FakeTicketCursor()
+        with _patch(cur), binding_guard.scope(self.BINDING):
+            out = lt.issue_login_ticket("t1", "u1")
+            identity = lt.consume_login_ticket(out["ticket"])
+        self.assertEqual(identity["channel_key"], "dms_a")
+        self.assertEqual(identity["binding_id"], "epoch-a")
 
 
 if __name__ == "__main__":

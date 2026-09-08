@@ -5,6 +5,23 @@
     var token = '';
     var renewalKey = 'dms-line-login-renewed';
 
+    // LINE opens the configured endpoint and carries the original query inside liff.state;
+    // outside LINE the same query sits on location.search. The OA key must survive both.
+    function param(name) {
+        var sp = new URLSearchParams(window.location.search);
+        var state = sp.get('liff.state');
+        if (state) {
+            var queryStart = state.indexOf('?');
+            state = queryStart >= 0 ? state.slice(queryStart + 1) : state;
+            return new URLSearchParams(state).get(name) || '';
+        }
+        return sp.get(name) || '';
+    }
+
+    function entryChannel() {
+        return (param('channel') || '').trim();
+    }
+
     function responseError(response, body) {
         var detail = body && body.detail;
         var code =
@@ -59,11 +76,20 @@
 
     async function authenticate(forceLogin) {
         token = '';
-        var config = await fetch('/api/line/dms-booking/config').then(function (response) {
+        var channel = entryChannel();
+        var configUrl = '/api/line/dms-booking/config';
+        if (channel) configUrl += '?channel=' + encodeURIComponent(channel);
+        var config = await fetch(configUrl).then(function (response) {
             return response.json();
         });
         var liffId = config && config.data && config.data.liff_id;
-        if (!liffId || !window.liff) throw new Error('open_in_line');
+        var channelKey = (config && config.data && config.data.channel_key) || channel;
+        if (!liffId || !window.liff) {
+            var unavailable = new Error('dms_booking.liff_unavailable');
+            unavailable.code = 'dms_booking.liff_unavailable';
+            unavailable.status = 503;
+            throw unavailable;
+        }
         await window.liff.init({ liffId: liffId });
         if (forceLogin) return renewLineLogin();
         if (!window.liff.isLoggedIn()) {
@@ -73,7 +99,10 @@
         var response = await fetch('/api/line/dms-booking/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id_token: window.liff.getIDToken() || '' }),
+            body: JSON.stringify({
+                id_token: window.liff.getIDToken() || '',
+                channel: channelKey || '',
+            }),
         });
         var body = await response.json().catch(function () {
             return null;

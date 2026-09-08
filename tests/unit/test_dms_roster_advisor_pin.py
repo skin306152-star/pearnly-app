@@ -221,13 +221,19 @@ class ListShowsAttributionTest(unittest.TestCase):
             "advisor_id": "9",
             "advisor_name": "阿明",
         }
-        with mock.patch.object(service.store, "list_profiles", return_value=[row]):
+        with (
+            mock.patch.object(service.store, "list_profiles", return_value=[row]),
+            mock.patch("services.line_dms.account_channel.get_channel", return_value="dms"),
+        ):
             item = service.list_operators(OWNER)["items"][0]
         self.assertEqual(item["advisor_id"], "9")
         self.assertEqual(item["advisor_name"], "阿明")
 
     def test_list_operators_defaults_to_empty_when_not_pinned(self):
-        with mock.patch.object(service.store, "list_profiles", return_value=[{"user_id": "op-1"}]):
+        with (
+            mock.patch.object(service.store, "list_profiles", return_value=[{"user_id": "op-1"}]),
+            mock.patch("services.line_dms.account_channel.get_channel", return_value="dms"),
+        ):
             item = service.list_operators(OWNER)["items"][0]
         self.assertEqual(item["advisor_name"], "")
 

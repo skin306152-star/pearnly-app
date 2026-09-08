@@ -375,13 +375,15 @@ class EditLinkChannelTests(TestCase):
     def test_legacy_channel_uses_legacy_liff(self):
         with mock.patch.dict("os.environ", {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=False):
             self.assertEqual(
-                qa_cards._edit_url("N1", "dms"), "https://liff.line.me/DMS-LIFF?draft=N1"
+                qa_cards._edit_url("N1", "dms"),
+                "https://liff.line.me/DMS-LIFF?draft=N1&channel=dms",
             )
 
     def test_non_legacy_channel_uses_its_own_liff(self):
         with mock.patch.dict("os.environ", {"LINE_DMS_A_LIFF_ID": "A-LIFF"}, clear=False):
             self.assertEqual(
-                qa_cards._edit_url("N1", "dms_a"), "https://liff.line.me/A-LIFF?draft=N1"
+                qa_cards._edit_url("N1", "dms_a"),
+                "https://liff.line.me/A-LIFF?draft=N1&channel=dms_a",
             )
 
     def test_non_legacy_without_liff_is_empty_not_legacy(self):
@@ -393,7 +395,10 @@ class EditLinkChannelTests(TestCase):
     def test_binding_scope_selects_channel(self):
         with mock.patch.dict("os.environ", {"LINE_DMS_A_LIFF_ID": "A-LIFF"}, clear=True):
             with binding_guard.scope(self._BINDING):
-                self.assertEqual(qa_cards._edit_url("N1"), "https://liff.line.me/A-LIFF?draft=N1")
+                self.assertEqual(
+                    qa_cards._edit_url("N1"),
+                    "https://liff.line.me/A-LIFF?draft=N1&channel=dms_a",
+                )
 
     def test_preview_omits_edit_button_when_oa_has_no_liff(self):
         with mock.patch.dict("os.environ", {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=True):

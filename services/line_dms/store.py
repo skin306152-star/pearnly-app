@@ -9,9 +9,10 @@ DMS 使用独立 LINE OA 与专属表，不复用 Cowork / ERP 的绑定状态�
   dms_line_sessions       —— 多轮会话态(state + payload + TTL),(tenant, channel, line_user) PK。
 
 多 OA:channel_key 把绑定/码/会话都钉在签发它的那个 OA 上,同一 LINE id 不会跨 OA 命中。
-建表/迁移照 line_intent_store 范式:prod 无 alembic 钩子 → 首用 ensure 幂等自愈 + _with_heal
-重试一次。绑定/绑定码按 (channel, line_user_id) 反查(webhook 无登录态,穿不进租户上下文)故走
-owner 连接;会话态租户已知 → 走 get_cursor_rls 施加 RLS(与 line_intent_store 同款)。
+建表/迁移由 Cloud Run schema Job 经 `services.startup._boot_schema_ddl` 跑本模块
+`ensure_tables`;`_with_heal` 首用重试只作兜底。绑定/绑定码按 (channel, line_user_id) 反查
+(webhook 无登录态,穿不进租户上下文)故走 owner 连接;会话态租户已知 → 走 get_cursor_rls
+施加 RLS(与 line_intent_store 同款)。
 """
 
 from __future__ import annotations
@@ -21,11 +22,24 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from services.line_platform import channels as line_channels
 from services.line_dms.schema import _with_heal, ensure_tables  # noqa: F401 · 兼容旧调用点
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_CODE_TTL_MINUTES = 10
+
+
+def scope_channel(channel_key: Optional[str]) -> Optional[str]:
+    """Resolve a caller's OA scope for single-OA lookups.
+
+    Empty / missing → the legacy ``dms`` OA (old callers keep working on exactly one OA).
+    Unknown non-empty key → ``None`` so the caller fails closed instead of querying every OA.
+    """
+    key = (channel_key or "").strip()
+    if not key:
+        return line_channels.DEFAULT_DMS_CHANNEL
+    return key if line_channels.is_valid(key) else None
 
 
 def _dal(label: str, default):
@@ -65,17 +79,32 @@ def generate_bind_code(
     """为 (tenant, user) 发一个 6 位数字绑定码,作废该 user 旧的未用码(只留最新一个)。
 
     channel_key = 该账号被分配的 OA;码只在同一个 OA 的 webhook 里能被核销(防串 OA)。
+    发码与改配共享账号级事务锁,锁内核对当前分配:调用方拿到的旧 OA 不会发出新码。
     返回 {"code", "expires_at"(iso), "channel_key"} 或 None。
     """
     from core import db
-    from services.line_platform import channels as line_channels
+    from services.line_dms import account_channel
 
-    key = line_channels.normalize(channel_key)
+    requested = (channel_key or "").strip()
+    if requested and not line_channels.is_valid(requested):
+        return None
     code = f"{secrets.randbelow(900000) + 100000}"
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=int(ttl_minutes))
 
     def _run():
         with db.get_cursor(commit=True) as cur:
+            subject = account_channel.subject_for(tenant_id, user_id)
+            account_channel.lock_account(cur, subject)
+            assigned = account_channel.read_channel(cur, subject)
+            key = requested or assigned
+            if key != assigned:
+                logger.warning(
+                    "[line_dms] bind code refused: subject=%s assigned=%s requested=%s",
+                    subject,
+                    assigned,
+                    key,
+                )
+                return None
             _void_unused_codes(cur, user_id)
             cur.execute(
                 "INSERT INTO line_dms_binding_codes "
@@ -83,11 +112,13 @@ def generate_bind_code(
                 "VALUES (%s, %s, %s, %s, %s) RETURNING code, expires_at",
                 (code, key, str(tenant_id), str(user_id), expires_at),
             )
-            return cur.fetchone()
+            row = cur.fetchone()
+            return (row, key) if row else None
 
-    row = _dal("generate_bind_code", None)(_run)
-    if not row:
+    result = _dal("generate_bind_code", None)(_run)
+    if not result:
         return None
+    row, key = result
     return {
         "code": row["code"],
         "expires_at": row["expires_at"].isoformat(),
@@ -99,32 +130,25 @@ def consume_bind_code(code: str, channel_key: Optional[str] = None) -> Optional[
     """核销绑定码(6 位数字 · 未用 · 未过期 · 属于当前 OA)→ 标记已用并返回归属。
 
     无效/已用/过期/不属于该 OA → None。webhook 无租户上下文 → owner 连接。
-    ``channel_key`` 省略时不过滤(仅测试/内部调用);生产 webhook 必须传,否则错 OA 也能兑换。
+    ``channel_key`` 省略 = 只认 legacy OA(旧调用兼容);未知非空 key → None(fail closed)。
     """
     from core import db
-    from services.line_platform import channels as line_channels
 
     code = (code or "").strip()
     if len(code) != 6 or not code.isdigit():
         return None
-    key = (channel_key or "").strip()
+    key = scope_channel(channel_key)
+    if key is None:
+        return None
 
     def _run():
         with db.get_cursor(commit=True) as cur:
-            if key:
-                cur.execute(
-                    "UPDATE line_dms_binding_codes SET used_at = now() "
-                    "WHERE code = %s AND channel_key = %s AND used_at IS NULL "
-                    "AND expires_at > now() RETURNING tenant_id, user_id, channel_key",
-                    (code, key),
-                )
-            else:
-                cur.execute(
-                    "UPDATE line_dms_binding_codes SET used_at = now() "
-                    "WHERE code = %s AND used_at IS NULL AND expires_at > now() "
-                    "RETURNING tenant_id, user_id, channel_key",
-                    (code,),
-                )
+            cur.execute(
+                "UPDATE line_dms_binding_codes SET used_at = now() "
+                "WHERE code = %s AND channel_key = %s AND used_at IS NULL "
+                "AND expires_at > now() RETURNING tenant_id, user_id, channel_key",
+                (code, key),
+            )
             return cur.fetchone()
 
     row = _dal("consume_bind_code", None)(_run)
@@ -144,28 +168,25 @@ def peek_bind_code_tenant(code: str, channel_key: Optional[str] = None) -> Optio
     allowlist 灰度下 tenant=None 恒判关会静默吞码。命中(不论未用/已用/过期)→ tenant_id 串;
     无此码(判不出归属)→ None(fail-closed)。owner 连接(webhook 无登录态)。
 
-    传 channel_key 时只认该 OA 的码:在错误 OA 里提交正确码 → 判不出归属 → 零回复零核销。
+    只认该 OA 的码:在错误 OA 里提交正确码 → 判不出归属 → 零回复零核销。
+    ``channel_key`` 省略 = 只认 legacy OA;未知非空 key → None(fail closed)。
     """
     from core import db
 
     code = (code or "").strip()
     if len(code) != 6 or not code.isdigit():
         return None
-    key = (channel_key or "").strip()
+    key = scope_channel(channel_key)
+    if key is None:
+        return None
 
     def _run():
         with db.get_cursor() as cur:
-            if key:
-                cur.execute(
-                    "SELECT tenant_id FROM line_dms_binding_codes "
-                    "WHERE code = %s AND channel_key = %s LIMIT 1",
-                    (code, key),
-                )
-            else:
-                cur.execute(
-                    "SELECT tenant_id FROM line_dms_binding_codes WHERE code = %s LIMIT 1",
-                    (code,),
-                )
+            cur.execute(
+                "SELECT tenant_id FROM line_dms_binding_codes "
+                "WHERE code = %s AND channel_key = %s LIMIT 1",
+                (code, key),
+            )
             return cur.fetchone()
 
     row = _dal("peek_bind_code_tenant", None)(_run)
@@ -187,16 +208,29 @@ def create_or_update_binding(
     """建/换绑 (channel, LINE user) ↔ (tenant, user)。同 OA 的 line_user_id 已绑别的 user → 拒。
 
     一个 user 任一时刻只留一个绑定(跨 OA 也先删旧);重复绑同一对 → 更新昵称/活跃时间。
+    写入前在账号级事务锁内核对当前分配:改配前签发的旧码不能把绑定恢复回旧 OA。
     """
     from core import db
-    from services.line_dms import binding_state
-    from services.line_platform import channels as line_channels
+    from services.line_dms import account_channel, binding_state
 
     key = line_channels.normalize(channel_key)
+    if not line_channels.is_valid(key):
+        return False
     old_lines = []
 
     def _run():
         with db.get_cursor(commit=True) as cur:
+            subject = account_channel.subject_for(tenant_id, user_id)
+            account_channel.lock_account(cur, subject)
+            assigned = account_channel.read_channel(cur, subject)
+            if assigned != key:
+                logger.warning(
+                    "[line_dms] binding refused: subject=%s assigned=%s code_channel=%s",
+                    subject,
+                    assigned,
+                    key,
+                )
+                return False
             cur.execute(
                 "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
                 ("dms-binding-user:" + str(user_id),),
@@ -214,14 +248,21 @@ def create_or_update_binding(
                 )
                 return False
             cur.execute(
-                "SELECT line_user_id, channel_key FROM line_dms_bindings WHERE user_id=%s",
+                "SELECT line_user_id, channel_key, tenant_id::text AS tenant_id "
+                "FROM line_dms_bindings WHERE user_id=%s",
                 (str(user_id),),
             )
             for old in cur.fetchall():
                 old_lines.append((old["line_user_id"], old["channel_key"]))
                 binding_state.lock_line(cur, old["line_user_id"], old["channel_key"])
-                binding_state.invalidate(cur, old["line_user_id"], user_id)
-            binding_state.invalidate(cur, line_user_id, user_id)
+                binding_state.invalidate(
+                    cur,
+                    old["line_user_id"],
+                    user_id,
+                    old["channel_key"],
+                    old["tenant_id"],
+                )
+            binding_state.invalidate(cur, line_user_id, user_id, key, str(tenant_id))
             cur.execute(
                 "DELETE FROM line_dms_bindings WHERE user_id = %s "
                 "AND NOT (channel_key = %s AND line_user_id = %s)",
@@ -253,29 +294,23 @@ def get_binding_by_line_user(
 ) -> Optional[dict]:
     """按 (channel, LINE user) 反查绑定(webhook 入口用)。无 → None。
 
-    channel_key 省略时不按 OA 过滤(旧调用/无 OA 上下文);webhook 必须传,否则同一个人
-    在另一个 OA 的绑定可能被误匹配。
+    channel_key 省略 = 只查 legacy OA(旧调用兼容,绝不跨 OA);未知非空 key → None。
     """
     from core import db
 
     if not line_user_id:
         return None
-    key = (channel_key or "").strip()
+    key = scope_channel(channel_key)
+    if key is None:
+        return None
 
     def _run():
         with db.get_cursor() as cur:
-            if key:
-                cur.execute(
-                    "SELECT id, channel_key, tenant_id, user_id, display_name, bound_at "
-                    "FROM line_dms_bindings WHERE channel_key = %s AND line_user_id = %s LIMIT 1",
-                    (key, line_user_id),
-                )
-            else:
-                cur.execute(
-                    "SELECT id, channel_key, tenant_id, user_id, display_name, bound_at "
-                    "FROM line_dms_bindings WHERE line_user_id = %s LIMIT 1",
-                    (line_user_id,),
-                )
+            cur.execute(
+                "SELECT id, channel_key, tenant_id, user_id, display_name, bound_at "
+                "FROM line_dms_bindings WHERE channel_key = %s AND line_user_id = %s LIMIT 1",
+                (key, line_user_id),
+            )
             return cur.fetchone()
 
     row = _dal("get_binding_by_line_user", None)(_run)
@@ -300,7 +335,11 @@ def get_binding_by_user(user_id: str) -> Optional[dict]:
     if not row:
         return None
     out = dict(row)
-    out["channel_key"] = line_channels.normalize(out.get("channel_key"))
+    stored = (out.get("channel_key") or "").strip()
+    if stored and not line_channels.is_valid(stored):
+        logger.error("[line_dms] binding %s has unknown channel_key; refusing", out.get("id"))
+        return None
+    out["channel_key"] = stored or line_channels.DEFAULT_DMS_CHANNEL
     return out
 
 
@@ -318,13 +357,16 @@ def unbind_by_user(user_id: str) -> bool:
                 ("dms-binding-user:" + str(user_id),),
             )
             cur.execute(
-                "SELECT line_user_id, channel_key FROM line_dms_bindings WHERE user_id=%s",
+                "SELECT line_user_id, channel_key, tenant_id::text AS tenant_id "
+                "FROM line_dms_bindings WHERE user_id=%s",
                 (str(user_id),),
             )
             for row in cur.fetchall():
                 removed_lines.append((row["line_user_id"], row["channel_key"]))
                 binding_state.lock_line(cur, row["line_user_id"], row["channel_key"])
-                binding_state.invalidate(cur, row["line_user_id"], user_id)
+                binding_state.invalidate(
+                    cur, row["line_user_id"], user_id, row["channel_key"], row["tenant_id"]
+                )
             cur.execute("DELETE FROM line_dms_bindings WHERE user_id = %s", (str(user_id),))
             return True
 
@@ -350,34 +392,33 @@ def void_bind_codes_for_user(user_id: str) -> bool:
 
 
 def unbind_by_line_user(line_user_id: str, channel_key: Optional[str] = None) -> bool:
-    """LINE 侧解绑(unfollow / 解绑命令)。返回是否真删到一行。"""
+    """LINE 侧解绑(unfollow / 解绑命令)。返回是否真删到一行。
+
+    channel_key 省略 = 只删 legacy OA 的绑定;未知非空 key → 不删任何行(fail closed)。
+    """
     from core import db
     from services.line_dms import binding_state
-    from services.line_platform import channels as line_channels
 
     if not line_user_id:
         return False
-    key = (channel_key or "").strip()
+    key = scope_channel(channel_key)
+    if key is None:
+        return False
 
     def _run():
         with db.get_cursor(commit=True) as cur:
             binding_state.lock_scope(cur, line_user_id, key)
-            if key:
-                cur.execute(
-                    "DELETE FROM line_dms_bindings "
-                    "WHERE channel_key = %s AND line_user_id = %s "
-                    "RETURNING user_id, channel_key",
-                    (key, line_user_id),
-                )
-            else:
-                cur.execute(
-                    "DELETE FROM line_dms_bindings WHERE line_user_id = %s "
-                    "RETURNING user_id, channel_key",
-                    (line_user_id,),
-                )
+            cur.execute(
+                "DELETE FROM line_dms_bindings "
+                "WHERE channel_key = %s AND line_user_id = %s "
+                "RETURNING user_id, channel_key, tenant_id::text AS tenant_id",
+                (key, line_user_id),
+            )
             row = cur.fetchone()
             if row:
-                binding_state.invalidate(cur, line_user_id, row["user_id"])
+                binding_state.invalidate(
+                    cur, line_user_id, row["user_id"], row["channel_key"], row["tenant_id"]
+                )
             return row
 
     row = _dal("unbind_by_line_user", None)(_run)
@@ -390,12 +431,13 @@ def unbind_by_line_user(line_user_id: str, channel_key: Optional[str] = None) ->
 
 
 def _binding_dict(row, line_user_id: str) -> dict:
-    from services.line_platform import channels as line_channels
-
     out = dict(row)
     out["id"] = str(out["id"])
     out["line_user_id"] = line_user_id
-    out["channel_key"] = line_channels.normalize(out.get("channel_key"))
+    stored = (out.get("channel_key") or "").strip()
+    if stored and not line_channels.is_valid(stored):
+        raise ValueError("dms_binding.unknown_channel")
+    out["channel_key"] = stored or line_channels.DEFAULT_DMS_CHANNEL
     out["tenant_id"] = str(out["tenant_id"])
     out["user_id"] = str(out["user_id"])
     return out

@@ -12,7 +12,13 @@ from core.pos_api import PosError
 from routes import line_dms_credentials_routes as credentials
 from services.line_dms import binding_guard as guard, query_flow
 
-A = {"id": "epoch-a", "line_user_id": "line-1", "user_id": "user-a", "tenant_id": "tenant"}
+A = {
+    "id": "epoch-a",
+    "line_user_id": "line-1",
+    "user_id": "user-a",
+    "tenant_id": "tenant",
+    "channel_key": "dms",
+}
 B = {**A, "id": "epoch-b", "user_id": "user-b"}
 
 
@@ -25,6 +31,10 @@ class BindingGuardTests(unittest.TestCase):
             ("services.line_dms.store.get_binding_by_line_user", lambda *_: self.live),
             ("core.db.find_user_by_id", lambda _: self.user),
             ("services.dms_roster.store.get_profile", lambda *_: self.profile),
+            (
+                "services.line_dms.account_channel.get_channel",
+                lambda subject: "dms",
+            ),
         ):
             self.enterContext(patch(target, side_effect=replacement))
 
@@ -49,6 +59,17 @@ class BindingGuardTests(unittest.TestCase):
         self.profile = {"status": "active", "can_query_dms": False, "dms_role": "sales"}
         self.assertFalse(guard.current({**A, "_require_query": True}))
         self.assertFalse(guard.current({**A, "_require_admin": True}))
+
+    def test_current_rejects_account_oa_mismatch_or_unreadable_assignment(self):
+        from services.line_dms import account_channel
+
+        with patch("services.line_dms.account_channel.get_channel", return_value="dms_a"):
+            self.assertFalse(guard.current(A))
+        with patch(
+            "services.line_dms.account_channel.get_channel",
+            side_effect=account_channel.AccountChannelError("dms_channel.unavailable"),
+        ):
+            self.assertFalse(guard.current(A))
 
     def test_browser_rejects_legacy_token_and_rebound_identity(self):
         request = Mock(headers={"Authorization": "Bearer signed"})

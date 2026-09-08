@@ -225,6 +225,13 @@ class InviteExistingUserTests(unittest.TestCase):
         )
         self._su.start()
         self.addCleanup(self._su.stop)
+        self.enterContext(
+            mock.patch.object(
+                admin_dms_routes.line_account_channel,
+                "set_channel",
+                return_value={"ok": True, "channel_key": "dms", "changed": False},
+            )
+        )
 
     def test_invite_existing_user_with_tenant_writes_tenant_id(self):
         existing = {"id": "user-1", "tenant_id": "tenant-9", "username": "member1"}
@@ -465,6 +472,13 @@ class InviteCreateAccountTests(unittest.TestCase):
         )
         self._su.start()
         self.addCleanup(self._su.stop)
+        self.enterContext(
+            mock.patch.object(
+                admin_dms_routes.line_account_channel,
+                "set_channel",
+                return_value={"ok": True, "channel_key": "dms", "changed": False},
+            )
+        )
 
     def test_invite_unknown_email_creates_account_and_reveals_password_once(self):
         with (

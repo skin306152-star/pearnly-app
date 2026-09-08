@@ -14,6 +14,7 @@
             saved: 'บันทึกฉบับร่างแล้ว ส่งสรุปใหม่ไปที่ LINE เรียบร้อย',
             failed: 'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองใหม่',
             expired: 'รายการนี้หมดอายุหรือถูกแก้ไขแล้ว กรุณาใช้สรุปล่าสุดใน LINE',
+            liffUnavailable: 'หน้าสำหรับ OA นี้ยังไม่เปิดใช้งาน กรุณาเปิดเมนู DMS ใหม่จาก LINE',
             masterChanged: 'ตัวเลือกเปลี่ยนไปแล้ว กรุณาใช้สรุปล่าสุดใน LINE แล้วลองอีกครั้ง',
             masterUnavailable: 'ยังโหลดตัวเลือกล่าสุดจาก DMS ไม่ได้ กรุณาลองใหม่อีกครั้ง',
             postcodeMissing: 'กรุณาเลือกรหัสไปรษณีย์จากรายการที่กำหนด',
@@ -92,6 +93,8 @@
             saved: 'Draft saved. A revised preview was sent to LINE.',
             failed: 'Could not save. Check the fields and try again.',
             expired: 'This draft expired or was changed. Use the latest preview in LINE.',
+            liffUnavailable:
+                'This editor is not enabled for this LINE OA. Reopen the DMS menu from LINE.',
             masterChanged:
                 'An option changed since this draft was created. Use the latest preview in LINE and try again.',
             masterUnavailable: 'The latest DMS options are unavailable. Try again shortly.',
@@ -171,6 +174,7 @@
             saved: '草稿已保存，新版预览已发送到 LINE。',
             failed: '保存失败，请检查字段后重试。',
             expired: '此草稿已过期或已被修改，请使用 LINE 中最新的预览卡。',
+            liffUnavailable: '此入口尚未为这个 LINE OA 开通，请从 LINE 重新打开 DMS 菜单。',
             masterChanged: '可选项目已更新，请使用 LINE 中的最新预览卡后重试。',
             masterUnavailable: '暂时无法读取 DMS 最新选项，请稍后重试。',
             postcodeMissing: '请从列表中选择邮编。',
@@ -249,6 +253,8 @@
             failed: '保存できませんでした。入力内容を確認して再試行してください。',
             expired:
                 'この下書きは期限切れ、または変更済みです。LINE の最新プレビューを使用してください。',
+            liffUnavailable:
+                'この画面はこのLINE OAでは利用できません。LINEからDMSメニューを開き直してください。',
             masterChanged: '選択肢が更新されました。LINE の最新プレビューで再試行してください。',
             masterUnavailable: 'DMS の最新選択肢を取得できません。しばらくして再試行してください。',
             postcodeMissing: 'リストから郵便番号を選択してください。',
@@ -327,6 +333,7 @@
         'dms_booking.slip_without_transfer': 'slipConflict',
         'dms_booking.payment_detail_required': 'paymentDetailRequired',
         'dms_booking.duplicate_payment': 'duplicatePayment',
+        'dms_booking.liff_unavailable': 'liffUnavailable',
     };
     window.DMS_BOOKING_GEO = ['province_id', 'district_id', 'subdistrict_id', 'zipcode_id'];
 })();

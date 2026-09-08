@@ -80,13 +80,21 @@ async def consume_mrerp_login_ticket(ticket: str = ""):
         return _error_page("ไม่สามารถยืนยันผู้ใช้งานได้ กรุณาเปิดเมนูใหม่", 410)
 
     from services.line_dms import store
+    from services.line_platform import channels as line_channels
 
     binding = await asyncio.to_thread(store.get_binding_by_user, str(identity["user_id"]))
     if binding:
         binding = {**binding, "user_id": str(identity["user_id"])}
+    ticket_channel = line_channels.normalize(identity.get("channel_key"))
+    ticket_epoch = identity.get("binding_id")
     if (
         not binding
         or not identity.get("created_at")
+        or binding["channel_key"] != ticket_channel
+        or (ticket_epoch is not None and str(binding["id"]) != str(ticket_epoch))
+        # Legacy tickets (issued before the epoch column) are only valid on the legacy OA and
+        # fall back to the bound_at timestamp check; they can never authorize an A/B binding.
+        or (ticket_epoch is None and binding["channel_key"] != line_channels.DEFAULT_DMS_CHANNEL)
         or binding["bound_at"] > identity["created_at"]
         or not await asyncio.to_thread(binding_guard.current, binding)
     ):

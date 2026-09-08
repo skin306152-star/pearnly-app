@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """DMS LINE 表结构 + 多 OA 迁移(幂等自愈)。
 
-prod 无 alembic 钩子:首用 `ensure_tables` 幂等建表/迁移 + `_with_heal` 重试一次。迁移含
-DROP/ADD 约束,多实例并发首用会互相打架 → 先取事务级 advisory lock(Postgres 分布式锁,
-不是单机文件锁)串行化。alembic 0125_dms_multi_line_oa 是同一份 DDL 的发布记录。
+发布路径是 Cloud Run schema Job(`PEARNLY_RUNTIME_ROLE=schema` →
+`services/cloud_runtime/schema.py::migrate()` → `services/startup.py::_boot_schema_ddl()`),
+该块显式调用本模块 `ensure_tables()`;运行期 `_with_heal` 首用自愈只作兜底,不是发布步骤。
+迁移含 DROP/ADD 约束,多实例并发会互相打架 → 先取事务级 advisory lock(Postgres 分布式锁,
+不是单机文件锁)串行化。alembic 0125_dms_multi_line_oa 是同一份 DDL 的留档记录。
 """
 
 from __future__ import annotations

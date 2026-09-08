@@ -53,6 +53,25 @@ class CloudImportSchemaTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Schema gate reported failures"):
                 schema.migrate()
 
+    def test_release_schema_gate_runs_startup_ddl_block_that_includes_dms_multi_oa(self):
+        """Cloud Run schema job → _boot_schema_ddl → line_dms.schema.ensure_tables."""
+        from services.cloud_runtime import schema
+
+        with (
+            patch("services.auth.schema._ensure_schema"),
+            patch("services.startup._boot_schema_ddl") as boot,
+            patch("services.users.columns.ensure_user_profile_columns"),
+            patch("services.cloud_tasks.store.ensure_table"),
+            patch("services.cloud_runtime.schema.migrate_queue_schema"),
+            patch("services.stocktake.schema.migrate"),
+        ):
+            schema.migrate()
+        boot.assert_called_once_with()
+        startup_source = (
+            Path(__file__).resolve().parents[2] / "services" / "startup.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("services.line_dms.schema", startup_source)
+
     def test_cloud_schema_audits_zero_policy_tables_without_disabling_rls(self):
         from core.rls import ensure_no_orphan_rls
 

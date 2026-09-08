@@ -61,7 +61,9 @@ async def open_menu(
     payload = {k: old.get(k) for k in _KEEP_KEYS if old.get(k)}
     await _thr(store.set_session, binding["tenant_id"], line_user_id, "menu", payload)
     allowed = await _thr(query_access.can_query, binding)
-    msgs: list = [menu_cards.menu_card(can_query=bool(allowed))]
+    msgs: list = [
+        menu_cards.menu_card(can_query=bool(allowed), channel=binding_guard.current_channel())
+    ]
     if greet:
         msgs.insert(0, {"type": "text", "text": cards.TXT_MENU_GREETING})
     line_client.reply_messages(reply_token, msgs, channel=binding_guard.current_channel())

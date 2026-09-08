@@ -63,7 +63,13 @@ class VerifyIdTokenTests(unittest.TestCase):
                 issue.assert_not_called()
 
     def test_dms_bound_user_gets_dms_scoped_token(self):
-        binding = {"id": "epoch-1", "line_user_id": "L1", "user_id": "u1", "tenant_id": "t1"}
+        binding = {
+            "id": "epoch-1",
+            "line_user_id": "L1",
+            "user_id": "u1",
+            "tenant_id": "t1",
+            "channel_key": "dms",
+        }
         user = {
             "id": "u1",
             "username": "sale02",
@@ -77,6 +83,7 @@ class VerifyIdTokenTests(unittest.TestCase):
             mock.patch("services.line_dms.store.get_binding_by_line_user", return_value=binding),
             mock.patch.object(dms_edit.db, "find_user_by_id", return_value=user),
             mock.patch("services.dms_roster.store.get_profile", return_value={"status": "active"}),
+            mock.patch("services.line_dms.account_channel.get_channel", return_value="dms"),
             mock.patch.object(dms_edit, "create_access_token", return_value="DMS-JWT") as issue,
         ):
             res = asyncio.run(dms_edit.dms_booking_liff_auth(dms_edit.LiffAuthIn(id_token="ok")))
@@ -84,6 +91,79 @@ class VerifyIdTokenTests(unittest.TestCase):
         self.assertEqual(res["data"]["token"], "DMS-JWT")
         self.assertEqual(issue.call_args.kwargs["entry"], "dms")
         self.assertEqual(issue.call_args.kwargs["dms_binding"], binding)
+
+    def test_dms_a_auth_verifies_a_liff_and_looks_up_a_binding(self):
+        binding = {
+            "id": "epoch-a",
+            "line_user_id": "L1",
+            "user_id": "u1",
+            "tenant_id": "t1",
+            "channel_key": "dms_a",
+        }
+        user = {
+            "id": "u1",
+            "username": "sale02",
+            "plan": "free",
+            "tenant_id": "t1",
+            "role": "member",
+            "is_active": True,
+        }
+        with (
+            mock.patch.object(dms_edit, "verify_id_token", return_value={"sub": "L1"}) as verify,
+            mock.patch(
+                "services.line_dms.store.get_binding_by_line_user", return_value=binding
+            ) as lookup,
+            mock.patch.object(dms_edit.db, "find_user_by_id", return_value=user),
+            mock.patch("services.dms_roster.store.get_profile", return_value={"status": "active"}),
+            mock.patch("services.line_dms.account_channel.get_channel", return_value="dms_a"),
+            mock.patch.object(dms_edit, "create_access_token", return_value="A-JWT"),
+        ):
+            res = asyncio.run(
+                dms_edit.dms_booking_liff_auth(dms_edit.LiffAuthIn(id_token="ok", channel="dms_a"))
+            )
+        verify.assert_called_once_with("ok", "LINE_DMS_A_LIFF_ID")
+        self.assertEqual(lookup.call_args.args, ("L1", "dms_a"))
+        self.assertEqual(res["data"]["token"], "A-JWT")
+
+    def test_unknown_channel_rejected_before_token_verification(self):
+        from core.pos_api import PosError
+
+        with mock.patch.object(dms_edit, "verify_id_token") as verify:
+            with self.assertRaises(PosError) as caught:
+                asyncio.run(
+                    dms_edit.dms_booking_liff_auth(
+                        dms_edit.LiffAuthIn(id_token="ok", channel="nope")
+                    )
+                )
+        self.assertEqual(caught.exception.http_status, 403)
+        verify.assert_not_called()
+
+
+class DmsBookingConfigTests(unittest.TestCase):
+    def test_config_defaults_to_legacy_liff(self):
+        with mock.patch.dict(
+            os.environ,
+            {"LINE_DMS_LIFF_ID": "DMS-LIFF", "LINE_LIFF_ID": "SHARED-LIFF"},
+            clear=True,
+        ):
+            res = asyncio.run(dms_edit.dms_booking_liff_config())
+        self.assertEqual(
+            res["data"], {"liff_id": "DMS-LIFF", "channel_key": "dms", "available": True}
+        )
+
+    def test_config_for_a_without_liff_is_honestly_unavailable(self):
+        with mock.patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=True):
+            res = asyncio.run(dms_edit.dms_booking_liff_config(channel="dms_a"))
+        self.assertEqual(res["data"]["liff_id"], "")
+        self.assertEqual(res["data"]["channel_key"], "dms_a")
+        self.assertFalse(res["data"]["available"])
+
+    def test_config_unknown_channel_rejected(self):
+        from core.pos_api import PosError
+
+        with self.assertRaises(PosError) as caught:
+            asyncio.run(dms_edit.dms_booking_liff_config(channel="nope"))
+        self.assertEqual(caught.exception.http_status, 404)
 
 
 class LiffEntryTests(unittest.TestCase):

@@ -268,7 +268,10 @@ async def dms_line_bind_code(request: Request):
 
     user = _authorize(request)
     tenant_id, user_id = _tenant_user(user)
-    channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
+    try:
+        channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
+    except account_channel.AccountChannelError:
+        raise HTTPException(503, detail="dms.channel_unavailable")
     out = await asyncio.to_thread(
         line_dms_store.generate_bind_code, tenant_id, user_id, channel_key
     )
@@ -289,7 +292,12 @@ async def dms_line_binding(request: Request):
 
     user = _authorize(request)
     tenant_id, user_id = _tenant_user(user)
-    account_channel_key = account_channel.get_channel(account_channel.subject_for(tenant_id, None))
+    try:
+        account_channel_key = account_channel.get_channel(
+            account_channel.subject_for(tenant_id, None)
+        )
+    except account_channel.AccountChannelError:
+        raise HTTPException(503, detail="dms.channel_unavailable")
     row = await asyncio.to_thread(line_dms_store.get_binding_by_user, user_id)
     if not row:
         return {

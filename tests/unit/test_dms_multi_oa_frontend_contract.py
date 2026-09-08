@@ -88,5 +88,43 @@ class I18nContractTests(unittest.TestCase):
                 self.assertGreaterEqual(source.count("'" + key + "'"), 2)
 
 
+class BookingLiffChannelContractTests(unittest.TestCase):
+    """The LIFF editor must carry the entry OA through URL, liff.state, config and auth."""
+
+    def test_api_reads_channel_from_url_and_liff_state(self):
+        source = _read("static/dms-booking-edit/dms-booking-api.js")
+        self.assertIn("liff.state", source)
+        self.assertIn("param('channel')", source)
+        self.assertIn("encodeURIComponent(channel)", source)
+
+    def test_api_sends_channel_to_config_and_auth(self):
+        source = _read("static/dms-booking-edit/dms-booking-api.js")
+        self.assertIn("/api/line/dms-booking/config", source)
+        self.assertIn("channel: channelKey", source)
+        self.assertIn("dms_booking.liff_unavailable", source)
+        self.assertIn("redirectUri: window.location.href", source)
+
+    def test_editor_maps_liff_unavailable_to_its_own_message(self):
+        source = _read("static/dms-booking-edit/dms-booking-edit.js")
+        self.assertIn("function errorKey(e, fallback)", source)
+        self.assertIn("ERROR_KEYS[e.code]", source)
+        i18n = _read("static/dms-booking-edit/dms-booking-i18n.js")
+        self.assertIn("'dms_booking.liff_unavailable': 'liffUnavailable'", i18n)
+        for lang in ("th", "en", "zh", "ja"):
+            with self.subTest(lang=lang):
+                self.assertIn("liffUnavailable", i18n)
+
+    def test_shell_bumps_changed_scripts(self):
+        html = _read("static/dms-booking-edit/dms-booking-edit.html")
+        for needle in (
+            "dms-booking-i18n.js?v=8",
+            "dms-booking-api.js?v=7",
+            "dms-credentials.js?v=5",
+            "dms-booking-edit.js?v=15",
+        ):
+            with self.subTest(needle=needle):
+                self.assertIn(needle, html)
+
+
 if __name__ == "__main__":
     unittest.main()

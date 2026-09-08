@@ -8,6 +8,7 @@ LIFF(那会把使用者登进错的 OA)。
 from __future__ import annotations
 
 import os
+import urllib.parse
 from typing import Optional
 
 
@@ -18,8 +19,10 @@ def url(nonce: str, channel_key: Optional[str] = None) -> str:
     key = channel_key or binding_guard.current_channel()
     liff_id = channels.liff_id(key)
     if liff_id:
-        return f"https://liff.line.me/{liff_id}?draft={nonce}"
+        query = urllib.parse.urlencode({"draft": nonce, "channel": key})
+        return f"https://liff.line.me/{liff_id}?{query}"
     if key != channels.DEFAULT_DMS_CHANNEL:
         return ""
     base = (os.getenv("PEARNLY_BASE_URL") or "https://pearnly.com").rstrip("/")
-    return f"{base}/liff/dms-booking?draft={nonce}"
+    query = urllib.parse.urlencode({"draft": nonce, "channel": key})
+    return f"{base}/liff/dms-booking?{query}"

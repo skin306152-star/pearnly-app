@@ -36,7 +36,8 @@
         if (code === 'dms_booking.line_auth_required' || (error && error.status === 401))
             return 'lineAuthRequired';
         if (code === 'dms_credentials.endpoint_missing') return 'endpointMissing';
-        if (code === 'dms_credentials.unavailable') return 'unavailable';
+        if (code === 'dms_credentials.unavailable' || code === 'dms_booking.liff_unavailable')
+            return 'unavailable';
         return 'failed';
     }
 

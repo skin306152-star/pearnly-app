@@ -44,12 +44,13 @@ def _reply(reply_token: str, text: str) -> None:
         line_client.reply_text(reply_token, text, channel=current_channel())
 
 
-def _push(line_user_id: str, text: str) -> None:
+def _push(line_user_id: str, text: str, channel: str = "") -> None:
+    """Push through the recipient's own OA when given, else the binding in scope."""
     require_current()
-    line_client.push_text(line_user_id, text, channel=current_channel())
+    line_client.push_text(line_user_id, text, channel=channel or current_channel())
 
 
-def _send(line_user_id: str, msg, reply_token: str = "") -> None:
+def _send(line_user_id: str, msg, reply_token: str = "", channel: str = "") -> None:
     """结构化消息出口(quickReply / Flex 必须走 reply_messages|push_messages)。
 
     有 reply_token 就 reply,没有就 push —— 逐问既可能应答 postback,也可能由后台任务发起。
@@ -57,7 +58,7 @@ def _send(line_user_id: str, msg, reply_token: str = "") -> None:
     require_current()
     if msg is None:
         return
-    channel = current_channel()
+    channel = channel or current_channel()
     if reply_token:
         line_client.reply_messages(reply_token, [msg], channel=channel)
     else:

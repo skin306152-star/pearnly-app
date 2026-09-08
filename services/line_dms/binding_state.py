@@ -28,6 +28,20 @@ def lock_scope(cur, line_user_id: str, channel_key: str = "") -> None:
         raise binding_guard.BindingChanged("dms_binding_changed")
 
 
-def invalidate(cur, line_user_id: str, user_id: str) -> None:
-    cur.execute("DELETE FROM dms_line_sessions WHERE line_user_id=%s", (line_user_id,))
-    cur.execute("DELETE FROM line_dms_login_tickets WHERE user_id=%s", (str(user_id),))
+def invalidate(cur, line_user_id: str, user_id: str, channel_key: str, tenant_id: str) -> None:
+    """Drop exactly this (tenant, OA, LINE user) conversation and its browser tickets.
+
+    The old unscoped DELETE removed the same LINE id's sessions/tickets in other OAs and
+    tenants. Both dimensions are required now so a rebind in one OA can never log out another.
+    """
+    key = channels.normalize(channel_key)
+    cur.execute(
+        "DELETE FROM dms_line_sessions "
+        "WHERE tenant_id=%s AND channel_key=%s AND line_user_id=%s",
+        (str(tenant_id), key, line_user_id),
+    )
+    cur.execute(
+        "DELETE FROM line_dms_login_tickets "
+        "WHERE tenant_id=%s AND user_id=%s AND channel_key=%s",
+        (str(tenant_id), str(user_id), key),
+    )

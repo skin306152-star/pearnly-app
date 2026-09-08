@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 _MIGRATION = ROOT / "alembic" / "versions" / "0102_line_dms_login_tickets.py"
+_SCOPE_MIGRATION = ROOT / "alembic" / "versions" / "0126_dms_login_ticket_scope.py"
 # 终止符两态:留档源文本里是 `)` + `"""`;模块 _DDL 是已求值字符串,`)` 后直接到结尾。
 _TABLE_RE = re.compile(
     r"CREATE TABLE IF NOT EXISTS line_dms_login_tickets \((.*?)\)\s*(?:\"\"\"|\Z)", re.S
@@ -27,6 +28,13 @@ class MigrationChainTests(unittest.TestCase):
         src = _MIGRATION.read_text(encoding="utf-8")
         self.assertIn('revision = "0102_line_dms_login_tickets"', src)
         self.assertIn('down_revision = "0101_daily_entries"', src)
+
+    def test_scope_migration_chains_onto_multi_oa_head(self):
+        src = _SCOPE_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn('revision = "0126_dms_login_ticket_scope"', src)
+        self.assertIn('down_revision = "0125_dms_multi_line_oa"', src)
+        self.assertIn("ADD COLUMN IF NOT EXISTS channel_key", src)
+        self.assertIn("ADD COLUMN IF NOT EXISTS binding_id", src)
 
 
 class DualRunDdlTests(unittest.TestCase):

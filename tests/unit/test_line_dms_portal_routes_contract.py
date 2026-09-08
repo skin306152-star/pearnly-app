@@ -46,6 +46,7 @@ class LineDmsPortalRouteTests(unittest.TestCase):
                     "id": "epoch",
                     "line_user_id": "line",
                     "tenant_id": "tenant-2",
+                    "channel_key": "dms",
                     "bound_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
                 },
             )
@@ -85,6 +86,8 @@ class LineDmsPortalRouteTests(unittest.TestCase):
         consume.return_value = {
             "tenant_id": "tenant-2",
             "user_id": "user-1",
+            "channel_key": "dms",
+            "binding_id": None,
             "created_at": datetime(2026, 1, 2, tzinfo=timezone.utc),
         }
         find_user.return_value = {
@@ -110,6 +113,8 @@ class LineDmsPortalRouteTests(unittest.TestCase):
         consume.return_value = {
             "tenant_id": "tenant-2",
             "user_id": "user-1",
+            "channel_key": "dms",
+            "binding_id": None,
             "created_at": datetime(2026, 1, 2, tzinfo=timezone.utc),
         }
         find_user.return_value = {"tenant_id": "tenant-2", "is_active": True}
@@ -123,6 +128,8 @@ class LineDmsPortalRouteTests(unittest.TestCase):
         consume.return_value = {
             "tenant_id": "tenant-2",
             "user_id": "user-1",
+            "channel_key": "dms",
+            "binding_id": None,
             "created_at": datetime(2026, 1, 2, tzinfo=timezone.utc),
         }
         find_user.return_value = {"tenant_id": "tenant-other", "is_active": True}

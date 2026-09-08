@@ -9,8 +9,9 @@ Pearnly provider. Bindings, 6-digit bind codes and conversation sessions carry `
 so the same LINE user id can never be matched across OAs, and the Earn page can change an
 account's OA without leaving stale bindings answering on the old OA.
 
-Dual-run: services/line_dms/store.ensure_tables() (prod has no alembic hook; first-use self-heal
-applies the same DDL). This file is the reviewed record for the release schema step.
+Dual-run: services/line_dms/schema.ensure_tables() runs the same DDL from the Cloud Run schema
+job (services.cloud_runtime.schema.migrate → services.startup._boot_schema_ddl); this file is the
+reviewed record for that step, not the mechanism that applies it.
 """
 
 from alembic import op

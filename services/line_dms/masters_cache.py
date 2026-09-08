@@ -25,9 +25,11 @@ from services.line_dms.master_contract import MasterSyncError, build_snapshot
 async def qa_endpoint(line_user_id: str, endpoint_id: Any) -> Optional[Dict[str, Any]]:
     """按 LINE 绑定的 user 解 DMS 端点。未绑定 / 端点被停用 → None。"""
     from services.erp import dms_id_ocr
-    from services.line_dms import store
+    from services.line_dms import binding_guard, store
 
-    binding = await _thr(store.get_binding_by_line_user, line_user_id)
+    binding = await _thr(
+        store.get_binding_by_line_user, line_user_id, binding_guard.current_channel()
+    )
     uid = (binding or {}).get("user_id") or ""
     if not uid:
         return None

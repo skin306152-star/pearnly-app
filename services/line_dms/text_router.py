@@ -82,7 +82,11 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
         allowed = await _thr(query_access.can_query, binding)
         line_client.reply_messages(
             reply_token,
-            [menu_cards.menu_card(can_query=bool(allowed))],
+            [
+                menu_cards.menu_card(
+                    can_query=bool(allowed), channel=binding_guard.current_channel()
+                )
+            ],
             channel=binding_guard.current_channel(),
         )
     else:

@@ -57,8 +57,8 @@ class FakeStore:
     def clear_session(self, tenant, luid):
         self.data.pop((str(tenant), str(luid)), None)
 
-    def get_binding_by_line_user(self, luid):
-        return {"tenant_id": "T1", "user_id": "U1"}
+    def get_binding_by_line_user(self, luid, channel_key=None):
+        return {"tenant_id": "T1", "user_id": "U1", "channel_key": channel_key or "dms"}
 
 
 class Env:

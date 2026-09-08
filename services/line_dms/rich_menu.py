@@ -43,7 +43,7 @@ def _area(col: int, action: dict, *, row: int = 0) -> dict:
 def _entry_url(mode: str, *, external: bool, channel: str = "dms") -> str:
     liff_id = channels.liff_id(channel)
     if liff_id:
-        params = {mode: "dms"}
+        params = {mode: "dms", "channel": channels.normalize(channel)}
         if external:
             params["openExternalBrowser"] = "1"
         query = urllib.parse.urlencode(params)
@@ -65,7 +65,10 @@ def credentials_liff_url(channel: str = "dms") -> str:
     """Open only the mobile credential editor inside LINE; portal stays external."""
     liff_id = channels.liff_id(channel)
     if liff_id:
-        return f"https://liff.line.me/{liff_id}/dms-booking?credentials=dms"
+        query = urllib.parse.urlencode(
+            {"credentials": "dms", "channel": channels.normalize(channel)}
+        )
+        return f"https://liff.line.me/{liff_id}/dms-booking?{query}"
     return "https://pearnly.com/dms"
 
 

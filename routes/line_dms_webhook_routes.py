@@ -106,7 +106,7 @@ async def _handle_dms_event_bound(ev: dict, binding, channel: str) -> None:
                 reply_token,
                 [
                     {"type": "text", "text": cards.TXT_MENU_GREETING},
-                    menu_cards.menu_card(can_query=bool(allowed)),
+                    menu_cards.menu_card(can_query=bool(allowed), channel=channel),
                 ],
                 channel=channel,
             )

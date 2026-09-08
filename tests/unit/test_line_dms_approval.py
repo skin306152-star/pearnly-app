@@ -249,7 +249,7 @@ class DecideTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(
                 approval_flow.store,
                 "get_binding_by_user",
-                return_value={"line_user_id": "Lsales"},
+                return_value={"line_user_id": "Lsales", "channel_key": "dms_a"},
             ),
             mock.patch.object(approval_flow, "_push") as push,
         ):
@@ -258,7 +258,9 @@ class DecideTests(unittest.IsolatedAsyncioTestCase):
             )
         fin.assert_called_once_with("T1", "req-1", "rejected")
         reply.assert_called_once_with("rt", approval_cards.TXT_REQ_REJECTED_ADMIN)
-        push.assert_called_once_with("Lsales", approval_cards.TXT_REQ_REJECTED_SALES)
+        push.assert_called_once_with(
+            "Lsales", approval_cards.TXT_REQ_REJECTED_SALES, channel="dms_a"
+        )
 
 
 class ExecuteTests(unittest.IsolatedAsyncioTestCase):

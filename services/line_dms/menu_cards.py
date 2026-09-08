@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from services.line_dms.cards import (
     ACT_MENU_BOOKING,
@@ -134,8 +134,15 @@ def menu_item(
     return row
 
 
-def menu_card(can_query: bool = False) -> Dict[str, Any]:
-    """入口菜单(照泰方认可的 mockup):标题区 + 四张整行可点的行卡。"""
+def menu_card(can_query: bool = False, channel: Optional[str] = None) -> Dict[str, Any]:
+    """入口菜单(照泰方认可的 mockup):标题区 + 四张整行可点的行卡。
+
+    channel 必须与收到事件的 OA 相同;省略时取当前 binding 作用域的 OA(无作用域 = legacy)。
+    """
+    if not channel:
+        from services.line_dms import binding_guard
+
+        channel = binding_guard.current_channel()
     head = {
         "type": "box",
         "layout": "horizontal",
@@ -195,8 +202,8 @@ def menu_card(can_query: bool = False) -> Dict[str, Any]:
             {
                 "type": "uri",
                 "label": TXT_MENU_ITEM3,
-                "uri": portal_external_url(),
-                "altUri": {"desktop": portal_desktop_url()},
+                "uri": portal_external_url(channel),
+                "altUri": {"desktop": portal_desktop_url(channel)},
             },
         ),
         menu_item(
@@ -208,8 +215,8 @@ def menu_card(can_query: bool = False) -> Dict[str, Any]:
             {
                 "type": "uri",
                 "label": TXT_MENU_ITEM4,
-                "uri": credentials_liff_url(),
-                "altUri": {"desktop": credentials_desktop_url()},
+                "uri": credentials_liff_url(channel),
+                "altUri": {"desktop": credentials_desktop_url(channel)},
             },
         ),
     ]

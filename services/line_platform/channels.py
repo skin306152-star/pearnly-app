@@ -141,6 +141,12 @@ def liff_id(channel_key: Optional[str]) -> str:
     return value
 
 
+def liff_env_name(channel_key: Optional[str]) -> str:
+    """Env var that holds this OA's LIFF id; unknown key → "" (caller must fail closed)."""
+    cfg = DMS_CHANNELS.get((channel_key or "").strip())
+    return cfg.liff_env if cfg else ""
+
+
 def menu_name(base: str, channel_key: Optional[str]) -> str:
     """Rich-menu name for an OA; the legacy OA keeps the historical unsuffixed name."""
     key = normalize(channel_key)
@@ -198,10 +204,17 @@ def resolve_credentials(
         return secret, token
     secret = secret or _pick(
         blob,
-        ("channel_secret", "channelSecret", "secret", secret_env),
+        ("channel_secret", "channelSecret", "secret", secret_env, "LINE_CHANNEL_SECRET"),
     )
     token = token or _pick(
         blob,
-        ("channel_access_token", "channelAccessToken", "access_token", "token", token_env),
+        (
+            "channel_access_token",
+            "channelAccessToken",
+            "access_token",
+            "token",
+            token_env,
+            "LINE_CHANNEL_ACCESS_TOKEN",
+        ),
     )
     return secret, token

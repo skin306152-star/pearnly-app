@@ -27,11 +27,23 @@ def current(binding: dict, line_user_id: str = "") -> bool:
     line_id = line_user_id or binding.get("line_user_id")
     if not line_id or line_id != binding.get("line_user_id"):
         return False
-    live = store.get_binding_by_line_user(line_id, binding.get("channel_key"))
+    channel = str(binding.get("channel_key") or "")
+    live = store.get_binding_by_line_user(line_id, channel)
     if not live or any(
         str(live.get(k) or "") != str(binding.get(k) or "")
         for k in ("id", "user_id", "tenant_id", "channel_key")
     ):
+        return False
+    from services.line_dms import account_channel
+
+    try:
+        assigned = account_channel.get_channel(
+            account_channel.subject_for(binding.get("tenant_id"), binding.get("user_id"))
+        )
+    except account_channel.AccountChannelError:
+        logger.error("DMS binding rejected: account OA assignment unavailable")
+        return False
+    if assigned != channel:
         return False
     user = db.find_user_by_id(str(binding["user_id"]))
     if not user or not user.get("is_active", True):
@@ -110,12 +122,16 @@ def bound_task(function):
 
 def authorize_browser(request, user: dict) -> dict:
     from core.auth import decode_access_token
+    from services.line_platform import channels
 
     header = request.headers.get("Authorization", "")
     claims = decode_access_token(header[7:].strip()) if header.startswith("Bearer ") else None
     identity = (claims or {}).get("dms_binding") or {}
-    token_channel = str(identity.get("channel_key") or "")
-    binding = store.get_binding_by_line_user(identity.get("line_user_id"), token_channel or None)
+    raw_channel = str(identity.get("channel_key") or "").strip()
+    if raw_channel and not channels.is_valid(raw_channel):
+        raise PosError("dms_booking.not_bound", 401, detail="line_binding_changed")
+    token_channel = raw_channel or channels.DEFAULT_DMS_CHANNEL
+    binding = store.get_binding_by_line_user(identity.get("line_user_id"), token_channel)
     if (
         not claims
         or claims.get("entry") != "dms"
@@ -125,7 +141,7 @@ def authorize_browser(request, user: dict) -> dict:
         or str(binding.get("id")) != str(identity["id"])
         or str(binding.get("user_id")) != str(user.get("id"))
         or str(claims.get("sub")) != str(user.get("id"))
-        or (token_channel and str(binding.get("channel_key") or "") != token_channel)
+        or str(binding.get("channel_key") or "") != token_channel
         or not current(binding)
     ):
         raise PosError("dms_booking.not_bound", 401, detail="line_binding_changed")

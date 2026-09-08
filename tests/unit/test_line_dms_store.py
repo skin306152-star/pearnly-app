@@ -94,12 +94,19 @@ class ConsumeBindCodeTests(unittest.TestCase):
         self.assertIn("expires_at > now()", cur.all_sql())
         self.assertIn("channel_key = %s", cur.all_sql())
 
-    def test_valid_without_channel_does_not_filter(self):
+    def test_valid_without_channel_is_legacy_only(self):
         cur = FakeCursor(fetchone={"tenant_id": "t9", "user_id": "u9", "channel_key": "dms"})
         with _patch_via_db(cur):
             out = store.consume_bind_code("654321")
         self.assertEqual(out["channel_key"], "dms")
-        self.assertNotIn("channel_key = %s", cur.all_sql())
+        self.assertIn("channel_key = %s", cur.all_sql())
+        self.assertEqual(cur.calls[0][1], ("654321", "dms"))
+
+    def test_unknown_channel_rejected_without_query(self):
+        cur = FakeCursor(fetchone={"tenant_id": "t9", "user_id": "u9"})
+        with _patch_via_db(cur):
+            self.assertIsNone(store.consume_bind_code("654321", "nope"))
+        self.assertEqual(cur.calls, [])
 
     def test_expired_or_used_none(self):
         with _patch_via_db(FakeCursor(fetchone=None)):
@@ -133,11 +140,12 @@ class PeekBindCodeTenantTests(unittest.TestCase):
             self.assertEqual(store.peek_bind_code_tenant("654321", "dms_a"), "t9")
         self.assertIn("channel_key = %s", cur.all_sql())
 
-    def test_channel_key_none_does_not_filter(self):
+    def test_channel_key_none_is_legacy_only(self):
         cur = FakeCursor(fetchone={"tenant_id": "t9"})
         with _patch_via_db(cur):
             self.assertEqual(store.peek_bind_code_tenant("654321"), "t9")
-        self.assertNotIn("channel_key = %s", cur.all_sql())
+        self.assertIn("channel_key = %s", cur.all_sql())
+        self.assertEqual(cur.calls[0][1], ("654321", "dms"))
 
 
 class CreateBindingTests(unittest.TestCase):
@@ -145,20 +153,20 @@ class CreateBindingTests(unittest.TestCase):
         self.enterContext(mock.patch("services.line_dms.menu_sync.request_sync"))
 
     def test_conflict_line_bound_other_rejected(self):
-        cur = FakeCursor(fetchone_seq=[{"user_id": "other"}])
+        cur = FakeCursor(fetchone_seq=[{"channel_key": "dms"}, {"user_id": "other"}])
         with _patch_via_db(cur):
             self.assertFalse(store.create_or_update_binding("t1", "u1", "L1"))
         self.assertNotIn("INSERT INTO line_dms_bindings", cur.all_sql())
 
     def test_conflict_check_is_channel_scoped(self):
         """冲突判定按 (channel, line_user_id):同 LINE id 在另一个 OA 不算冲突。"""
-        cur = FakeCursor(fetchone_seq=[{"user_id": "other"}])
+        cur = FakeCursor(fetchone_seq=[{"channel_key": "dms_a"}, {"user_id": "other"}])
         with _patch_via_db(cur):
             self.assertFalse(store.create_or_update_binding("t1", "u1", "L1", channel_key="dms_a"))
         self.assertIn("channel_key = %s AND line_user_id = %s", cur.all_sql())
 
     def test_happy_upserts(self):
-        cur = FakeCursor(fetchone_seq=[None])
+        cur = FakeCursor(fetchone_seq=[{"channel_key": "dms_a"}, None])
         with _patch_via_db(cur):
             self.assertTrue(
                 store.create_or_update_binding(
@@ -169,6 +177,15 @@ class CreateBindingTests(unittest.TestCase):
         self.assertIn("DELETE FROM line_dms_bindings", sql)
         self.assertIn("ON CONFLICT (channel_key, line_user_id) DO UPDATE", sql)
         self.assertIn("channel_key = %s AND line_user_id = %s", sql)
+
+    def test_stale_code_channel_refused_inside_account_lock(self):
+        """改配后旧码带着旧 OA 来建绑定 → 锁内核对当前分配后拒绝,不恢复旧 OA。"""
+        cur = FakeCursor(fetchone_seq=[{"channel_key": "dms_b"}])
+        with _patch_via_db(cur):
+            self.assertFalse(store.create_or_update_binding("t1", "u1", "L1", channel_key="dms_a"))
+        sql = cur.all_sql()
+        self.assertIn("pg_advisory_xact_lock", sql)
+        self.assertNotIn("INSERT INTO line_dms_bindings", sql)
 
 
 class GetBindingTests(unittest.TestCase):
@@ -213,10 +230,21 @@ class UnbindTests(unittest.TestCase):
         self.enterContext(mock.patch("services.line_dms.menu_sync.request_sync"))
 
     def test_unbind_by_line_user_rowcount(self):
-        with _patch_via_db(FakeCursor(fetchone={"user_id": "u1"}, rowcount=1)):
+        with _patch_via_db(
+            FakeCursor(
+                fetchone={"user_id": "u1", "channel_key": "dms", "tenant_id": "t1"},
+                rowcount=1,
+            )
+        ):
             self.assertTrue(store.unbind_by_line_user("L1"))
         with _patch_via_db(FakeCursor(rowcount=0)):
             self.assertFalse(store.unbind_by_line_user("L1"))
+
+    def test_unbind_unknown_channel_never_deletes(self):
+        cur = FakeCursor(fetchone={"user_id": "u1"}, rowcount=1)
+        with _patch_via_db(cur):
+            self.assertFalse(store.unbind_by_line_user("L1", "nope"))
+        self.assertEqual(cur.calls, [])
 
     def test_unbind_by_user_true(self):
         with _patch_via_db(FakeCursor()):

@@ -75,6 +75,12 @@ class PublicIdentityTests(unittest.TestCase):
             channels.menu_name("pearnly-dms-basic", "dms_a"), "pearnly-dms-basic-dms_a"
         )
 
+    def test_liff_env_name_is_per_channel_and_unknown_is_empty(self):
+        self.assertEqual(channels.liff_env_name("dms"), "LINE_DMS_LIFF_ID")
+        self.assertEqual(channels.liff_env_name("dms_a"), "LINE_DMS_A_LIFF_ID")
+        self.assertEqual(channels.liff_env_name("dms_b"), "LINE_DMS_B_LIFF_ID")
+        self.assertEqual(channels.liff_env_name("nope"), "")
+
 
 class CredentialResolutionTests(unittest.TestCase):
     def test_individual_env_wins(self):
@@ -121,6 +127,34 @@ class CredentialResolutionTests(unittest.TestCase):
                     "LINE_DMS_A_CREDENTIALS",
                 ),
                 ("ds", "dt"),
+            )
+
+    def test_secret_manager_blob_uses_line_channel_field_names(self):
+        """A/B Secret Manager 挂载的 JSON 用 LINE_CHANNEL_SECRET/ACCESS_TOKEN 两个字段。"""
+        blob = '{"LINE_CHANNEL_SECRET": "sm-sec", "LINE_CHANNEL_ACCESS_TOKEN": "sm-tok"}'
+        with mock.patch.dict("os.environ", {"LINE_DMS_B_CREDENTIALS": blob}, clear=True):
+            self.assertEqual(
+                channels.resolve_credentials(
+                    "LINE_DMS_B_CHANNEL_SECRET",
+                    "LINE_DMS_B_CHANNEL_ACCESS_TOKEN",
+                    "LINE_DMS_B_CREDENTIALS",
+                ),
+                ("sm-sec", "sm-tok"),
+            )
+
+    def test_per_channel_field_names_win_over_generic_blob_fields(self):
+        blob = (
+            '{"channel_secret": "per", "channel_access_token": "pertok", '
+            '"LINE_CHANNEL_SECRET": "generic", "LINE_CHANNEL_ACCESS_TOKEN": "generictok"}'
+        )
+        with mock.patch.dict("os.environ", {"LINE_DMS_A_CREDENTIALS": blob}, clear=True):
+            self.assertEqual(
+                channels.resolve_credentials(
+                    "LINE_DMS_A_CHANNEL_SECRET",
+                    "LINE_DMS_A_CHANNEL_ACCESS_TOKEN",
+                    "LINE_DMS_A_CREDENTIALS",
+                ),
+                ("per", "pertok"),
             )
 
     def test_missing_material_is_empty_not_error(self):

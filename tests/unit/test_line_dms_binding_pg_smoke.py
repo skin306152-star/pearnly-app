@@ -15,7 +15,7 @@ from psycopg2.extras import RealDictCursor
 
 from core import db
 from services.erp import push_store
-from services.line_dms import binding_guard, login_tickets, store
+from services.line_dms import account_channel, binding_guard, login_tickets, schema, store
 from tests.unit._pg_smoke import require_disposable_db
 
 
@@ -35,9 +35,18 @@ class DmsBindingPostgresTests(unittest.TestCase):
         with psycopg2.connect(cls.dsn) as conn, conn.cursor() as cur:
             cur.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(cls.schema)))
         with cls.cursor(commit=True) as cur:
-            cur.execute(store._BINDINGS)
-            cur.execute(store._SESSIONS)
+            cur.execute(schema._BINDINGS)
+            cur.execute(schema._BINDING_CODES)
+            cur.execute(schema._SESSIONS)
+            cur.execute(schema._ACCOUNT_CHANNELS)
+            for statement in schema._MIGRATIONS:
+                cur.execute(statement)
+            cur.execute(schema._SESSIONS_PK)
             cur.execute(login_tickets._DDL)
+            for statement in login_tickets._MIGRATIONS:
+                cur.execute(statement)
+            for statement in login_tickets._INDEXES:
+                cur.execute(statement)
             cur.execute(
                 "CREATE TABLE erp_endpoints(id uuid PRIMARY KEY, user_id uuid, "
                 "config jsonb, binding_generation integer DEFAULT 0)"
@@ -154,3 +163,74 @@ class DmsBindingPostgresTests(unittest.TestCase):
         self.assertIsNone(store.get_binding_by_line_user(self.line))
         self.assertIsNone(store.get_session(self.tenant, self.line))
         self.assertIsNone(login_tickets.consume_login_ticket(ticket["ticket"]))
+
+    def test_same_line_id_cannot_take_two_users_on_one_oa(self):
+        account_channel.set_channel(self.tenant, "dms_a")
+        self.assertTrue(
+            store.create_or_update_binding(self.tenant, self.a, self.line, channel_key="dms_a")
+        )
+        self.assertIsNotNone(store.get_binding_by_line_user(self.line, "dms_a"))
+        self.assertFalse(
+            store.create_or_update_binding(self.tenant, self.b, self.line, channel_key="dms_a")
+        )
+
+    def test_schema_constraints_are_channel_scoped(self):
+        """Unique (channel_key, line_user_id) + session PK includes channel_key."""
+        with self.cursor() as cur:
+            cur.execute(
+                "SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() "
+                "AND indexname = 'ux_line_dms_bindings_channel_line'"
+            )
+            indexdef = cur.fetchone()["indexdef"]
+            self.assertIn("UNIQUE", indexdef)
+            self.assertIn("channel_key", indexdef)
+            self.assertIn("line_user_id", indexdef)
+            cur.execute(
+                "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint "
+                "WHERE conrelid = 'dms_line_sessions'::regclass AND contype = 'p'"
+            )
+            definition = cur.fetchone()["definition"]
+            self.assertIn("channel_key", definition)
+            self.assertIn("line_user_id", definition)
+
+    def test_sessions_are_keyed_by_channel(self):
+        store.set_session(self.tenant, self.line, "state_dms", {"v": 1})
+        store.set_session(self.tenant, self.line, "state_a", {"v": 2}, channel_key="dms_a")
+        self.assertEqual(store.get_session(self.tenant, self.line)["state"], "state_dms")
+        self.assertEqual(
+            store.get_session(self.tenant, self.line, channel_key="dms_a")["state"], "state_a"
+        )
+
+    def test_channel_change_is_atomic_and_kills_old_codes_and_bindings(self):
+        account_channel.set_channel(self.tenant, "dms_a")
+        issued = store.generate_bind_code(self.tenant, self.a, "dms_a")
+        self.assertEqual(issued["channel_key"], "dms_a")
+        self.assertTrue(
+            store.create_or_update_binding(self.tenant, self.a, self.line, channel_key="dms_a")
+        )
+        result = account_channel.set_channel(self.tenant, "dms_b")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["unbound"], 1)
+        self.assertIsNone(store.get_binding_by_line_user(self.line, "dms_a"))
+        self.assertIsNone(store.consume_bind_code(issued["code"], "dms_a"))
+        # The stale code can no longer restore the old OA even if it is still submitted.
+        self.assertFalse(
+            store.create_or_update_binding(self.tenant, self.a, self.line, channel_key="dms_a")
+        )
+
+    def test_bind_code_issuance_refuses_stale_channel_under_the_account_lock(self):
+        account_channel.set_channel(self.tenant, "dms_b")
+        self.assertIsNone(store.generate_bind_code(self.tenant, self.a, "dms_a"))
+        self.assertIsNotNone(store.generate_bind_code(self.tenant, self.a, "dms_b"))
+
+    def test_login_ticket_carries_binding_channel_and_epoch(self):
+        account_channel.set_channel(self.tenant, "dms_a")
+        self.assertTrue(
+            store.create_or_update_binding(self.tenant, self.a, self.line, channel_key="dms_a")
+        )
+        binding = store.get_binding_by_line_user(self.line, "dms_a")
+        with binding_guard.scope(binding):
+            ticket = login_tickets.issue_login_ticket(self.tenant, self.a)
+        identity = login_tickets.consume_login_ticket(ticket["ticket"])
+        self.assertEqual(identity["channel_key"], "dms_a")
+        self.assertEqual(identity["binding_id"], binding["id"])

@@ -25,6 +25,11 @@ class ReplyChannelTests(unittest.TestCase):
         with binding_guard.scope(_BINDING):
             self.assertEqual(binding_guard.current_channel(), "dms_b")
 
+    def test_unknown_scope_channel_never_sends_through_legacy(self):
+        with binding_guard.scope({**_BINDING, "channel_key": "nope"}):
+            with self.assertRaises(binding_guard.BindingChanged):
+                binding_guard.current_channel()
+
     def test_reply_uses_binding_channel(self):
         with (
             mock.patch.object(_out, "require_current"),

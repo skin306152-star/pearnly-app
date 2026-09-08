@@ -187,6 +187,20 @@ class CreateBindingTests(unittest.TestCase):
         self.assertIn("pg_advisory_xact_lock", sql)
         self.assertNotIn("INSERT INTO line_dms_bindings", sql)
 
+    def test_unknown_non_empty_channel_refused_before_any_db_write(self):
+        """Unknown OA key must not normalize to legacy and create a legacy binding."""
+        cur = FakeCursor()
+        with _patch_via_db(cur):
+            self.assertFalse(store.create_or_update_binding("t1", "u1", "L1", channel_key="nope"))
+        self.assertEqual(cur.calls, [])
+
+    def test_blank_channel_still_creates_the_legacy_binding(self):
+        cur = FakeCursor(fetchone_seq=[{"channel_key": "dms"}, None])
+        with _patch_via_db(cur):
+            self.assertTrue(store.create_or_update_binding("t1", "u1", "L1", channel_key="  "))
+        self.assertIn(("dms-binding-user:u1",), [call[1] for call in cur.calls])
+        self.assertIn("channel_key = %s AND line_user_id = %s", cur.all_sql())
+
 
 class GetBindingTests(unittest.TestCase):
     def test_by_user_returns_dict(self):
@@ -319,6 +333,17 @@ class SessionTests(unittest.TestCase):
             store.set_session("t1", "L1", "s", {}, ttl_minutes=30)
             store.clear_session("t1", "L1")
             self.assertIsNone(store.get_session("t1", "L1"))
+
+    def test_unknown_channel_write_fails_closed_without_touching_legacy(self):
+        cur = FakeSessionCursor()
+        with _patch_via_db(cur):
+            with self.assertRaises(ValueError):
+                store.set_session("t1", "L1", "s", {}, channel_key="nope")
+            with self.assertRaises(ValueError):
+                store.clear_session("t1", "L1", channel_key="nope")
+            with self.assertRaises(ValueError):
+                store.get_session("t1", "L1", channel_key="nope")
+        self.assertEqual(cur.rows, {})
 
 
 if __name__ == "__main__":

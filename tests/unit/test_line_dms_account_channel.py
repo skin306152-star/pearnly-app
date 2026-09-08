@@ -181,6 +181,40 @@ class SetChannelTests(unittest.TestCase):
         self.assertEqual(out, {"error": "dms_channel.save_failed"})
         sync.assert_not_called()
 
+    def test_change_takes_user_then_line_lock_and_sweeps_all_old_tickets(self):
+        """改配必须与 binding_state.lock_scope 同序拿锁,并清掉该账号所有旧 OA 票据。"""
+        cur = _ScriptedCur(
+            {
+                "SELECT channel_key FROM dms_account_line_channels": {"channel_key": "dms"},
+                "SELECT owner_user_id::text": {"owner_user_id": "owner"},
+                "SELECT id::text AS id FROM users": [{"id": "u1"}],
+                "SELECT line_user_id, channel_key, tenant_id::text": [
+                    {"line_user_id": "L1", "channel_key": "dms", "tenant_id": "t1"}
+                ],
+                "UPDATE line_dms_binding_codes": {"rowcount": 0},
+                "DELETE FROM line_dms_bindings": {"rowcount": 1},
+            }
+        )
+        with (
+            mock.patch("core.db.get_cursor", lambda *a, **k: _CM(cur)),
+            mock.patch("services.line_dms.menu_sync.request_sync"),
+        ):
+            out = account_channel.set_channel("t1", "dms_b", actor_id="admin")
+        self.assertTrue(out["changed"])
+        locks = [params for sql, params in cur.calls if "pg_advisory_xact_lock" in sql]
+        self.assertIn(("dms-account-channel:t1",), locks)
+        self.assertIn(("dms-binding-user:u1",), locks)
+        self.assertIn(("dms-binding:dms:L1",), locks)
+        # Deletes stay scoped to the exact stored OA, never a rewritten legacy key.
+        session_deletes = [p for sql, p in cur.calls if "DELETE FROM dms_line_sessions" in sql]
+        self.assertEqual(session_deletes, [("t1", "dms", "L1")])
+        sweeps = [
+            p
+            for sql, p in cur.calls
+            if "DELETE FROM line_dms_login_tickets WHERE user_id = %s AND channel_key <> %s" in sql
+        ]
+        self.assertEqual(sweeps, [("u1", "dms_b")])
+
 
 if __name__ == "__main__":
     unittest.main()

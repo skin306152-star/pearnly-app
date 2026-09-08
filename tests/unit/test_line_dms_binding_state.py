@@ -40,10 +40,16 @@ class InvalidateScopeTests(unittest.TestCase):
         self.assertEqual(cur.calls[0][1], ("t1", "dms_b", "L1"))
         self.assertEqual(cur.calls[1][1], ("t1", "u1", "dms_b"))
 
-    def test_unknown_channel_never_normalizes_to_legacy_delete(self):
+    def test_unknown_channel_never_deletes_the_legacy_rows(self):
         cur = _Cur()
-        binding_state.invalidate(cur, "L1", "u1", "nope", "t1")
-        # Unknown keys fail closed to the legacy OA, never to another OA's rows.
+        with self.assertRaises(binding_state.UnknownChannel):
+            binding_state.invalidate(cur, "L1", "u1", "nope", "t1")
+        # Unknown keys fail closed: no delete is issued against the legacy OA either.
+        self.assertEqual(cur.calls, [])
+
+    def test_empty_channel_still_scopes_to_legacy(self):
+        cur = _Cur()
+        binding_state.invalidate(cur, "L1", "u1", "", "t1")
         self.assertEqual(cur.calls[0][1], ("t1", "dms", "L1"))
 
 
@@ -62,6 +68,18 @@ class LockScopeTests(unittest.TestCase):
             binding_state.lock_scope(cur, "L1", "dms_a")
         self.assertIn("channel_key=%s", cur.all_sql())
         self.assertEqual(cur.calls[0][1], ("dms-binding:dms_a:L1",))
+
+    def test_unknown_non_empty_channel_is_never_locked_as_legacy(self):
+        cur = _Cur()
+        with self.assertRaises(binding_state.UnknownChannel):
+            binding_state.lock_line(cur, "L1", "nope")
+        self.assertEqual(cur.calls, [])
+
+    def test_lock_scope_rejects_unknown_channel_before_epoch_check(self):
+        cur = _Cur()
+        with self.assertRaises(binding_state.UnknownChannel):
+            binding_state.lock_scope(cur, "L1", "nope")
+        self.assertEqual(cur.calls, [])
 
 
 if __name__ == "__main__":

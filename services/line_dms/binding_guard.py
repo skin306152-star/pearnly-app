@@ -73,13 +73,18 @@ def current_channel() -> str:
     """OA key of the binding in scope; legacy default when no binding is scoped.
 
     Every DMS outbound call resolves its channel through this, so a reply/push/rich-menu
-    operation always uses the same OA the event arrived on.
+    operation always uses the same OA the event arrived on. An unknown non-empty key raises
+    instead of silently sending through the legacy OA.
     """
     from services.line_platform import channels as line_channels
 
     binding = snapshot()
     if binding and binding.get("channel_key"):
-        return line_channels.normalize(binding.get("channel_key"))
+        key = line_channels.resolve(binding.get("channel_key"))
+        if key is None:
+            logger.error("DMS binding has an unknown channel_key; refusing outbound send")
+            raise BindingChanged("dms_binding_changed")
+        return key
     return line_channels.DEFAULT_DMS_CHANNEL
 
 

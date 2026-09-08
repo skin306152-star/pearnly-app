@@ -74,7 +74,13 @@ async def dms_booking_liff_auth(req: LiffAuthIn):
         logger.warning("DMS browser authentication rejected: unknown_channel")
         raise PosError("dms_booking.liff_unavailable", 403, detail="unknown_channel")
     key = raw or channels.DEFAULT_DMS_CHANNEL
-    claims = await asyncio.to_thread(verify_id_token, req.id_token, channels.liff_env_name(key))
+    liff_env = channels.liff_env_name(key)
+    if key != channels.DEFAULT_DMS_CHANNEL and not channels.liff_id(key):
+        # An A/B OA without its own LIFF app must not authenticate through the legacy / shared
+        # login channel; refuse before any verify request is sent.
+        logger.warning("DMS browser authentication rejected: liff_unavailable")
+        raise PosError("dms_booking.liff_unavailable", 403, detail="liff_unavailable")
+    claims = await asyncio.to_thread(verify_id_token, req.id_token, liff_env)
     if not claims or not claims.get("sub"):
         logger.warning("DMS browser authentication rejected: line_token_invalid")
         raise PosError("dms_booking.line_auth_required", 401, detail="line_token_invalid")

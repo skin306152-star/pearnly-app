@@ -48,7 +48,9 @@ def sync(line_user_id: str, channel_key: str = "") -> None:
     """Read current permission at execution, never use queued permission snapshots."""
     if not line_user_id:
         return
-    channel = channels.normalize(channel_key)
+    channel = channels.resolve(channel_key)
+    if channel is None:
+        raise RuntimeError("dms_menu_channel_unknown")
     basic_name, query_name = rich_menu.menu_names(channel)
     menus = {m.get("name"): m.get("richMenuId") for m in rich_menu._list_menus(channel)}
     basic, query = menus.get(basic_name), menus.get(query_name)
@@ -71,7 +73,10 @@ def request_sync(line_user_id: str, channel_key: str = "") -> None:
 
     if not line_user_id:
         return
-    channel = channels.normalize(channel_key)
+    channel = channels.resolve(channel_key)
+    if channel is None:
+        logger.error("DMS menu sync skipped: unknown channel_key")
+        return
     try:
         if dispatch.enabled():
             dispatch.enqueue("dms.menu_sync", line_user_id, channel)

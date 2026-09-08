@@ -43,6 +43,39 @@ class VerifyIdTokenTests(unittest.TestCase):
         os.environ.pop("LINE_LOGIN_CHANNEL_ID", None)
         self.assertIsNone(liff.verify_id_token("tok", "LINE_LIFF_ID"))
 
+    def test_non_legacy_env_without_its_liff_never_borrows_login_channel(self):
+        with mock.patch.dict(os.environ, {"LINE_LOGIN_CHANNEL_ID": "ch-1"}, clear=True):
+            with mock.patch.object(liff.requests, "post") as post:
+                self.assertIsNone(liff.verify_id_token("tok", "LINE_DMS_A_LIFF_ID"))
+                self.assertIsNone(liff.verify_id_token("tok", "LINE_DMS_B_LIFF_ID"))
+        post.assert_not_called()
+
+    def test_non_legacy_env_with_its_own_liff_verifies_that_channel(self):
+        with mock.patch.dict(
+            os.environ,
+            {"LINE_DMS_A_LIFF_ID": "111-abc", "LINE_LOGIN_CHANNEL_ID": "ch-1"},
+            clear=True,
+        ):
+            with mock.patch.object(
+                liff.requests, "post", return_value=_Resp(200, {"sub": "U1"})
+            ) as post:
+                self.assertEqual(liff.verify_id_token("tok", "LINE_DMS_A_LIFF_ID")["sub"], "U1")
+        self.assertEqual(post.call_args.kwargs["data"]["client_id"], "111")
+
+    def test_legacy_env_keeps_shared_login_channel_fallback(self):
+        with mock.patch.dict(os.environ, {"LINE_LOGIN_CHANNEL_ID": "ch-1"}, clear=True):
+            with mock.patch.object(
+                liff.requests, "post", return_value=_Resp(200, {"sub": "U1"})
+            ) as post:
+                self.assertEqual(liff.verify_id_token("tok", "LINE_ERP_LIFF_ID")["sub"], "U1")
+        self.assertEqual(post.call_args.kwargs["data"]["client_id"], "ch-1")
+
+    def test_unknown_liff_env_never_borrows_login_channel(self):
+        with mock.patch.dict(os.environ, {"LINE_LOGIN_CHANNEL_ID": "ch-1"}, clear=True):
+            with mock.patch.object(liff.requests, "post") as post:
+                self.assertIsNone(liff.verify_id_token("tok", "LINE_OTHER_LIFF_ID"))
+        post.assert_not_called()
+
     def test_dms_invalid_line_token_requires_line_login_before_binding_lookup(self):
         from core.pos_api import PosError
 
@@ -109,6 +142,7 @@ class VerifyIdTokenTests(unittest.TestCase):
             "is_active": True,
         }
         with (
+            mock.patch.dict(os.environ, {"LINE_DMS_A_LIFF_ID": "A-LIFF"}, clear=True),
             mock.patch.object(dms_edit, "verify_id_token", return_value={"sub": "L1"}) as verify,
             mock.patch(
                 "services.line_dms.store.get_binding_by_line_user", return_value=binding
@@ -124,6 +158,29 @@ class VerifyIdTokenTests(unittest.TestCase):
         verify.assert_called_once_with("ok", "LINE_DMS_A_LIFF_ID")
         self.assertEqual(lookup.call_args.args, ("L1", "dms_a"))
         self.assertEqual(res["data"]["token"], "A-JWT")
+
+    def test_dms_a_without_its_liff_is_rejected_before_any_verify_request(self):
+        from core.pos_api import PosError
+
+        with mock.patch.dict(
+            os.environ,
+            {"LINE_DMS_LIFF_ID": "DMS-LIFF", "LINE_LOGIN_CHANNEL_ID": "ch-1"},
+            clear=True,
+        ):
+            with (
+                mock.patch.object(dms_edit, "verify_id_token") as verify,
+                mock.patch.object(liff.requests, "post") as post,
+            ):
+                with self.assertRaises(PosError) as caught:
+                    asyncio.run(
+                        dms_edit.dms_booking_liff_auth(
+                            dms_edit.LiffAuthIn(id_token="ok", channel="dms_a")
+                        )
+                    )
+        self.assertEqual(caught.exception.http_status, 403)
+        self.assertEqual(caught.exception.code, "dms_booking.liff_unavailable")
+        verify.assert_not_called()
+        post.assert_not_called()
 
     def test_unknown_channel_rejected_before_token_verification(self):
         from core.pos_api import PosError

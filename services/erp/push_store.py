@@ -283,7 +283,7 @@ def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
             context["tenant_id"] = binding["tenant_id"]
         with db.get_cursor_rls(**context) as cur:
             if binding is not None:
-                binding_state.lock_scope(cur, binding["line_user_id"])
+                binding_state.lock_scope(cur, binding["line_user_id"], binding.get("channel_key"))
             # Confirm and lock the legacy row before touching any secondary defaults.
             # A managed row must be invisible to this old mutation path, including
             # its unrelated endpoints' flags.

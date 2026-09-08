@@ -36,10 +36,7 @@ def scope_channel(channel_key: Optional[str]) -> Optional[str]:
     Empty / missing → the legacy ``dms`` OA (old callers keep working on exactly one OA).
     Unknown non-empty key → ``None`` so the caller fails closed instead of querying every OA.
     """
-    key = (channel_key or "").strip()
-    if not key:
-        return line_channels.DEFAULT_DMS_CHANNEL
-    return key if line_channels.is_valid(key) else None
+    return line_channels.resolve(channel_key)
 
 
 def _dal(label: str, default):
@@ -213,8 +210,9 @@ def create_or_update_binding(
     from core import db
     from services.line_dms import account_channel, binding_state
 
-    key = line_channels.normalize(channel_key)
-    if not line_channels.is_valid(key):
+    key = line_channels.resolve(channel_key)
+    if key is None:
+        logger.warning("[line_dms] binding refused: unknown channel_key=%r", channel_key)
         return False
     old_lines = []
 
@@ -426,7 +424,11 @@ def unbind_by_line_user(line_user_id: str, channel_key: Optional[str] = None) ->
         return False
     from services.line_dms.menu_sync import request_sync
 
-    request_sync(line_user_id, line_channels.normalize(row.get("channel_key")))
+    channel = line_channels.resolve(row.get("channel_key"))
+    if channel is None:
+        logger.error("[line_dms] unbind menu sync skipped: unknown channel_key")
+        return True
+    request_sync(line_user_id, channel)
     return True
 
 

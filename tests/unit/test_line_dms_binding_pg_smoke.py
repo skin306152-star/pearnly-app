@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 import os
 import threading
+import time
 import unittest
 from unittest.mock import patch
 from urllib.parse import urlsplit
@@ -47,6 +48,12 @@ class DmsBindingPostgresTests(unittest.TestCase):
                 cur.execute(statement)
             for statement in login_tickets._INDEXES:
                 cur.execute(statement)
+            # Minimal account tables so set_channel can resolve the account's users.
+            cur.execute("CREATE TABLE tenants(id uuid PRIMARY KEY, owner_user_id uuid)")
+            cur.execute(
+                "CREATE TABLE users(id uuid PRIMARY KEY, tenant_id uuid, role text, "
+                "is_active boolean DEFAULT true)"
+            )
             cur.execute(
                 "CREATE TABLE erp_endpoints(id uuid PRIMARY KEY, user_id uuid, "
                 "config jsonb, binding_generation integer DEFAULT 0)"
@@ -79,6 +86,16 @@ class DmsBindingPostgresTests(unittest.TestCase):
         self.enterContext(patch("services.line_dms.menu_sync.request_sync"))
         self.tenant, self.a, self.b = [str(uuid4()) for _ in range(3)]
         self.line = "line-" + uuid4().hex
+        with self.cursor(commit=True) as cur:
+            cur.execute(
+                "INSERT INTO tenants(id, owner_user_id) VALUES (%s, %s)",
+                (self.tenant, self.a),
+            )
+            cur.execute(
+                "INSERT INTO users(id, tenant_id, role, is_active) VALUES "
+                "(%s, %s, 'owner', true), (%s, %s, 'member', true)",
+                (self.a, self.tenant, self.b, self.tenant),
+            )
         self.assertTrue(store.create_or_update_binding(self.tenant, self.a, self.line))
         self.binding = store.get_binding_by_line_user(self.line)
 
@@ -234,3 +251,165 @@ class DmsBindingPostgresTests(unittest.TestCase):
         identity = login_tickets.consume_login_ticket(ticket["ticket"])
         self.assertEqual(identity["channel_key"], "dms_a")
         self.assertEqual(identity["binding_id"], binding["id"])
+
+    def test_ab_credentials_save_uses_the_binding_channel(self):
+        """A/B 保存凭据必须锁在 dms_a 上:默认 legacy 锁会让 A/B 保存永远失败。"""
+        account_channel.set_channel(self.tenant, "dms_a")
+        self.assertTrue(
+            store.create_or_update_binding(self.tenant, self.a, self.line, channel_key="dms_a")
+        )
+        binding = store.get_binding_by_line_user(self.line, "dms_a")
+        endpoint = str(uuid4())
+        with self.cursor(commit=True) as cur:
+            cur.execute(
+                "INSERT INTO erp_endpoints(id,user_id,config) VALUES (%s,%s,%s::jsonb)",
+                (endpoint, self.a, '{"password_enc":"original"}'),
+            )
+        with binding_guard.scope(binding):
+            self.assertTrue(
+                push_store.update_erp_endpoint(
+                    self.a, endpoint, config={"password_enc": "new-a-secret"}
+                )
+            )
+        with self.cursor() as cur:
+            cur.execute("SELECT config FROM erp_endpoints WHERE id=%s", (endpoint,))
+            self.assertEqual(cur.fetchone()["config"]["password_enc"], "new-a-secret")
+
+        self.assertTrue(account_channel.set_channel(self.tenant, "dms_b")["changed"])
+        with binding_guard.scope(binding):
+            self.assertFalse(
+                push_store.update_erp_endpoint(
+                    self.a, endpoint, config={"password_enc": "stale-a-write"}
+                )
+            )
+        with self.cursor() as cur:
+            cur.execute("SELECT config FROM erp_endpoints WHERE id=%s", (endpoint,))
+            self.assertEqual(cur.fetchone()["config"]["password_enc"], "new-a-secret")
+
+    def test_channel_change_waits_for_in_flight_old_session_and_removes_it(self):
+        """改配必须等旧会话写完,再删掉它 —— 不能留下旧 OA 的会话。"""
+        account_channel.set_channel(self.tenant, "dms_a")
+        self.assertTrue(
+            store.create_or_update_binding(self.tenant, self.a, self.line, channel_key="dms_a")
+        )
+        binding = store.get_binding_by_line_user(self.line, "dms_a")
+        lock_taken = threading.Event()
+        release = threading.Event()
+        errors = []
+
+        def stale_writer():
+            from services.line_dms import binding_state
+
+            conn = psycopg2.connect(self.dsn)
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute(
+                        sql.SQL("SET LOCAL search_path TO {}").format(sql.Identifier(self.schema))
+                    )
+                    with binding_guard.scope(binding):
+                        binding_state.lock_scope(cur, self.line, "dms_a")
+                        lock_taken.set()
+                        release.wait(timeout=10)
+                        cur.execute(
+                            "INSERT INTO dms_line_sessions "
+                            "(tenant_id, channel_key, line_user_id, state, payload, expires_at) "
+                            "VALUES (%s, %s, %s, %s, %s::jsonb, now() + interval '30 minutes')",
+                            (self.tenant, "dms_a", self.line, "stale", "{}"),
+                        )
+                conn.commit()
+            except Exception as exc:  # pragma: no cover - surfaced by the assertion below
+                errors.append(exc)
+            finally:
+                conn.close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            writer = pool.submit(stale_writer)
+            self.assertTrue(lock_taken.wait(timeout=10))
+            changer = pool.submit(account_channel.set_channel, self.tenant, "dms_b")
+            time.sleep(0.5)
+            self.assertFalse(changer.done())  # blocked on the same LINE lock
+            release.set()
+            writer.result(timeout=15)
+            result = changer.result(timeout=15)
+
+        self.assertEqual(errors, [])
+        self.assertTrue(result["changed"])
+        self.assertIsNone(store.get_binding_by_line_user(self.line, "dms_a"))
+        self.assertIsNone(store.get_session(self.tenant, self.line, channel_key="dms_a"))
+
+    def test_after_channel_change_old_sessions_tickets_and_credentials_are_refused(self):
+        account_channel.set_channel(self.tenant, "dms_a")
+        self.assertTrue(
+            store.create_or_update_binding(self.tenant, self.a, self.line, channel_key="dms_a")
+        )
+        binding = store.get_binding_by_line_user(self.line, "dms_a")
+        with binding_guard.scope(binding):
+            store.set_session(
+                self.tenant, self.line, "reviewing", {"nonce": "old"}, channel_key="dms_a"
+            )
+            ticket = login_tickets.issue_login_ticket(self.tenant, self.a)
+        self.assertIsNotNone(ticket)
+        endpoint = str(uuid4())
+        with self.cursor(commit=True) as cur:
+            cur.execute(
+                "INSERT INTO erp_endpoints(id,user_id,config) VALUES (%s,%s,%s::jsonb)",
+                (endpoint, self.a, '{"password_enc":"original"}'),
+            )
+
+        self.assertTrue(account_channel.set_channel(self.tenant, "dms_b")["changed"])
+
+        self.assertIsNone(store.get_session(self.tenant, self.line, channel_key="dms_a"))
+        self.assertIsNone(login_tickets.consume_login_ticket(ticket["ticket"]))
+        with binding_guard.scope(binding):
+            self.assertFalse(
+                push_store.update_erp_endpoint(
+                    self.a, endpoint, config={"password_enc": "stale-a-write"}
+                )
+            )
+        with binding_guard.scope(binding):
+            store.set_session(
+                self.tenant, self.line, "reviewing", {"nonce": "stale"}, channel_key="dms_a"
+            )
+        self.assertIsNone(store.get_session(self.tenant, self.line, channel_key="dms_a"))
+        with self.cursor() as cur:
+            cur.execute("SELECT config FROM erp_endpoints WHERE id=%s", (endpoint,))
+            self.assertEqual(cur.fetchone()["config"]["password_enc"], "original")
+
+    def test_channel_change_failure_rolls_back_binding_session_and_assignment(self):
+        account_channel.set_channel(self.tenant, "dms_a")
+        self.assertTrue(
+            store.create_or_update_binding(self.tenant, self.a, self.line, channel_key="dms_a")
+        )
+        binding = store.get_binding_by_line_user(self.line, "dms_a")
+        with binding_guard.scope(binding):
+            store.set_session(
+                self.tenant, self.line, "reviewing", {"nonce": "keep"}, channel_key="dms_a"
+            )
+        function = sql.Identifier(self.schema, "reject_channel_write")
+        with self.cursor(commit=True) as cur:
+            cur.execute(
+                sql.SQL(
+                    "CREATE FUNCTION {}() RETURNS trigger LANGUAGE plpgsql AS "
+                    "$$ BEGIN RAISE EXCEPTION 'boom'; END $$"
+                ).format(function)
+            )
+            cur.execute(
+                sql.SQL(
+                    "CREATE TRIGGER reject_channel_write BEFORE INSERT OR UPDATE "
+                    "ON dms_account_line_channels FOR EACH ROW EXECUTE FUNCTION {}()"
+                ).format(function)
+            )
+        try:
+            out = account_channel.set_channel(self.tenant, "dms_b")
+            self.assertEqual(out, {"error": "dms_channel.save_failed"})
+        finally:
+            with self.cursor(commit=True) as cur:
+                cur.execute(
+                    "DROP TRIGGER IF EXISTS reject_channel_write ON dms_account_line_channels"
+                )
+                cur.execute(sql.SQL("DROP FUNCTION IF EXISTS {}()").format(function))
+
+        self.assertEqual(account_channel.get_channel(self.tenant), "dms_a")
+        self.assertIsNotNone(store.get_binding_by_line_user(self.line, "dms_a"))
+        session = store.get_session(self.tenant, self.line, channel_key="dms_a")
+        self.assertEqual(session["payload"]["nonce"], "keep")

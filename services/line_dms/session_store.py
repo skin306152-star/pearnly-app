@@ -18,7 +18,11 @@ def _channel(channel_key: Optional[str]) -> str:
 
     if channel_key is None:
         return binding_guard.current_channel()
-    return channels.normalize(channel_key)
+    key = channels.resolve(channel_key)
+    if key is None:
+        # Unknown non-empty key must never touch the legacy OA's rows (callers fail closed).
+        raise ValueError("dms_channel.unknown_channel")
+    return key
 
 
 def set_session(

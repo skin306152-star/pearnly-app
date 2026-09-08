@@ -114,6 +114,20 @@ def normalize(channel_key: Optional[str]) -> str:
     return key if key in DMS_CHANNELS else DEFAULT_DMS_CHANNEL
 
 
+def resolve(channel_key: Optional[str]) -> Optional[str]:
+    """Strict key resolution for invariant paths.
+
+    Empty / missing → the legacy ``dms`` OA (old callers keep working on exactly one OA).
+    Unknown non-empty → ``None`` so binding / state / lock scoping fails closed instead of
+    silently treating a foreign key as the legacy OA. Browser-facing and back-compat payloads
+    keep using :func:`normalize`.
+    """
+    key = (channel_key or "").strip()
+    if not key:
+        return DEFAULT_DMS_CHANNEL
+    return key if key in DMS_CHANNELS else None
+
+
 def is_valid(channel_key: Optional[str]) -> bool:
     return (channel_key or "").strip() in DMS_CHANNELS
 

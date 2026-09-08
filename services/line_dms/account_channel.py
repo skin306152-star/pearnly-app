@@ -169,7 +169,11 @@ def set_channel(subject_id: str, channel_key: str, *, actor_id: Optional[str] = 
     on the previous OA. Re-setting the same key is a no-op and never unbinds anyone.
 
     The read, revoke and write happen in one transaction under the account lock shared with
-    bind-code issuance and binding creation; menu reconciliation runs only after commit.
+    bind-code issuance and binding creation, and every per-user / per-LINE lock is taken in the
+    same account → user → line order before its rows are deleted. A conversation, ticket or
+    credential write that already holds a LINE lock either commits before the revoke (and is then
+    deleted) or re-checks the binding epoch after the revoke and fails; it can never commit a
+    stale write behind the delete. Menu reconciliation runs only after commit.
     """
     sid = str(subject_id or "").strip()
     key = (channel_key or "").strip()
@@ -183,6 +187,7 @@ def set_channel(subject_id: str, channel_key: str, *, actor_id: Optional[str] = 
 
     def _run():
         from core import db
+        from services.line_dms import binding_state
 
         removed.clear()
         result.clear()
@@ -197,16 +202,29 @@ def set_channel(subject_id: str, channel_key: str, *, actor_id: Optional[str] = 
             unbound = 0
             codes_voided = 0
             for user_id in user_ids:
+                # Lock order account → user → line, identical to bind-code issuance, binding
+                # writes and conversation/credential/ticket writes (binding_state.lock_scope).
+                cur.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    ("dms-binding-user:" + str(user_id),),
+                )
                 cur.execute(
                     "SELECT line_user_id, channel_key, tenant_id::text AS tenant_id "
                     "FROM line_dms_bindings WHERE user_id = %s",
                     (str(user_id),),
                 )
-                for row in cur.fetchall():
+                binding_rows = cur.fetchall()
+                for row in binding_rows:
+                    # Keep the exact stored key: an unknown value must scope its own rows, never
+                    # be rewritten to the legacy OA.
+                    stored_channel = (row.get("channel_key") or "").strip()
+                    if not stored_channel:
+                        stored_channel = channels.DEFAULT_DMS_CHANNEL
+                    binding_state.lock_line(cur, row["line_user_id"], stored_channel)
                     removed.append(
                         (
                             row["line_user_id"],
-                            channels.normalize(row.get("channel_key")),
+                            stored_channel,
                             str(row["tenant_id"]),
                             str(user_id),
                         )
@@ -219,6 +237,13 @@ def set_channel(subject_id: str, channel_key: str, *, actor_id: Optional[str] = 
                 codes_voided += max(0, int(cur.rowcount or 0))
                 cur.execute("DELETE FROM line_dms_bindings WHERE user_id = %s", (str(user_id),))
                 unbound += max(0, int(cur.rowcount or 0))
+                # Tickets are keyed by user, not by binding row: drop every ticket issued under
+                # any previous OA even when its binding row was already gone.
+                cur.execute(
+                    "DELETE FROM line_dms_login_tickets "
+                    "WHERE user_id = %s AND channel_key <> %s",
+                    (str(user_id), key),
+                )
             for line_id, line_channel, tenant_id, user_id in removed:
                 cur.execute(
                     "DELETE FROM dms_line_sessions "
@@ -262,8 +287,12 @@ def set_channel(subject_id: str, channel_key: str, *, actor_id: Optional[str] = 
     from services.line_dms import menu_sync
 
     for line_id, line_channel, _tenant_id, _user_id in removed:
+        channel = channels.resolve(line_channel)
+        if channel is None:
+            logger.error("[dms_account_channel] menu reconciliation skipped: unknown channel")
+            continue
         try:
-            menu_sync.request_sync(line_id, line_channel)
+            menu_sync.request_sync(line_id, channel)
         except Exception:
             logger.exception("[dms_account_channel] menu reconciliation pending")
 

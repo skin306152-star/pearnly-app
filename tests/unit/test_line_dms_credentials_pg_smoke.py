@@ -21,7 +21,7 @@ from core import db
 from core.pos_api import register_pos_error_handler
 from routes import line_dms_credentials_routes as routes
 from services.erp import push_store
-from services.line_dms import binding_guard, store
+from services.line_dms import binding_guard, schema, store
 from tests.unit._pg_smoke import require_disposable_db
 
 
@@ -47,7 +47,7 @@ class CredentialRlsTests(unittest.TestCase):
                 )
             )
         with cls.cursor(commit=True) as cur:
-            cur.execute(store._BINDINGS)
+            cur.execute(schema._BINDINGS)
             cur.execute(
                 "CREATE TABLE erp_endpoints (id uuid PRIMARY KEY, user_id uuid, name text, adapter text, "
                 "config jsonb, binding_generation integer DEFAULT 0, enabled boolean DEFAULT true, "

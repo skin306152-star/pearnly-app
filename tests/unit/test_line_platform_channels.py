@@ -57,6 +57,15 @@ class PublicIdentityTests(unittest.TestCase):
         self.assertFalse(channels.is_valid("nope"))
         self.assertIsNone(channels.get("nope"))
 
+    def test_resolve_is_strict_for_invariant_paths(self):
+        """Binding/state/lock scoping must never rewrite an unknown key to the legacy OA."""
+        self.assertEqual(channels.resolve(""), "dms")
+        self.assertEqual(channels.resolve(None), "dms")
+        self.assertEqual(channels.resolve("dms_b"), "dms_b")
+        self.assertIsNone(channels.resolve("nope"))
+        self.assertEqual(channels.resolve(" dms_a "), "dms_a")
+        self.assertIsNone(channels.resolve(" nope "))
+
     def test_liff_id_never_falls_back_across_oas(self):
         with mock.patch.dict(
             "os.environ",

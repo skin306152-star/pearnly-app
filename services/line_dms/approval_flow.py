@@ -26,7 +26,7 @@ from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_platform import client as line_client
 from services.line_dms import _out, approval_cards, approval_store, cards, store
-from services.line_dms._out import _CHANNEL, _push, _reply, _thr
+from services.line_dms._out import _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,9 @@ async def _submit(binding: dict, line_user_id: str, reply_token: str, pb: dict) 
         return
     await _thr(store.clear_session, tenant, line_user_id)
     line_client.reply_messages(
-        reply_token, [approval_cards.picker_card(req_id, approvers)], channel=_CHANNEL
+        reply_token,
+        [approval_cards.picker_card(req_id, approvers)],
+        channel=binding_guard.current_channel(),
     )
 
 
@@ -199,12 +201,19 @@ async def _target(binding: dict, line_user_id: str, reply_token: str, pb: dict) 
     # 广播并发推(每次 push 是阻塞 HTTP)· 不占事件循环也不让销售的等待卡多等 N 次串行。
     await asyncio.gather(
         *(
-            _thr(line_client.push_messages, t["line_user_id"], [card], channel=_CHANNEL)
+            _thr(
+                line_client.push_messages,
+                t["line_user_id"],
+                [card],
+                channel=binding_guard.current_channel(),
+            )
             for t in targets
         )
     )
     line_client.reply_messages(
-        reply_token, [approval_cards.waiting_card(str(req["id"]), label)], channel=_CHANNEL
+        reply_token,
+        [approval_cards.waiting_card(str(req["id"]), label)],
+        channel=binding_guard.current_channel(),
     )
 
 
@@ -217,7 +226,9 @@ async def _retarget(binding: dict, line_user_id: str, reply_token: str, pb: dict
         _reply(reply_token, approval_cards.TXT_NO_APPROVERS)
         return
     line_client.reply_messages(
-        reply_token, [approval_cards.picker_card(str(req["id"]), approvers)], channel=_CHANNEL
+        reply_token,
+        [approval_cards.picker_card(str(req["id"]), approvers)],
+        channel=binding_guard.current_channel(),
     )
 
 
@@ -259,7 +270,7 @@ async def _execute_approved(binding: dict, admin_line_user_id: str, req: dict) -
         await _thr(approval_store.finish, binding["tenant_id"], str(req["id"]), "pending")
         return
     tenant, approver_id = binding["tenant_id"], str(binding["user_id"])
-    await _thr(line_client.start_loading, admin_line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, admin_line_user_id)
 
     ep = await _thr(_id_ocr.resolve_dms_endpoint, approver_id, None)
     if not ep:

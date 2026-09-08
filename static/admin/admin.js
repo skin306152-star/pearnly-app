@@ -3762,9 +3762,10 @@
         return on + ' · ' + rollout;
     }
 
-    function _renderDmsList(rows) {
+    function _renderDmsList(rows, channels) {
         const host = document.getElementById('adm-dms-list');
         if (!host) return;
+        const oaList = channels || [];
         if (!rows || !rows.length) {
             host.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-dms-list-empty')) + '</div>';
             return;
@@ -3779,14 +3780,55 @@
                     .filter(Boolean)
                     .map(_esc)
                     .join(' · ');
+                const bound = r.line_bound
+                    ? _t('adm-dms-line-bound-count').replace(
+                          '{n}',
+                          String((r.line_accounts || []).length)
+                      )
+                    : _t('adm-dms-line-unbound');
+                const lineMeta =
+                    _esc(r.channel_name || '') +
+                    ' · ' +
+                    _esc(r.channel_basic_id || '') +
+                    ' · ' +
+                    bound;
+                const options = oaList
+                    .map(function (c) {
+                        return (
+                            '<option value="' +
+                            _esc(c.channel_key) +
+                            '"' +
+                            (c.channel_key === r.channel_key ? ' selected' : '') +
+                            '>' +
+                            _esc(c.channel_name) +
+                            ' (' +
+                            _esc(c.basic_id) +
+                            ')</option>'
+                        );
+                    })
+                    .join('');
                 return (
                     '<div class="adm-ai-list-row">' +
                     '<span class="adm-ai-list-who"><span class="adm-ai-list-name">' +
                     who +
                     '</span><span class="adm-ai-list-meta">' +
                     meta +
+                    '</span><span class="adm-ai-list-meta">' +
+                    lineMeta +
                     '</span></span>' +
                     '<span class="adm-ai-list-actions">' +
+                    '<select class="adm-dms-oa-select" data-adm-dms-oa="' +
+                    _esc(r.subject_id) +
+                    '" aria-label="LINE OA">' +
+                    options +
+                    '</select>' +
+                    '<button class="btn btn-ghost btn-sm" data-adm-dms-oa-save="' +
+                    _esc(r.subject_id) +
+                    '" data-adm-dms-oa-bound="' +
+                    (r.line_bound ? '1' : '') +
+                    '">' +
+                    _esc(_t('adm-dms-oa-save-btn')) +
+                    '</button>' +
                     '<button class="btn btn-ghost btn-sm" data-adm-dms-reset="' +
                     _esc(r.subject_id) +
                     '" data-adm-dms-reset-who="' +
@@ -3804,6 +3846,35 @@
                 );
             })
             .join('');
+        host.querySelectorAll('[data-adm-dms-oa-save]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const subjectId = btn.dataset.admDmsOaSave;
+                const select = host.querySelector('[data-adm-dms-oa="' + subjectId + '"]');
+                const key = select ? select.value : '';
+                if (!key) return;
+                if (btn.dataset.admDmsOaBound) {
+                    const ok = await _admConfirm(_t('adm-dms-oa-change-confirm'), {
+                        title: _t('adm-dms-oa-save-btn'),
+                        okText: _t('adm-dms-oa-save-btn'),
+                        danger: true,
+                    });
+                    if (!ok) return;
+                }
+                try {
+                    const r = await _adminFetch('/api/admin/dms/channel', {
+                        method: 'POST',
+                        body: { subject_id: subjectId, line_channel_key: key },
+                    });
+                    _toast(
+                        _t('adm-dms-oa-changed').replace('{n}', r.channel_name || key),
+                        'success'
+                    );
+                    _renderDmsPage();
+                } catch (e) {
+                    _toast(_t(_dmsErrorKey(e)), 'error');
+                }
+            });
+        });
         host.querySelectorAll('[data-adm-dms-revoke]').forEach(function (btn) {
             btn.addEventListener('click', async function () {
                 const ok = await _admConfirm(_t('adm-dms-revoke-confirm'), {
@@ -3866,6 +3937,8 @@
         'admin.dms_not_invited': 'adm-dms-reset-not-invited',
         'admin.dms_subject_unknown': 'adm-dms-reset-subject-unknown',
         'admin.username_exists': 'adm-dms-invite-username-exists',
+        'admin.dms_invalid_channel': 'adm-dms-invalid-channel',
+        'admin.dms_channel_failed': 'adm-dms-channel-failed',
     };
 
     function _dmsErrorKey(err) {
@@ -4072,6 +4145,7 @@
         const btn = document.getElementById('adm-dms-invite-btn');
         const input = document.getElementById('adm-dms-invite-input');
         const pwInput = document.getElementById('adm-dms-invite-password');
+        const channelSel = document.getElementById('adm-dms-invite-channel');
         if (!btn || !input) return;
         if (!btn.__bound) {
             btn.__bound = true;
@@ -4079,12 +4153,14 @@
                 const raw = (input.value || '').trim();
                 if (!raw) return;
                 const pwd = (pwInput && pwInput.value.trim()) || '';
+                const channelKey = (channelSel && channelSel.value) || '';
+                const body = { username_or_email: raw };
+                if (pwd) body.password = pwd;
+                if (channelKey) body.line_channel_key = channelKey;
                 try {
                     const r = await _adminFetch('/api/admin/dms/invite', {
                         method: 'POST',
-                        body: pwd
-                            ? { username_or_email: raw, password: pwd }
-                            : { username_or_email: raw },
+                        body: body,
                     });
                     input.value = '';
                     if (pwInput) pwInput.value = '';
@@ -4132,7 +4208,35 @@
         }
         const flagLine = document.getElementById('adm-dms-flag-line');
         if (flagLine) flagLine.textContent = _dmsFlagText(d.flag);
-        _renderDmsList(d.allowlist);
+        _fillDmsChannels(channelSel, d.channels || []);
+        _renderDmsList(d.allowlist, d.channels || []);
+    }
+
+    // 邀请下拉:选项只来自后端公开字段(stable key + 显示名 + Basic ID),不写死 OA。
+    function _fillDmsChannels(select, channels) {
+        if (!select) return;
+        const prev = select.value;
+        select.innerHTML = channels
+            .map(function (c) {
+                return (
+                    '<option value="' +
+                    _esc(c.channel_key) +
+                    '">' +
+                    _esc(c.channel_name) +
+                    ' (' +
+                    _esc(c.basic_id) +
+                    ')</option>'
+                );
+            })
+            .join('');
+        if (
+            prev &&
+            channels.some(function (c) {
+                return c.channel_key === prev;
+            })
+        ) {
+            select.value = prev;
+        }
     }
 
     // ============ ERP 入口邀请管理页(照 DMS 邀请页范式 · 仅列表/邀请/撤销,不加重置密码) ============

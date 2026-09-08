@@ -1,25 +1,28 @@
 """Transaction helpers shared by binding changes and conversation state writes."""
 
 from services.line_dms import binding_guard
+from services.line_platform import channels
 
 
-def lock_line(cur, line_user_id: str) -> None:
+def lock_line(cur, line_user_id: str, channel_key: str = "") -> None:
+    key = channels.normalize(channel_key)
     cur.execute(
         "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
-        ("dms-binding:" + str(line_user_id),),
+        ("dms-binding:" + key + ":" + str(line_user_id),),
     )
 
 
-def lock_scope(cur, line_user_id: str) -> None:
+def lock_scope(cur, line_user_id: str, channel_key: str = "") -> None:
     """Serialize state writes with rebind, checking the epoch under the same lock."""
-    lock_line(cur, line_user_id)
+    key = channels.normalize(channel_key)
+    lock_line(cur, line_user_id, key)
     binding = binding_guard.snapshot()
     if binding is None:
         return
     cur.execute(
-        "SELECT id FROM line_dms_bindings WHERE line_user_id=%s AND id=%s "
+        "SELECT id FROM line_dms_bindings WHERE line_user_id=%s AND channel_key=%s AND id=%s "
         "AND user_id=%s AND tenant_id=%s",
-        (line_user_id, str(binding["id"]), binding["user_id"], binding["tenant_id"]),
+        (line_user_id, key, str(binding["id"]), binding["user_id"], binding["tenant_id"]),
     )
     if not cur.fetchone():
         raise binding_guard.BindingChanged("dms_binding_changed")

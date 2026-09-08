@@ -15,6 +15,7 @@ from typing import Optional
 from services.cloud_tasks import dispatch as cloud_dispatch
 from services.line_platform import client as line_client
 from services.line_dms import (
+    binding_guard,
     booking_qa,
     cards,
     commands,
@@ -26,7 +27,7 @@ from services.line_dms import (
     query_flow,
     store,
 )
-from services.line_dms._out import _CHANNEL, _reply, _thr
+from services.line_dms._out import _reply, _thr
 
 
 async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -> None:
@@ -80,7 +81,9 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
     if not sess:  # 无会话 → 菜单卡引路(取代旧 TXT_INTRO 文本)
         allowed = await _thr(query_access.can_query, binding)
         line_client.reply_messages(
-            reply_token, [menu_cards.menu_card(can_query=bool(allowed))], channel=_CHANNEL
+            reply_token,
+            [menu_cards.menu_card(can_query=bool(allowed))],
+            channel=binding_guard.current_channel(),
         )
     else:
         _reply(reply_token, _nudge(sess))

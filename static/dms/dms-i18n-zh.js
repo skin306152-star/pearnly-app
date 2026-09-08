@@ -362,6 +362,7 @@ window.__DMS_I18N_ZH__ = {
     'dms-op-code-title': '绑定码',
     'dms-op-code-step1': '让该操作员在 LINE 添加 Pearnly DMS 好友',
     'dms-op-code-step2': '在 LINE 对话中发送此绑定码完成连接',
+    'dms-op-code-line-id': 'LINE ID',
     'dms-op-code-regen': '重新生成',
     'dms-op-code-expires': '剩余有效期',
     'dms-op-code-expired': '绑定码已过期,请重新生成',

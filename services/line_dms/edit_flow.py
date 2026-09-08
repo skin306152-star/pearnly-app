@@ -21,8 +21,8 @@ from typing import Any, Dict, Optional, Tuple
 from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp.dms_id_validate import is_valid_thai_id, normalize_thai_id
 from services.line_platform import client as line_client
-from services.line_dms import cards, store
-from services.line_dms._out import _CHANNEL, _reply, _thr
+from services.line_dms import binding_guard, cards, store
+from services.line_dms._out import _reply, _thr
 
 EDIT_ACTIONS = frozenset({cards.ACT_EDIT, cards.ACT_EDIT_FIELD, cards.ACT_EDIT_CANCEL})
 
@@ -51,7 +51,9 @@ def _open_menu(reply_token: str, sess: Optional[dict], nonce: Optional[str]) -> 
     if not store.verify_nonce(sess, nonce):
         _reply(reply_token, cards.TXT_EXPIRED)
         return
-    line_client.reply_messages(reply_token, [cards.edit_menu_message(nonce)], channel=_CHANNEL)
+    line_client.reply_messages(
+        reply_token, [cards.edit_menu_message(nonce)], channel=binding_guard.current_channel()
+    )
 
 
 async def _pick_field(

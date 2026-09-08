@@ -1,7 +1,7 @@
 import contextlib
 from unittest import TestCase, mock
 
-from services.line_dms import booking_edit, qa_cards
+from services.line_dms import binding_guard, booking_edit, qa_cards
 
 QA = {
     "endpoint_id": "E1",
@@ -359,3 +359,44 @@ class BookingEditTests(TestCase):
         self.assertIn("Bangkok", raw)
         self.assertIn("10230", raw)
         self.assertIn("รหัสไปรษณีย์", raw)
+
+
+class EditLinkChannelTests(TestCase):
+    """编辑入口只认绑定所属 OA 的 LIFF,非 legacy OA 绝不回落到别的 OA。"""
+
+    _BINDING = {
+        "id": "b1",
+        "line_user_id": "L1",
+        "tenant_id": "t1",
+        "user_id": "u1",
+        "channel_key": "dms_a",
+    }
+
+    def test_legacy_channel_uses_legacy_liff(self):
+        with mock.patch.dict("os.environ", {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=False):
+            self.assertEqual(
+                qa_cards._edit_url("N1", "dms"), "https://liff.line.me/DMS-LIFF?draft=N1"
+            )
+
+    def test_non_legacy_channel_uses_its_own_liff(self):
+        with mock.patch.dict("os.environ", {"LINE_DMS_A_LIFF_ID": "A-LIFF"}, clear=False):
+            self.assertEqual(
+                qa_cards._edit_url("N1", "dms_a"), "https://liff.line.me/A-LIFF?draft=N1"
+            )
+
+    def test_non_legacy_without_liff_is_empty_not_legacy(self):
+        with mock.patch.dict(
+            "os.environ", {"LINE_DMS_LIFF_ID": "DMS-LIFF", "LINE_LIFF_ID": "SHARED"}, clear=True
+        ):
+            self.assertEqual(qa_cards._edit_url("N1", "dms_b"), "")
+
+    def test_binding_scope_selects_channel(self):
+        with mock.patch.dict("os.environ", {"LINE_DMS_A_LIFF_ID": "A-LIFF"}, clear=True):
+            with binding_guard.scope(self._BINDING):
+                self.assertEqual(qa_cards._edit_url("N1"), "https://liff.line.me/A-LIFF?draft=N1")
+
+    def test_preview_omits_edit_button_when_oa_has_no_liff(self):
+        with mock.patch.dict("os.environ", {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=True):
+            with binding_guard.scope({**self._BINDING, "channel_key": "dms_b"}):
+                card = qa_cards.preview_card(QA, "N-NO-LIFF")
+        self.assertNotIn(qa_cards.BTN_EDIT, str(card))

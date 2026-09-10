@@ -5,21 +5,23 @@ from __future__ import annotations
 
 from typing import Any
 
+from services.erp.dms_id_validate import normalize_thai_id
 from services.erp.mrerp_dms_client_base import DMSClientError
 from services.erp.mrerp_dms_models import ThaiAddress, ThaiIdCardPayload
 
 
 def card_from_customer(client: Any, *, customer_id: str, people_id: str) -> ThaiIdCardPayload:
-    """按身份证号重查客户，校验客户号后返回主档快照。"""
-    match = client.lookup_customer(people_id)
-    matched_id = str(match.get("customer_id") or "")
-    if not match.get("found") or matched_id != str(customer_id):
+    """在当前订车账号中直读已选客户，核验完整证号后使用实时主档。"""
+    expected = normalize_thai_id(people_id)
+    if not str(customer_id or "").strip() or not expected:
+        raise DMSClientError("booking customer identity missing", "ERR_DMS_CUSTOMER_LOOKUP")
+    fields = client.read_customer(str(customer_id))
+    if normalize_thai_id(str(fields.get("people_id") or "")) != expected:
         raise DMSClientError(
-            f"booking customer lookup mismatch: expected={customer_id!r} found={matched_id!r}",
-            "ERR_DMS_CUSTOMER_SAVE",
+            f"booking customer {customer_id!r} identity could not be verified",
+            "ERR_DMS_CUSTOMER_LOOKUP",
         )
 
-    fields = match.get("fields") or {}
     address = ThaiAddress(
         house_no=str(fields.get("house_no") or ""),
         building=str(fields.get("building") or ""),
@@ -58,7 +60,7 @@ def card_from_customer(client: Any, *, customer_id: str, people_id: str) -> Thai
     if not all(required):
         raise DMSClientError(
             f"booking customer {customer_id!r} has incomplete master data",
-            "ERR_DMS_CUSTOMER_SAVE",
+            "ERR_DMS_CUSTOMER_LOOKUP",
         )
 
     return ThaiIdCardPayload(

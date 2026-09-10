@@ -172,7 +172,11 @@ def _retryable_result(result: Dict[str, Any]) -> bool:
         return False
     if result.get("error_code") == "ERR_DMS_MASTER_UNMATCHED":
         return False
-    if result.get("error_code") in ("ERR_DMS_CONCURRENT_LOGIN", "ERR_DMS_MASTER_UNAVAILABLE"):
+    if result.get("error_code") in (
+        "ERR_DMS_CONCURRENT_LOGIN",
+        "ERR_DMS_MASTER_UNAVAILABLE",
+        "ERR_DMS_CUSTOMER_LOOKUP",
+    ):
         return True
     raw = str(result.get("raw_error") or "")
     response = result.get("response_body") or {}

@@ -86,6 +86,13 @@ _DMS_FRIENDLY = {
         "zh_TW": "DMS 管理員憑證登入失敗 · 請檢查管理員使用者名稱和密碼",
         "ja": "DMS 管理者資格情報でのログインに失敗しました · 管理者のユーザー名とパスワードをご確認ください",
     },
+    "ERR_DMS_CUSTOMER_LOOKUP": {
+        "zh": "订车尚未提交：无法核验 DMS 客户资料。请检查客户资料及账号访问权限后重试，无需重新建档。",
+        "en": "Booking has not been submitted: DMS customer details could not be verified. Check the customer details and account access, then retry without creating another customer.",
+        "th": "ยังไม่ได้ส่งใบจอง: ตรวจสอบข้อมูลลูกค้าใน DMS ไม่สำเร็จ กรุณาตรวจสอบข้อมูลลูกค้าและสิทธิ์เข้าถึงของบัญชี แล้วลองใหม่โดยไม่ต้องสร้างลูกค้าใหม่",
+        "zh_TW": "訂車尚未提交：無法核驗 DMS 客戶資料。請檢查客戶資料及帳號存取權限後重試，無需重新建檔。",
+        "ja": "予約は未送信です。DMS の顧客情報を確認できませんでした。顧客情報とアカウントのアクセス権を確認して再試行してください。顧客の再登録は不要です。",
+    },
     "ERR_DMS_CUSTOMER_SAVE": {
         "zh": "保存客户到 DMS 失败 · 请检查字段后重试",
         "en": "Failed to save the customer to DMS — check the fields and retry",

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""订车前按身份证号重查客户主档，并完整回填地址可见名称。"""
+"""订车前按客户号实时读取并核验身份证，并完整回填地址可见名称。"""
 
 import unittest
 
@@ -34,9 +34,14 @@ class _Client:
         self.result = result
         self.queries = []
 
+    def read_customer(self, customer_id):
+        self.queries.append(customer_id)
+        if self.result.get("customer_id") != customer_id:
+            return {}
+        return self.result.get("fields") or {}
+
     def lookup_customer(self, people_id):
-        self.queries.append(people_id)
-        return self.result
+        raise AssertionError("booking must not depend on the customer search listing")
 
 
 class _BookingForm(DMSClientFormsMixin):
@@ -49,7 +54,7 @@ class BookingCustomerMasterTests(unittest.TestCase):
 
         card = card_from_customer(client, customer_id="119", people_id="3319900165090")
 
-        self.assertEqual(client.queries, ["3319900165090"])
+        self.assertEqual(client.queries, ["119"])
         self.assertEqual(card.full_name, _FIELDS["name"])
         self.assertEqual(card.phone, _FIELDS["phone"])
         self.assertEqual(card.address.province_name, "กรุงเทพมหานคร")
@@ -74,7 +79,40 @@ class BookingCustomerMasterTests(unittest.TestCase):
         with self.assertRaises(DMSClientError) as ctx:
             card_from_customer(client, customer_id="119", people_id="3319900165090")
 
-        self.assertEqual(ctx.exception.error_code, "ERR_DMS_CUSTOMER_SAVE")
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_CUSTOMER_LOOKUP")
+
+    def test_direct_read_identity_mismatch_or_empty_blocks_booking(self):
+        for identity in ("", "3319900165091"):
+            with self.subTest(identity=identity):
+                client = _Client(
+                    {"customer_id": "119", "fields": dict(_FIELDS, people_id=identity)}
+                )
+                with self.assertRaises(DMSClientError) as ctx:
+                    card_from_customer(client, customer_id="119", people_id="3319900165090")
+                self.assertEqual(ctx.exception.error_code, "ERR_DMS_CUSTOMER_LOOKUP")
+
+    def test_missing_expected_identity_never_reads_or_accepts_customer(self):
+        for cid, pid in (("", "3319900165090"), ("119", "")):
+            client = _Client({"customer_id": "119", "fields": dict(_FIELDS)})
+            with self.assertRaises(DMSClientError):
+                card_from_customer(client, customer_id=cid, people_id=pid)
+            self.assertEqual(client.queries, [])
+
+    def test_identity_formatting_is_normalized_but_live_fields_are_preserved(self):
+        fields = dict(_FIELDS, people_id="3-3199-00165-09-0", phone="0890000000")
+        client = _Client({"customer_id": "119", "fields": fields})
+        card = card_from_customer(client, customer_id="119", people_id="๓๓๑๙๙๐๐๑๖๕๐๙๐")
+        self.assertEqual(card.phone, "0890000000")
+
+    def test_lookup_error_messages_match_line_and_push_log_in_every_language(self):
+        from services.erp.erp_dms_push import _dms_friendly
+        from services.erp.push_log_friendly import dms_push_friendly
+
+        line = _dms_friendly("ERR_DMS_CUSTOMER_LOOKUP")
+        log = dms_push_friendly("ERR_DMS_CUSTOMER_LOOKUP")
+        for lang in ("zh", "en", "th", "ja"):
+            self.assertTrue(line[lang])
+            self.assertEqual(line[lang], log[lang])
 
     def test_incomplete_master_address_blocks_booking(self):
         for missing_field in ("prefix_name", "zipcode_name"):
@@ -85,7 +123,7 @@ class BookingCustomerMasterTests(unittest.TestCase):
                 with self.assertRaises(DMSClientError) as ctx:
                     card_from_customer(client, customer_id="119", people_id="3319900165090")
 
-                self.assertEqual(ctx.exception.error_code, "ERR_DMS_CUSTOMER_SAVE")
+                self.assertEqual(ctx.exception.error_code, "ERR_DMS_CUSTOMER_LOOKUP")
 
 
 if __name__ == "__main__":

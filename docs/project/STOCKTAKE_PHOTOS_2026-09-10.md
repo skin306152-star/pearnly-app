@@ -21,6 +21,6 @@
 
 ## 发布时剩余
 
-发布需按当前 Cloud Run 规范执行。`services.cloud_runtime.schema` 已调用 stocktake schema gate，新 gate 追加图片表；独立迁移记录为 `0125_stocktake_photos`。先执行串行 schema gate，再切新代码流量。此次没有运行生产迁移。
+发布需按当前 Cloud Run 规范执行。`services.cloud_runtime.schema` 已调用 stocktake schema gate，新 gate 追加图片表；独立迁移记录为 `0127_stocktake_photos`。先执行串行 schema gate，再切新代码流量。此次没有运行生产迁移。
 
 发布后需要真实 LINE（尤其 iPhone）拍照/相册与保存确认，以及用户常用 Excel 客户端点击附件、离线查看内嵌图片确认。

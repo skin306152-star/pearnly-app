@@ -3,8 +3,8 @@
 from alembic import op
 from services.stocktake.photo_schema import apply
 
-revision = "0125_stocktake_photos"
-down_revision = "0124_stocktake_scan_entries"
+revision = "0127_stocktake_photos"
+down_revision = "0126_dms_login_ticket_scope"
 branch_labels = None
 depends_on = None
 

@@ -6,7 +6,7 @@ from decimal import Decimal
 from io import BytesIO
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 SUMMARY = [
     "รหัสสินค้า",
@@ -148,6 +148,8 @@ def workbook(task):
     from services.stocktake.photo_report import attach
 
     attach(wb, task, summary, detail)
+    edge = Side(style="thin", color="A6ACB3")
+    border = Border(left=edge, right=edge, top=edge, bottom=edge)
     for sheet in wb:
         sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = sheet.dimensions
@@ -158,8 +160,11 @@ def workbook(task):
         sheet.column_dimensions["B"].width = 36
         sheet.row_dimensions[1].height = 26
         for cells in sheet:
+            bordered = sheet in (summary, detail) or any(cell.value is not None for cell in cells)
             for cell in cells:
                 cell.alignment = Alignment(vertical="top", wrap_text=True)
+                if bordered:
+                    cell.border = border
     out = BytesIO()
     wb.save(out)
     return out.getvalue()

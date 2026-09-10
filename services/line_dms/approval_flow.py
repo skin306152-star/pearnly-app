@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+from services.line_dms import binding_guard
+
 import asyncio
 import json
 import logging
@@ -24,7 +26,7 @@ from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_platform import client as line_client
 from services.line_dms import _out, approval_cards, approval_store, cards, store
-from services.line_dms._out import _CHANNEL, _push, _reply, _thr
+from services.line_dms._out import _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
 
@@ -94,12 +96,14 @@ def exact_diff_card(
 def _bound_approvers(tenant_id: str) -> List[Dict[str, str]]:
     """本租户可收审批卡的管理员:dms_role='admin' + 启用 + 已绑 LINE。
 
-    line_user_id 直接取自 list_profiles 的 JOIN 列(不再逐人 get_binding_by_user·消 N+1)。"""
+    line_user_id / channel_key 直接取自 list_profiles 的 JOIN 列(不再逐人 get_binding_by_user·
+    消 N+1);channel_key 让推送按收件人自己的 OA 发出,绝不借发件人的 OA 串线。"""
     return [
         {
             "user_id": str(p["user_id"]),
             "display_name": p.get("display_name") or "",
             "line_user_id": p.get("line_user_id") or "",
+            "channel_key": p.get("line_channel_key") or "",
         }
         for p in roster_store.list_profiles(tenant_id)
         if _is_active_admin(p) and p.get("line_user_id")
@@ -144,7 +148,9 @@ async def _submit(binding: dict, line_user_id: str, reply_token: str, pb: dict) 
         return
     await _thr(store.clear_session, tenant, line_user_id)
     line_client.reply_messages(
-        reply_token, [approval_cards.picker_card(req_id, approvers)], channel=_CHANNEL
+        reply_token,
+        [approval_cards.picker_card(req_id, approvers)],
+        channel=binding_guard.current_channel(),
     )
 
 
@@ -197,12 +203,19 @@ async def _target(binding: dict, line_user_id: str, reply_token: str, pb: dict) 
     # 广播并发推(每次 push 是阻塞 HTTP)· 不占事件循环也不让销售的等待卡多等 N 次串行。
     await asyncio.gather(
         *(
-            _thr(line_client.push_messages, t["line_user_id"], [card], channel=_CHANNEL)
+            _thr(
+                line_client.push_messages,
+                t["line_user_id"],
+                [card],
+                channel=t.get("channel_key") or binding_guard.current_channel(),
+            )
             for t in targets
         )
     )
     line_client.reply_messages(
-        reply_token, [approval_cards.waiting_card(str(req["id"]), label)], channel=_CHANNEL
+        reply_token,
+        [approval_cards.waiting_card(str(req["id"]), label)],
+        channel=binding_guard.current_channel(),
     )
 
 
@@ -215,7 +228,9 @@ async def _retarget(binding: dict, line_user_id: str, reply_token: str, pb: dict
         _reply(reply_token, approval_cards.TXT_NO_APPROVERS)
         return
     line_client.reply_messages(
-        reply_token, [approval_cards.picker_card(str(req["id"]), approvers)], channel=_CHANNEL
+        reply_token,
+        [approval_cards.picker_card(str(req["id"]), approvers)],
+        channel=binding_guard.current_channel(),
     )
 
 
@@ -249,10 +264,15 @@ async def _decide(
     )
 
 
+@binding_guard.bound_task
 async def _execute_approved(binding: dict, admin_line_user_id: str, req: dict) -> None:
     """以批准人自己的 endpoint 凭据执行 overwrite;成功 approved,失败回炉 pending。"""
+    profile = await _thr(roster_store.get_profile, binding["tenant_id"], binding["user_id"])
+    if not _is_active_admin(profile):
+        await _thr(approval_store.finish, binding["tenant_id"], str(req["id"]), "pending")
+        return
     tenant, approver_id = binding["tenant_id"], str(binding["user_id"])
-    await _thr(line_client.start_loading, admin_line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, admin_line_user_id)
 
     ep = await _thr(_id_ocr.resolve_dms_endpoint, approver_id, None)
     if not ep:
@@ -352,4 +372,4 @@ def _operator_display_name(tenant_id: str, user_id: str) -> str:
 async def _notify_operator(tenant_id: str, req: dict, text: str) -> None:
     b = await _thr(store.get_binding_by_user, str(req.get("operator_user_id") or ""))
     if b and b.get("line_user_id"):
-        _push(b["line_user_id"], text)
+        _push(b["line_user_id"], text, channel=b.get("channel_key") or "")

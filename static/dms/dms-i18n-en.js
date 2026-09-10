@@ -377,6 +377,7 @@ window.__DMS_I18N_EN__ = {
     'dms-op-code-title': 'Bind code',
     'dms-op-code-step1': 'Have the operator add Pearnly DMS as a LINE friend',
     'dms-op-code-step2': 'Send this bind code in the LINE chat to connect',
+    'dms-op-code-line-id': 'LINE ID',
     'dms-op-code-regen': 'Regenerate',
     'dms-op-code-expires': 'Expires in',
     'dms-op-code-expired': 'Bind code expired, regenerate it',

@@ -18,8 +18,8 @@ from typing import Optional
 
 from services.cloud_tasks import dispatch as cloud_dispatch
 from services.line_platform import client as line_client
-from services.line_dms import booking_qa, cards, menu_cards, query_access, store
-from services.line_dms._out import _CHANNEL, _push, _reply, _thr
+from services.line_dms import binding_guard, booking_qa, cards, menu_cards, query_access, store
+from services.line_dms._out import _push, _reply, _thr
 
 MENU_ACTIONS = frozenset(
     {
@@ -61,10 +61,12 @@ async def open_menu(
     payload = {k: old.get(k) for k in _KEEP_KEYS if old.get(k)}
     await _thr(store.set_session, binding["tenant_id"], line_user_id, "menu", payload)
     allowed = await _thr(query_access.can_query, binding)
-    msgs: list = [menu_cards.menu_card(can_query=bool(allowed))]
+    msgs: list = [
+        menu_cards.menu_card(can_query=bool(allowed), channel=binding_guard.current_channel())
+    ]
     if greet:
         msgs.insert(0, {"type": "text", "text": cards.TXT_MENU_GREETING})
-    line_client.reply_messages(reply_token, msgs, channel=_CHANNEL)
+    line_client.reply_messages(reply_token, msgs, channel=binding_guard.current_channel())
 
 
 async def handle_choice(

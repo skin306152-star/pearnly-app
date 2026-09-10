@@ -13,10 +13,10 @@ import asyncio
 import logging
 
 from services.line_platform import client as line_client
+from services.line_dms.binding_guard import current_channel, require_current
 
 logger = logging.getLogger(__name__)
 
-_CHANNEL = "dms"
 _thr = asyncio.to_thread
 
 
@@ -39,22 +39,37 @@ def make_spawn(tag: str):
 
 
 def _reply(reply_token: str, text: str) -> None:
+    require_current()
     if reply_token:
-        line_client.reply_text(reply_token, text, channel=_CHANNEL)
+        line_client.reply_text(reply_token, text, channel=current_channel())
 
 
-def _push(line_user_id: str, text: str) -> None:
-    line_client.push_text(line_user_id, text, channel=_CHANNEL)
+def _push(line_user_id: str, text: str, channel: str = "") -> None:
+    """Push through the recipient's own OA when given, else the binding in scope."""
+    require_current()
+    line_client.push_text(line_user_id, text, channel=channel or current_channel())
 
 
-def _send(line_user_id: str, msg, reply_token: str = "") -> None:
+def _send(line_user_id: str, msg, reply_token: str = "", channel: str = "") -> None:
     """结构化消息出口(quickReply / Flex 必须走 reply_messages|push_messages)。
 
     有 reply_token 就 reply,没有就 push —— 逐问既可能应答 postback,也可能由后台任务发起。
     """
+    require_current()
     if msg is None:
         return
+    channel = channel or current_channel()
     if reply_token:
-        line_client.reply_messages(reply_token, [msg], channel=_CHANNEL)
+        line_client.reply_messages(reply_token, [msg], channel=channel)
     else:
-        line_client.push_messages(line_user_id, [msg], channel=_CHANNEL)
+        line_client.push_messages(line_user_id, [msg], channel=channel)
+
+
+def start_loading(line_user_id: str) -> None:
+    """当前 OA 的「正在输入」动画(阻塞 HTTP,调用方仍须 _thr 离开事件循环)。"""
+    line_client.start_loading(line_user_id, 30, channel=current_channel())
+
+
+def download_content(message_id: str):
+    """下载消息内容(图片/附件)用的当前 OA token。"""
+    return line_client.download_message_content(message_id, channel=current_channel())

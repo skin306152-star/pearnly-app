@@ -24,6 +24,7 @@ HANDLERS = {
     "workorder.bank_sales": ("services.cloud_tasks.workorders", "bank_sales"),
     "cowork.document": ("services.cowork_line.webhook_documents", "process_document"),
     "line_erp.document": ("services.line_erp.webhook", "_process_document"),
+    "dms.menu_sync": ("services.line_dms.menu_sync", "sync"),
     "dms.image": ("services.line_dms.flow", "_dispatch_image"),
     "dms.create": ("services.line_dms.flow", "_write_create"),
     "dms.update": ("services.line_dms.flow", "_write_update"),

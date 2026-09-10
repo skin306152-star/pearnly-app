@@ -373,6 +373,7 @@ window.__DMS_I18N_JA__ = {
     'dms-op-code-title': '連携コード',
     'dms-op-code-step1': '担当者にLINEでPearnly DMSを友だち追加してもらう',
     'dms-op-code-step2': 'LINEチャットでこの連携コードを送信して接続',
+    'dms-op-code-line-id': 'LINE ID',
     'dms-op-code-regen': '再生成',
     'dms-op-code-expires': '残り',
     'dms-op-code-expired': '連携コードが期限切れです。再生成してください',

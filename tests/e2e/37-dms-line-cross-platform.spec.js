@@ -146,7 +146,7 @@ function readMenuContracts() {
 }
 
 function stateFor(mode, platform) {
-    const external = platform.mobile ? '&openExternalBrowser=1' : '';
+    const external = platform.mobile && mode === 'portal' ? '&openExternalBrowser=1' : '';
     return `/dms-booking?${mode}=dms${external}`;
 }
 
@@ -168,7 +168,7 @@ function token() {
     return `e2e.${payload}.sig`;
 }
 
-function liffSdk(platform) {
+function liffSdk(platform, mode) {
     return `
         (() => {
             const params = new URLSearchParams(location.search);
@@ -208,7 +208,7 @@ function liffSdk(platform) {
                     persist();
                     return loggedIn ? ${JSON.stringify(`LINE-ID-TOKEN-${platform.id}`)} : null;
                 },
-                isInClient: () => false,
+                isInClient: () => ${JSON.stringify(platform.mobile && mode === 'credentials')},
                 getOS: () => ${JSON.stringify(platform.os)},
                 openWindow: (options) => window.__recordHarnessEvent({ type: 'liff.openWindow', options }),
                 closeWindow: () => window.__recordHarnessEvent({ type: 'liff.closeWindow' }),
@@ -239,7 +239,7 @@ async function newHarnessPage(context, platform, mode) {
         });
     });
     await page.route('https://static.line-scdn.net/**', (route) =>
-        route.fulfill({ contentType: 'application/javascript', body: liffSdk(platform) })
+        route.fulfill({ contentType: 'application/javascript', body: liffSdk(platform, mode) })
     );
     await page.route('**/api/line/dms-booking/config', async (route) => {
         events.push({ type: 'config' });
@@ -420,7 +420,7 @@ test.afterAll(() => {
     if (server) server.kill('SIGTERM');
 });
 
-test('LINE menu 1-4 contracts preserve postbacks, mobile external URIs, and desktop altUri', () => {
+test('LINE menu 1-4 contracts preserve postbacks, separate mobile destinations, and desktop altUri', () => {
     const [customer, booking, portal, credentialsAction] = contracts.flex;
     expect(customer).toEqual({ type: 'postback', data: 'action=menu_customer' });
     expect(booking).toEqual({ type: 'postback', data: 'action=menu_booking' });
@@ -431,7 +431,7 @@ test('LINE menu 1-4 contracts preserve postbacks, mobile external URIs, and desk
     });
     expect(credentialsAction).toMatchObject({
         type: 'uri',
-        uri: 'https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1',
+        uri: 'https://liff.line.me/DMS-LIFF/dms-booking?credentials=dms',
         altUri: { desktop: 'https://pearnly.com/home/dms-booking?credentials=dms' },
     });
 
@@ -439,7 +439,7 @@ test('LINE menu 1-4 contracts preserve postbacks, mobile external URIs, and desk
         ['postback', 'action=menu_customer'],
         ['postback', 'action=menu_booking'],
         ['uri', 'https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1'],
-        ['uri', 'https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1'],
+        ['uri', 'https://liff.line.me/DMS-LIFF/dms-booking?credentials=dms'],
     ]);
 });
 
@@ -460,7 +460,7 @@ for (const platform of PLATFORMS) {
             expect(selectedPortalUri).toContain('portal=dms');
             expect(selectedCredentialsUri).toContain('credentials=dms');
             expect(selectedPortalUri.includes('openExternalBrowser=1')).toBe(platform.mobile);
-            expect(selectedCredentialsUri.includes('openExternalBrowser=1')).toBe(platform.mobile);
+            expect(selectedCredentialsUri.includes('openExternalBrowser=1')).toBe(false);
 
             const portal = await newHarnessPage(context, platform, 'portal');
             await portal.page.screenshot({

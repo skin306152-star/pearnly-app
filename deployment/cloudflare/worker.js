@@ -1,4 +1,4 @@
-/* global URL, Response, Headers, Request, fetch */
+/* global URL, URLSearchParams, Response, Headers, Request, fetch */
 const ORIGIN = 'https://pearnly-web-112074003592.asia-southeast1.run.app';
 
 export default {
@@ -10,6 +10,19 @@ export default {
         if (original.pathname.startsWith('/internal/')) {
             return new Response('Not found', { status: 404 });
         }
+        const state = original.searchParams.get('liff.state') || '';
+        const stateQuery = new URLSearchParams(state.slice(state.indexOf('?') + 1));
+        const dmsCredentials =
+            ['/home/dms-booking', '/login/dms-booking', '/liff/dms-booking'].includes(
+                original.pathname
+            ) ||
+            (['/home', '/login'].includes(original.pathname) &&
+                stateQuery.get('credentials') === 'dms') ||
+            [
+                '/api/line/dms-booking/auth',
+                '/api/line/dms-booking/config',
+                '/api/line/dms-credentials',
+            ].includes(original.pathname);
         const target = new URL(original.pathname + original.search, ORIGIN);
         const headers = new Headers(request.headers);
         headers.delete('host');
@@ -28,13 +41,21 @@ export default {
             body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
             redirect: 'manual',
         });
-        const response = await fetch(upstream, {
-            cf: cacheable
-                ? { cacheEverything: true, cacheTtlByStatus: { '200-299': 86400, '400-599': -1 } }
-                : { cacheTtl: 0 },
-        });
+        const response = await fetch(
+            upstream,
+            dmsCredentials
+                ? { cache: 'no-store' }
+                : {
+                      cf: cacheable
+                          ? {
+                                cacheEverything: true,
+                                cacheTtlByStatus: { '200-299': 86400, '400-599': -1 },
+                            }
+                          : { cacheTtl: 0 },
+                  }
+        );
         const result = new Response(response.body, response);
-        if (original.pathname.endsWith('/latest.json')) {
+        if (dmsCredentials || original.pathname.endsWith('/latest.json')) {
             result.headers.set('cache-control', 'no-store');
         }
         const location = result.headers.get('location');

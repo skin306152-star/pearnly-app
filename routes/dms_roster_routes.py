@@ -37,6 +37,7 @@ _ERR_STATUS = {
     "dms_roster.create_failed": 500,
     "dms_roster.endpoint_failed": 500,
     "dms_roster.bind_code_failed": 500,
+    "dms_roster.channel_unavailable": 503,
     "dms_roster.delete_failed": 500,
 }
 

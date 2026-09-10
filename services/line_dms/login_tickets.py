@@ -26,15 +26,26 @@ CREATE TABLE IF NOT EXISTS line_dms_login_tickets (
     ticket_hash text PRIMARY KEY,
     tenant_id uuid NOT NULL,
     user_id uuid NOT NULL,
+    channel_key text NOT NULL DEFAULT 'dms',
+    binding_id uuid,
     expires_at timestamptz NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 )
 """
 
+# 既有表补列(与 0126 迁移同源):票据钉在签发时的 (OA, binding epoch) 上。
+_MIGRATIONS = (
+    "ALTER TABLE line_dms_login_tickets "
+    "ADD COLUMN IF NOT EXISTS channel_key text NOT NULL DEFAULT 'dms'",
+    "ALTER TABLE line_dms_login_tickets ADD COLUMN IF NOT EXISTS binding_id uuid",
+)
+
 # expires_at 索引:核销按 hash 走 PK,索引只服务过期票清扫(WHERE expires_at < now())。
 _INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_line_dms_login_tickets_expires_at "
     "ON line_dms_login_tickets (expires_at)",
+    "CREATE INDEX IF NOT EXISTS idx_line_dms_login_tickets_scope "
+    "ON line_dms_login_tickets (tenant_id, channel_key, user_id)",
 )
 
 
@@ -49,6 +60,8 @@ def ensure_table() -> None:
 
     with db.get_cursor(commit=True) as cur:
         cur.execute(_DDL)
+        for stmt in _MIGRATIONS:
+            cur.execute(stmt)
         for stmt in _INDEXES:
             cur.execute(stmt)
         apply_tenant_rls(cur, _TABLE)
@@ -79,34 +92,68 @@ def _dal(label: str, default):
 
 
 def issue_login_ticket(
-    tenant_id, user_id, ttl_seconds: int = MAX_TICKET_TTL_SECONDS
+    tenant_id,
+    user_id,
+    ttl_seconds: int = MAX_TICKET_TTL_SECONDS,
+    *,
+    channel_key: Optional[str] = None,
+    binding_id: Optional[str] = None,
 ) -> Optional[dict]:
     """为 (tenant, user) 发一次性登录票据:明文只返调用方一次,库里只有 SHA256 哈希。
 
+    票据钉在签发时的 (channel_key, binding epoch) 上,核销必须命中同一绑定;A/B 绑定不会再因为
+    锁/查询落到 legacy 而失败。默认从当前作用域 binding 取值。
     TTL 夹到 [0, MAX_TICKET_TTL_SECONDS](60s 上限)。返回 {"ticket", "expires_at"(iso)};
     落库失败 → None。
     """
     from core import db
+    from services.line_platform import channels
 
     ttl = max(0, min(int(ttl_seconds), MAX_TICKET_TTL_SECONDS))
     ticket = secrets.token_urlsafe(32)
 
     def _run():
         with db.get_cursor(commit=True) as cur:
+            from services.line_dms import binding_guard, binding_state
+
+            binding = binding_guard.snapshot()
+            key = channel_key
+            epoch = binding_id
+            if binding is not None:
+                key = key or binding.get("channel_key")
+                epoch = epoch or binding.get("id")
+            key = (key or "").strip()
+            if key and not channels.is_valid(key):
+                return None
+            key = key or channels.DEFAULT_DMS_CHANNEL
+            if binding is not None:
+                binding_state.lock_scope(cur, binding["line_user_id"], key)
             cur.execute("DELETE FROM line_dms_login_tickets WHERE expires_at <= now()")
             cur.execute(
                 "INSERT INTO line_dms_login_tickets "
-                "(ticket_hash, tenant_id, user_id, expires_at) "
-                "VALUES (%s, %s, %s, now() + (%s * interval '1 second')) "
-                "RETURNING ticket_hash, expires_at",
-                (_ticket_hash(ticket), str(tenant_id), str(user_id), ttl),
+                "(ticket_hash, tenant_id, user_id, channel_key, binding_id, expires_at) "
+                "VALUES (%s, %s, %s, %s, %s, now() + (%s * interval '1 second')) "
+                "RETURNING ticket_hash, channel_key, binding_id, expires_at",
+                (
+                    _ticket_hash(ticket),
+                    str(tenant_id),
+                    str(user_id),
+                    key,
+                    str(epoch) if epoch else None,
+                    ttl,
+                ),
             )
             return cur.fetchone()
 
     row = _dal("issue_login_ticket", None)(_run)
     if not row:
         return None
-    return {"ticket": ticket, "expires_at": row["expires_at"].isoformat()}
+    return {
+        "ticket": ticket,
+        "expires_at": row["expires_at"].isoformat(),
+        "channel_key": row.get("channel_key") or "dms",
+        "binding_id": str(row["binding_id"]) if row.get("binding_id") else None,
+    }
 
 
 def consume_login_ticket(ticket: str) -> Optional[dict]:
@@ -126,7 +173,7 @@ def consume_login_ticket(ticket: str) -> Optional[dict]:
             cur.execute(
                 "DELETE FROM line_dms_login_tickets "
                 "WHERE ticket_hash = %s AND expires_at > now() "
-                "RETURNING tenant_id, user_id",
+                "RETURNING tenant_id, user_id, channel_key, binding_id, created_at",
                 (_ticket_hash(ticket),),
             )
             return cur.fetchone()
@@ -134,4 +181,10 @@ def consume_login_ticket(ticket: str) -> Optional[dict]:
     row = _dal("consume_login_ticket", None)(_run)
     if not row:
         return None
-    return {"tenant_id": str(row["tenant_id"]), "user_id": str(row["user_id"])}
+    return {
+        "tenant_id": str(row["tenant_id"]),
+        "user_id": str(row["user_id"]),
+        "channel_key": row.get("channel_key") or "dms",
+        "binding_id": str(row["binding_id"]) if row.get("binding_id") else None,
+        "created_at": row["created_at"],
+    }

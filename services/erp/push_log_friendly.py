@@ -126,6 +126,12 @@ _DMS_PUSH_FRIENDLY: Dict[str, Dict[str, str]] = {
         "th": "เข้าสู่ระบบด้วยบัญชีผู้ดูแล DMS ไม่สำเร็จ กรุณาตรวจสอบชื่อผู้ใช้และรหัสผ่านของผู้ดูแลแล้วลองใหม่",
         "ja": "DMS 管理者アカウントでのログインに失敗しました。管理者のユーザー名とパスワード設定を確認して再試行してください。",
     },
+    "ERR_DMS_CUSTOMER_LOOKUP": {
+        "zh": "订车尚未提交：无法核验 DMS 客户资料。请检查客户资料及账号访问权限后重试，无需重新建档。",
+        "en": "Booking has not been submitted: DMS customer details could not be verified. Check the customer details and account access, then retry without creating another customer.",
+        "th": "ยังไม่ได้ส่งใบจอง: ตรวจสอบข้อมูลลูกค้าใน DMS ไม่สำเร็จ กรุณาตรวจสอบข้อมูลลูกค้าและสิทธิ์เข้าถึงของบัญชี แล้วลองใหม่โดยไม่ต้องสร้างลูกค้าใหม่",
+        "ja": "予約は未送信です。DMS の顧客情報を確認できませんでした。顧客情報とアカウントのアクセス権を確認して再試行してください。顧客の再登録は不要です。",
+    },
     "ERR_DMS_CUSTOMER_SAVE": {
         "zh": "客户资料保存到 DMS 失败 · 请检查身份证识别出的姓名与地址后重试",
         "en": "Saving the customer to DMS failed. Please check the recognized name and address from the ID card, then retry.",

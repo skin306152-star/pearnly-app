@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-06 18:14（Asia/Bangkok，UTC+7）。状态：**Cloud Run已接管，Cowork超管入口跳转修正与盘点整卡删除已发布并复验通过**。
+更新时间：2026-09-10 14:13（Asia/Bangkok，UTC+7）。状态：**DMS 订车客户实时详情核验修复已上线，Web/Worker 各 100% 新版本；原失败单待用户重新确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,9 +27,28 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`1856fdbe316a390989b1e5ff5c534a5cca26f90a`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:600a3fe01ba16783d354721444326d59446538d51ff1e843bda729686da486fb`。
-- Web revision：`pearnly-web-1856fdbe316a-s2`，100%流量；Worker revision：`pearnly-worker-1856fdbe316a-s2`，100%流量。
+- 完整 SHA：`db98e6f5ef1f2b8e0139f6bebb72b977363deef0`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:65229f87e5e2c22c36b3e1a8f2e4c558167cc2295a55088aa57bcade82d5136e`。
+- Web revision：`pearnly-web-db98e6f5ef1f-s2`，100% 流量；Worker revision：`pearnly-worker-db98e6f5ef1f-s2`，100% 流量。
+- DMS 客户衔接修复：订车前以客户号实时读取详情、核对完整身份证和主档完整性，不再依赖客户搜索列表；核验失败独立报错并保留草稿及一次性重试按钮。定向 66 项、完整 pre-push 1168 模块/6 片及所有机械闸通过。原用户账号只读详情与修复函数实读验证通过，未创建或重试真实订车单。范围检查与限制见 [任务记录](../dms/2026-09-10-live-customer-booking-fix.md)。
+- [Manual CD 34447973781](https://github.com/skin306152-star/pearnly-app/actions/runs/34447973781) 构建镜像成功，但首次 schema execution `pearnly-schema-j24d2` 因只读事务失败，未切流。原因是此次诊断脚本的会话级只读设置被 Supabase 事务池保留；已 RESET 该会话设置，三个新连接回读均为 off，诊断脚本改为事务级只读并显式 rollback/close。未改变数据库/角色默认配置。后台 recovery 在 07:10:05 UTC 已恢复 HTTP 200。
+- 复用上述 SHA/不可变镜像，在同一源码运行原 `deployment/cloud-run/deploy.sh` 完整流程，exit 0：schema execution `pearnly-schema-wj7kd` 成功，Web/Worker 候选与正式身份、健康、就绪及安装包完整下载均通过，两端各切到 100%。没有跳过 schema 或放宽验证，也没有再次构建。GitHub 首次运行仍为失败，后续恢复成功由本机原发布脚本及 GCP 回读证明。
+- 正式域名 `/api/ready?dms_customer_fix=db98e6f5ef1f` 返回 ready=true，db/gemini/smtp/line 均 ok。原失败草稿仍保留，旧确认 nonce 已消耗；尚未向用户重发确认卡或替用户提交，真实订车与手机验收未完成。
+
+### 上一次发布与既有配置记录（2026-09-09）
+
+- DMS 多 OA 绑定发布：[Manual CD 34264466160](https://github.com/skin306152-star/pearnly-app/actions/runs/34264466160) 成功；schema execution `pearnly-schema-7hq2v` 于 18:44:40 UTC 成功（`PEARNLY_RUNTIME_ROLE=schema` → `_boot_schema_ddl()` 含 DMS 多 OA 列/约束/会话 PK/账号表与登录票据列），Job 失败即阻断切流。候选与正式流量两服务都通过精确 SHA、镜像摘要、健康、就绪、`/internal/runtime-version` 和安装包完整下载校验后才切流。
+- 发布身份独立回读：正式域名 `/api/health`、`/api/ready` 200（db/gemini/smtp/line 均 ok）；Web 运行期 `/internal/runtime-version` 返回 `ffc4bf09…`/`pearnly-web-ffc4bf091acd-s2`/`web`；Worker 匿名 403（IAM 私有），由 CD 用 ID token 验证同一 SHA/镜像/revision。切流后两服务无 ERROR 级日志。
+- A/B 凭据挂载进入声明式 render：`deployment/cloud-run/render_service.py` 为 Web、Worker 和 schema Job 声明 `LINE_DMS_A_CREDENTIALS=pearnly-line-dms-a:1`、`LINE_DMS_B_CREDENTIALS=pearnly-line-dms-b:1`（`secretKeyRef`，版本钉死），避免 `gcloud run services replace` 抹掉手工 `--update-secrets`。两个 secret 的 `roles/secretmanager.secretAccessor` 只授 `pearnly-web`/`pearnly-worker` 两个运行账号；未改动 `pearnly-web-env`/`pearnly-worker-env` 与其他 runtime secrets。
+- 生产只读 schema 核对：`line_dms_bindings`/`line_dms_binding_codes`/`dms_line_sessions`/`line_dms_login_tickets` 均有 `channel_key`，票据另有 `binding_id`；`dms_account_line_channels` 存在；`dms_line_sessions` 主键 `(tenant_id, channel_key, line_user_id)`；唯一索引 `ux_line_dms_bindings_channel_line(channel_key, line_user_id)`。现有 4 条绑定全部 `channel_key='dms'`，账号 OA 分配 0 行，登录票据 0 行——未新建真实业务单据、未改真实账号密码/余额/OA 分配。
+- A/B webhook 端点经官方 API 设置并回读：A `https://pearnly.com/api/line/dms/webhook/a`、B `…/webhook/b`，`POST /v2/bot/channel/webhook/test` 两次均 `success:true, statusCode:200`。`GET …/webhook/endpoint` 仍 `active=false`：**Use webhook 开关只能在 LINE Developers Console/OA Manager 打开，Messaging API 无对应写接口**，是本次唯一剩余外部配置。空 `events` 签名请求实测 legacy/A/B 正确 secret 均 200，跨 OA secret 与错误签名 400 `line_dms.bad_signature`，未知 OA 路径 404。
+- A/B 富菜单已发布并回读：`pearnly-dms-basic-v3-liff-dms_a` = `richmenu-c97def834b597a1c2dd2761956df3341`、`pearnly-dms-query-v3-liff-dms_a` = `richmenu-16e37a4db26738a89deee9a821a967c8`；`…-dms_b` = `richmenu-2bf651f21047bdf138a94eb85eba4f84` / `richmenu-1575d12fa340d3025c35a9a879f28a92`；两个 OA 默认菜单均为各自 basic 菜单，图片与仓库源 MD5 一致。A/B 未配 LIFF，菜单入口按实现降级到 `https://pearnly.com/dms`（`/api/line/dms-booking/config` 对 `dms_a`/`dms_b` 返回 `available:false` 且不回落 legacy LIFF，未知 channel 404/403 失败关闭）。
+- legacy OA 兼容保持：webhook 仍为 `https://pearnly.com/api/line/dms/webhook` 且 `active=true`；`pearnly-dms-basic-v3-liff`=`richmenu-4fabd60b180dd4e0dd08cc0d5bbc05ae`、`pearnly-dms-query-v3-liff`=`richmenu-db70029ab3bef9b815913432746bac78` 与默认菜单未变，旧 v1/v2 菜单仍在。正式域名 `/dms/`、`/home/dms-booking`、`/api/health`、`/api/ready` 200，`dist/dms.js`、`dist/dms.css`、`dms-i18n-th.js`、`dms-roster.js`、`admin.js`、`admin-i18n.js`、`dms-booking-api.js`、`dms-booking-edit.js`、`dms-booking-i18n.js`、`dms-credentials.js` 与发布源字节一致；operator/roster/records API 无身份 401 `auth.missing_token`。
+- 本地验证：pre-push 机械闸全绿（含生产 Python 全量分片单测、prettier/eslint/vite build/dist 一致/cachebust/UI 与防屎山棘轮；`services/line_platform/liff.py` 的 +15 行按 `RATCHET-EXEMPT` 记录）。真库 pg smoke `test_line_dms_binding_pg_smoke.py` 因本机 Docker/Colima 不可达**未执行**，改为发布后对生产库只读核对上述列/约束。**A/B 的 LIFF 与手机真机绑定/回复验收未做**，A/B 无 LIFF 时入口降级到 `/dms`，不得声称手机自动登录已验收。详见[DMS 多 OA 记录](../dms/MULTI_LINE_OA_2026_09_08.md)。
+- 上一版本（历史）：SHA `3a9db541e7b16345212c485a05989a97f02c65b2`，镜像 `…@sha256:13ded394f281b9415485832a7f052e38171e065746e3f56abef70692acaf8f74`，Web/Worker revision `pearnly-{web,worker}-3a9db541e7b1-s2`，已不再服务流量。
+- LINE DMS 菜单4手机恢复LINE内打开：[发布34115905413](https://github.com/skin306152-star/pearnly-app/actions/runs/34115905413)成功，schema execution `pearnly-schema-k4qzk`成功，两服务候选/正式SHA、镜像、健康、就绪及完整安装包校验通过，均接管100%流量。完整pre-push含1163模块通过，定向16项单测和6项跨平台浏览器测试通过。LINE两个v3-liff菜单创建并回读，默认四项；现有4个绑定同步后为1个四项、3个五项，与实时权限一致。菜单3外部地址、桌面入口、登录回跳及此前保存修复保留。正式LINE内回跳200/no-store；手机LINE真机打开和实际保存仍待用户验收。详见[菜单4记录](../dms/BINDING_INTEGRITY_2026_09_07.md)。
+- LINE DMS 密码保存与认证恢复发布 [34111323561](https://github.com/skin306152-star/pearnly-app/actions/runs/34111323561) 成功；schema execution `pearnly-schema-l7x6v` 成功，两服务候选/正式身份、健康、就绪及完整安装包验证通过，各接管100%流量。补齐保存事务的绑定租户 RLS 上下文；无效 LINE 身份返回独立401，页面提供有界登录恢复与手动重试。完整 pre-push 1,163模块通过，325项 DMS 测试（含真实 PostgreSQL HTTP 保存、加密落库、读回与旧绑定拒绝）及27项浏览器回归通过。正式域名三份脚本与发布源字节一致、页面版本引用正确、空 LINE token 返回401 `dms_booking.line_auth_required`。当前用户绑定仍存在但 active_jti 为空，未签发替代会话，因此发布后带身份 GET 核验未完成；未写真实密码，用户重新登录和真机改密验收待确认。详见[后续修复记录](../dms/BINDING_INTEGRITY_2026_09_07.md)。
+- LINE DMS 修复发布 [34104299567](https://github.com/skin306152-star/pearnly-app/actions/runs/34104299567) 成功；schema execution `pearnly-schema-vhlzn` 成功，Web/Worker 候选和正式服务的版本、健康/就绪、流量及安装包完整校验通过。本地完整 pre-push 含 1,162 个测试模块通过，DMS 浏览器回归 19 项通过，另有真实 PostgreSQL 重绑与并发确认测试。正式凭据和草稿 API 拒绝旧令牌/旧绑定（401），当前绑定可只读取得自身配置（200）；三份关键前端脚本与候选字节一致。默认底部菜单四项，当前三个绑定的四项/五项/五项分配与实时权限一致。用户手机及真实 DMS 写单未验收；原测试 A/B 已停用解绑，未恢复或猜测密码。详见 [绑定修复记录](../dms/BINDING_INTEGRITY_2026_09_07.md)。
 - Cowork 入口与盘点删除发布 [34029239117](https://github.com/skin306152-star/pearnly-app/actions/runs/34029239117)：schema execution `pearnly-schema-955g8` 成功，两端候选验证及正式 Worker 验证通过并各切到 100%。最后正式 Web 的 `/api/ready` 探针发生 TLS 握手 `Connection reset by peer`，因此 workflow 状态为失败；随后对同一 SHA／digest 使用仓库原 `verify_release.py` 分别复跑正式 Web、Worker，两次均 exit 0，完整版本／镜像／流量／健康／就绪／安装包大小和 MD5 校验通过，无放宽条件或重新部署。正式域名 readiness 200，`cowork_delete=1856fdbe316a` 命中新 Web；Cowork 与 home HTML 引用新版 landing26／main12060027，ui4／CSS4／词典stocktake4和 bundle 字节一致。Cowork 超管快捷进入和新登录不再强制跳 Earn，也不覆盖管理后台会话；盘点网页卡片可确认后永久删除该任务及全部关联记录，权限为 recon.create，事务锁与租户／账套隔离保持。74 项定向单元和真库测试、67 项入口浏览器、5 项会话隔离、盘点删除与扫描浏览器、1159 模块完整推送闸通过。未删除真实用户盘点；普通 Chrome 与用户实际删除验收待确认。
 - 账面位置映射与对比发布 [34027810317](https://github.com/skin306152-star/pearnly-app/actions/runs/34027810317) 成功，schema execution `pearnly-schema-8fxjl` 成功，候选与正式身份／就绪／完整下载检查通过。每次扫码重新带出该商品账面仓库／位置，空值保留空白，不沿用上一笔；历史修改仍保留该笔实际值。泰语汇总新增账面／实际仓库和位置及各自对比，逐笔明细保留配对；撤销记录不参与汇总，未盘点和账面未提供分别标记。修正手机表单横向溢出。17 项定向单元、真实 EAN／QR 浏览器、1158 模块完整推送闸通过。本次无 SQL／schema 变更；沿用已有权限与逐笔记录。正式域名 health／ready 200，`stocktake_places=30afc1a3a3f9` 日志命中新 Web；counter.js?v=3、CSS?v=3、词典 stocktake-3、main.js?v=12060026 与 main.css stocktake-3 回读字节一致。真实 LINE 真机验收仍待用户确认。
 - 数量显示修正 [34025488705](https://github.com/skin306152-star/pearnly-app/actions/runs/34025488705) 成功；schema execution `pearnly-schema-slgdb` 成功，两端候选与正式身份／就绪／完整下载检查通过。盘点网页与手机、新旧任务的账面、实盘、差异、逐笔数量及修改输入去掉末尾补零，10.000000 显示 10，2.500000 显示 2.5；保留实际小数精度和编号前导零，不改数据库数值。定向浏览器与前端推送闸通过。正式域名 readiness 200，`stocktake_numbers=b816f291146f` 日志命中新 Web，ui.js?v=3、counter.js?v=2、main.js?v=12060025 回读字节一致。
@@ -49,6 +68,9 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 - 账本/CI文档提交可能晚于线上镜像SHA；文档更新不自动重发容器，不能据仓库HEAD推断线上版本。
 
 ## 域名与旧发布入口
+
+2026-09-07 18:02 Cloudflare Worker 最终限定修复：Dashboard 版本 `bd70ddb6` Active Latest。此前本任务发布的全局禁缓存版本 `efb574fb` 及保留源站头的全局版本 `1b4f4fab` 已撤回；**仅 DMS 密码页面三个别名、带 credentials=dms 的 /home 与 /login LIFF 回跳、DMS auth/config/credentials 三个 API 路径使用 no-store**。其他路径恢复到本任务前 `c2d015f8` 的转发和缓存逻辑，未修改域名 Cache Rules 或 Browser Cache TTL 配置。正式 DMS 页/config/回跳均 DYNAMIC/no-store，AI/ERP/Cowork/Daily/POS/cashier/首页和健康接口已回读原缓存行为，均200。687条非DMS路由声明的离线差分测试确认转发请求、cache选项、响应头/体与旧Worker相同；这不是687项真实业务验收。该次边缘修复完成时Cloud Run镜像为 `bc6ce06f574a`。详见[诊断与范围纠正](../dms/BINDING_INTEGRITY_2026_09_07.md)。
+
 
 Cloudflare Worker 两条 route 为 `pearnly.com/*` 和 `www.pearnly.com/*`，均 fail closed。没有新增 `*.pearnly.com/*`，避免接管其他租户子域名。源站在 Worker 中明确指定 Cloud Run Web。
 

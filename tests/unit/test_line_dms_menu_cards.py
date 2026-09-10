@@ -27,9 +27,9 @@ class DmsMenuCardTests(unittest.TestCase):
             {
                 "type": "uri",
                 "label": cards.TXT_MENU_ITEM3,
-                "uri": "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
+                "uri": "https://pearnly.com/home/dms-booking?portal=dms&channel=dms&openExternalBrowser=1",
                 "altUri": {
-                    "desktop": "https://pearnly.com/home/dms-booking?portal=dms",
+                    "desktop": "https://pearnly.com/home/dms-booking?portal=dms&channel=dms",
                 },
             },
         )
@@ -38,9 +38,9 @@ class DmsMenuCardTests(unittest.TestCase):
             {
                 "type": "uri",
                 "label": cards.TXT_MENU_ITEM4,
-                "uri": "https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1",
+                "uri": "https://liff.line.me/DMS-LIFF/dms-booking?credentials=dms&channel=dms",
                 "altUri": {
-                    "desktop": "https://pearnly.com/home/dms-booking?credentials=dms",
+                    "desktop": "https://pearnly.com/home/dms-booking?credentials=dms&channel=dms",
                 },
             },
         )
@@ -58,6 +58,35 @@ class DmsMenuCardTests(unittest.TestCase):
             items[4]["action"],
             {"type": "postback", "data": cards._data(cards.ACT_MENU_QUERY)},
         )
+
+    def test_explicit_channel_never_falls_back_to_legacy_liff(self):
+        """A/B 菜单必须用自己 OA 的 LIFF;没有就回门户,绝不给 legacy LIFF 链接。"""
+        with patch.dict(
+            os.environ,
+            {"LINE_DMS_LIFF_ID": "DMS-LIFF", "LINE_DMS_A_LIFF_ID": "A-LIFF"},
+            clear=True,
+        ):
+            items = [
+                item
+                for item in menu_cards.menu_card(channel="dms_a")["contents"]["body"]["contents"]
+                if item.get("action")
+            ]
+            self.assertEqual(
+                items[2]["action"]["uri"],
+                "https://pearnly.com/home/dms-booking?portal=dms&channel=dms_a&openExternalBrowser=1",
+            )
+            self.assertEqual(
+                items[3]["action"]["uri"],
+                "https://liff.line.me/A-LIFF/dms-booking?credentials=dms&channel=dms_a",
+            )
+        with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=True):
+            items = [
+                item
+                for item in menu_cards.menu_card(channel="dms_a")["contents"]["body"]["contents"]
+                if item.get("action")
+            ]
+            self.assertEqual(items[2]["action"]["uri"], "https://pearnly.com/dms")
+            self.assertEqual(items[3]["action"]["uri"], "https://pearnly.com/dms")
 
 
 if __name__ == "__main__":

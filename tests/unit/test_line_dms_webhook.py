@@ -102,7 +102,7 @@ class DedupTests(unittest.TestCase):
         self.assertEqual(failed.call_args.args[0], "E7")
         self.assertIn("boom", failed.call_args.args[1])  # last_error 留证据
         self.assertEqual(notify.call_args.kwargs["text"], w._MSG_FAILED)
-        self.assertEqual(notify.call_args.kwargs["channel"], w._CHANNEL)
+        self.assertEqual(notify.call_args.kwargs["channel"], w._LEGACY_CHANNEL)
 
 
 class GateClosedSilentTests(unittest.TestCase):
@@ -128,13 +128,17 @@ class GateClosedSilentTests(unittest.TestCase):
 
 
 class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Domain behavior after authentication; rejection cases live in binding_guard regressions.
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+
     async def test_unbind_command(self):
         with (
             mock.patch.object(w.store, "unbind_by_line_user", return_value=True) as unbind,
             mock.patch.object(w.line_client, "reply_text") as reply,
         ):
             await w._handle_dms_text("L1", "rt", w._UNBIND_CMD)
-        unbind.assert_called_once_with("L1")
+        unbind.assert_called_once_with("L1", "dms")
         self.assertEqual(reply.call_args.args[1], w._MSG_UNBOUND)
 
     async def test_follow_welcomes_when_gate_open(self):
@@ -176,11 +180,15 @@ class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(w.line_client, "reply_text") as reply,
         ):
             await w._handle_dms_event(ev)
-        unbind.assert_called_once_with("L1")
+        unbind.assert_called_once_with("L1", "dms")
         reply.assert_not_called()  # unfollow 无回复
 
 
 class BindCodeGateOrderingTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Domain behavior after authentication; rejection cases live in binding_guard regressions.
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+
     """R1 闸序缺陷根治:未绑用户的绑定码须按「码所属租户」判闸,不能拿 None 判。
 
     dms_line_enabled_for 用 side_effect 模拟 allowlist 灰度(仅名单内租户 True),坐实闸对
@@ -211,8 +219,8 @@ class BindCodeGateOrderingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(w.line_client, "reply_text") as reply,
         ):
             await w._handle_dms_event(self._code_event())
-        consume.assert_called_once_with("123456")
-        create.assert_called_once_with("T", "u1", "L1", display_name="Som")
+        consume.assert_called_once_with("123456", "dms")
+        create.assert_called_once_with("T", "u1", "L1", display_name="Som", channel_key="dms")
         self.assertEqual(reply.call_args.args[1], w._MSG_BIND_OK)
 
     async def test_e2_offlist_tenant_code_not_burned_zero_reply(self):
@@ -297,6 +305,10 @@ class BindCodeGateOrderingTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BoundUserFlowRoutingTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Domain behavior after authentication; rejection cases live in binding_guard regressions.
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+
     """DL-3:已绑用户的 image/text/postback 转 flow;闸关一切静默(C7)。"""
 
     _BOUND = {"tenant_id": "T1", "user_id": "U1"}
@@ -357,7 +369,7 @@ class BoundUserFlowRoutingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(w.line_client, "reply_text") as reply,
         ):
             await w._handle_dms_event(self._ev(message={"type": "text", "text": w._UNBIND_CMD}))
-        unbind.assert_called_once_with("L1")
+        unbind.assert_called_once_with("L1", "dms")
         h_txt.assert_not_called()
         self.assertEqual(reply.call_args.args[1], w._MSG_UNBOUND)
 
@@ -370,6 +382,138 @@ class BoundUserFlowRoutingTests(unittest.IsolatedAsyncioTestCase):
         ):
             await w._handle_dms_event(self._ev(postback=pb, etype="postback"))
         h_pb.assert_called_once_with(self._BOUND, "L1", "rt", pb)
+
+
+class MultiOaEndpointTests(unittest.TestCase):
+    """A/B 独立入口:入口决定验签 secret,错 secret 400、对的 200。"""
+
+    _ENV = {
+        "LINE_DMS_CHANNEL_SECRET": "dms-sec",
+        "LINE_DMS_A_CHANNEL_SECRET": "a-sec",
+        "LINE_DMS_A_CHANNEL_ACCESS_TOKEN": "a-tok",
+        "LINE_DMS_B_CHANNEL_SECRET": "b-sec",
+        "LINE_DMS_B_CHANNEL_ACCESS_TOKEN": "b-tok",
+    }
+
+    def _post(self, path, secret):
+        body = b'{"events":[]}'
+        return _client().post(path, content=body, headers={"x-line-signature": _sign(body, secret)})
+
+    def test_a_endpoint_accepts_only_a_secret(self):
+        with mock.patch.dict(os.environ, self._ENV, clear=False):
+            self.assertEqual(self._post("/api/line/dms/webhook/a", "a-sec").status_code, 200)
+            self.assertEqual(self._post("/api/line/dms/webhook/a", "dms-sec").status_code, 400)
+            self.assertEqual(self._post("/api/line/dms/webhook/a", "b-sec").status_code, 400)
+
+    def test_b_endpoint_accepts_only_b_secret(self):
+        with mock.patch.dict(os.environ, self._ENV, clear=False):
+            self.assertEqual(self._post("/api/line/dms/webhook/b", "b-sec").status_code, 200)
+            self.assertEqual(self._post("/api/line/dms/webhook/b", "a-sec").status_code, 400)
+
+    def test_legacy_endpoint_rejects_other_oas(self):
+        with mock.patch.dict(os.environ, self._ENV, clear=False):
+            self.assertEqual(self._post("/api/line/dms/webhook", "dms-sec").status_code, 200)
+            self.assertEqual(self._post("/api/line/dms/webhook", "a-sec").status_code, 400)
+            self.assertEqual(self._post("/api/line/dms/webhook", "b-sec").status_code, 400)
+
+
+class MultiOaChannelScopingTests(unittest.IsolatedAsyncioTestCase):
+    """业务查找/回复必须沿用入口 channel key;错 OA 的码在别的入口不可兑换。"""
+
+    def setUp(self):
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+
+    def _code_event(self, code="123456"):
+        return {
+            "type": "message",
+            "source": {"userId": "L1"},
+            "replyToken": "rt",
+            "message": {"type": "text", "text": code},
+        }
+
+    def _follow(self):
+        return {"type": "follow", "source": {"userId": "L1"}, "replyToken": "rt"}
+
+    async def test_reply_uses_incoming_channel(self):
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._follow(), "dms_a")
+        self.assertEqual(reply.call_args.kwargs["channel"], "dms_a")
+
+    async def test_binding_lookup_is_scoped_to_incoming_channel(self):
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None) as get,
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+        ):
+            await w._handle_dms_event(self._follow(), "dms_b")
+        get.assert_called_once_with("L1", "dms_b")
+
+    async def test_code_issued_for_other_oa_not_redeemed_here(self):
+        """dms_a 签发的码在 dms 入口 peek 不到 → 零回复零核销。"""
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
+            mock.patch.object(
+                w.store,
+                "peek_bind_code_tenant",
+                side_effect=lambda code, channel: "T" if channel == "dms_a" else None,
+            ) as peek,
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(w.store, "consume_bind_code") as consume,
+            mock.patch.object(w.store, "create_or_update_binding") as create,
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._code_event(), "dms")
+        peek.assert_called_once_with("123456", "dms")
+        consume.assert_not_called()
+        create.assert_not_called()
+        reply.assert_not_called()
+
+    async def test_same_code_redeems_on_its_own_oa_with_same_channel(self):
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
+            mock.patch.object(
+                w.store,
+                "peek_bind_code_tenant",
+                side_effect=lambda code, channel: "T" if channel == "dms_a" else None,
+            ),
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(
+                w.store,
+                "consume_bind_code",
+                return_value={"tenant_id": "T", "user_id": "u1", "channel_key": "dms_a"},
+            ) as consume,
+            mock.patch.object(
+                w.line_client, "get_user_profile", return_value={"displayName": "Som"}
+            ) as profile,
+            mock.patch.object(w.store, "create_or_update_binding", return_value=True) as create,
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._code_event(), "dms_a")
+        consume.assert_called_once_with("123456", "dms_a")
+        self.assertEqual(profile.call_args.kwargs["channel"], "dms_a")
+        create.assert_called_once_with("T", "u1", "L1", display_name="Som", channel_key="dms_a")
+        self.assertEqual(reply.call_args.kwargs["channel"], "dms_a")
+
+    async def test_consumed_channel_mismatch_is_rejected(self):
+        """核销返回的 channel 与入口不符(数据异常)→ 不建绑定不回复。"""
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
+            mock.patch.object(w.store, "peek_bind_code_tenant", return_value="T"),
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(
+                w.store,
+                "consume_bind_code",
+                return_value={"tenant_id": "T", "user_id": "u1", "channel_key": "dms_b"},
+            ),
+            mock.patch.object(w.store, "create_or_update_binding") as create,
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._code_event(), "dms_a")
+        create.assert_not_called()
+        reply.assert_not_called()
 
 
 if __name__ == "__main__":

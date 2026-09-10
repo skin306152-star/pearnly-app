@@ -249,7 +249,7 @@ class DecideTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(
                 approval_flow.store,
                 "get_binding_by_user",
-                return_value={"line_user_id": "Lsales"},
+                return_value={"line_user_id": "Lsales", "channel_key": "dms_a"},
             ),
             mock.patch.object(approval_flow, "_push") as push,
         ):
@@ -258,10 +258,22 @@ class DecideTests(unittest.IsolatedAsyncioTestCase):
             )
         fin.assert_called_once_with("T1", "req-1", "rejected")
         reply.assert_called_once_with("rt", approval_cards.TXT_REQ_REJECTED_ADMIN)
-        push.assert_called_once_with("Lsales", approval_cards.TXT_REQ_REJECTED_SALES)
+        push.assert_called_once_with(
+            "Lsales", approval_cards.TXT_REQ_REJECTED_SALES, channel="dms_a"
+        )
 
 
 class ExecuteTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Domain behavior after authentication; rejection cases live in binding_guard regressions.
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+        self.enterContext(
+            mock.patch(
+                "services.dms_roster.store.get_profile",
+                return_value={"status": "active", "dms_role": "admin"},
+            )
+        )
+
     _EP = {"id": "ep-admin", "adapter": "mrerp_dms", "enabled": True, "config": {}}
 
     async def test_success_uses_approver_endpoint_and_snapshot(self):

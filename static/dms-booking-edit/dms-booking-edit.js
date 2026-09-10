@@ -284,7 +284,7 @@
         }
         if (portalMode) {
             try {
-                if (!gateway.hasDmsToken()) await gateway.authenticate();
+                await gateway.authenticate();
                 var portal = await gateway.api('/api/line/dms-portal/ticket', {
                     method: 'POST',
                     body: '{}',
@@ -305,13 +305,13 @@
                     location.replace(portalUrl);
                 }
             } catch (e) {
-                return showError('failed');
+                return showError(errorKey(e, 'failed'));
             }
             return;
         }
         if (!nonce) return showError('expired');
         try {
-            if (!gateway.hasDmsToken()) await gateway.authenticate();
+            await gateway.authenticate();
             model = await gateway.api(
                 '/api/line/dms-booking/draft?nonce=' + encodeURIComponent(nonce)
             );
@@ -323,10 +323,10 @@
                         '/api/line/dms-booking/draft?nonce=' + encodeURIComponent(nonce)
                     );
                 } catch (x) {
-                    return showError(x.status === 409 ? 'expired' : 'failed');
+                    return showError(errorKey(x, 'failed'));
                 }
             } else {
-                return showError(e.status === 409 ? 'expired' : 'failed');
+                return showError(errorKey(e, 'failed'));
             }
         }
         masters = model.masters;
@@ -621,6 +621,10 @@
         document.getElementById('loading').hidden = true;
         result.hidden = false;
         result.innerHTML = '<h1>' + t(key) + '</h1>';
+    }
+    function errorKey(e, fallback) {
+        if (e && e.code && ERROR_KEYS[e.code]) return ERROR_KEYS[e.code];
+        return e && e.status === 409 ? 'expired' : fallback;
     }
     function applyLanguage() {
         document.documentElement.lang = locale;

@@ -39,6 +39,14 @@ class FakeStore:
             "ttl_minutes": ttl_minutes,
         }
 
+    def consume_nonce(self, tenant, luid, state, nonce):
+        sess = self.get_session(tenant, luid)
+        payload = (sess or {}).get("payload") or {}
+        if not sess or sess["state"] != state or not nonce or payload.get("nonce") != nonce:
+            return None
+        self.set_session(tenant, luid, state, {**payload, "nonce": None})
+        return payload
+
     def clear_session(self, tenant, luid):
         self.data.pop((str(tenant), str(luid)), None)
 
@@ -146,15 +154,24 @@ class _Env:
     def __enter__(self):
         es = self.es
         p = lambda *a, **k: es.enter_context(mock.patch.object(*a, **k))  # noqa: E731
+        # These are domain-flow fixtures; real epoch/rebind and SQL concurrency have separate tests.
+        p(
+            __import__("services.line_dms.binding_guard", fromlist=["current"]),
+            "current",
+            return_value=True,
+        )
+        p(bf.store, "consume_nonce", side_effect=self.store.consume_nonce)
         p(bf.store, "get_session", side_effect=self.store.get_session)
         p(bf.store, "set_session", side_effect=self.store.set_session)
         p(bf.store, "clear_session", side_effect=self.store.clear_session)
         p(bf, "_spawn", side_effect=self.spawned.append)
-        self.reply = p(bf.line_client, "reply_text")
-        self.push_text = p(bf.line_client, "push_text")
-        self.push_msgs = p(bf.line_client, "push_messages")
-        p(bf.line_client, "start_loading")
-        self.download = p(bf.line_client, "download_message_content", return_value=self._download)
+        self.reply = p(bf._out.line_client, "reply_text")
+        self.push_text = p(bf._out.line_client, "push_text")
+        self.push_msgs = p(bf._out.line_client, "push_messages")
+        p(bf._out.line_client, "start_loading")
+        self.download = p(
+            bf._out.line_client, "download_message_content", return_value=self._download
+        )
         p(bf._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
         self.insert_log = p(bf.db, "insert_push_log", return_value="LOG1")
         if self._book_result is not None:
@@ -252,6 +269,36 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             env.push_msgs.call_args_list[0].args[1][0]["text"], qa_cards.TXT_MASTER_CHANGED
         )
+
+    async def test_live_customer_identity_failure_stops_before_booking_write(self):
+        from services.erp.mrerp_dms_client_base import DMSClientError
+
+        rec = {}
+
+        class WrongCustomer(_FakeClient):
+            def read_customer(self, customer_id):
+                rec["read_customer"] = customer_id
+                return {"people_id": "different-identity"}
+
+            def lookup_customer(self, people_id):
+                raise AssertionError("must read the selected customer directly")
+
+        with (
+            mock.patch(
+                "services.erp.erp_dms_intake._run_logged_in",
+                side_effect=lambda ep, do: do(WrongCustomer(rec), object()),
+            ),
+            mock.patch(
+                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
+                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
+            ),
+        ):
+            with self.assertRaises(DMSClientError) as ctx:
+                bf._book_in_session({"id": "E1", "config": {}}, _review())
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_CUSTOMER_LOOKUP")
+        self.assertEqual(rec["read_customer"], "C1")
+        self.assertNotIn("booking", rec)
+        self.assertNotIn("customer_save", rec)
 
     async def test_browser_customer_edits_are_written_before_booking(self):
         rec = {}
@@ -551,6 +598,28 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(env.session()["state"], "booking_review")
         self.assertEqual(env.session()["ttl_minutes"], 30)
         self.assertNotEqual(env.session()["payload"]["nonce"], "N1")
+
+    async def test_customer_lookup_failure_preserves_draft_with_fresh_retry_nonce(self):
+        from services.erp.erp_dms_push import _dms_friendly
+
+        result = {
+            "ok": False,
+            "error_code": "ERR_DMS_CUSTOMER_LOOKUP",
+            "error_friendly": _dms_friendly("ERR_DMS_CUSTOMER_LOOKUP"),
+        }
+        with _Env(book_result=result) as env:
+            original = _review()
+            env.store.set_session("T1", "L1", "booking_review", original)
+            await bf.handle_postback(
+                _BINDING, _LUID, "rt", cards.ACT_CONFIRM_BOOKING, {"nonce": "N1"}
+            )
+            await env.drain()
+        self.assertEqual(env.session()["payload"]["qa"], original["qa"])
+        self.assertNotEqual(env.session()["payload"]["nonce"], "N1")
+        card = env.push_msgs.call_args.args[1][0]
+        self.assertIn(result["error_friendly"]["th"], json.dumps(card, ensure_ascii=False))
+        self.assertFalse(bf._retryable_result({**result, "booking_id": "already-written"}))
+        self.assertFalse(bf._retryable_result({"error_code": "ERR_DMS_IMPORT"}))
 
     async def test_retry_postback_resumes_draft_and_finishes_booking(self):
         failure = {

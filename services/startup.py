@@ -228,6 +228,15 @@ def _boot_schema_ddl() -> None:
         except Exception as e:
             logger.warning(f"启动 LINE {_label} schema 失败: {e}")
 
+    # DMS 多 OA 表/迁移(channel_key 列、复合唯一、账号 OA 分配)必须进串行 schema 闸;
+    # 首请求 _with_heal 只作兜底,不能当作发布步骤(alembic 0125 留档)。
+    try:
+        from services.line_dms.schema import ensure_tables as ensure_line_dms_schema
+
+        ensure_line_dms_schema()
+    except Exception as e:
+        logger.warning(f"启动 LINE DMS schema 失败: {e}")
+
     # 商户采购(进项)schema 双跑 · 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
     try:
         from services.purchase.schema import ensure_purchase_schema

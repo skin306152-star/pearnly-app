@@ -11,6 +11,8 @@ A4 定义形状),顶层 payload 只有 nonce 与 collecting 残留键。
 
 from __future__ import annotations
 
+from services.line_dms import binding_guard
+
 import dataclasses
 import json
 import logging
@@ -21,9 +23,8 @@ from core import db
 from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.session_lock import mrerp_booking_lock
-from services.line_platform import client as line_client
 from services.line_dms import _out, cards, master_contract, masters_cache, qa_cards, store
-from services.line_dms._out import _CHANNEL, _push, _reply, _send, _thr
+from services.line_dms._out import _push, _reply, _send, _thr
 from services.line_dms.qa_util import find_row
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ BOOKING_ACTIONS = frozenset(
 )
 _RETRY_TTL_MINUTES = 30
 
-# 后台调度 + LINE 出口(_CHANNEL/_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
+# 后台调度 + LINE 出口(_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
 _spawn = _out.make_spawn("line_dms.booking")
 
 # 附件种类表:(qa.files 键尾, DMS 显示名, 落盘文件名)。
@@ -80,10 +81,11 @@ async def handle_postback(
 
 
 # ── 建订车单 ─────────────────────────────────────────────────────────────
+@binding_guard.bound_task
 async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> None:
     tenant, user_id = binding["tenant_id"], binding["user_id"]
     qa = payload.get("qa") or {}
-    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, line_user_id)
     ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, qa.get("endpoint_id"))
     if not ep:
         _push(line_user_id, cards.TXT_NO_ENDPOINT)
@@ -170,7 +172,11 @@ def _retryable_result(result: Dict[str, Any]) -> bool:
         return False
     if result.get("error_code") == "ERR_DMS_MASTER_UNMATCHED":
         return False
-    if result.get("error_code") in ("ERR_DMS_CONCURRENT_LOGIN", "ERR_DMS_MASTER_UNAVAILABLE"):
+    if result.get("error_code") in (
+        "ERR_DMS_CONCURRENT_LOGIN",
+        "ERR_DMS_MASTER_UNAVAILABLE",
+        "ERR_DMS_CUSTOMER_LOOKUP",
+    ):
         return True
     raw = str(result.get("raw_error") or "")
     response = result.get("response_body") or {}
@@ -202,7 +208,7 @@ async def _download_attach_files(qa: dict) -> Tuple[List[dict], List[dict]]:
         mid = files.get(f"{key}_mid")
         if not mid:
             continue
-        content = await _thr(line_client.download_message_content, mid, channel=_CHANNEL)
+        content = await _thr(_out.download_content, mid)
         if not content:
             failed.append({"display_name": display, "error": "line content download failed"})
             continue

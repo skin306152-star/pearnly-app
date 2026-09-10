@@ -134,6 +134,14 @@ class FakeStore:
     def set_session(self, tenant, luid, state, payload=None, ttl_minutes=30):
         self.data[(str(tenant), str(luid))] = {"state": state, "payload": payload or {}}
 
+    def consume_nonce(self, tenant, luid, state, nonce):
+        sess = self.get_session(tenant, luid)
+        payload = (sess or {}).get("payload") or {}
+        if not sess or sess["state"] != state or not nonce or payload.get("nonce") != nonce:
+            return None
+        self.set_session(tenant, luid, state, {**payload, "nonce": None})
+        return payload
+
     def clear_session(self, tenant, luid):
         self.data.pop((str(tenant), str(luid)), None)
 
@@ -159,6 +167,13 @@ class _Env:
     def __enter__(self):
         es = self._es
         p = lambda *a, **k: es.enter_context(mock.patch.object(*a, **k))  # noqa: E731
+        # These are domain-flow fixtures; real epoch/rebind and SQL concurrency have separate tests.
+        p(
+            __import__("services.line_dms.binding_guard", fromlist=["current"]),
+            "current",
+            return_value=True,
+        )
+        p(flow.store, "consume_nonce", side_effect=self.store.consume_nonce)
         p(flow.store, "get_session", side_effect=self.store.get_session)
         p(flow.store, "set_session", side_effect=self.store.set_session)
         p(flow.store, "clear_session", side_effect=self.store.clear_session)
@@ -170,12 +185,12 @@ class _Env:
             self.store.clear_session(str(tenant_id), luid)
 
         self.qa_start = p(flow.menu_flow.booking_qa, "start", side_effect=_qa_start)
-        self.reply = p(flow.line_client, "reply_text")
-        self.reply_msgs = p(flow.line_client, "reply_messages")
-        self.push_text = p(flow.line_client, "push_text")
-        self.push_msgs = p(flow.line_client, "push_messages")
-        p(flow.line_client, "start_loading")
-        p(flow.line_client, "download_message_content", return_value=b"imgbytes")
+        self.reply = p(flow._out.line_client, "reply_text")
+        self.reply_msgs = p(flow._out.line_client, "reply_messages")
+        self.push_text = p(flow._out.line_client, "push_text")
+        self.push_msgs = p(flow._out.line_client, "push_messages")
+        p(flow._out.line_client, "start_loading")
+        p(flow._out.line_client, "download_message_content", return_value=b"imgbytes")
         p(flow.db, "find_user_by_id", return_value={"id": "U1", "tenant_id": "T1"})
         self.insert_log = p(flow.db, "insert_push_log", return_value="LOG1")
         if self._ocr_error is not None:

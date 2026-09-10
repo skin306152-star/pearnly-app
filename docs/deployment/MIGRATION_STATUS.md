@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-10 17:58（Asia/Bangkok，UTC+7）。状态：**LINE 盘点图片与差异标黄导出已上线，Web/Worker 各 100% 新版本；用户 LINE 与 Excel 验收待确认。**
+更新时间：2026-09-10 18:22（Asia/Bangkok，UTC+7）。状态：**盘点导出表格边框修正已上线，Web/Worker 各 100% 新版本；用户重新导出验收待确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -26,6 +26,15 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- 完整 SHA：`2a954babe1471af869a7f69eb1d3fdb6bdf37fac`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:37ef28c5e4e3aae18570ddc50ff1a1f071dac4dbef0305c370978bbfc203af12`。
+- Web revision：`pearnly-web-2a954babe147-s2`，100% 流量；Worker revision：`pearnly-worker-2a954babe147-s2`，100% 流量。
+- [Manual CD 34470260139](https://github.com/skin306152-star/pearnly-app/actions/runs/34470260139) 成功；schema execution `pearnly-schema-49kbn` 于 11:19:13 UTC 成功。候选与正式服务的精确版本、镜像、健康、就绪和安装包完整下载全部通过，11:21:57 UTC 完成最终 Web 校验。
+- 修正汇总、明细与附件文字行的显式四边细线，避免黄色填充覆盖查看器默认网格线。实际 XLSX 回读验证所有汇总/明细单元格四边及原有标黄，17 项定向测试、导出预览、完整 pre-push 1169 模块/6 片通过。无新增 schema 或前端资源。
+- 正式域名 readiness 200、ready=true，`stocktake_borders=2a954babe147` 日志命中新 Web；已有下载文件不会自动变化，用户需重新导出核验。
+
+### 图片附件首轮发布（2026-09-10 17:58）
 
 - 完整 SHA：`4f7aa0bd048c5c0306820178195137c9c3aedb70`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:185d2a4a3f09b145b39f86a6837c1a824fa85ef9255ff0359842a98dca446df2`。

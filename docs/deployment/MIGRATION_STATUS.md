@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-09 01:55（Asia/Bangkok，UTC+7）。状态：**Cloud Run 已接管；DMS 多 OA（legacy + A/B）已发布，A/B webhook 端点已设置并 verify，LINE 控制台 Use webhook 开关待开启**。
+更新时间：2026-09-10 14:13（Asia/Bangkok，UTC+7）。状态：**DMS 订车客户实时详情核验修复已上线，Web/Worker 各 100% 新版本；原失败单待用户重新确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,9 +27,16 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`ffc4bf091acd9c1ae8969a8576540a4ac89fa441`（PR #86 rebase 并入 master）。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:12817198e7295278ac211b2c965c2ccf4965ee1a2e063b7b4152e259e62ade5f`。
-- Web revision：`pearnly-web-ffc4bf091acd-s2`，100%流量；Worker revision：`pearnly-worker-ffc4bf091acd-s2`，100%流量；两者同一镜像摘要。
+- 完整 SHA：`db98e6f5ef1f2b8e0139f6bebb72b977363deef0`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:65229f87e5e2c22c36b3e1a8f2e4c558167cc2295a55088aa57bcade82d5136e`。
+- Web revision：`pearnly-web-db98e6f5ef1f-s2`，100% 流量；Worker revision：`pearnly-worker-db98e6f5ef1f-s2`，100% 流量。
+- DMS 客户衔接修复：订车前以客户号实时读取详情、核对完整身份证和主档完整性，不再依赖客户搜索列表；核验失败独立报错并保留草稿及一次性重试按钮。定向 66 项、完整 pre-push 1168 模块/6 片及所有机械闸通过。原用户账号只读详情与修复函数实读验证通过，未创建或重试真实订车单。范围检查与限制见 [任务记录](../dms/2026-09-10-live-customer-booking-fix.md)。
+- [Manual CD 34447973781](https://github.com/skin306152-star/pearnly-app/actions/runs/34447973781) 构建镜像成功，但首次 schema execution `pearnly-schema-j24d2` 因只读事务失败，未切流。原因是此次诊断脚本的会话级只读设置被 Supabase 事务池保留；已 RESET 该会话设置，三个新连接回读均为 off，诊断脚本改为事务级只读并显式 rollback/close。未改变数据库/角色默认配置。后台 recovery 在 07:10:05 UTC 已恢复 HTTP 200。
+- 复用上述 SHA/不可变镜像，在同一源码运行原 `deployment/cloud-run/deploy.sh` 完整流程，exit 0：schema execution `pearnly-schema-wj7kd` 成功，Web/Worker 候选与正式身份、健康、就绪及安装包完整下载均通过，两端各切到 100%。没有跳过 schema 或放宽验证，也没有再次构建。GitHub 首次运行仍为失败，后续恢复成功由本机原发布脚本及 GCP 回读证明。
+- 正式域名 `/api/ready?dms_customer_fix=db98e6f5ef1f` 返回 ready=true，db/gemini/smtp/line 均 ok。原失败草稿仍保留，旧确认 nonce 已消耗；尚未向用户重发确认卡或替用户提交，真实订车与手机验收未完成。
+
+### 上一次发布与既有配置记录（2026-09-09）
+
 - DMS 多 OA 绑定发布：[Manual CD 34264466160](https://github.com/skin306152-star/pearnly-app/actions/runs/34264466160) 成功；schema execution `pearnly-schema-7hq2v` 于 18:44:40 UTC 成功（`PEARNLY_RUNTIME_ROLE=schema` → `_boot_schema_ddl()` 含 DMS 多 OA 列/约束/会话 PK/账号表与登录票据列），Job 失败即阻断切流。候选与正式流量两服务都通过精确 SHA、镜像摘要、健康、就绪、`/internal/runtime-version` 和安装包完整下载校验后才切流。
 - 发布身份独立回读：正式域名 `/api/health`、`/api/ready` 200（db/gemini/smtp/line 均 ok）；Web 运行期 `/internal/runtime-version` 返回 `ffc4bf09…`/`pearnly-web-ffc4bf091acd-s2`/`web`；Worker 匿名 403（IAM 私有），由 CD 用 ID token 验证同一 SHA/镜像/revision。切流后两服务无 ERROR 级日志。
 - A/B 凭据挂载进入声明式 render：`deployment/cloud-run/render_service.py` 为 Web、Worker 和 schema Job 声明 `LINE_DMS_A_CREDENTIALS=pearnly-line-dms-a:1`、`LINE_DMS_B_CREDENTIALS=pearnly-line-dms-b:1`（`secretKeyRef`，版本钉死），避免 `gcloud run services replace` 抹掉手工 `--update-secrets`。两个 secret 的 `roles/secretmanager.secretAccessor` 只授 `pearnly-web`/`pearnly-worker` 两个运行账号；未改动 `pearnly-web-env`/`pearnly-worker-env` 与其他 runtime secrets。

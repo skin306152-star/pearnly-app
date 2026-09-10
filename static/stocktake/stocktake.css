@@ -210,3 +210,32 @@ dialog.st-dialog {
   color: var(--ink2);
   white-space: pre-line;
 }
+.st-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.st-photos figure {
+  margin: 0;
+  max-width: 100%;
+}
+.st-photos img {
+  display: block;
+  width: 160px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+dialog.st-photo-dialog {
+  box-sizing: border-box;
+  width: min(92vw, 760px);
+  max-height: 85vh;
+}
+.st-photo-dialog .st-photos {
+  display: block;
+}
+.st-photo-dialog img {
+  width: 100%;
+  height: auto;
+  margin-top: 16px;
+}

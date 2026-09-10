@@ -57,6 +57,7 @@ def migrate():
     from core import db
     from core.rls import apply_tenant_workspace_rls
     from services.stocktake.entry_schema import apply
+    from services.stocktake.photo_schema import apply as apply_photos
 
     with db.get_cursor(commit=True) as cur:
         cur.execute(DDL)
@@ -64,3 +65,4 @@ def migrate():
             cur, "cowork_stocktakes", "cowork_stocktake_items", "cowork_stocktake_counts"
         )
         apply(cur)
+        apply_photos(cur)

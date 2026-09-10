@@ -3,6 +3,7 @@
 import hashlib
 from decimal import Decimal
 from uuid import UUID
+from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, Query
 from fastapi.encoders import jsonable_encoder
@@ -10,7 +11,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from services.stocktake import access as stocktake_access
-from services.stocktake import excel, store, entries, reports
+from services.stocktake import excel, store, entries, reports, photos
 
 router = APIRouter(prefix="/api/cowork/stocktakes", tags=["stocktake"])
 
@@ -41,6 +42,9 @@ class Entry(BaseModel):
     quantity: str = Field(max_length=40)
     warehouse: str = Field(min_length=1, max_length=300)
     location: str = Field(default="", max_length=300)
+    photos: list[Annotated[str, Field(max_length=1400000)]] = Field(
+        default_factory=list, max_length=5
+    )
 
 
 class EntryEdit(Entry):
@@ -113,7 +117,14 @@ def close(task_id: UUID, request: Request):
 def add_entry(task_id: UUID, item_id: UUID, body: Entry, request: Request):
     scope = stocktake_access.scope_for(request, "recon.create")
     return entries.write(
-        scope, task_id, item_id, body.request_id, body.quantity, body.warehouse, body.location
+        scope,
+        task_id,
+        item_id,
+        body.request_id,
+        body.quantity,
+        body.warehouse,
+        body.location,
+        photo_values=body.photos,
     )
 
 
@@ -142,6 +153,15 @@ def edit_entry(task_id: UUID, entry_id: UUID, body: EntryEdit, request: Request)
         body.location,
         version=body.version,
         voided=body.voided,
+        photo_values=body.photos,
+    )
+
+
+@router.get("/{task_id}/entries/{entry_id}/photos")
+def entry_photos(task_id: UUID, entry_id: UUID, request: Request):
+    return JSONResponse(
+        photos.listing(stocktake_access.scope_for(request, "recon.view"), task_id, entry_id),
+        headers={"Cache-Control": "private, no-store"},
     )
 
 

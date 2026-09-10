@@ -3,13 +3,15 @@
 from fastapi import HTTPException
 from psycopg2.extras import Json
 
-from services.stocktake import store
+from services.stocktake import store, photos
 from services.stocktake.excel import quantity as validate_quantity
 
 
 def fetch(cur, scope, task_id, limit=100, offset=0):
     cur.execute(
         """SELECT e.*, i.product_code, i.product_name, i.barcode, i.unit,
+        (SELECT COUNT(*) FROM cowork_stocktake_photos p WHERE p.entry_id=e.id
+         AND p.tenant_id=e.tenant_id AND p.workspace_client_id=e.workspace_client_id) AS photo_count,
         COALESCE(NULLIF(u.full_name,''), u.username, u.id::text) AS counted_by_name,
         COALESCE(NULLIF(m.full_name,''), m.username, m.id::text) AS updated_by_name
         FROM cowork_stocktake_entries e JOIN cowork_stocktake_items i ON i.id=e.item_id
@@ -103,12 +105,23 @@ def _total(cur, scope, item_id):
 
 
 def write(
-    scope, task_id, target_id, request_id, qty, warehouse, location, *, version=None, voided=False
+    scope,
+    task_id,
+    target_id,
+    request_id,
+    qty,
+    warehouse,
+    location,
+    *,
+    version=None,
+    voided=False,
+    photo_values=(),
 ):
     warehouse, location = warehouse.strip(), location.strip()
     if not warehouse or len(warehouse) > 300 or len(location) > 300:
         raise HTTPException(422, detail="stocktake.warehouse_required")
     qty = validate_quantity(qty, nonnegative=True)
+    images = photos.prepare(photo_values)
     request = {
         "task_id": str(task_id),
         "target_id": str(target_id),
@@ -119,6 +132,8 @@ def write(
         "voided": voided,
         "actor_id": scope.user_id,
     }
+    if images:
+        request["photos"] = [digest for _, digest in images]
     with store.cursor(scope, commit=True) as cur:
         task = store._task(cur, scope, task_id, lock=True)
         if task["count_mode"] != "scan":
@@ -181,6 +196,7 @@ def write(
                 "voided=%s, version=version+1, updated_by=%s, updated_at=NOW() WHERE id=%s",
                 (warehouse, location, qty, voided, scope.user_id, str(entry_id)),
             )
+        photos.save(cur, scope, entry_id, images)
         _audit(cur, scope, request_id, entry_id, next_version, request, previous, current)
         _total(cur, scope, item_id)
         return {"ok": True, "entry_id": str(entry_id), "version": next_version}

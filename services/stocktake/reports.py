@@ -23,6 +23,7 @@ SUMMARY = [
     "ตำแหน่งตามบัญชี",
     "ตำแหน่งที่ตรวจนับ",
     "ผลเทียบตำแหน่ง",
+    "ดูรูปภาพ",
 ]
 DETAIL = [
     "รหัสสินค้า",
@@ -41,6 +42,7 @@ DETAIL = [
     "ผลเทียบคลังสินค้า",
     "ตำแหน่งตามบัญชี",
     "ผลเทียบตำแหน่ง",
+    "ดูรูปภาพ",
 ]
 
 
@@ -59,6 +61,11 @@ def _append(sheet, values):
             cell.value = str(cell.value)
         if isinstance(cell.value, str):
             cell.data_type = "s"
+
+
+def _highlight(sheet, columns):
+    for col in columns:
+        sheet.cell(sheet.max_row, col).fill = PatternFill("solid", fgColor="FFF2CC")
 
 
 def workbook(task):
@@ -98,8 +105,15 @@ def workbook(task):
                 row["location"],
                 "\n".join(value or "(ไม่ระบุ)" for value in locations),
                 _comparison(row["location"], locations),
+                "",
             ],
         )
+        if difference is not None and difference != 0:
+            _highlight(summary, (5, 6, 7, 8))
+        if _comparison(row["warehouse"], warehouses) == "ไม่ตรงกัน":
+            _highlight(summary, (9, 10, 11))
+        if _comparison(row["location"], locations) == "ไม่ตรงกัน":
+            _highlight(summary, (12, 13, 14))
     detail = wb.create_sheet("รายละเอียดการนับ")
     _append(detail, DETAIL)
     for entry in task["entries"]:
@@ -123,8 +137,17 @@ def workbook(task):
                 _comparison(book["warehouse"], [entry["warehouse"]]),
                 book["location"],
                 _comparison(book["location"], [entry["location"]]),
+                "",
             ],
         )
+        if not entry["voided"]:
+            if _comparison(book["warehouse"], [entry["warehouse"]]) == "ไม่ตรงกัน":
+                _highlight(detail, (4, 13, 14))
+            if _comparison(book["location"], [entry["location"]]) == "ไม่ตรงกัน":
+                _highlight(detail, (5, 15, 16))
+    from services.stocktake.photo_report import attach
+
+    attach(wb, task, summary, detail)
     for sheet in wb:
         sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = sheet.dimensions

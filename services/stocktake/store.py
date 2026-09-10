@@ -109,6 +109,10 @@ def detail(scope, task_id, *, export=False):
                 (str(task_id), scope.tenant_id, scope.workspace_client_id),
             )
             task["places"] = [dict(row) for row in cur.fetchall()]
+            if export:
+                from services.stocktake.photos import export as export_photos
+
+                task["photos"] = export_photos(cur, scope, task_id)
         return task
 
 

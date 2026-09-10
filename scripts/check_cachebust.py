@@ -144,6 +144,7 @@ _ENTRY_ASSETS = {
         "/static/stocktake/ui.js",
         "/static/stocktake/camera.js",
         "/static/stocktake/counter.js",
+        "/static/stocktake/photos.js",
         "/static/stocktake/mobile.js",
     ),
     "static/daily/daily.html": (

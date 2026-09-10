@@ -69,6 +69,7 @@
         "static/stocktake/ui.js",
         "static/stocktake/camera.js",
         "static/stocktake/counter.js",
+        "static/stocktake/photos.js",
         "static/stocktake/mobile.js",
         "static/stocktake/mobile.html",
         "static/stocktake/stocktake.css"

@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-10 14:13（Asia/Bangkok，UTC+7）。状态：**DMS 订车客户实时详情核验修复已上线，Web/Worker 各 100% 新版本；原失败单待用户重新确认。**
+更新时间：2026-09-10 17:58（Asia/Bangkok，UTC+7）。状态：**LINE 盘点图片与差异标黄导出已上线，Web/Worker 各 100% 新版本；用户 LINE 与 Excel 验收待确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -26,6 +26,16 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- 完整 SHA：`4f7aa0bd048c5c0306820178195137c9c3aedb70`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:185d2a4a3f09b145b39f86a6837c1a824fa85ef9255ff0359842a98dca446df2`。
+- Web revision：`pearnly-web-4f7aa0bd048c-s2`，100% 流量；Worker revision：`pearnly-worker-4f7aa0bd048c-s2`，100% 流量。
+- [Manual CD 34468147393](https://github.com/skin306152-star/pearnly-app/actions/runs/34468147393) 成功。串行 schema execution `pearnly-schema-6czdf` 于 10:54:12 UTC 成功；两端候选与正式流量均通过精确 SHA、digest、健康、就绪及安装包完整下载校验，10:57:03 UTC 最终 Web 验证成功。
+- 每条逐笔盘点最多 5 张图片，与数量同事务、同幂等回执保存，照片读取沿用 tenant/workspace 和 recon.view。Excel 内嵌图片、内部附件跳转，数量/仓库/位置差异分别标黄。图片表为追加式 schema，迁移记录 `0127_stocktake_photos` 衔接当前 DMS `0126`；既有 DMS 修复和配置保留在候选中。
+- 完整 pre-push 1169 模块/6 片与机械闸通过；前序定向真实 PostgreSQL 和真实页面浏览器验证通过。正式域名 6 个 JS/CSS/词典文件按真实缓存参数回读字节与候选完全一致，手机与桌面 HTML 引用正确；readiness 200，nonce `stocktake_photos=4f7aa0bd048c` 的请求日志命中新 Web；匿名附件读取为 401。
+- 没有向真实盘点写入测试图片或数量。LINE 原生拍照/相册与用户常用 Excel 客户端的附件跳转、图片查看仍待用户验收，详见 [本次记录](../project/STOCKTAKE_PHOTOS_2026-09-10.md)。
+
+### 上一次发布（2026-09-10 DMS 客户核验）
 
 - 完整 SHA：`db98e6f5ef1f2b8e0139f6bebb72b977363deef0`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:65229f87e5e2c22c36b3e1a8f2e4c558167cc2295a55088aa57bcade82d5136e`。

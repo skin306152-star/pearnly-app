@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-13 02:33（Asia/Bangkok，UTC+7）。状态：**DMS 原生订车编号、回读、实时主档快照、编辑返回与常用分隔符修复已上线，Web/Worker 各 100%；Cloudflare 沿用既有 DMS no-store 规则，本次未发布新边缘 Worker。历史单 `BK000002609000007` 已只读确认落库但没有附件，禁止自动重提；真实 LINE 手机新单验收与历史单附件补传仍待确认。独立 WeKan 保持原发布。**
+更新时间：2026-09-13 03:22（Asia/Bangkok，UTC+7）。状态：**DMS 订车编辑器的称谓／邮编实时补全、保存后 LINE 新卡回执、可选转账时间移除及移动端控件修复已上线，Web/Worker 各 100%；Cloudflare 已回读新静态资源，本次未发布新边缘 Worker。没有自动重提真实订单；真实 LINE 手机完整新单验收与历史单附件补传仍待确认。独立 WeKan 保持原发布。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,6 +27,20 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- Pearnly 完整 SHA：`08fb411c02b9895503258d51d7ee86115e1f4a51`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:d4c29acaa8cef50678df0005439250ef0389dd3f510422ee2f0b1d59e5bd4070`。
+- Web revision：`pearnly-web-08fb411c02b9-s3`；Worker revision：`pearnly-worker-08fb411c02b9-s3`；两端 Ready、各 100% 流量，同一 digest。
+- [Manual CD 34716506039](https://github.com/skin306152-star/pearnly-app/actions/runs/34716506039) 于 2026-09-13 03:20 Bangkok 完成，conclusion success；schema execution `pearnly-schema-klm7w` 成功，候选和正式两端的精确 SHA、镜像、健康、就绪及安装包完整下载均通过。
+- 新卡未出现的根因不是用户操作：`get_binding_by_user` 查询漏回 `user_id`，旧异步预览任务的绑定守卫因此在真正调用 LINE 前返回，但任务仍记为 succeeded。查询现已补全；编辑保存只有拿到 LINE API 成功回执才返回成功，发送失败会恢复原草稿和 nonce、保留编辑页供重试。
+- 称谓与邮编：编辑器在同一次管理员权威登录中读取 DMS 当前客户详情，用实时值补草稿空项，用户已编辑值优先，并核对身份证防串客户。身份证没有邮编时，仅在 DMS 当前街道唯一对应一个邮编时自动选择；多个候选保持待选。生产客户 `115` 只读验证得到称谓 `นาย`、邮编 `10230`，编辑快照 2.47 秒且没有额外 geo 登录。
+- 转账时间：MR.ERP 原生表单的 `txttimetffrom` 没有 required 或提交校验，确认是可选字段；LINE 问答、网页编辑器、预览与 DMS 提交已统一移除。旧对话若仍按旧格式带时间可兼容接收，但不会再保存或提交。所有输入／下拉限制在容器宽度内，不再出现手机端控件撑出页面。
+- 性能：加载所需的当前客户、主档、银行、车型颜色和四级地址在一次管理员 DMS 会话中完成，前端直接复用同一份 geo 快照，不再逐级重复登录 DMS。
+- 测试：相关 Python 217 项与 51 subtests、移动端／桌面／iOS／Android／多 OA 编辑器 16 个场景通过；最终 pre-push 1181 个模块／6 分片及 ruff、Black、import、i18n、Prettier、前端构建、文件规模、棘轮、E2E stub、authz 闸全部通过，未跳过 hook。
+- 线上回读：`/api/health` 200；`/api/ready` 200 且 ready=true，db、Gemini、SMTP、LINE 全部 ok；Cloudflare 正式域名已返回 `dms-booking-edit.css?v=4`、`dms-booking-i18n.js?v=10`、`dms-booking-edit.js?v=18`，线上脚本无 `src-time`／`transferTime`。新 Web/Worker revision 的 ERROR 级日志为空。
+- 业务边界：没有为验证创建或重提真实 DMS 订单，也没有替用户发送 LINE 消息。已有旧页面／旧 nonce 不会自动升级，用户需从 LINE 重新进入一次订车流程完成真实手机验收。
+
+### 上一次 Pearnly 发布：DMS 原生订车编号与回读（2026-09-13 02:28）
 
 - Pearnly 完整 SHA：`bdd34d3b951e8ca41319c9cf517128e98ccb9148`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:6f44375bac8036d98fc32127a53ed060ce35049155c1eec2b4f8f7fc8926f819`。

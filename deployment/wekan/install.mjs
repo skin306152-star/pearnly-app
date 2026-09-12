@@ -75,6 +75,41 @@ export function includeIdentityHeaders(source) {
         : source;
 }
 
+// Pearnly permits username-only accounts. Native invitation already adds the
+// member, then unconditionally dereferences its email and reports a false failure.
+// Skip only that optional notification when this recipient has no email.
+export function allowUsernameInvitation(source) {
+    const tree = parse(source, { ecmaVersion: 'latest', sourceType: 'script' });
+    const patches = [];
+    walk(tree, (node) => {
+        if (node.type !== 'Property' || (node.key.name || node.key.value) !== 'inviteUserToBoard')
+            return;
+        for (const statement of node.value.body.body) {
+            if (statement.type !== 'TryStatement') continue;
+            const recipients = new Set();
+            walk(statement.block, (member) => {
+                if (
+                    member.type === 'MemberExpression' &&
+                    member.property.name === 'address' &&
+                    member.object.type === 'MemberExpression' &&
+                    member.object.property.value === 0 &&
+                    member.object.object.type === 'MemberExpression' &&
+                    member.object.object.property.name === 'emails'
+                ) {
+                    const recipient = member.object.object.object;
+                    if (recipient.type !== 'Identifier') throw new Error('Native invitee shape changed');
+                    recipients.add(recipient.name);
+                }
+            });
+            if (recipients.size === 1) patches.push({ offset: statement.start, user: [...recipients][0] });
+        }
+    });
+    if (patches.length !== 1) throw new Error('Native invitation email block changed');
+    const { offset, user } = patches[0];
+    const guard = `if(!${user}.emails?.[0]?.address)return{username:${user}.username,email:null};`;
+    return source.slice(0, offset) + guard + source.slice(offset);
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const root = process.argv[2] || '/build/programs/server';
     const manifestPath = root + '/program.json';
@@ -83,7 +118,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (index < 0 || manifest.load.some((entry) => entry.path === 'packages/pearnly-bridge.js'))
         throw new Error('Unexpected Meteor manifest');
     const appPath = root + '/app/app.js';
-    writeFileSync(appPath, awaitNativeCreation(readFileSync(appPath, 'utf8')));
+    writeFileSync(appPath, allowUsernameInvitation(awaitNativeCreation(readFileSync(appPath, 'utf8'))));
     const ddpPath =
         root + '/npm/node_modules/meteor/ddp-server/node_modules/sockjs/lib/transport.js';
     writeFileSync(ddpPath, includeIdentityHeaders(readFileSync(ddpPath, 'utf8')));

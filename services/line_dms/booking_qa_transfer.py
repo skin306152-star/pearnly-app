@@ -25,6 +25,7 @@ from services.line_dms.qa_util import (
     parse_amount,
     THAI_DIGITS,
 )
+from services.line_dms.text_fields import split_fields
 
 _SRC_KEYS = ("src_account_name", "src_account_no", "src_branch_name", "src_time")
 _SRC_MANUAL_KEYS = ("src_bank_name", *_SRC_KEYS)
@@ -50,12 +51,13 @@ def masters_reader(tenant_id, *, persist):
 
 
 def parse_details(text, destination=False, manual_source=False):
-    """一行资料 → 原生字段。manual_source=来源银行目录权威为空:首段是手工银行名称。"""
+    """一行资料 → 原生字段。manual_source=来源银行目录权威为空:首段是手工银行名称。
+
+    分段用共用分隔符规则(text_fields):| ｜ , ， 、 / ／ · 都行,点号另有保守规则;
+    一种规则切出的段数必须精确等于字段数,否则照旧重问。"""
     keys = _DST_KEYS if destination else (_SRC_MANUAL_KEYS if manual_source else _SRC_KEYS)
-    parts = [value.strip() for value in str(text or "").replace("｜", "|").split("|")]
-    if len(parts) != len(keys) or any(
-        not value or value == "-" or len(value) > 160 for value in parts
-    ):
+    parts = split_fields(text, len(keys))
+    if parts is None or any(not value or value == "-" or len(value) > 160 for value in parts):
         return None
     account_index = keys.index("dst_account_no" if destination else "src_account_no")
     if not any(ch.isdigit() for ch in parts[account_index].translate(THAI_DIGITS)):

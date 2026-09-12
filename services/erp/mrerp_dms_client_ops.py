@@ -138,7 +138,9 @@ class DMSClientOpsMixin:
         取代 Excel 导入 + patch 两步。返回 (booking_id, booking_no)。
 
         autonum 计数器与全局唯一约束失步时会回已占用号 → 提交即「单号重复」。
-        撞重复就往后顺号重试(_bump_docno),跳过被占用的号。"""
+        建单前先只读扫列表,从实际最大流水之后选号,并把 ``natn`` 同量前移;撞重复
+        仍往后顺号重试(数字主体与 natn 同步 +1),跳过被占用的号。
+        ``booking_no``/回读/台账一律用完整号(DMS 返回的前缀 + 数字主体)。"""
         form_html = self._post_text("drfcbc/form.php", {"status": "n"})
         base = self._parse_form_defaults(form_html)
         base["stsel"] = "n"
@@ -147,43 +149,78 @@ class DMSClientOpsMixin:
         base["menulv"] = _DRFCBC_MENULV
         self._apply_booking_form_fields(base, customer_id=customer_id, booking=booking, card=card)
 
-        docno = self._next_booking_docno(booking.branch.id)
-        if not docno:
-            raise DMSClientError("booking auto number unavailable", "ERR_DMS_IMPORT")
-        digits = getattr(self, "_booking_docno_digits", 6)
-        docno = mrerp_dms_docno.next_unoccupied_docno(docno, digits, self._post_text)
-        return submit_booking(self, base, docno, on_attempt=on_attempt)
+        state = self._next_booking_docno(booking.branch.id)
+        scan = mrerp_dms_docno.scan_unoccupied_docno(state.docno, state.digits, self._post_text)
+        if scan.docno != state.docno:
+            # 换号的唯一入口:with_docno 只把 natn 前移「所选尾号 - 原候选尾号」的 delta。
+            # 计数器基数(natn)可能不等于候选尾号,绝不能被新尾号绝对值覆盖,也不能
+            # 在调用前先手动 align 一次 —— 那会把同一个 delta 推两次。
+            state = state.with_docno(scan.docno)
+        return submit_booking(
+            self,
+            base,
+            state,
+            on_attempt=on_attempt,
+            write_payload=self._booking_write_payload,
+            readback_payload=self._booking_readback_payload,
+        )
 
-    def _next_booking_docno(self, branch_id: str) -> str:
-        """取 DMS 订车单下一个自动编号(BK+期间+流水)。autonum 关/异常时返回空。"""
+    def _next_booking_docno(self, branch_id: str) -> mrerp_dms_docno.DMSBookingAutonumState:
+        """取 DMS 原生订车单取号状态(前缀 + 完整号 + 隐藏字段)。
+
+        ``autonum.php``/``autonumdetail.php`` 缺字段或形状不符原生协议时 fail closed
+        (``ERR_DMS_IMPORT``),绝不回退成空串或自造单号 —— 旧版丢掉 ``idatndt``/``natn``
+        导致计数器永不推进,是本次修复的根因。
+        """
         try:
-            cfg = json.loads(
-                self._post_text(
-                    "component/php/autonum.php",
-                    {"menulv": _DRFCBC_MENULV, "idmenu": _DRFCBC_IDMENU},
-                )
+            cfg_body = self._post_text(
+                "component/php/autonum.php",
+                {"menulv": _DRFCBC_MENULV, "idmenu": _DRFCBC_IDMENU},
             )
-            if not cfg or cfg[0] is None or str(cfg[1]) != "1":
-                return ""
-            digits = int(cfg[3])
-            if digits <= 0:
-                return ""
-            self._booking_docno_digits = digits
-            det = json.loads(
-                self._post_text(
-                    "component/php/autonumdetail.php",
-                    {
-                        "idautonum": cfg[0],
-                        "prefixautonum": cfg[2],
-                        "digitautonum": cfg[3],
-                        "idautonumformat": cfg[4],
-                        "idbranch": branch_id or "",
-                    },
-                )
+            cfg = json.loads(cfg_body)
+            detail_body = self._post_text(
+                "component/php/autonumdetail.php",
+                {
+                    "idautonum": cfg[0],
+                    "prefixautonum": cfg[2],
+                    "digitautonum": cfg[3],
+                    "idautonumformat": cfg[4],
+                    "idbranch": branch_id or "",
+                },
             )
-            return str(det[2]) if len(det) > 2 and det[2] else ""
-        except Exception:
-            return ""
+            return mrerp_dms_docno.autonum_state(cfg_body, detail_body)
+        except Exception as exc:
+            raise DMSClientError(
+                f"booking auto number protocol unavailable: {type(exc).__name__}",
+                "ERR_DMS_IMPORT",
+            ) from exc
+
+    def _booking_write_payload(self, base: Dict[str, str], state) -> Dict[str, str]:
+        """``drfcbc/new.php`` 的提交体 —— 完全模拟原生表单:
+
+        ``txtprefixautonum`` = 配置前缀,``txtdocno`` = 完整号去掉精确前缀后的数字主体,
+        外加保存用隐藏字段 ``idatndt``(detail[0])与 ``natn``(与实际选号对齐的下一个流水)。
+        单号整串**不**塞进 ``txtdocno``,否则前缀栏为空、计数器也不推进。
+        """
+        return {
+            **base,
+            "txtprefixautonum": state.prefix,
+            "txtdocno": state.body,
+            mrerp_dms_docno.HIDDEN_IDAUTNUMDETAIL: state.idautonumdetail,
+            mrerp_dms_docno.HIDDEN_NEXTAUTONUM: str(state.nextautonum),
+        }
+
+    def _booking_readback_payload(self, base: Dict[str, str], state) -> Dict[str, str]:
+        """回读比对用的 submitted 视图 —— 必须带**完整号**,不能退化成纯数字主体。
+
+        真实 POST 的 ``txtdocno`` 是纯数字,直接拿它比对会把正确的单判成不一致;
+        这里构造一份只用于比对的副本(不参与任何写入)。
+        """
+        return {
+            **base,
+            "txtprefixautonum": state.prefix,
+            "txtdocno": state.docno,
+        }
 
     def attach_booking_files(self, *, booking_id: str, files: list) -> dict:
         """给已存在订车单挂附件 —— 逐文件独立一轮 edit.php POST,失败不中断。

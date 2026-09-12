@@ -304,6 +304,30 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
             texts = [c.args[1] for c in env.push_text.call_args_list]
             self.assertIn(cards.TXT_DONE_SAVED, texts)
 
+    async def test_menu_one_customer_mode_writes_the_customer_master_only(self):
+        """菜单一(customer 模式)只走客户档写入(原生客户表 cus/new.php|cus/edit.php 那条
+        intake 路),不自动开订车;客户档落定后清会话。"""
+        with _Env(lookup=_lookup("none")) as env:
+            nonce = await self._seed_reviewing(env, mode="customer")
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_CREATE, nonce))
+            await env.drain()
+            self.assertTrue(env.push_idcard.called)
+            self.assertEqual(env.push_idcard.call_args.kwargs["mode"], "create")
+            self.assertIsNone(env.push_idcard.call_args.kwargs["customer_id"])
+            self.assertFalse(env.qa_start.called)  # 菜单一不自动订车
+            self.assertIsNone(env.session())
+            self.assertIn(cards.TXT_DONE_SAVED, [c.args[1] for c in env.push_text.call_args_list])
+
+    async def test_id_card_mid_survives_the_customer_write_into_booking_qa(self):
+        """默认(订车)模式:客户档写入后开逐问,身份证消息 id 一路带到 booking_qa.start。"""
+        with _Env(lookup=_lookup("none")) as env:
+            nonce = await self._seed_reviewing(env)  # mode 缺省 = 老直拍行为
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_CREATE, nonce))
+            await env.drain()
+            self.assertTrue(env.qa_start.called)
+            self.assertEqual(env.qa_start.call_args.kwargs["customer_id"], "C99")
+            self.assertEqual(env.qa_start.call_args.kwargs["id_card_mid"], "mid1")
+
     async def test_a3_continue_triggers_booking_qa(self):
         """A3:continue 卡点「ทำใบจองต่อ」(cid 对齐)→ 开订车逐问。"""
         with _Env() as env:

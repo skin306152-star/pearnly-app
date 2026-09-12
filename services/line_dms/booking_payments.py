@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from services.erp.mrerp_dms_company_banks import (
     company_bank_payment_extra,
@@ -21,6 +21,7 @@ from services.line_dms.qa_util import (
     find_row,
     parse_amount,
 )
+from services.line_dms.text_fields import split_fields
 
 
 class PaymentValidationError(ValueError):
@@ -29,50 +30,65 @@ class PaymentValidationError(ValueError):
         self.code = code
 
 
+_DETAIL_KEYS = {
+    "cheque": ("cheque_no", "cheque_book_no"),
+    "cashier_cheque": ("cashier_no", "cashier_book_no"),
+    "card": ("bank_name", "card_type"),
+}
+
+
+def _two_parts(channel: str, value: str) -> Optional[Tuple[str, str]]:
+    """两段拆法:共用分隔符规则先试;只剩空格(或竖线段数不是 2)时沿用老写法。
+
+    老写法:有 | 就取首个 | 的左右;否则按空格拆 —— 转账的银行名可含空格,故取末段当账号,
+    其余渠道反之(word[0] 当编号)。"""
+    parts = split_fields(value, 2)
+    if parts is not None:
+        return parts[0], parts[1]
+    normalized = value.replace("｜", "|")
+    if "|" in normalized:
+        left, right = (part.strip() for part in normalized.split("|", 1))
+        return (left, right) if left and right else None
+    words = normalized.split()
+    if len(words) < 2:
+        return None
+    if channel == "transfer":
+        return " ".join(words[:-1]), words[-1]
+    return words[0], " ".join(words[1:])
+
+
 def parse_payment_detail(
     channel: str, text: Optional[str], *, manual_bank: bool = False
 ) -> Optional[Dict[str, str]]:
     """把 LINE 的一行付款补充资料拆成 DMS 的独立字段。
 
+    分段用共用分隔符规则(text_fields):| ｜ , ， 、 / ／ · 都行,点号另有保守规则。
     manual_bank=该渠道银行目录权威为空:多出一段手工银行名称(支票/本票在末段,卡在首段)。"""
     value = str(text or "").strip()
     if not value:
         return None
     if channel == "card" and manual_bank:
-        parts = [part.strip() for part in value.replace("｜", "|").split("|")]
-        if len(parts) == 2 and all(part and part != "-" for part in parts):
+        parts = split_fields(value, 2)
+        if parts is not None and all(part != "-" for part in parts):
             return {"bank_name": parts[0], "card_type": parts[1]}
         return None
     if channel in {"card", "other"}:
         return {"card_type" if channel == "card" else "detail": value} if value != "-" else None
-    value = value.replace("｜", "|")
-    if "|" in value:
-        left, right = (part.strip() for part in value.split("|", 1))
-    else:
-        parts = value.split()
-        if len(parts) < 2:
+    keys = _DETAIL_KEYS.get(channel)
+    if keys and manual_bank and channel != "card":
+        parts = split_fields(value, 3)
+        if parts is None or any(part == "-" for part in parts):
             return None
-        if channel == "transfer":
-            left, right = " ".join(parts[:-1]), parts[-1]
-        else:
-            left, right = parts[0], " ".join(parts[1:])
-    if not left or not right:
+        return {keys[0]: parts[0], keys[1]: parts[1], "bank_name": parts[2]}
+    parts = _two_parts(channel, value)
+    if parts is None:
         return None
+    left, right = parts
     if channel == "transfer":
         if not any(ch.isdigit() for ch in right.translate(THAI_DIGITS)):
             return None
         return {"src_bank_name": left, "src_account_no": right}
-    keys = {
-        "cheque": ("cheque_no", "cheque_book_no"),
-        "cashier_cheque": ("cashier_no", "cashier_book_no"),
-        "card": ("bank_name", "card_type"),
-    }.get(channel)
     if keys:
-        if manual_bank and channel != "card":
-            parts = [part.strip() for part in value.split("|")]
-            if len(parts) != 3 or any(not part or part == "-" for part in parts):
-                return None
-            return {keys[0]: parts[0], keys[1]: parts[1], "bank_name": parts[2]}
         return {keys[0]: left, keys[1]: right}
     if channel == "other":
         return {"detail": value}

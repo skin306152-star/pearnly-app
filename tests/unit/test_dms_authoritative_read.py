@@ -15,6 +15,7 @@ import contextlib
 import dataclasses
 import json
 import os
+import re
 import unittest
 from unittest import mock
 
@@ -415,12 +416,17 @@ _GEO_CHILDREN = {
 # bshsd.php(主档)、cus/form.php(客户档)、detailbooksell.php(顾问组织)都不在其中。
 _SALES_ALLOWED_PATHS = (
     "drfcbc/form.php",
+    "drfcbc/edit.php",
     "component/php/autonum.php",
     "component/php/autonumdetail.php",
     "drfcbc/component/showdata.php",
     "drfcbc/new.php",
     "drfcbc/view.php",
 )
+
+# 与 services/erp/mrerp_dms_client_ops.py 的附件回读契约同源:
+#   re.findall(r'<textarea name="(?:fulcurrname)(\\d+)"[^>]*>(.*?)</textarea>')
+_FULCURR_RE = re.compile(r'<textarea name="fulcurrname(\d+)"[^>]*>(.*?)</textarea>', re.S)
 
 
 def _admin_booking_posts(elems):
@@ -444,36 +450,60 @@ class _BookingSite:
     """销售会话的假 DMS 服务端:取号 → new.php 建单一次 → 回读原样回显已存表单。"""
 
     BID = "BID100"
+    # 原生协议(2026-09-13 实测形态):autonum 前缀来自配置,autonumdetail 回隐藏字段
+    # idatndt/natn + 完整号;表单存「前缀栏 + 数字主体栏」两格。
+    PREFIX = "BK2606"
+    DIGITS = 6
+    IDAUTNUMDETAIL = "27"
+    NEXTAUTONUM = "1"
     DOCNO = "BK2606000001"
+    BODY = DOCNO[len(PREFIX) :]
 
     def __init__(self):
         self.stored = {}
+        self.attached = []
+        self.writes = []
         self.reject = ""
 
     def posts(self, url, data):
         data = data or {}
         if url.endswith("component/php/autonum.php"):
-            return _Resp(json.dumps(["7", "1", "BK2606", 6, self.DOCNO]))
+            return _Resp(json.dumps(["16", "1", self.PREFIX, self.DIGITS, "1"]))
         if url.endswith("component/php/autonumdetail.php"):
-            return _Resp(json.dumps(["0", "0", self.DOCNO, "0"]))
+            return _Resp(json.dumps([self.IDAUTNUMDETAIL, self.NEXTAUTONUM, self.DOCNO]))
         if url.endswith("drfcbc/new.php"):
             self.stored = dict(data)
             return _Resp(self.reject)
         if url.endswith("drfcbc/component/showdata.php"):
             if str(data.get("selcolsorttype")) == "2":
                 return _Resp("dt::")  # 取号扫描:号段未被占用
-            return _Resp(f'dt::<div data-val="{self.BID}"><div><p>{self.DOCNO}</p></div></div>')
+            full = f"{self.stored.get('txtprefixautonum', '')}{self.stored.get('txtdocno', '')}"
+            return _Resp(f'dt::<div data-val="{self.BID}"><div><p>{full}</p></div></div>')
+        if url.endswith("drfcbc/edit.php"):
+            # 原生上传 = 提交【完整编辑表单】FormData;这里只记新附件名并在回读里渲染。
+            self.attached.append(str(data.get("fulnewname[]") or ""))
+            self.writes.append(("edit.php", dict(data)))
+            return _Resp(" ")
         if url.endswith("drfcbc/form.php"):
-            if data.get("status") == "e" and str(data.get("id")) == self.BID:
+            if str(data.get("id")) == self.BID or data.get("status") == "e":
                 return _Resp(self._candidate_form())
-            return _Resp("")  # 新建表单(status=n):字段由调用方填
+            return _Resp("")  # 新建表单(status=n 且无 id):字段由调用方填
         return _Resp("")
 
     def _candidate_form(self):
+        """原生回读表单:两格单号 + 既有附件名(fulcurrnameN)。"""
         fields = {**self.stored, "idsel": self.BID}
+        fields["stsel"] = "e"  # 打开已存单据时原生表单把 stsel 置成编辑态
+        # 原生回读表单是「前缀栏 + 数字主体栏」两格,不是提交体的原样镜像。
+        fields["txtprefixautonum"] = self.stored.get("txtprefixautonum", self.PREFIX)
+        fields["txtdocno"] = self.stored.get("txtdocno", self.BODY)
         return (
             "<form>"
             + "".join(f'<input name="{key}" value="{value}">' for key, value in fields.items())
+            + "".join(
+                f'<textarea name="fulcurrname{index}">{name}</textarea>'
+                for index, name in enumerate(["สำเนาบัตรประชาชน", *self.attached], start=1)
+            )
             + "</form>"
         )
 
@@ -596,7 +626,15 @@ class BookingAuthoritativeChainTests(unittest.TestCase):
         qa["master_snapshot"] = bf.master_contract.build_snapshot(_full_masters())
         return qa
 
-    def _run(self, *, admin_posts=None, admin_factory=None, site=None, qa=None):
+    def _run(
+        self,
+        *,
+        admin_posts=None,
+        admin_factory=None,
+        site=None,
+        qa=None,
+        attach_files=None,
+    ):
         """跑一次真建单链:返回 (result, sales, admin, factory, trace, site, adapter)。
 
         只用假 transport 与假适配器;载荷解析/建单/回读全走真代码(零网络)。
@@ -614,7 +652,8 @@ class BookingAuthoritativeChainTests(unittest.TestCase):
         self.es.enter_context(
             mock.patch("services.line_dms.booking_flow.mrerp_booking_lock", _lock_cm)
         )
-        result = bf._book_in_session(_EP_BOOKING, {"qa": qa or self._qa()})
+        options = {"attach_files": attach_files} if attach_files is not None else {}
+        result = bf._book_in_session(_EP_BOOKING, {"qa": qa or self._qa()}, **options)
         return result, sales, admin, factory, trace, site, adapter
 
     def test_real_payload_resolution_runs_on_the_admin_snapshot(self):
@@ -653,7 +692,19 @@ class BookingAuthoritativeChainTests(unittest.TestCase):
         )
         self.assertEqual((submitted["branch_bookval"], submitted["team_bookval"]), ("1", "30"))
         self.assertEqual(submitted["txtuserstel"], "0811111111")  # 顾问电话来自权威名册行
-        self.assertEqual(submitted["txtdocno"], _BookingSite.DOCNO)
+        # 原生两栏:提交的 txtdocno 是纯数字主体,整串单号由前缀栏拼回。
+        self.assertEqual(submitted["txtprefixautonum"], _BookingSite.PREFIX)
+        self.assertEqual(submitted["txtdocno"], _BookingSite.BODY)
+        self.assertNotIn(_BookingSite.PREFIX, submitted["txtdocno"])
+        # 保存用隐藏字段:计数器不推进就会一直回同一个号(旧版根因)。
+        self.assertEqual(submitted["idatndt"], _BookingSite.IDAUTNUMDETAIL)
+        self.assertEqual(submitted["natn"], _BookingSite.NEXTAUTONUM)
+        self.assertEqual(submitted["txtprefixautonum"] + submitted["txtdocno"], _BookingSite.DOCNO)
+        # 回读检索与返回的 booking_no 用完整号。
+        self.assertIn(
+            _BookingSite.DOCNO,
+            [d.get("sd") for _m, url, d in sales.calls if url.endswith("showdata.php")],
+        )
         # 逐问值覆盖端点默认基线:交车日/登记人/订金渠道都进了提交表单
         self.assertEqual(submitted["txtcardeliverydate"], "01/01/2570")
         self.assertEqual(submitted["txtregisname"], "บริษัท สมชาย จำกัด")
@@ -671,6 +722,68 @@ class BookingAuthoritativeChainTests(unittest.TestCase):
         )
         # 每一次 DMS 请求都落在「权威只读闸」或「销售会话」上:没有裸管理员会话的读写
         self.assertEqual({where for where, _m, _url in trace.entries}, {"admin(readonly)", "sales"})
+
+    def test_attachment_upload_runs_only_after_the_write_is_verified(self):
+        """建单被核实后才挂附件,且附件一步拿到 DMS row id 与完整 booking no。"""
+        result, sales, _admin, _factory, _trace, site, _adapter = self._run(
+            attach_files=[
+                {
+                    "display_name": "ใบขับขี่",
+                    "filename": "lic.jpg",
+                    "content_type": "image/jpeg",
+                    "content": b"\xff\xd8jpeg-lic",
+                }
+            ]
+        )
+
+        self.assertTrue(result["ok"], result)
+        self.assertTrue(result["attach_ok"])
+        self.assertEqual(result["attached"], 1)
+        self.assertEqual(result["booking_id"], _BookingSite.BID)  # DMS row id
+        self.assertEqual(result["booking_no"], _BookingSite.DOCNO)  # 完整号
+        self.assertEqual(site.attached, ["ใบขับขี่"])
+        # 附件上传 = 一次 edit.php,带完整编辑表单(不是独立小接口)
+        edit_urls = [url for _m, url, _d in sales.calls if url.endswith("drfcbc/edit.php")]
+        self.assertEqual(len(edit_urls), 1)
+        edit_data = site.writes[-1][1]
+        self.assertEqual(edit_data["stsel"], "e")
+        self.assertEqual(edit_data["idsel"], _BookingSite.BID)
+        self.assertEqual(edit_data["txtprefixautonum"] + edit_data["txtdocno"], _BookingSite.DOCNO)
+        # 建单永远只有一次
+        self.assertEqual(len(sales.paths_matching("new.php")), 1)
+
+    def test_native_docno_readback_rejects_wrong_prefix_number_and_cells(self):
+        """回读等价严格拼「前缀 + 主体」:错前缀/错主体/缺格一律 identity_mismatch。"""
+        raisers = (
+            {"txtprefixautonum": "PD"},  # 错前缀
+            {"txtdocno": "000002609000006"},  # 错主体
+            {"txtprefixautonum": ""},  # 缺前缀格
+            {"txtdocno": ""},  # 缺主体格
+        )
+        for override in raisers:
+            with self.subTest(override=override):
+                site = _BookingSite()
+                original = site._candidate_form
+
+                def patched(original=original, override=override):
+                    fields = {**site.stored, "idsel": site.BID}
+                    fields["txtprefixautonum"] = site.stored.get("txtprefixautonum", site.PREFIX)
+                    fields["txtdocno"] = site.stored.get("txtdocno", site.BODY)
+                    fields.update(override)
+                    return (
+                        "<form>"
+                        + "".join(
+                            f'<input name="{key}" value="{value}">' for key, value in fields.items()
+                        )
+                        + "</form>"
+                    )
+
+                site._candidate_form = patched
+                result, sales, *_rest = self._run(site=site)
+                self.assertFalse(result.get("ok"), result)
+                self.assertEqual(result.get("error_code"), "ERR_DMS_BOOKING_OUTCOME_UNKNOWN")
+                self.assertEqual(len(sales.paths_matching("new.php")), 1)  # 不重发
+                self.assertEqual(site.attached, [])  # 未核实 → 不挂附件
 
     def test_preflight_does_not_refetch_masters_per_field(self):
         """一次权威全主档快照:每个 elemname 正好一次;颜色一次;组织一次;单次管理员解析。"""

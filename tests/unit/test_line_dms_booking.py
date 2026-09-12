@@ -129,6 +129,15 @@ _ORG_BODY = json.dumps(
 
 
 class _FakeAdapter:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def login(self):
+        return None
+
     def _client(self):
         return _FakeClient({})
 
@@ -603,6 +612,48 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(res["ok"])
         self.assertFalse(res["attach_ok"])
         self.assertEqual([f["filename"] for f in rec["attach_files"]], ["idcard.jpg"])
+
+    async def test_d4_attach_runs_only_after_the_write_was_verified(self):
+        """回读没确认写入(UNKNOWN)→ 一张附件都不挂:附件只挂在已核实的单据上。"""
+        from services.erp.mrerp_dms_booking_submit import DMSBookingOutcomeUnknown
+
+        rec = {}
+
+        class UnverifiedClient(_FakeClient):
+            def create_booking_via_form(self, *, customer_id, booking, card, on_attempt=None):
+                if on_attempt:
+                    on_attempt("BK000002609000007")
+                raise DMSBookingOutcomeUnknown("BK000002609000007", http_status=200, body="ok")
+
+        adapter = _FakeAdapter()
+        adapter._client = lambda: UnverifiedClient(rec)
+        with (
+            mock.patch(
+                "services.erp.erp_dms_intake._build_mrerp_dms_adapter",
+                return_value=(adapter, None),
+            ),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
+            ),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
+        ):
+            result = bf._book_in_session(
+                {"id": "E1", "config": {}},
+                _review(),
+                attach_files=[
+                    {
+                        "display_name": "สำเนาบัตรประชาชน",
+                        "filename": "idcard.jpg",
+                        "content_type": "image/jpeg",
+                        "content": _JPEG,
+                    }
+                ],
+            )
+        self.assertFalse(result.get("ok"))
+        self.assertEqual(result.get("error_code"), "ERR_DMS_BOOKING_OUTCOME_UNKNOWN")
+        self.assertTrue((result.get("response_body") or {}).get("submitted"))  # 不许重试
+        self.assertNotIn("attach_booking_id", rec)  # 未核实 → 附件一步都没走
 
     async def test_d4_create_booking_runs_inside_shared_account_lock(self):
         """create_booking_via_form 在账套级 mrerp_booking_lock 内执行;附件在锁释放后挂载。"""

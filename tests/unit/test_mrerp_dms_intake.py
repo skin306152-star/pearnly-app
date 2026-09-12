@@ -253,6 +253,30 @@ class IntakeContractTests(unittest.TestCase):
         self.assertEqual(save["stsel"], "e")
         self.assertEqual(save["idsel"], "95")
 
+    def test_menu_one_customer_create_and_update_keep_the_native_customer_form(self):
+        """菜单一(customer 模式的建档/改档)仍走原生客户表:create → cus/new.php,
+        overwrite → cus/edit.php;绝不落成订车单写入(drfcbc/new.php)。"""
+        fields = {
+            "prefix_id": "17",
+            "name": "Menu One",
+            "people_id": "1234567890123",
+            "birthday_be": "01/01/2530",
+            "phone": "0899999999",
+            "province_id": "65",
+            "district_id": "804",
+            "subdistrict_id": "6472",
+            "zipcode_id": "6477",
+        }
+        self.t.search_hits = []  # 不存在 → 真新建
+        self.assertEqual(self.c.save_customer(fields=fields, mode="create")[0], "95")
+        self.assertTrue([p for p in self.t.posts if p[0].endswith("cus/new.php")])
+        self.t._edit_name = "Menu One"  # 覆盖后重读核对
+        self.assertEqual(
+            self.c.save_customer(fields=fields, mode="overwrite", customer_id="95")[0], "95"
+        )
+        self.assertTrue([p for p in self.t.posts if p[0].endswith("cus/edit.php")])
+        self.assertFalse([p for p in self.t.posts if p[0].endswith("drfcbc/new.php")])
+
     def test_save_create_idempotent_to_overwrite_when_exists(self):
         """create 前先查身份证号 · 已存在则转 overwrite 更新它(防撞客户编号重复)。"""
         self.t._edit_name = "Dup Person"  # 重读核对

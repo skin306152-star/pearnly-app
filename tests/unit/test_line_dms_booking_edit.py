@@ -1,5 +1,6 @@
 import contextlib
-from unittest import TestCase, mock
+import copy
+from unittest import IsolatedAsyncioTestCase, TestCase, mock
 
 from services.line_dms import binding_guard, booking_edit, qa_cards
 
@@ -114,13 +115,34 @@ def form():
     }
 
 
+# 客户四级地址 + 称谓的权威行:save 的标签解析吃本请求快照里的这一份(零额外登录)。
+GEO_ROWS = {
+    "provinces": [["P1", "Bangkok"]],
+    "districts": [["D1", "District"]],
+    "subdistricts": [["S1", "Subdistrict"]],
+    "zipcodes": [["Z1", "10230"]],
+}
+
+
+def snapshot(masters=None, *, paints=None, geo=None):
+    """read_edit_snapshot 的返回形状:一次权威登录取回的主档/颜色/级联。"""
+    use = masters or MASTERS
+    return {
+        "masters": use,
+        "paints": {"C1": [["PA1", "RED", "Red"]]} if paints is None else paints,
+        "prefixes": list(use.get("prefixes") or []),
+        "geo": GEO_ROWS if geo is None else geo,
+    }
+
+
 class BookingEditTests(TestCase):
     def setUp(self):
         self.user = {"id": "U1", "tenant_id": "T1"}
         self.binding = {"user_id": "U1", "tenant_id": "T1", "line_user_id": "L1"}
         self.payload = {"nonce": "N1", "qa": QA}
 
-    def patches(self, masters=None):
+    def patches(self, masters=None, *, paints=None, snap=None):
+        current = snap if snap is not None else snapshot(masters, paints=paints)
         return (
             mock.patch.object(booking_edit.store, "get_binding_by_user", return_value=self.binding),
             mock.patch.object(
@@ -133,18 +155,10 @@ class BookingEditTests(TestCase):
                 "resolve_dms_endpoint",
                 return_value={"id": "E1"},
             ),
-            mock.patch.object(booking_edit, "get_masters", return_value=masters or MASTERS),
-            mock.patch.object(booking_edit, "get_paints", return_value=[["PA1", "RED", "Red"]]),
             mock.patch.object(
                 booking_edit,
-                "_customer_master_labels",
-                return_value={
-                    "prefix_name": "Mr",
-                    "province_name": "Bangkok",
-                    "district_name": "District",
-                    "subdistrict_name": "Subdistrict",
-                    "zipcode": "10230",
-                },
+                "read_edit_snapshot",
+                side_effect=lambda endpoint, **kwargs: copy.deepcopy(current),
             ),
         )
 
@@ -193,7 +207,8 @@ class BookingEditTests(TestCase):
         self.assertEqual(send.call_args.args[0], "L1")
         self.assertIn(next_nonce, str(send.call_args.args[1]))
 
-    def test_load_forces_fresh_masters_and_uses_same_session_prefixes(self):
+    def test_load_reads_one_fresh_snapshot_for_masters_and_car_colours(self):
+        """load 一个请求只登录一次:主档 + 本次展示的车型颜色吃同一份新鲜快照。"""
         masters = {**MASTERS, "prefixes": [["17", "Mr"]]}
         with (
             mock.patch.object(
@@ -201,13 +216,18 @@ class BookingEditTests(TestCase):
                 "_review",
                 return_value=(self.binding, self.payload, {"id": "E1"}),
             ),
-            mock.patch.object(booking_edit, "get_masters", return_value=masters) as fetch,
-            mock.patch.object(booking_edit, "get_paints", return_value=[]),
+            mock.patch.object(
+                booking_edit,
+                "read_edit_snapshot",
+                return_value=snapshot(masters, paints={"C1": [["PA1", "RED", "Red"]]}),
+            ) as read,
         ):
             out = booking_edit.load(self.user, "N1")
 
-        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True, require_complete=True)
+        # 不拿 12h 缓存:唯一一次读取带上了本请求要展示的车型(颜色不再单独登第二次)。
+        read.assert_called_once_with({"id": "E1"}, car_ids=("C1",), customer=None)
         self.assertEqual(out["masters"]["prefixes"], [{"id": "17", "label": "Mr"}])
+        self.assertEqual(out["masters"]["paints"], [{"id": "PA1", "label": "Red"}])
         self.assertEqual(
             out["masters"]["company_banks"],
             [
@@ -243,8 +263,11 @@ class BookingEditTests(TestCase):
                 "_review",
                 return_value=(self.binding, self.payload, {"id": "E1"}),
             ),
-            mock.patch.object(booking_edit, "get_masters", return_value=MASTERS_PRODUCTION),
-            mock.patch.object(booking_edit, "get_paints", return_value=[]),
+            mock.patch.object(
+                booking_edit,
+                "read_edit_snapshot",
+                return_value=snapshot(MASTERS_PRODUCTION, paints={"C1": []}),
+            ),
         ):
             out = booking_edit.load(self.user, "N1")
         self.assertEqual(
@@ -261,8 +284,11 @@ class BookingEditTests(TestCase):
                 "_review",
                 return_value=(self.binding, self.payload, {"id": "E1"}),
             ),
-            mock.patch.object(booking_edit, "get_masters", return_value=MASTERS),
-            mock.patch.object(booking_edit, "get_paints", return_value=[]),
+            mock.patch.object(
+                booking_edit,
+                "read_edit_snapshot",
+                return_value=snapshot(MASTERS, paints={"C1": []}),
+            ),
         ):
             out = booking_edit.load(self.user, "N1")
         # company_banks 永不手工 → 收款账户永远只出现在这里
@@ -399,7 +425,27 @@ class BookingEditTests(TestCase):
                 "_review",
                 return_value=(self.binding, self.payload, {"id": "E1"}),
             ),
-            mock.patch.object(booking_edit, "get_masters", return_value={"cars": MASTERS["cars"]}),
+            mock.patch.object(
+                booking_edit,
+                "read_edit_snapshot",
+                return_value=snapshot({"cars": MASTERS["cars"]}, paints={}),
+            ),
+        ):
+            with self.assertRaisesRegex(
+                booking_edit.BookingEditError, "dms_booking.master_unavailable"
+            ) as ctx:
+                booking_edit.load(self.user, "N1")
+        self.assertEqual(ctx.exception.status, 503)
+
+    def test_load_fails_closed_when_the_snapshot_cannot_be_read(self):
+        """读取失败(登录/抓取)不留旧缓存兜底:如实 503,不拿 12h 快照冒充实时。"""
+        with (
+            mock.patch.object(
+                booking_edit,
+                "_review",
+                return_value=(self.binding, self.payload, {"id": "E1"}),
+            ),
+            mock.patch.object(booking_edit, "read_edit_snapshot", return_value=None),
         ):
             with self.assertRaisesRegex(
                 booking_edit.BookingEditError, "dms_booking.master_unavailable"
@@ -447,35 +493,82 @@ class BookingEditTests(TestCase):
             with self.assertRaisesRegex(booking_edit.BookingEditError, "duplicate_payment"):
                 booking_edit.save(self.user, "N1", submitted)
 
-    def test_paints_forces_fresh_masters(self):
-        """颜色下拉同 load:按当前 DMS 主档映射,不吃 12h 快照。"""
+    def test_paints_reads_one_fresh_snapshot_for_the_asked_car(self):
+        """颜色下拉同 load:按当前 DMS 主档映射,不吃 12h 快照,一个请求只登录一次。"""
         with (
             mock.patch.object(
                 booking_edit,
                 "_review",
                 return_value=(self.binding, self.payload, {"id": "E1"}),
             ),
-            mock.patch.object(booking_edit, "get_masters", return_value=MASTERS) as fetch,
-            mock.patch.object(booking_edit, "get_paints", return_value=[["PA1", "RED", "Red"]]),
+            mock.patch.object(
+                booking_edit,
+                "read_edit_snapshot",
+                return_value=snapshot(MASTERS, paints={"C1": [["PA1", "RED", "Red"]]}),
+            ) as read,
         ):
             out = booking_edit.paints(self.user, "N1", "C1")
-        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True, require_complete=True)
+        read.assert_called_once_with({"id": "E1"}, car_ids=("C1",), customer=None)
         self.assertEqual(out, [{"id": "PA1", "label": "Red"}])
 
-    def test_save_reads_fresh_masters(self):
-        """save 校验/映射按当前 DMS 主档(称谓/地点/车型/条件/登记/银行),不吃 12h 快照。"""
+    def test_unread_car_colours_fail_closed_instead_of_looking_empty(self):
+        """快照里该车型是 None(这次没读到)≠ 空表(权威结论「没颜色」)→ 503,不冒充空目录。"""
+        with (
+            mock.patch.object(
+                booking_edit,
+                "_review",
+                return_value=(self.binding, self.payload, {"id": "E1"}),
+            ),
+            mock.patch.object(
+                booking_edit,
+                "read_edit_snapshot",
+                return_value=snapshot(MASTERS, paints={"C1": None}),
+            ),
+        ):
+            with self.assertRaisesRegex(
+                booking_edit.BookingEditError, "dms_booking.master_unavailable"
+            ) as ctx:
+                booking_edit.paints(self.user, "N1", "C1")
+        self.assertEqual(ctx.exception.status, 503)
+
+    def test_save_reads_one_snapshot_for_masters_colours_and_customer_labels(self):
+        """save 一次登录一份快照:主档/银行/选中车型颜色/客户四级地址标签全吃它,不再各登一次。"""
         with contextlib.ExitStack() as es:
             for patcher in self.patches():
                 es.enter_context(patcher)
-            fetch = es.enter_context(
-                mock.patch.object(booking_edit, "get_masters", return_value=MASTERS)
+            read = es.enter_context(
+                mock.patch.object(
+                    booking_edit,
+                    "read_edit_snapshot",
+                    side_effect=lambda endpoint, **kwargs: snapshot(),
+                )
             )
             es.enter_context(
                 mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
             )
             es.enter_context(mock.patch.object(booking_edit, "_send"))
             booking_edit.save(self.user, "N1", form())
-        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True, require_complete=True)
+        self.assertEqual(read.call_count, 1)
+        args, kwargs = read.call_args
+        self.assertEqual(args, ({"id": "E1"},))
+        self.assertEqual(kwargs["car_ids"], ("C1",))
+        # 客户四级地址标签的解析也吃同一份快照(不再为此单独登录、也不吃 12h 缓存)。
+        self.assertEqual(kwargs["customer"]["province_id"], "P1")
+        self.assertEqual(kwargs["customer"]["district_id"], "D1")
+
+    def test_save_rejects_when_a_customer_label_is_missing_from_the_snapshot(self):
+        """快照里查不到客户的府/区/街道/邮编 id → invalid_master,不写回预览。"""
+        broken = form()
+        broken["customer"]["province_id"] = "GONE"
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches():
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload")
+            )
+            with self.assertRaisesRegex(booking_edit.BookingEditError, "invalid_master"):
+                booking_edit.save(self.user, "N1", broken)
+        replace.assert_not_called()
 
     def test_invalid_master_does_not_replace_review(self):
         broken = form()
@@ -560,6 +653,112 @@ class BookingEditTests(TestCase):
         self.assertIn("Bangkok", raw)
         self.assertIn("10230", raw)
         self.assertIn("รหัสไปรษณีย์", raw)
+
+
+class PreviewDispatchTests(TestCase):
+    """save 的新版预览卡出口:生产入队 Cloud Tasks 不等 LINE 网络;入队失败恢复旧 payload。"""
+
+    def setUp(self):
+        self.user = {"id": "U1", "tenant_id": "T1"}
+        self.binding = {"id": "b1", "user_id": "U1", "tenant_id": "T1", "line_user_id": "L1"}
+        self.payload = {"nonce": "N1", "qa": QA}
+        self.patches = (
+            mock.patch.object(booking_edit.store, "get_binding_by_user", return_value=self.binding),
+            mock.patch.object(
+                booking_edit.store,
+                "get_session",
+                return_value={"state": "booking_review", "payload": self.payload},
+            ),
+            mock.patch.object(
+                booking_edit.dms_id_ocr, "resolve_dms_endpoint", return_value={"id": "E1"}
+            ),
+            mock.patch.object(
+                booking_edit,
+                "read_edit_snapshot",
+                side_effect=lambda endpoint, **kwargs: snapshot(),
+            ),
+        )
+
+    def test_production_save_enqueues_preview_and_does_not_wait_for_line(self):
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches:
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
+            )
+            send = es.enter_context(mock.patch.object(booking_edit, "_send"))
+            enqueue = es.enter_context(
+                mock.patch("services.cloud_tasks.dispatch.enqueue", return_value="task-1")
+            )
+            es.enter_context(mock.patch("services.cloud_tasks.dispatch.enabled", return_value=True))
+            nonce = booking_edit.save(self.user, "N1", form())
+
+        self.assertNotEqual(nonce, "N1")
+        self.assertEqual(
+            enqueue.call_args.args,
+            ("dms.booking_preview", self.binding, "L1", nonce),
+        )
+        # HTTP save 里不再同步碰 LINE:新版预览卡由 dms.booking_preview 任务发。
+        send.assert_not_called()
+        saved = replace.call_args.args[3]
+        self.assertEqual(saved["nonce"], nonce)
+
+    def test_enqueue_failure_restores_previous_payload_and_nonce(self):
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches:
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
+            )
+            es.enter_context(mock.patch.object(booking_edit, "_send"))
+            es.enter_context(mock.patch("services.cloud_tasks.dispatch.enabled", return_value=True))
+            es.enter_context(
+                mock.patch(
+                    "services.cloud_tasks.dispatch.enqueue", side_effect=RuntimeError("queue down")
+                )
+            )
+            with self.assertRaisesRegex(booking_edit.BookingEditError, "preview_send_failed"):
+                booking_edit.save(self.user, "N1", form())
+
+        self.assertEqual(replace.call_count, 2)
+        # 第二次 replace 把旧 payload/nonce 原样放回去(用户还能用同一个 nonce 重试)。
+        self.assertEqual(replace.call_args.args[2], replace.call_args_list[0].args[3]["nonce"])
+        self.assertEqual(replace.call_args.args[3]["nonce"], "N1")
+
+
+class PreviewTaskHandlerTests(IsolatedAsyncioTestCase):
+    """dms.booking_preview 任务:重新核对当前 booking_review 的 nonce,旧任务不发旧卡。"""
+
+    BINDING = {"id": "b1", "user_id": "U1", "tenant_id": "T1", "line_user_id": "L1"}
+
+    def _session(self, nonce: str) -> dict:
+        return {"state": "booking_review", "payload": {"nonce": nonce, "qa": QA}}
+
+    async def test_sends_only_the_current_booking_review_nonce(self):
+        sess = self._session("N2")
+        with (
+            mock.patch.object(booking_edit.binding_guard, "current", return_value=True),
+            mock.patch.object(booking_edit.store, "get_session", return_value=sess),
+            mock.patch.object(booking_edit.store, "verify_nonce") as verify,
+            mock.patch.object(booking_edit, "_send") as send,
+        ):
+            verify.return_value = True
+            await booking_edit._send_review_preview(self.BINDING, "L1", "N2")
+        verify.assert_called_once_with(sess, "N2", "booking_review")
+        send.assert_called_once()
+        self.assertEqual(send.call_args.args[0], "L1")
+        self.assertIn("N2", str(send.call_args.args[1]))
+
+    async def test_stale_nonce_is_dropped_without_sending(self):
+        sess = self._session("N2")
+        with (
+            mock.patch.object(booking_edit.binding_guard, "current", return_value=True),
+            mock.patch.object(booking_edit.store, "get_session", return_value=sess),
+            mock.patch.object(booking_edit.store, "verify_nonce", return_value=False),
+            mock.patch.object(booking_edit, "_send") as send,
+        ):
+            await booking_edit._send_review_preview(self.BINDING, "L1", "N1")
+        send.assert_not_called()
 
 
 class EditLinkChannelTests(TestCase):

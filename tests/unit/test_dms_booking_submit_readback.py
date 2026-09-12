@@ -30,6 +30,10 @@ from services.erp.mrerp_dms_client import DMSClient
 from services.erp.mrerp_dms_client_base import DMSClientError
 
 _DOCNO = "PD26001100"
+# 生产真实形态(2026-09-13):单号 BK000002609000007 在 DMS 表单里是两格 ——
+# txtprefixautonum='BK' + txtdocno='000002609000007';提交的是一整串。
+_BK_DOCNO = "BK000002609000007"
+_BK_NUMBER = "000002609000007"
 _BASE = {
     "stsel": "n",
     "idsel": "",
@@ -59,6 +63,24 @@ _BASE = {
 
 def _stored(booking_id="15499", **overrides):
     return {**_BASE, "idsel": booking_id, "stsel": "e", **overrides}
+
+
+def _submitted_bk(**overrides):
+    """提交字典:整串单号(与 DMS 回读表单的两格形态不同)。"""
+    return {**_BASE, "txtdocno": _BK_DOCNO, **overrides}
+
+
+def _stored_native(booking_id="82", *, prefix="BK", number=_BK_NUMBER, **overrides):
+    """真实回读表单:单号落成 prefix + 纯数字两格,绝不是提交字典原样。"""
+    fields = {key: value for key, value in _BASE.items() if key != "txtdocno"}
+    return {
+        **fields,
+        "stsel": "e",
+        "idsel": booking_id,
+        "txtprefixautonum": prefix,
+        "txtdocno": number,
+        **overrides,
+    }
 
 
 def _form(fields):
@@ -324,6 +346,128 @@ class BookingSubmitReadbackTests(_NoSleepMixin, unittest.TestCase):
                 )
                 self.assertFalse(raised.exception.response_body["retry_safe"])
                 self.assertEqual(len(sales.writes()), 1)
+
+
+class BookingDocnoEquivalenceTests(unittest.TestCase):
+    """单号等价:提交 BK+纯数字 与回读 prefix='BK' + txtdocno=纯数字 是同一张单。
+
+    判据必须严格 —— 删字母、只比尾号、模糊前缀都会把别单认成我们刚提交的那张。
+    """
+
+    def test_prefix_plus_number_shape_matches_the_submitted_docno(self):
+        from services.erp.mrerp_dms_booking_readback import docno_equal
+
+        self.assertTrue(docno_equal(_BK_DOCNO, {"txtprefixautonum": "BK", "txtdocno": _BK_NUMBER}))
+        # 旧形态/同形存储:回读的 txtdocno 就是我们提交的那一串。
+        self.assertTrue(docno_equal(_BK_DOCNO, {"txtdocno": _BK_DOCNO}))
+        self.assertTrue(docno_equal(_DOCNO, {"txtdocno": _DOCNO, "txtprefixautonum": _DOCNO[:2]}))
+
+    def test_other_prefix_or_number_is_not_the_same_docno(self):
+        from services.erp.mrerp_dms_booking_readback import docno_equal
+
+        base = {"txtprefixautonum": "BK", "txtdocno": _BK_NUMBER}
+        self.assertFalse(docno_equal(_BK_DOCNO, {**base, "txtprefixautonum": "PD"}))
+        self.assertFalse(docno_equal(_BK_DOCNO, {**base, "txtprefixautonum": "bk"}))
+        self.assertFalse(docno_equal(_BK_DOCNO, {**base, "txtdocno": "000002609000008"}))
+        # 只比尾号/删字母就会误判的两种形态
+        self.assertFalse(
+            docno_equal(_BK_DOCNO, {"txtprefixautonum": "BKX", "txtdocno": _BK_NUMBER})
+        )
+        self.assertFalse(docno_equal(_BK_DOCNO, {"txtprefixautonum": "BK", "txtdocno": "09000007"}))
+
+    def test_missing_cells_and_prefixless_submission_never_match(self):
+        from services.erp.mrerp_dms_booking_readback import docno_equal
+
+        # 缺前缀格(只剩纯数字)→ 不是这张单;缺编号格同理。
+        self.assertFalse(docno_equal(_BK_DOCNO, {"txtdocno": _BK_NUMBER}))
+        self.assertFalse(docno_equal(_BK_DOCNO, {"txtprefixautonum": "BK", "txtdocno": ""}))
+        # 提交值本身没有前缀、回读的 txtdocno 又逐字相同 → 同形存储,按规则 1 通过;
+        # 但只要编号不同就不再等价(前缀格凑不出一张单)。
+        self.assertTrue(docno_equal(_BK_NUMBER, {"txtprefixautonum": "BK", "txtdocno": _BK_NUMBER}))
+        self.assertFalse(
+            docno_equal(_BK_NUMBER, {"txtprefixautonum": "BK", "txtdocno": "000002609000008"})
+        )
+        self.assertFalse(docno_equal(_BK_DOCNO, {}))
+
+
+class BookingReadbackNativeDocnoTests(_NoSleepMixin, unittest.TestCase):
+    """回读表单一律用真实形态(prefix + 纯数字),不再把提交字典原样当回读表单。"""
+
+    def test_configured_prefix_shapes_need_no_regex(self):
+        """前缀来自配置:非两位/non-ASCII/含数字都能精确拼接,不靠正则形状。"""
+        for prefix, number in (("BK", _BK_NUMBER), ("PD", "26001100"), ("AB12", "2600099")):
+            with self.subTest(prefix=prefix):
+                full = prefix + number
+                sales = _Transport(
+                    {"82": _stored_native(prefix=prefix, number=number)},
+                )
+                submitted = {**_BASE, "txtprefixautonum": prefix, "txtdocno": full}
+                self.assertEqual(submit_booking(_client(sales), submitted, full), ("82", full))
+                self.assertEqual(len(sales.writes()), 1)
+
+    def test_non_ascii_prefix_concatenates_exactly(self):
+        # 非 ASCII 前缀照样要能精确拼接;正则形状([A-Za-z]+\\d+)在这里必然落空。
+        sales = _Transport({"82": _stored_native(prefix="จอง", number="000042")})
+        submitted = {**_BASE, "txtprefixautonum": "จอง", "txtdocno": "จอง000042"}
+        self.assertEqual(
+            submit_booking(_client(sales), submitted, "จอง000042"), ("82", "จอง000042")
+        )
+
+    def test_native_prefix_and_number_verifies_with_a_single_write(self):
+        sales = _Transport({"82": _stored_native()})
+        self.assertEqual(
+            submit_booking(_client(sales), _submitted_bk(), _BK_DOCNO), ("82", _BK_DOCNO)
+        )
+        self.assertEqual(len(sales.writes()), 1)
+        self.assertEqual(sales.writes()[0]["txtdocno"], _BK_DOCNO)  # 提交的仍是整串单号
+        self.assertEqual(sales.detail_reads, ["82"])
+
+    def test_other_prefix_stays_unknown_identity_mismatch(self):
+        sales = _Transport({"82": _stored_native(prefix="PD")})
+        with self.assertRaises(DMSBookingOutcomeUnknown) as raised:
+            submit_booking(_client(sales), _submitted_bk(), _BK_DOCNO)
+        self.assertEqual(raised.exception.response_body["readback_stage"], STAGE_IDENTITY_MISMATCH)
+        self.assertFalse(raised.exception.response_body["retry_safe"])
+        self.assertEqual(len(sales.writes()), 1)
+
+    def test_other_number_stays_unknown_identity_mismatch(self):
+        sales = _Transport({"82": _stored_native(number="000002609000008")})
+        with self.assertRaises(DMSBookingOutcomeUnknown) as raised:
+            submit_booking(_client(sales), _submitted_bk(), _BK_DOCNO)
+        self.assertEqual(raised.exception.response_body["readback_stage"], STAGE_IDENTITY_MISMATCH)
+        self.assertEqual(len(sales.writes()), 1)
+
+    def test_missing_prefix_cell_stays_unknown_identity_mismatch(self):
+        stored = _stored_native()
+        stored.pop("txtprefixautonum")
+        sales = _Transport({"82": stored})
+        with self.assertRaises(DMSBookingOutcomeUnknown) as raised:
+            submit_booking(_client(sales), _submitted_bk(), _BK_DOCNO)
+        self.assertEqual(raised.exception.response_body["readback_stage"], STAGE_IDENTITY_MISMATCH)
+
+    def test_fuzzy_candidate_is_skipped_and_the_real_booking_is_verified(self):
+        # 900 是「同数字、别前缀」的模糊命中;82 才是刚建的那张。
+        sales = _Transport(
+            {
+                "900": _stored_native("900", prefix="PD"),
+                "82": _stored_native(),
+            }
+        )
+        self.assertEqual(verify_created_booking(_client(sales), _BK_DOCNO, _submitted_bk()), "82")
+        self.assertEqual(sales.detail_reads, ["900", "82"])  # 模糊候选被读过但没被认下
+        self.assertEqual(len(sales.writes()), 0)
+
+    def test_submit_finds_the_real_booking_after_a_fuzzy_candidate(self):
+        sales = _Transport(
+            {
+                "900": _stored_native("900", number="000002609000006"),
+                "82": _stored_native(),
+            }
+        )
+        self.assertEqual(
+            submit_booking(_client(sales), _submitted_bk(), _BK_DOCNO), ("82", _BK_DOCNO)
+        )
+        self.assertEqual(len(sales.writes()), 1)
 
 
 class BookingReadbackRetryTests(_NoSleepMixin, unittest.TestCase):

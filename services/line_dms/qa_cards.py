@@ -20,6 +20,7 @@ from services.line_dms.qa_payment_cards import (
     ask_pay_src as ask_pay_src,
     ask_payment_bank as ask_payment_bank,
     ask_transfer_details as ask_transfer_details,
+    TXT_SEP_HINT,
 )
 from services.line_dms.cards import (
     ACT_CANCEL_BOOKING,
@@ -76,10 +77,10 @@ TXT_MASTER_UNAVAILABLE = _DMS_FRIENDLY["ERR_DMS_MASTER_UNAVAILABLE"]["th"]
 TXT_MASTER_EMPTY = _DMS_FRIENDLY["ERR_DMS_MASTER_EMPTY"]["th"]
 TXT_MASTER_CHANGED = _DMS_FRIENDLY["ERR_DMS_MASTER_CHANGED"]["th"]
 TXT_MASTER_UNMATCHED = _DMS_FRIENDLY["ERR_DMS_MASTER_UNMATCHED"]["th"]
-TXT_ASK_CHEQUE_REF = "พิมพ์ เลขที่เช็ค | เล่มที่เช็ค เช่น 123456 | 01"
+TXT_ASK_CHEQUE_REF = "พิมพ์ เลขที่เช็ค | เล่มที่เช็ค เช่น 123456 | 01\n" + TXT_SEP_HINT
 TXT_ASK_CARD_REF = "พิมพ์ประเภทบัตร เช่น VISA"
 TXT_ASK_OTHER_REF = "รายละเอียดช่องทาง — พิมพ์"
-TXT_BAD_PAYMENT_DETAIL = "รูปแบบไม่ถูกต้อง กรุณาพิมพ์ข้อมูลทั้ง 2 ช่องโดยคั่นด้วย |"
+TXT_BAD_PAYMENT_DETAIL = f"รูปแบบไม่ถูกต้อง กรุณาพิมพ์ข้อมูลทั้ง 2 ช่อง {TXT_SEP_HINT}"
 TXT_ASK_MORE = "มีช่องทางอื่นอีกไหม"
 BTN_MORE_DONE = "ครบแล้ว"
 BTN_MORE_ADD = "เพิ่มช่องทาง"

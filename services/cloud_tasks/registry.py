@@ -31,6 +31,7 @@ HANDLERS = {
     "dms.dedup": ("services.line_dms.flow", "_run_dedup"),
     "dms.approve": ("services.line_dms.approval_flow", "_execute_approved"),
     "dms.booking": ("services.line_dms.booking_flow", "_execute_booking"),
+    "dms.booking_preview": ("services.line_dms.booking_edit", "_send_review_preview"),
     "dms.records": ("services.line_dms.query_flow", "_run_records"),
     "dms.top": ("services.line_dms.query_flow", "_run_top"),
 }

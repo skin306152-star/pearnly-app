@@ -23,6 +23,23 @@ from services.erp.mrerp_dms_client_base import DMSClientError
 
 logger = logging.getLogger(__name__)
 
+
+class _LegacyDocnoState:
+    """兼容「完整号即 txtdocno」的旧形态(无原生两栏/隐藏字段可用时)。
+
+    真实建单路径一律传 ``DMSBookingAutonumState``;这里只是让旧形态仍能跑重复号
+    bump(末尾数字 +1),不参与原生前缀/隐藏字段。
+    """
+
+    __slots__ = ("docno",)
+
+    def __init__(self, docno: str):
+        self.docno = docno
+
+    def with_docno(self, docno: str):
+        return _LegacyDocnoState(docno)
+
+
 # 原生订车单列表搜索(只读)。绝不含 drfcbc/new.php —— 回读永不写。
 _BOOKING_LIST_PATH = "drfcbc/component/showdata.php"
 _BOOKING_FORM_PATH = "drfcbc/form.php"
@@ -253,16 +270,52 @@ def verify_created_booking(
     return None
 
 
-def submit_booking(client, base: dict, docno: str, *, on_attempt=None) -> tuple[str, str]:
-    """Only an explicit duplicate rejection permits another write attempt."""
+def submit_booking(
+    client,
+    base: dict,
+    state,
+    *,
+    on_attempt=None,
+    write_payload=None,
+    readback_payload=None,
+) -> tuple[str, str]:
+    """Only an explicit duplicate rejection permits another write attempt.
+
+    ``state`` 是 DMS 原生取号状态(``autonum_state`` 的产物)。写入体由
+    ``write_payload(base, state)`` 构造,默认(无回调时)把完整号放进 ``txtdocno`` 的旧形态
+    仍可跑;真实建单路径一律传原生两栏构造器 + 带完整号的回读视图(见
+    ``DMSClientOpsMixin._booking_write_payload`` / ``_booking_readback_payload``)。
+
+    重复号 bump 走 ``state.with_docno``:数字主体与 ``natn`` 同步前进,绝不脱节;
+    非重复错误与 outcome unknown 都不会重写(后者抛异常交调用方保留草稿)。
+    """
+    if isinstance(state, str):
+        state = _LegacyDocnoState(state)
+    if callable(write_payload) and callable(readback_payload):
+
+        def build_write(current):
+            return write_payload(base, current)
+
+        def build_readback(current):
+            return readback_payload(base, current)
+
+    else:
+
+        def build_write(current):
+            return {**base, "txtdocno": current.docno}
+
+        build_readback = build_write
+
     last_body = ""
     for _ in range(mrerp_dms_docno.BOOKING_DOCNO_MAX_TRIES):
-        data = {**base, "txtdocno": docno}
+        docno = state.docno
+        data = build_write(state)
         status = None
         if on_attempt is not None:
             # Persist the attempt before crossing the write boundary. A crash after POST
             # must not turn the next worker delivery into a second business document.
             on_attempt(docno)
+        readback_input = build_readback(state)
         try:
             resp = client.transport.post(
                 client._url("drfcbc/new.php"), data=data, timeout_ms=120000
@@ -273,11 +326,11 @@ def submit_booking(client, base: dict, docno: str, *, on_attempt=None) -> tuple[
             last_body = ""
         if status == 200 and last_body.startswith("err::"):
             if mrerp_dms_docno.is_duplicate_docno_error(last_body):
-                docno = mrerp_dms_docno.bump_docno(docno)
+                state = state.with_docno(mrerp_dms_docno.bump_docno(docno))
                 continue
             raise DMSClientError(f"booking create rejected: {last_body[:300]!r}", "ERR_DMS_IMPORT")
         readback = {}
-        booking_id = verify_created_booking(client, docno, data, stage_out=readback)
+        booking_id = verify_created_booking(client, docno, readback_input, stage_out=readback)
         if booking_id:
             return booking_id, docno
         raise DMSBookingOutcomeUnknown(

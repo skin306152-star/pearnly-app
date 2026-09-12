@@ -45,6 +45,10 @@ _ROW_RE = re.compile(r'data-val=["\']([^"\']+)["\']')
 _CELL_RE = re.compile(r"<p[^>]*>(.*?)</p>", re.S | re.I)
 _TAG_RE = re.compile(r"<[^>]*>")
 
+# 订车单号在原生表单里是**两格**:txtprefixautonum(配置前缀,如 BK)+ txtdocno(数字主体)。
+# 回读要么收到同样一整串,要么收到这两格;比对只做「精确拼接」,不做任何形状推断 ——
+# 前缀可能不是 ASCII 字母、可能不是两位,用正则拆完整号只会把别单认成我们的单。
+
 # 身份字段:业务上唯一确定「这行是我们要的那张单」的最小集合。
 # 缺任何一个都判 identity_mismatch,不拿模糊命中冒名顶替。
 _REQUIRED_IDENTITY = (
@@ -183,8 +187,36 @@ def field_spec(field: str) -> str | None:
     return None
 
 
-def same_value(field: str, expected: str, actual: str) -> bool:
+def docno_equal(submitted: str, form: dict) -> bool:
+    """提交的订车单号与回读表单里的单号是不是同一张单。
+
+    DMS 把「BK000002609000007」存成 txtprefixautonum='BK' + txtdocno='000002609000007'
+    (2026-09-13 生产实测),所以只比 txtdocno 一格必然得到假阴性。等价规则严格两条:
+
+    1. 回读的 txtdocno 与我们提交的完整号逐字相同 → 同一张单(同形存储/旧形态);
+    2. 回读的 txtprefixautonum 与 txtdocno 都非空,且「前缀 + 数字主体」精确拼接
+       正好等于我们提交的完整号 → 同一张单。
+    3. 其它一律不是这张单:错误前缀、错误主体、缺前缀格、缺主体格都判不一致。
+
+    刻意不做的事:不按正则在完整号里猜前缀(前缀不必是 ASCII 字母、不必两位)、
+    不删字母后只比数字、不只比尾号、不容错大小写。提交字典里的 txtprefixautonum
+    不参与比对(新单表单默认值可能是空串,拿它比会把正确的单判成不一致)。
+    """
+    expected = _text(submitted)
+    actual = _text(form.get("txtdocno"))
+    if expected and expected == actual:
+        return True
+    if not expected or not actual:
+        return False
+    prefix = _text(form.get("txtprefixautonum"))
+    return bool(prefix) and prefix + actual == expected
+
+
+def same_value(field: str, expected: str, actual: str, *, form: dict | None = None) -> bool:
     """同一字段的等价比较:身份证去噪、金额按 Decimal、其余折叠空白。"""
+    if field == "txtdocno" and form is not None:
+        # 单号等价要吃整张表单(前缀 + 编号两格),不是只看 txtdocno 一格。
+        return docno_equal(expected, form)
     if field == "txtpeopleid":
         normalized = normalize_thai_id(expected)
         return bool(normalized) and normalized == normalize_thai_id(actual)
@@ -226,7 +258,7 @@ def evaluate_candidate(submitted: dict, form: dict, row_id: str) -> ReadbackMatc
         if spec is None:
             continue
         # 提交了、回读表单却没有这个字段 —— 对身份/关键字段是真实缺失。
-        if field in form and same_value(field, str(expected), str(form.get(field))):
+        if field in form and same_value(field, str(expected), str(form.get(field)), form=form):
             continue
         if spec == "identity":
             identity_diffs.append(field)
@@ -313,6 +345,7 @@ __all__ = [
     "STAGE_IDENTITY_MISMATCH",
     "STAGE_SEARCH_EMPTY",
     "STAGE_VERIFIED",
+    "docno_equal",
     "evaluate_candidate",
     "field_spec",
     "max_readback_extra_seconds",

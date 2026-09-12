@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-12 13:32（Asia/Bangkok，UTC+7）。状态：**WeKan / COWORK 统一登录已上线，Web/Worker 各 100% 新版本；独立 WeKan 正式域名、持久存储及备份恢复已验证。用户真机验收待确认。**
+更新时间：2026-09-12 20:15（Asia/Bangkok，UTC+7）。状态：**DMS 建档/订车实时映射已上线，Web/Worker 各 100%；Cloudflare DMS no-store 已发布并回读。真实销售手机及新订单业务验收待确认。独立 WeKan 保持原发布。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,6 +27,16 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- Pearnly 完整 SHA：`b78697f3d5ca760f5aa27ef1be2ed9fa00eb3d1d`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:577443d0a249c7968ff6acb9f13cf8a9466f510c72164f6ec258e25ba40d0e33`。
+- Web revision：`pearnly-web-b78697f3d5ca-s3`；Worker revision：`pearnly-worker-b78697f3d5ca-s3`；两端各 100% 流量，runtime secret 均保留 v3。
+- [Manual CD 34694253680](https://github.com/skin306152-star/pearnly-app/actions/runs/34694253680) 成功；schema execution `pearnly-schema-kdzgw` 于 12:43:45 UTC 成功，无新增 DDL。候选与正式 SHA/digest/revision、健康、就绪及完整安装包校验通过；12:46:35 UTC 完成最终 Web 验证，独立 GCP 回读一致。
+- 完整 pre-push 1176 模块/6 片和机械闸通过；正式域名两份 HTML、七份脚本与候选字节一致。LINE 对话与网页均覆盖实时选择、删除重选、变更重确认及收付款必填字段。详见 [DMS 任务记录](../dms/2026-09-12-complete-live-mapping.md)。
+- Cloudflare Worker 源码提交 `05f52eb96df4a2f783e0200dc092f3e73bb01f89`，2026-09-12 20:14 发布；控制台显示 `b24c28cb (Active) Latest`。`/dms`、`/dms/`、`/api/dms`、`/api/dms/`、订车及 portal API 禁止缓存，并保留原凭据入口规则。替代此前仅凭据/订车入口 no-store 的范围；版本化静态资源策略保留。
+- 正式域名 GET `/dms/` 与 `/home/dms-booking` 200，geo 缺认证 400、paints 无效 nonce 422、portal 根路径 404，以上均 `Cache-Control: no-store` / `CF-Cache-Status: DYNAMIC`。错误响应只验证边缘策略，不作为带身份业务数据验收。ready 200；不自动重试真实订单，不宣称历史聊天卡片会自动刷新。
+
+### 上一次 Pearnly 发布与独立 WeKan 当前状态（2026-09-12）
 
 - Pearnly 完整 SHA：`6ae1a234fa19c38d8292c2b67e1ed6aee130eaef`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:d9820d8a4c51990e086d4f182e42155e4e3edb09b219e80ce7921cf190908cd3`。

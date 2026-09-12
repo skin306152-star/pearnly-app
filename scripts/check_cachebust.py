@@ -68,6 +68,7 @@ class CacheBustDir(NamedTuple):
 # i18n / 设计系统 CSS 不进 bundle,是带 ?v 直接 serve 的:改了不 bump 就服旧文案或旧样式
 # (pearnly-ui.css 被五个入口共用,漏 bump = 五个站一起吃旧样式)。
 _ENTRY_ASSETS = {
+    "work.html": ("/static/work/entry.js",),
     "home.html": (
         "/static/dist/main.js",
         "/static/dist/main.css",

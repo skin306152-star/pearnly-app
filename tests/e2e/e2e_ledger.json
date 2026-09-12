@@ -24,6 +24,10 @@
     "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
   ],
   "stale_ack": {
+    "_erp_cowork_split_verify.cjs": {
+      "why": "WeKan 接入仅新增 COWORK/主站协作链接及入口参数，未改 ERP 导航、登录门、跨壳路由白名单或移动样式。已在外部 Chrome 用真实本地普通账号验证 COWORK 登录、菜单进入 WeKan、私密看板创建和退出返回；本会话 UI 操作限定 CUA，未运行依赖 Playwright token/API 注入的旧全量双壳脚本。该脚本的 ERP/手机/快捷键全矩阵仍欠验收，证据及限制见 docs/project/WEKAN_SSO_20260912.md。",
+      "until": "2026-09-13"
+    },
     "_erp_admin_invite_verify.cjs": {
       "why": "OCR 重构只改共享后台缓存键与 OCR 文案，未改 ERP 邀请行为；OCR 页中泰语真实浏览器已验证，按用户要求不扩大到邀请测试；2026-09-05 开发工具清理仅替换脚本第3行的文档链接；对比 ab6bec3e 与候选，除整行注释外逐字一致，未重跑真实 ERP 邀请。若脚本行为变化须重验。",
       "until": "2026-09-05"

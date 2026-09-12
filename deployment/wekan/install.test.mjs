@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { awaitNativeCreation, includeIdentityHeaders, allowUsernameInvitation } from './install.mjs';
+import {
+    awaitNativeCreation,
+    includeIdentityHeaders,
+    allowUsernameInvitation,
+} from './install.mjs';
 import vm from 'node:vm';
 
 test('only missing awaits change; native authorization and awaited calls stay intact', () => {
@@ -40,7 +44,10 @@ test('username invitation preserves authorization and membership while omitting 
     assert.equal((await context.methods.inviteUserToBoard({ username: 'employee' })).email, null);
     assert.deepEqual(context.added, ['employee']);
     assert.deepEqual(context.sent, []);
-    await context.methods.inviteUserToBoard({ username: 'mail-user', emails: [{ address: 'a@example.test' }] });
+    await context.methods.inviteUserToBoard({
+        username: 'mail-user',
+        emails: [{ address: 'a@example.test' }],
+    });
     assert.deepEqual(context.sent, ['a@example.test']);
     context.allowed = false;
     await assert.rejects(context.methods.inviteUserToBoard({ username: 'denied' }));

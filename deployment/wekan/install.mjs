@@ -97,11 +97,13 @@ export function allowUsernameInvitation(source) {
                     member.object.object.property.name === 'emails'
                 ) {
                     const recipient = member.object.object.object;
-                    if (recipient.type !== 'Identifier') throw new Error('Native invitee shape changed');
+                    if (recipient.type !== 'Identifier')
+                        throw new Error('Native invitee shape changed');
                     recipients.add(recipient.name);
                 }
             });
-            if (recipients.size === 1) patches.push({ offset: statement.start, user: [...recipients][0] });
+            if (recipients.size === 1)
+                patches.push({ offset: statement.start, user: [...recipients][0] });
         }
     });
     if (patches.length !== 1) throw new Error('Native invitation email block changed');
@@ -118,7 +120,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (index < 0 || manifest.load.some((entry) => entry.path === 'packages/pearnly-bridge.js'))
         throw new Error('Unexpected Meteor manifest');
     const appPath = root + '/app/app.js';
-    writeFileSync(appPath, allowUsernameInvitation(awaitNativeCreation(readFileSync(appPath, 'utf8'))));
+    writeFileSync(
+        appPath,
+        allowUsernameInvitation(awaitNativeCreation(readFileSync(appPath, 'utf8')))
+    );
     const ddpPath =
         root + '/npm/node_modules/meteor/ddp-server/node_modules/sockjs/lib/transport.js';
     writeFileSync(ddpPath, includeIdentityHeaders(readFileSync(ddpPath, 'utf8')));

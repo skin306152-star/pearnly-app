@@ -68,6 +68,7 @@ async function preminifyDcScript(html) {
 // dist/ 子目录 webhook 部署可靠拾取(门户 vendor 全套已实证),故新页面一律走"可读源→dist 产物",
 // 不再内联进 .py 常量(2026-07-10 脸0 门户 + reset/pos-login 全部并入本管线)。
 const TARGETS = [
+    { src: 'work.html', out: 'static/dist/work.html' },
     { src: 'static/stocktake/mobile.html', out: 'static/dist/stocktake-mobile.html' },
     { src: 'home.html', out: 'static/dist/home.html' },
     { src: 'login.html', out: 'static/dist/login.html' },

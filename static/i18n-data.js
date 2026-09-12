@@ -8,6 +8,7 @@
 // ============================================================
 window.I18N = {
     zh: {
+        'nav-work': '工作协作',
         'st-scan-first': "直接扫描实物，匹配后输入本次数量。",
         'st-manual-code': "输入条形码、QR编号或商品编号",
         'st-find-product': "确认编号",
@@ -5350,6 +5351,7 @@ window.I18N = {
         'stc-op-save-fail': '保存失败,请重试',
     },
     en: {
+        'nav-work': 'Work collaboration',
         'st-scan-first': "Scan the physical item, then enter the quantity counted this time.",
         'st-manual-code': "Enter barcode, QR ID or product code",
         'st-find-product': "Find product",
@@ -10672,6 +10674,7 @@ window.I18N = {
         'stc-op-save-fail': 'Failed to save, please retry',
     },
     th: {
+        'nav-work': 'การทำงานร่วมกัน',
         'st-scan-first': "สแกนสินค้าจริง แล้วกรอกจำนวนที่นับครั้งนี้",
         'st-manual-code': "กรอกบาร์โค้ด รหัส QR หรือรหัสสินค้า",
         'st-find-product': "ค้นหาสินค้า",
@@ -15987,6 +15990,7 @@ window.I18N = {
         'stc-op-save-fail': 'บันทึกไม่สำเร็จ กรุณาลองใหม่',
     },
     ja: {
+        'nav-work': '共同作業',
         'st-scan-first': "実物をスキャンして、今回数えた数量を入力します。",
         'st-manual-code': "バーコード・QR番号・商品コードを入力",
         'st-find-product': "商品を表示",

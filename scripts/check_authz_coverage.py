@@ -47,6 +47,7 @@ PUBLIC_ROUTES = {
     # 登录准入与数据权限仍由 /api/login entry 和后端 API 守门。
     # 绝不登记任何 /api/erp/* 业务路由。
     ("GET", "/cowork"),
+    ("GET", "/work"),  # Public redirect shell; no business data or credentials.
     ("GET", "/erp"),
     ("GET", "/cashier-sw.js"),  # PWA Service Worker 脚本(公开静态 · 同 /pos-sw.js)
     ("GET", "/reset"),

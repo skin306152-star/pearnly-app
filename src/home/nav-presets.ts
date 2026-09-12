@@ -29,6 +29,7 @@ const POS_AVATAR_HIDE = [...FIRM_AVATAR_HIDE];
 export const NAV_NODES: Record<string, string> = {
     dashboard: '.nav-item[data-route="dashboard"]',
     cowork: '[data-collapsible="firm"]', // Pearnly Cowork(录入 / 识别 / 推送 / 对账)
+    work: '#nav-work', // All COWORK users; WeKan owns board permissions.
     products: '[data-collapsible="products"]', // 商品系统(POS/商户端:商品数据/费用数据/库存)
     firmGoods: '[data-collapsible="firm-goods"]', // 商品(事务所端:收发存报表 · 与 products 各是各的)
     purchases: '[data-collapsible="expense"]', // 采购系统
@@ -51,6 +52,7 @@ export const FIRM_PRESET: NavPreset = {
     show: [
         'dashboard',
         'cowork',
+        'work',
         'firmGoods',
         'purchases',
         'clients',
@@ -74,7 +76,7 @@ export const POS_PRESET: NavPreset = {
 // Cowork 版(entry=cowork · 协同工作台 canonical):首页 + Pearnly Cowork + 主数据 + 集成 +
 // 使用教程。集成恢复 Cowork LINE 主账号绑定入口；底部账号 / 右上账套切换 / 头像保留。
 export const COWORK_PRESET: NavPreset = {
-    show: ['dashboard', 'cowork', 'master', 'clients', 'company', 'integrations', 'guide'],
+    show: ['dashboard', 'cowork', 'work', 'master', 'clients', 'company', 'integrations', 'guide'],
     home: 'dashboard',
     avatarHide: FIRM_AVATAR_HIDE,
 };
@@ -130,6 +132,8 @@ const CHILD_GATED_GROUPS = new Set(['cashier', 'perm', 'master']);
 // 按清单显隐顶层节点。显示的折叠组顺带复位子项 display(切业态往返时清残留),
 // 唯 CHILD_GATED_GROUPS 内的组子项另有门控(见上),此处不碰。
 export function applyNavPreset(preset: NavPreset): void {
+    const work = document.querySelector<HTMLAnchorElement>('#nav-work');
+    if (work) work.href = '/work?entry=' + (location.pathname === '/cowork' ? 'cowork' : 'main');
     const visible = new Set(preset.show);
     Object.keys(NAV_NODES).forEach((key) => {
         const el = document.querySelector<HTMLElement>(NAV_NODES[key]);

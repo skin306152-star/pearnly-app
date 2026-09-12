@@ -1,0 +1,60 @@
+services:
+    gateway:
+        image: ${WORK_IMAGE:?WORK_IMAGE required}
+        entrypoint: [node, /opt/pearnly/gateway.mjs]
+        restart: unless-stopped
+        environment:
+            PORT: 8096
+            PEARNLY_ENV: ${PEARNLY_ENV:-production}
+            PEARNLY_ORIGIN: ${PEARNLY_ORIGIN:-https://pearnly.com}
+            PEARNLY_SERVICE_ORIGIN: ${PEARNLY_SERVICE_ORIGIN:-https://pearnly.com}
+            WORK_BRIDGE_URL: ${WORK_BRIDGE_URL:?WORK_BRIDGE_URL required}
+            WORK_BRIDGE_SECRET: ${WORK_BRIDGE_SECRET:?WORK_BRIDGE_SECRET required}
+            WEKAN_UPSTREAM: http://wekan:8080
+        ports:
+            - '${WORK_BIND:-127.0.0.1}:8096:8096'
+        networks:
+            work:
+                ipv4_address: 172.31.91.3
+        depends_on:
+            - wekan
+    wekan:
+        image: ${WORK_IMAGE:?WORK_IMAGE required}
+        restart: unless-stopped
+        environment:
+            PORT: 8080
+            ROOT_URL: ${WORK_BRIDGE_URL:?WORK_BRIDGE_URL required}
+            MONGO_URL: mongodb://mongo:27017/wekan
+            WRITABLE_PATH: /data
+            DEFAULT_LANGUAGE: th
+            PASSWORD_LOGIN_ENABLED: 'false'
+            WITH_API: 'true'
+            MAIL_URL: ${WORK_MAIL_URL:-}
+            MAIL_FROM: ${WORK_MAIL_FROM:-Pearnly <hello@pearnly.com>}
+            PEARNLY_ORIGIN: ${PEARNLY_ORIGIN:-https://pearnly.com}
+            PEARNLY_SERVICE_ORIGIN: ${PEARNLY_SERVICE_ORIGIN:-https://pearnly.com}
+            WORK_BRIDGE_SECRET: ${WORK_BRIDGE_SECRET:?WORK_BRIDGE_SECRET required}
+            PEARNLY_TRUSTED_PROXY_IPS: 172.31.91.3
+        volumes:
+            - files:/data
+        networks:
+            work:
+                ipv4_address: 172.31.91.2
+        depends_on:
+            - mongo
+    mongo:
+        image: mongo:7@sha256:b6421fd6d1c5ded6377b397d8983e2f82e2100dc5123332dcfda2065a472be5b
+        restart: unless-stopped
+        volumes:
+            - database:/data/db
+        networks:
+            work:
+                ipv4_address: 172.31.91.4
+networks:
+    work:
+        ipam:
+            config:
+                - subnet: 172.31.91.0/24
+volumes:
+    database:
+    files:

@@ -27,6 +27,14 @@ export const SIDEBAR_HTML = `
         <span class="nav-label" data-i18n="nav-dashboard">首页</span>
     </div>
 
+    <a class="nav-item" id="nav-work" href="/work" style="display:none;text-decoration:none;color:inherit">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2.5" y="3" width="15" height="14" rx="2"/>
+            <path d="M7.5 3v14M12.5 3v14M5 6v4M10 6v7M15 6v3"/>
+        </svg>
+        <span class="nav-label" data-i18n="nav-work">工作协作</span>
+    </a>
+
     <!-- 事务所工具 ▼ 可折叠组(2026-06-10 五-bis · 代账工具:上传识别/识别记录/对账中心)·
          business_type=firm 或未选(老租户兜底)显示 · 商户业态隐藏 · module-nav.ts apply() 控显隐 -->
     <div class="nav-group nav-collapsible" data-collapsible="firm" style="display:none;">

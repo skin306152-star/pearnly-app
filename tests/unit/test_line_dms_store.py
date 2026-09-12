@@ -204,10 +204,19 @@ class CreateBindingTests(unittest.TestCase):
 
 class GetBindingTests(unittest.TestCase):
     def test_by_user_returns_dict(self):
-        cur = FakeCursor(fetchone={"line_user_id": "L1", "tenant_id": "t1", "display_name": "N"})
+        cur = FakeCursor(
+            fetchone={
+                "line_user_id": "L1",
+                "tenant_id": "t1",
+                "user_id": "u1",
+                "display_name": "N",
+            }
+        )
         with _patch_via_db(cur):
             out = store.get_binding_by_user("u1")
         self.assertEqual(out["line_user_id"], "L1")
+        self.assertEqual(out["user_id"], "u1")
+        self.assertIn("tenant_id, user_id, display_name", cur.all_sql())
 
     def test_by_line_user_normalizes_ids(self):
         cur = FakeCursor(

@@ -143,7 +143,6 @@
             esc(value || '') +
             '"' +
             (required ? ' required' : '') +
-            (cls === 'src-time' ? ' type="time"' : '') +
             '></div>'
         );
     }
@@ -199,7 +198,6 @@
                   paymentField('src-account', 'sourceAccount', x.src_account_no, false, true) +
                   paymentField('src-name', 'sourceAccountName', x.src_account_name, false, true) +
                   paymentField('src-branch', 'sourceBranch', x.src_branch_name, false, true) +
-                  paymentField('src-time', 'transferTime', x.src_time, false, true) +
                   '<div class="field wide"><label>' +
                   t('destination') +
                   '</label><select class="dst" required>' +
@@ -533,9 +531,14 @@
             : '';
     }
     async function hydrateGeo() {
-        var c = model.form.customer;
+        var c = model.form.customer,
+            bundled = model.geo || {};
         try {
-            setOptions('province_id', await geo('provinces', ''), c.province_id);
+            setOptions(
+                'province_id',
+                bundled.provinces || (await geo('provinces', '')),
+                c.province_id
+            );
             var levels = [
                 ['districts', 'province_id', 'district_id'],
                 ['subdistricts', 'district_id', 'subdistrict_id'],
@@ -543,7 +546,11 @@
             ];
             for (var item of levels) {
                 var parent = document.getElementById(item[1]).value;
-                setOptions(item[2], parent ? await geo(item[0], parent) : [], c[item[2]]);
+                setOptions(
+                    item[2],
+                    bundled[item[0]] || (parent ? await geo(item[0], parent) : []),
+                    c[item[2]]
+                );
             }
             document.getElementById('save').disabled = false;
         } catch (e) {
@@ -609,7 +616,6 @@
                 x.src_account_no = row.querySelector('.src-account').value.trim();
                 x.src_account_name = row.querySelector('.src-name').value.trim();
                 x.src_branch_name = row.querySelector('.src-branch').value.trim();
-                x.src_time = row.querySelector('.src-time').value.trim();
                 x.dst_id = row.querySelector('.dst').value;
                 x.dst_business_name = row.querySelector('.dst-name').value.trim();
                 x.dst_account_no = row.querySelector('.dst-account').value.trim();

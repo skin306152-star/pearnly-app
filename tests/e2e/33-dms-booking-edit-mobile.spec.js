@@ -231,6 +231,24 @@ const GEO = {
     },
 };
 
+const AUTO_DEFAULT_DRAFT = {
+    ...GEO_DRAFT,
+    form: {
+        ...GEO_DRAFT.form,
+        customer: { ...GEO_DRAFT.form.customer, prefix_id: '17' },
+    },
+    masters: {
+        ...GEO_DRAFT.masters,
+        prefixes: [{ id: '17', label: 'นาย' }],
+    },
+    geo: {
+        provinces: GEO.provinces,
+        districts: GEO.districts['1'],
+        subdistricts: GEO.subdistricts['18'],
+        zipcodes: GEO.zipcodes['72'],
+    },
+};
+
 function liffMockScript(os, inClient = true, loggedIn = true) {
     return `window.__dmsPortalOpen=null;window.__dmsPortalClosed=false;window.__dmsLiffInit=null;window.__dmsLiffLogin=null;window.liff={init:async(params)=>{window.__dmsLiffInit=params;localStorage.setItem('__dmsLiffInit',JSON.stringify(params));},isLoggedIn:()=>${JSON.stringify(loggedIn)},login:(params)=>{window.__dmsLiffLogin=params;localStorage.setItem('__dmsLiffLogin',JSON.stringify(params));},getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>${JSON.stringify(inClient)},getOS:()=>${JSON.stringify(os)},openWindow:(params)=>{window.__dmsPortalOpen=params;},closeWindow:()=>{window.__dmsPortalClosed=true;}};`;
 }
@@ -648,6 +666,7 @@ test('payment editor keeps bank, account and company destination as separate fie
     await page.waitForSelector('#editor:not([hidden])');
     await expect(page.locator('.src-bank')).toHaveValue('S1');
     await expect(page.locator('.src-account')).toHaveValue('111222333');
+    await expect(page.locator('.src-time')).toHaveCount(0);
     await expect(page.locator('.dst')).toHaveValue('2');
     await expect(page.locator('.dst option:checked')).toHaveText('BBL · Bbl 987654321 · ระยอง');
     await expect(page.locator('[data-t="loading"]')).toBeHidden();
@@ -691,7 +710,6 @@ test('payment editor keeps bank, account and company destination as separate fie
             src_account_no: '111222333',
             src_account_name: 'Customer',
             src_branch_name: 'Bangkok',
-            src_time: '15:06',
             dst_id: '2',
         },
     });
@@ -755,7 +773,6 @@ test('empty source bank directory falls back to a typed bank name', async ({ pag
             src_account_no: '111222333',
             src_account_name: 'Customer',
             src_branch_name: 'Bangkok',
-            src_time: '15:06',
             dst_id: '2',
             dst_business_name: 'Example Company',
             dst_account_no: '987654321',
@@ -943,6 +960,38 @@ test('booking editor exposes every live DMS title option', async ({ page }) => {
             fullPage: true,
         });
     }
+});
+
+test('identity title and DMS postcode open selected without extra geo logins', async ({ page }) => {
+    let geoRequests = 0;
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
+        const url = new URL(route.request().url());
+        if (url.pathname.endsWith('/geo')) geoRequests += 1;
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: AUTO_DEFAULT_DRAFT }),
+        });
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=auto-defaults`);
+    await page.waitForSelector('#save:not([disabled])');
+    await expect(page.locator('#prefix_id')).toHaveValue('17');
+    await expect(page.locator('#zipcode_id')).toHaveValue('197');
+    expect(geoRequests).toBe(0);
+    await page.screenshot({ path: path.join(OUT, 'auto-title-postcode-390.png'), fullPage: true });
 });
 
 test('save errors are actionable on mobile and desktop', async ({ page }) => {

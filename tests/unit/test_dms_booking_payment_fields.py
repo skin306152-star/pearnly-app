@@ -106,7 +106,7 @@ class TestPaymentFormFields(unittest.TestCase):
         self.assertEqual(fields["txtbanknametffrom"], "SCB")
         self.assertEqual(fields["banktffromval"], "7")
         self.assertEqual(fields["txtbranchnametffrom"], "Bangkok")
-        self.assertEqual(fields["txttimetffrom"], "15:06")
+        self.assertNotIn("txttimetffrom", fields)
         self.assertEqual(fields["txtaccountnumtfmon"], "ACC-DST")
         self.assertEqual(fields["txtbusinessnametfmon"], "Pearnly")
         self.assertEqual(fields["txtbanknametfmon"], "BBL")

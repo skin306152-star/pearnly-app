@@ -49,6 +49,17 @@ class _FakeClient:
         self.painted_cars = []
         self.geo_levels = []
         self.strict = None
+        self.customer_reads = []
+        self.live_customer = {
+            "people_id": "1101700998118",
+            "prefix_id": "17",
+            "prefix_name": "นาย",
+            "province_id": "P1",
+            "district_id": "D1",
+            "subdistrict_id": "S1",
+            "zipcode_id": "Z1",
+            "zipcode_name": "10230",
+        }
 
     def fetch_masters(self, *, strict=False):
         self.strict = strict
@@ -63,6 +74,10 @@ class _FakeClient:
     def list_geo(self, level, parent_id=""):
         self.geo_levels.append((level, parent_id))
         return list(_GEO_ROWS.get(level) or [])
+
+    def read_customer(self, customer_id):
+        self.customer_reads.append(customer_id)
+        return dict(self.live_customer)
 
 
 class _RunLoggedIn:
@@ -130,6 +145,22 @@ class EditSnapshotTests(unittest.TestCase):
         snap = dms_edit_snapshot.read_edit_snapshot(_ENDPOINT, car_ids=("C1",))
         self.assertEqual(self.run.client.geo_levels, [])
         self.assertEqual(snap["geo"], {})
+
+    def test_missing_title_and_postcode_are_backfilled_from_the_current_dms_customer(self):
+        draft = {"people_id": "1101700998118", "prefix_id": "", "zipcode_id": ""}
+        snap = dms_edit_snapshot.read_edit_snapshot(_ENDPOINT, customer=draft, customer_id="115")
+        self.assertEqual(self.run.client.customer_reads, ["115"])
+        self.assertEqual(snap["resolved_customer"]["prefix_id"], "17")
+        self.assertEqual(snap["resolved_customer"]["prefix_name"], "นาย")
+        self.assertEqual(snap["resolved_customer"]["zipcode_id"], "Z1")
+        self.assertEqual(snap["resolved_customer"]["zipcode"], "10230")
+        self.assertEqual(snap["geo"]["zipcodes"], [["Z1", "10230"]])
+
+    def test_dms_customer_identity_mismatch_fails_closed(self):
+        snap = dms_edit_snapshot.read_edit_snapshot(
+            _ENDPOINT, customer={"people_id": "1101700998119"}, customer_id="115"
+        )
+        self.assertIsNone(snap)
 
     def test_login_failure_is_none_and_never_falls_back_to_cache(self):
         self.run.error = "ERR_DMS_AUTH"

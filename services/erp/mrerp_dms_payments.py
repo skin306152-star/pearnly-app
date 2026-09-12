@@ -33,7 +33,6 @@ _PAYMENT_TEXT_FIELD = {
         "src_bank_name": "txtbanknametffrom",
         "src_bank_id": "banktffromval",
         "src_branch_name": "txtbranchnametffrom",
-        "src_time": "txttimetffrom",
         "dst_business_name": "txtbusinessnametfmon",
         "dst_account_no": "txtaccountnumtfmon",
         "dst_bank_name": "txtbanknametfmon",

@@ -118,7 +118,13 @@ class DMSClientFormsMixin:
         zipcodes = self._fetch_options(
             "cus/component/listzipcodes.php", {"selsubdistricts": subdistrict_id}
         )
-        return replace(resolved, zipcode_id=self._match_geo(zipcodes, address.zipcode))
+        zipcode_id = self._match_geo(zipcodes, address.zipcode)
+        # 泰国身份证正面常不印邮编。当前街道若在 DMS 只对应一个邮编，可确定性补齐；
+        # 多个候选仍保持空白，留给用户选择，绝不猜第一项。
+        if not zipcode_id:
+            unique_ids = {str(row[0]) for row in zipcodes if row and row[0] is not None}
+            zipcode_id = next(iter(unique_ids)) if len(unique_ids) == 1 else ""
+        return replace(resolved, zipcode_id=zipcode_id)
 
     def _fetch_options(self, path: str, body: Dict[str, str]) -> List[List[str]]:
         return self._parse_options(self._post_text(path, body))

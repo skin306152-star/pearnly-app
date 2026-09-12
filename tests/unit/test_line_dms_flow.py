@@ -90,6 +90,14 @@ class DraftPrefixTests(unittest.TestCase):
             {"prefix_name": "นางสาว", "address": {}}, {}, [["17", "นาย"], ["18", "นางสาว"]], ""
         )
         self.assertEqual(out["prefix_id"], "18")
+        self.assertEqual(out["prefix_name"], "นางสาว")
+
+    def test_common_identity_title_alias_maps_to_the_unique_dms_option(self):
+        out = draft.build_draft(
+            {"prefix_name": "Mr.", "address": {}}, {}, [["17", "นาย"], ["18", "นางสาว"]], ""
+        )
+        self.assertEqual(out["prefix_id"], "17")
+        self.assertEqual(out["prefix_name"], "Mr.")
 
     def test_unmapped_ocr_prefix_stays_unselected(self):
         out = draft.build_draft(

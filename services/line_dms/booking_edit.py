@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Load and save the browser editor for a pending LINE DMS booking.
 
-每个请求只登录 DMS **一次**:主档、银行目录、选中车型颜色、客户四级地址标签都吃
+每个请求只登录 DMS **一次**:主档、当前客户、银行目录、车型颜色、地址标签都吃
 `dms_edit_snapshot.read_edit_snapshot` 的同一份请求级新鲜快照(见该模块的契约注释)。
-save 成功后经既有 Cloud Tasks 异步补发新版预览卡,HTTP save 不等 LINE 网络。
+save 只有在 LINE 确认收到新版预览卡后才成功，避免页面先关但实际没有卡。
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from services.line_dms.qa_util import car_label, find_row, row_name
 
 logger = logging.getLogger(__name__)
 
-# Cloud Tasks 白名单 handler:异步补发新版预览卡(save 不在 HTTP 请求里等 LINE 网络)。
+# 保留白名单 handler 供部署前已入队任务兼容；新保存流程同步确认 LINE 回执。
 PREVIEW_TASK = "dms.booking_preview"
 
 MASTER_FIELDS = {
@@ -76,7 +76,11 @@ class BookingEditError(ValueError):
 
 def _binding(user: dict) -> dict:
     binding = store.get_binding_by_user(str(user.get("id") or ""))
-    if not binding or str(binding.get("tenant_id")) != str(user.get("tenant_id")):
+    if (
+        not binding
+        or str(binding.get("tenant_id")) != str(user.get("tenant_id"))
+        or str(binding.get("user_id")) != str(user.get("id"))
+    ):
         raise BookingEditError("dms_booking.not_bound", 403)
     return binding
 
@@ -138,9 +142,18 @@ def _form(qa: dict) -> dict:
     }
 
 
-def _snapshot(endpoint: dict, *, car_ids: Iterable[str] = (), customer: dict | None = None) -> dict:
+def _snapshot(
+    endpoint: dict,
+    *,
+    car_ids: Iterable[str] = (),
+    customer: dict | None = None,
+    customer_id: str = "",
+) -> dict:
     """本请求唯一一次权威登录取回的快照;读不到就 fail closed(不拿旧缓存冒充实时)。"""
-    snapshot = read_edit_snapshot(endpoint, car_ids=car_ids, customer=customer)
+    kwargs = {"car_ids": car_ids, "customer": customer}
+    if customer_id:
+        kwargs["customer_id"] = customer_id
+    snapshot = read_edit_snapshot(endpoint, **kwargs)
     if not snapshot:
         raise BookingEditError("dms_booking.master_unavailable", 503)
     return snapshot
@@ -177,11 +190,21 @@ def load(user: dict, nonce: str) -> dict:
     # 编辑页展示的是用户即将确认的主档,不能让 12 小时前的银行/车型快照继续占位:
     # 主档 + 本次要展示的车型颜色在**同一次登录**里读回(不再为同一车型颜色登第二次)。
     car_id = str(((qa.get("answers") or {}).get("car") or {}).get("id") or "")
-    snapshot = _snapshot(endpoint, car_ids=(car_id,) if car_id else ())
+    form = _form(qa)
+    customer_id = str((qa.get("customer") or {}).get("id") or "")
+    snapshot = _snapshot(
+        endpoint,
+        car_ids=(car_id,) if car_id else (),
+        customer=form["customer"],
+        customer_id=customer_id,
+    )
+    # 身份证草稿已填的值优先；缺失的称谓/邮编/地址 id 从同一次管理员权威直读补齐。
+    resolved_customer = snapshot.get("resolved_customer") or {}
+    form["customer"].update({key: str(resolved_customer.get(key) or "") for key in CUSTOMER_FIELDS})
     masters = _masters(snapshot)
     prefix_rows = masters.get("prefixes") or []
     return {
-        "form": _form(qa),
+        "form": form,
         "masters": {
             "places": _options(masters.get("place_books") or []),
             "cars": _options(masters.get("cars") or [], car_label),
@@ -196,6 +219,8 @@ def load(user: dict, nonce: str) -> dict:
         },
         # 与 LINE 对话同一条规则:这几类目录权威为空 → 银行名称手工填,hidden id 留空。
         "manual_banks": _manual_bank_keys(masters),
+        # 首屏直接复用同一次权威快照，避免移动端再为四级地址重复登录 DMS 四次。
+        "geo": {key: _options(rows) for key, rows in (snapshot.get("geo") or {}).items()},
     }
 
 
@@ -355,29 +380,18 @@ def save(user: dict, nonce: str, submitted: dict) -> str:
 
 # ── 新版预览卡出口 ──────────────────────────────────────────────────────
 def _preview_message(line_user_id: str, qa: dict, nonce: str) -> None:
-    """新版预览卡(本地/测试直发;生产由 Cloud Tasks 任务在 worker 里发)。"""
-    _send(line_user_id, qa_cards.preview_card(qa, nonce))
+    """发送新版预览卡；LINE 没确认接收就抛错，不能把 False 当成功。"""
+    if not _send(line_user_id, qa_cards.preview_card(qa, nonce)):
+        raise RuntimeError("line_booking_preview_not_delivered")
 
 
 def _dispatch_preview(binding: dict, line_user_id: str, nonce: str, qa: dict) -> bool:
-    """把新版预览卡投出去。返回 False = 既没发也没落队,调用方必须恢复旧 payload/nonce。
-
-    生产(web/worker 角色):入队 `dms.booking_preview` —— HTTP save 不等 LINE 网络;入队本身是
-    先落库再投递,持久化失败会抛异常,这里如实返回 False。本地/测试:直接发(行为与改前一致)。
-    """
-    from services.cloud_tasks import dispatch
-
-    if not dispatch.enabled():
-        try:
-            _preview_message(line_user_id, qa, nonce)
-        except Exception:
-            logger.warning("[dms] booking preview send failed", exc_info=True)
-            return False
-        return True
+    """同步取得 LINE 200 回执；失败时调用方恢复旧 nonce，编辑页保持可重试。"""
     try:
-        dispatch.enqueue(PREVIEW_TASK, binding, line_user_id, nonce)
+        with binding_guard.scope(binding):
+            _preview_message(line_user_id, qa, nonce)
     except Exception:
-        logger.warning("[dms] booking preview enqueue failed", exc_info=True)
+        logger.warning("[dms] booking preview send failed", exc_info=True)
         return False
     return True
 

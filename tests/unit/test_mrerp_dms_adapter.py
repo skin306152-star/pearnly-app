@@ -126,6 +126,24 @@ class GeoResolveTests(unittest.TestCase):
         self.assertEqual(r.district_id, "47")
         self.assertEqual(r.subdistrict_id, "149")
 
+    def test_missing_id_card_postcode_uses_the_only_dms_postcode_for_the_subdistrict(self):
+        t = GeoFakeTransport(
+            districts=[("47", "บางนา")],
+            subdistricts=[("149", "บางนา")],
+            zipcodes=[("106", "10260")],
+        )
+        r = self._resolve(t, _geo_address(zipcode=""))
+        self.assertEqual(r.zipcode_id, "106")
+
+    def test_missing_id_card_postcode_stays_blank_when_dms_has_multiple_choices(self):
+        t = GeoFakeTransport(
+            districts=[("47", "บางนา")],
+            subdistricts=[("149", "บางนา")],
+            zipcodes=[("106", "10260"), ("107", "10261")],
+        )
+        r = self._resolve(t, _geo_address(zipcode=""))
+        self.assertEqual(r.zipcode_id, "")
+
     def test_unmatched_province_remains_unselected_without_using_form_default(self):
         t = GeoFakeTransport(
             districts=[("800", "เมือง")],

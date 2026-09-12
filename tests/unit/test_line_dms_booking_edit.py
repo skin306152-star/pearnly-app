@@ -124,7 +124,7 @@ GEO_ROWS = {
 }
 
 
-def snapshot(masters=None, *, paints=None, geo=None):
+def snapshot(masters=None, *, paints=None, geo=None, resolved_customer=None):
     """read_edit_snapshot 的返回形状:一次权威登录取回的主档/颜色/级联。"""
     use = masters or MASTERS
     return {
@@ -132,6 +132,7 @@ def snapshot(masters=None, *, paints=None, geo=None):
         "paints": {"C1": [["PA1", "RED", "Red"]]} if paints is None else paints,
         "prefixes": list(use.get("prefixes") or []),
         "geo": GEO_ROWS if geo is None else geo,
+        "resolved_customer": resolved_customer or {},
     }
 
 
@@ -189,7 +190,6 @@ class BookingEditTests(TestCase):
                 "src_account_no": "99",
                 "src_account_name": "Customer",
                 "src_branch_name": "Bangkok",
-                "src_time": "15:06",
                 "dst_id": "B1",
                 "dst": "SCB · 1234567890123 · Rayong",
                 "dst_bank_id": "B1",
@@ -225,9 +225,43 @@ class BookingEditTests(TestCase):
             out = booking_edit.load(self.user, "N1")
 
         # 不拿 12h 缓存:唯一一次读取带上了本请求要展示的车型(颜色不再单独登第二次)。
-        read.assert_called_once_with({"id": "E1"}, car_ids=("C1",), customer=None)
+        read.assert_called_once_with(
+            {"id": "E1"},
+            car_ids=("C1",),
+            customer=out["form"]["customer"],
+            customer_id="C1",
+        )
         self.assertEqual(out["masters"]["prefixes"], [{"id": "17", "label": "Mr"}])
         self.assertEqual(out["masters"]["paints"], [{"id": "PA1", "label": "Red"}])
+
+    def test_load_backfills_blank_title_and_postcode_from_current_dms_customer(self):
+        qa = copy.deepcopy(QA)
+        qa["draft"].update(prefix_id="", prefix_name="", zipcode_id="", zipcode="")
+        payload = {"nonce": "N1", "qa": qa}
+        resolved = {
+            **booking_edit._form(qa)["customer"],
+            "prefix_id": "17",
+            "prefix_name": "นาย",
+            "zipcode_id": "Z1",
+            "zipcode": "10230",
+        }
+        with (
+            mock.patch.object(
+                booking_edit,
+                "_review",
+                return_value=(self.binding, payload, {"id": "E1"}),
+            ),
+            mock.patch.object(
+                booking_edit,
+                "read_edit_snapshot",
+                return_value=snapshot(resolved_customer=resolved),
+            ),
+        ):
+            out = booking_edit.load(self.user, "N1")
+        self.assertEqual(out["form"]["customer"]["prefix_id"], "17")
+        self.assertEqual(out["form"]["customer"]["zipcode_id"], "Z1")
+        self.assertEqual(out["form"]["customer"]["zipcode"], "10230")
+        self.assertEqual(out["geo"]["zipcodes"], [{"id": "Z1", "label": "10230"}])
         self.assertEqual(
             out["masters"]["company_banks"],
             [
@@ -656,7 +690,7 @@ class BookingEditTests(TestCase):
 
 
 class PreviewDispatchTests(TestCase):
-    """save 的新版预览卡出口:生产入队 Cloud Tasks 不等 LINE 网络;入队失败恢复旧 payload。"""
+    """save 必须拿到 LINE 成功回执；失败恢复旧 payload/nonce。"""
 
     def setUp(self):
         self.user = {"id": "U1", "tenant_id": "T1"}
@@ -679,7 +713,7 @@ class PreviewDispatchTests(TestCase):
             ),
         )
 
-    def test_production_save_enqueues_preview_and_does_not_wait_for_line(self):
+    def test_production_save_waits_for_line_delivery_receipt(self):
         with contextlib.ExitStack() as es:
             for patcher in self.patches:
                 es.enter_context(patcher)
@@ -687,36 +721,23 @@ class PreviewDispatchTests(TestCase):
                 mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
             )
             send = es.enter_context(mock.patch.object(booking_edit, "_send"))
-            enqueue = es.enter_context(
-                mock.patch("services.cloud_tasks.dispatch.enqueue", return_value="task-1")
-            )
-            es.enter_context(mock.patch("services.cloud_tasks.dispatch.enabled", return_value=True))
             nonce = booking_edit.save(self.user, "N1", form())
 
         self.assertNotEqual(nonce, "N1")
-        self.assertEqual(
-            enqueue.call_args.args,
-            ("dms.booking_preview", self.binding, "L1", nonce),
-        )
-        # HTTP save 里不再同步碰 LINE:新版预览卡由 dms.booking_preview 任务发。
-        send.assert_not_called()
+        send.assert_called_once()
+        self.assertEqual(send.call_args.args[0], "L1")
+        self.assertIn(nonce, str(send.call_args.args[1]))
         saved = replace.call_args.args[3]
         self.assertEqual(saved["nonce"], nonce)
 
-    def test_enqueue_failure_restores_previous_payload_and_nonce(self):
+    def test_line_delivery_failure_restores_previous_payload_and_nonce(self):
         with contextlib.ExitStack() as es:
             for patcher in self.patches:
                 es.enter_context(patcher)
             replace = es.enter_context(
                 mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
             )
-            es.enter_context(mock.patch.object(booking_edit, "_send"))
-            es.enter_context(mock.patch("services.cloud_tasks.dispatch.enabled", return_value=True))
-            es.enter_context(
-                mock.patch(
-                    "services.cloud_tasks.dispatch.enqueue", side_effect=RuntimeError("queue down")
-                )
-            )
+            es.enter_context(mock.patch.object(booking_edit, "_send", return_value=False))
             with self.assertRaisesRegex(booking_edit.BookingEditError, "preview_send_failed"):
                 booking_edit.save(self.user, "N1", form())
 

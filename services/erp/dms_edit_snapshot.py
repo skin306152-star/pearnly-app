@@ -56,8 +56,25 @@ def _plain_car_ids(car_ids: Iterable[Any]) -> Tuple[str, ...]:
     return tuple(out)
 
 
-def _read(endpoint: Dict[str, Any], cars: Tuple[str, ...], levels: Tuple[Tuple[str, str], ...]):
-    """一次登录里把三块读全:主档不完整就抛错(整体 fail closed),车型颜色读失败留 None。"""
+def _merge_customer_defaults(
+    draft: Optional[Dict[str, Any]], live: Optional[Dict[str, Any]]
+) -> Dict[str, str]:
+    """只用 DMS 当前客户资料补草稿空值；用户已有值永远优先。"""
+    out = {str(key): str(value or "") for key, value in (draft or {}).items()}
+    for key, value in (live or {}).items():
+        target = "zipcode" if key == "zipcode_name" else str(key)
+        if not str(out.get(target) or "").strip():
+            out[target] = str(value or "")
+    return out
+
+
+def _read(
+    endpoint: Dict[str, Any],
+    cars: Tuple[str, ...],
+    customer: Optional[Dict[str, Any]],
+    customer_id: str,
+):
+    """一次登录读主档、客户现值、颜色和地址级联；任何权威读取失败都 fail closed。"""
 
     def _fetch(client, adapter):
         from services.erp.mrerp_dms_company_banks import fetch_payment_bank_masters
@@ -73,8 +90,30 @@ def _read(endpoint: Dict[str, Any], cars: Tuple[str, ...], levels: Tuple[Tuple[s
             # closed:别因为一个不该出现的车型 id 把整次请求判成主档不可用,也别把
             # 「没读到」当成「这车没颜色」。
             paints[car_id] = list(rows) if rows is not None else None
-        geo = {level: list(client.list_geo(level, parent) or []) for level, parent in levels}
-        return {"masters": masters, "paints": paints, "geo": geo}
+        live_customer: Dict[str, Any] = {}
+        if customer_id:
+            live_customer = dict(client.read_customer(customer_id) or {})
+            from services.erp.dms_id_validate import normalize_thai_id
+            from services.erp.mrerp_dms_client_base import DMSClientError
+
+            expected = normalize_thai_id(str((customer or {}).get("people_id") or ""))
+            actual = normalize_thai_id(str(live_customer.get("people_id") or ""))
+            if expected and actual != expected:
+                raise DMSClientError(
+                    "booking editor customer identity mismatch", "ERR_DMS_CUSTOMER_LOOKUP"
+                )
+        resolved_customer = _merge_customer_defaults(customer, live_customer)
+        geo = {
+            level: list(client.list_geo(level, parent) or [])
+            for level, parent in geo_levels(resolved_customer)
+        }
+        return {
+            "masters": masters,
+            "paints": paints,
+            "geo": geo,
+            "customer": live_customer,
+            "resolved_customer": resolved_customer,
+        }
 
     from services.erp.erp_dms_intake import _run_logged_in
 
@@ -103,14 +142,14 @@ def read_edit_snapshot(
     *,
     car_ids: Iterable[Any] = (),
     customer: Optional[Dict[str, Any]] = None,
+    customer_id: Any = "",
 ) -> Optional[Dict[str, Any]]:
     """一次权威登录取齐编辑器要用的主档/银行/颜色/地址级联;失败回 None(fail closed)。
 
     返回 {"masters", "paints": {car_id: rows}, "prefixes", "geo": {level: rows}}。
     """
     cars = _plain_car_ids(car_ids)
-    levels = geo_levels(customer)
-    result = _read(endpoint, cars, levels)
+    result = _read(endpoint, cars, customer, str(customer_id or ""))
     if not isinstance(result, dict) or result.get("ok") is False:
         # _run_logged_in 的 _err dict(dict 但 ok=False)与异常回退路径都算失败。
         return None
@@ -119,6 +158,8 @@ def read_edit_snapshot(
         "paints": result["paints"],
         "prefixes": list((result["masters"] or {}).get("prefixes") or []),
         "geo": result["geo"],
+        "customer": result.get("customer") or {},
+        "resolved_customer": result.get("resolved_customer") or {},
     }
     _store(endpoint, snapshot)
     return snapshot

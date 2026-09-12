@@ -123,10 +123,10 @@ class BookingLiffChannelContractTests(unittest.TestCase):
         for rel in shells:
             html = _read(rel)
             for needle in (
-                "dms-booking-i18n.js?v=9",
+                "dms-booking-i18n.js?v=10",
                 "dms-booking-api.js?v=7",
                 "dms-credentials.js?v=5",
-                "dms-booking-edit.js?v=17",
+                "dms-booking-edit.js?v=18",
             ):
                 with self.subTest(shell=rel, needle=needle):
                     self.assertIn(needle, html)

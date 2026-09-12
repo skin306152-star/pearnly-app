@@ -323,7 +323,7 @@ def get_binding_by_user(user_id: str) -> Optional[dict]:
     def _run():
         with db.get_cursor() as cur:
             cur.execute(
-                "SELECT id, line_user_id, channel_key, tenant_id, display_name, bound_at "
+                "SELECT id, line_user_id, channel_key, tenant_id, user_id, display_name, bound_at "
                 "FROM line_dms_bindings WHERE user_id = %s LIMIT 1",
                 (str(user_id),),
             )

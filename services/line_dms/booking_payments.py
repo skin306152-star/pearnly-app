@@ -145,7 +145,6 @@ def normalize_editor_payments(rows: list, masters: dict) -> list[dict]:
                         "src_account_no",
                         "src_account_name",
                         "src_branch_name",
-                        "src_time",
                         "dst_business_name",
                     )
                 },
@@ -193,7 +192,6 @@ def payment_preview_detail(payment: dict) -> str:
                 str(extra.get("src_bank_name") or ""),
                 str(extra.get("src_account_no") or ""),
                 str(extra.get("src_branch_name") or ""),
-                str(extra.get("src_time") or ""),
             )
             if part
         )

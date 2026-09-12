@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Dict, List, Tuple
 
 from services.erp.erp_dms_push import _dms_resolve_admin_creds
@@ -46,6 +48,35 @@ _MASTER_DRAFT_KEYS = (
     "zipcode_id",
 )
 
+_PREFIX_ALIASES = (
+    frozenset({"mr", "นาย"}),
+    frozenset({"mrs", "นาง"}),
+    frozenset({"miss", "ms", "นางสาว"}),
+    frozenset({"ดช", "เด็กชาย"}),
+    frozenset({"ดญ", "เด็กหญิง"}),
+)
+
+
+def _norm_prefix(value: str) -> str:
+    text = unicodedata.normalize("NFKC", str(value or "")).casefold().strip()
+    return re.sub(r"[\s.．。、,，/\\|｜·・:：\-]+", "", text)
+
+
+def _prefix_id(prefix_name: str, prefixes: List[list]) -> str:
+    """身份证称谓映射到当前 DMS 主档；只接受唯一的精确/安全别名命中。"""
+    target = _norm_prefix(prefix_name)
+    if not target:
+        return ""
+    alias_group = next((group for group in _PREFIX_ALIASES if target in group), None)
+    matches = set()
+    for row in prefixes or ():
+        if not row or len(row) < 2 or row[0] is None:
+            continue
+        label = _norm_prefix(row[1])
+        if label == target or (alias_group is not None and label in alias_group):
+            matches.add(str(row[0]))
+    return next(iter(matches)) if len(matches) == 1 else ""
+
 
 def build_draft(id_card: dict, geo: dict, prefixes: List[list], phone: str) -> Dict[str, str]:
     """OCR 身份证 + 实时地址/称谓 → 写库字段;未唯一匹配的称谓留给用户确认。"""
@@ -53,14 +84,11 @@ def build_draft(id_card: dict, geo: dict, prefixes: List[list], phone: str) -> D
     sel = geo.get("selected") or {}
     txt = geo.get("text") or {}
     pn = id_card.get("prefix_name") or ""
-    matches = {
-        str(opt[0])
-        for opt in prefixes or []
-        if opt and len(opt) > 1 and opt[0] is not None and opt[1] == pn
-    }
-    prefix_id = next(iter(matches)) if len(matches) == 1 else ""
+    prefix_id = _prefix_id(pn, prefixes)
     return {
         "prefix_id": prefix_id,
+        # 编辑器需要原始身份证称谓，在主档暂时未命中时也不能把它丢掉。
+        "prefix_name": pn,
         "name": id_card.get("name") or "",
         "people_id": id_card.get("people_id") or "",
         "tax_id": id_card.get("people_id") or "",

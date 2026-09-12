@@ -27,10 +27,10 @@ from services.line_dms.qa_util import (
 )
 from services.line_dms.text_fields import split_fields
 
-_SRC_KEYS = ("src_account_name", "src_account_no", "src_branch_name", "src_time")
+_SRC_KEYS = ("src_account_name", "src_account_no", "src_branch_name")
 _SRC_MANUAL_KEYS = ("src_bank_name", *_SRC_KEYS)
 _DST_KEYS = ("dst_business_name", "dst_account_no", "dst_branch_name")
-_TIME = re.compile(r"(?:[01]?\d|2[0-3]):[0-5]\d")
+_LEGACY_TIME = re.compile(r"(?:[01]?\d|2[0-3]):[0-5]\d")
 
 # 逐问里所有付款资料文本步:金额 / 来源银行(含目录为空时的手工名称)/ 渠道资料。
 TEXT_STEPS = frozenset(
@@ -57,12 +57,16 @@ def parse_details(text, destination=False, manual_source=False):
     一种规则切出的段数必须精确等于字段数,否则照旧重问。"""
     keys = _DST_KEYS if destination else (_SRC_MANUAL_KEYS if manual_source else _SRC_KEYS)
     parts = split_fields(text, len(keys))
+    # 已经看到旧问法的会话可能仍回「... | 时间」。兼容接收这一轮，但丢弃非 DMS
+    # 必填的时间，不再保存/展示/提交；新问法只收上面的三项(手工银行时四项)。
+    if parts is None and not destination:
+        legacy = split_fields(text, len(keys) + 1)
+        if legacy and _LEGACY_TIME.fullmatch(legacy[-1].translate(THAI_DIGITS)):
+            parts = legacy[:-1]
     if parts is None or any(not value or value == "-" or len(value) > 160 for value in parts):
         return None
     account_index = keys.index("dst_account_no" if destination else "src_account_no")
     if not any(ch.isdigit() for ch in parts[account_index].translate(THAI_DIGITS)):
-        return None
-    if not destination and not _TIME.fullmatch(parts[-1].translate(THAI_DIGITS)):
         return None
     return dict(zip(keys, parts))
 

@@ -80,6 +80,11 @@ class ParseTransferDetailsTests(unittest.TestCase):
 
     def test_source_details_accept_common_separators(self):
         for text in (
+            "Customer | 123456789 | Bangkok",
+            "Customer, 123456789, Bangkok",
+            "Customer/123456789/Bangkok",
+            "Customer · 123456789 · Bangkok",
+            # 旧卡已经展示给用户时仍兼容收尾，但时间会被丢弃。
             "Customer | 123456789 | Bangkok | 14:36",
             "Customer, 123456789, Bangkok, 14:36",
             "Customer、123456789、Bangkok、14:36",
@@ -93,7 +98,6 @@ class ParseTransferDetailsTests(unittest.TestCase):
                         "src_account_name": "Customer",
                         "src_account_no": "123456789",
                         "src_branch_name": "Bangkok",
-                        "src_time": "14:36",
                     },
                 )
 
@@ -122,7 +126,6 @@ class ParseTransferDetailsTests(unittest.TestCase):
                 "src_account_name": "สมชาย ใจดี",
                 "src_account_no": "1234567890",
                 "src_branch_name": "ระยอง",
-                "src_time": "14:36",
             },
         )
 
@@ -146,7 +149,6 @@ class ParseTransferDetailsTests(unittest.TestCase):
                 "src_account_name": "Customer",
                 "src_account_no": "123/456",
                 "src_branch_name": "Bangkok",
-                "src_time": "14:36",
             },
         )
         # 用斜杠当分隔符时,日期串只会让段数对不上 → 重问,不拆。

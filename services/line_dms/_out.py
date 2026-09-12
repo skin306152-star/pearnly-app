@@ -50,19 +50,18 @@ def _push(line_user_id: str, text: str, channel: str = "") -> None:
     line_client.push_text(line_user_id, text, channel=channel or current_channel())
 
 
-def _send(line_user_id: str, msg, reply_token: str = "", channel: str = "") -> None:
+def _send(line_user_id: str, msg, reply_token: str = "", channel: str = "") -> bool:
     """结构化消息出口(quickReply / Flex 必须走 reply_messages|push_messages)。
 
     有 reply_token 就 reply,没有就 push —— 逐问既可能应答 postback,也可能由后台任务发起。
     """
     require_current()
     if msg is None:
-        return
+        return False
     channel = channel or current_channel()
     if reply_token:
-        line_client.reply_messages(reply_token, [msg], channel=channel)
-    else:
-        line_client.push_messages(line_user_id, [msg], channel=channel)
+        return line_client.reply_messages(reply_token, [msg], channel=channel)
+    return line_client.push_messages(line_user_id, [msg], channel=channel)
 
 
 def start_loading(line_user_id: str) -> None:

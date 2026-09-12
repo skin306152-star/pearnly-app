@@ -689,7 +689,6 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                     "src_account_name": "Customer",
                     "src_account_no": "999",
                     "src_branch_name": "Bangkok",
-                    "src_time": "14:36",
                     "dst_business_name": "Company",
                     "dst_id": "1",
                     "dst": "SCB · 1234567890123 · ระยอง",

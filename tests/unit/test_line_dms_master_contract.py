@@ -55,6 +55,21 @@ def _qa():
     }
 
 
+def _production_masters():
+    """生产租户真形态(2026-09-13):收款账户 2 行,来源/支票/本票/银行卡目录都是 0 行。"""
+    return {
+        **_masters(),
+        "company_banks": [
+            ["b1", "SCB", "SCB", "Bangna", "1234567890"],
+            ["b2", "BBL", "BBL", "Rayong", "9876543210"],
+        ],
+        "source_banks": [],
+        "cheque_banks": [],
+        "cashier_banks": [],
+        "card_banks": [],
+    }
+
+
 class MasterSnapshotTests(unittest.TestCase):
     def test_every_button_master_add_update_delete_changes_version(self):
         base = _masters()
@@ -226,6 +241,85 @@ class MasterReconcileTests(unittest.TestCase):
         result = master_contract.reconcile(_qa(), masters, [["p1", "RED", "Red"]])
         self.assertEqual(result["field"], "advisor")
         self.assertEqual(result["code"], "ERR_DMS_ADVISOR_UNMATCHED")
+
+
+class ManualBankReconcileTests(unittest.TestCase):
+    """目录权威为空时的手工银行名称:确认前复核放行,但收款账户与「已删除选项」照旧拦。"""
+
+    def _production_qa(self, **extra):
+        qa = _qa()
+        qa["payments"][0]["extra"] = {
+            "dst_id": "b1",
+            "dst": "SCB · 1234567890 · Bangna",
+            "dst_account_no": "1234567890",
+            "dst_branch_name": "Bangna",
+            "src_bank_id": "",
+            "src_bank_name": "KBank",
+            **extra,
+        }
+        return qa
+
+    def test_manual_source_bank_keeps_the_typed_name_and_needs_no_reask(self):
+        qa = self._production_qa()
+        result = master_contract.reconcile(qa, _production_masters(), [["p1", "RED", "Red"]])
+
+        self.assertEqual(result["status"], "ok")
+        payment = result["qa"]["payments"][0]["extra"]
+        self.assertEqual(payment["src_bank_name"], "KBank")
+        self.assertEqual(payment["src_bank_id"], "")
+        self.assertEqual(payment["bank_manual"], "1")
+        self.assertEqual(result["qa"]["master_snapshot"]["counts"]["source_banks"], 0)
+
+    def test_empty_source_directory_without_a_name_asks_for_that_step_again(self):
+        qa = self._production_qa(src_bank_name="")
+        result = master_contract.reconcile(qa, _production_masters(), [["p1", "RED", "Red"]])
+        self.assertEqual(result["status"], "unmatched")
+        self.assertEqual(result["field"], "source_bank")
+        self.assertEqual(result["qa"]["step"], "pay_src")
+
+    def test_directory_rows_still_require_a_real_match(self):
+        masters = _production_masters()
+        masters["source_banks"] = [["S1", "KBANK", "KBank"]]
+        kept = master_contract.reconcile(
+            self._production_qa(src_bank_id="S1", src_bank_name="KBank"),
+            masters,
+            [["p1", "RED", "Red"]],
+        )
+        self.assertEqual(kept["status"], "ok")
+        self.assertEqual(kept["qa"]["payments"][0]["extra"]["src_bank_id"], "S1")
+        self.assertNotIn("bank_manual", kept["qa"]["payments"][0]["extra"])
+
+        # 目录里已删除的旧 id 不拿名称兜底 → 回落该步重选。
+        removed = master_contract.reconcile(
+            self._production_qa(src_bank_id="S9", src_bank_name="KBank"),
+            masters,
+            [["p1", "RED", "Red"]],
+        )
+        self.assertEqual(removed["status"], "unmatched")
+        self.assertEqual(removed["field"], "source_bank")
+
+    def test_manual_cheque_bank_and_removed_channel_bank(self):
+        qa = _qa()
+        qa["payments"] = [
+            {
+                "channel": "cheque",
+                "amount": "200.00",
+                "extra": {"cheque_no": "10", "cheque_book_no": "01", "bank_name": "KBank"},
+            }
+        ]
+        result = master_contract.reconcile(qa, _production_masters(), [["p1", "RED", "Red"]])
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["qa"]["payments"][0]["extra"]["bank_name"], "KBank")
+        self.assertEqual(result["qa"]["payments"][0]["extra"]["bank_id"], "")
+        self.assertEqual(result["qa"]["payments"][0]["extra"]["bank_manual"], "1")
+
+    def test_receiving_account_directory_is_never_manual(self):
+        masters = _production_masters()
+        masters["company_banks"] = []
+        result = master_contract.reconcile(_qa(), masters, [["p1", "RED", "Red"]])
+        self.assertEqual(result["status"], "unmatched")
+        self.assertEqual(result["field"], "bank")
+        self.assertEqual(result["qa"]["step"], "pay_dst")
 
 
 if __name__ == "__main__":

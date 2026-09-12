@@ -18,7 +18,9 @@ from services.erp import erp_dms_push  # noqa: E402
 from services.line_platform import client as line_client  # noqa: E402
 from services.line_dms import booking_qa as qa  # noqa: E402
 from services.line_dms import masters_cache  # noqa: E402
+from services.line_dms import master_contract  # noqa: E402
 from services.line_dms import qa_cards  # noqa: E402
+from services.line_dms import qa_payment_cards  # noqa: E402
 
 _TID, _LUID = "T1", "L1"
 _ADVISOR = {"id": "335", "name": "sale02"}
@@ -33,6 +35,19 @@ _PLACES = [["pl1", "", "สาขาบางนา"], ["pl2", "", "สาขา
 _TERMS = [["t1", "", "เงินสด"], ["t2", "", "ผ่อน"]]
 _REGIS = [["r1", "", "บริษัท"], ["r2", "", "บุคคลธรรมดา"]]
 _COMPANY_BANKS = [["1", "SCB", "SCB", "ระยอง", "1234567890123"]]
+_KBANK = [["S1", "KBANK", "KBank"]]
+# 生产租户真形态(2026-09-13 OA A):收款账户有行,来源/支票/本票/银行卡目录都是 0 行。
+# 每个银行目录各自独立成参 —— 不许再假设「五类目录都必有行」。
+PRODUCTION_BANKS = {
+    "company_banks": [
+        ["1", "SCB", "SCB", "ระยอง", "1234567890123"],
+        ["2", "BBL", "BBL", "Rayong", "9876543210"],
+    ],
+    "source_banks": [],
+    "cheque_banks": [],
+    "cashier_banks": [],
+    "card_banks": [],
+}
 
 
 class FakeStore:
@@ -69,6 +84,10 @@ class Env:
         advisor=_ADVISOR,
         dms_username="sale02",
         company_banks=_COMPANY_BANKS,
+        source_banks=_KBANK,
+        cheque_banks=_KBANK,
+        cashier_banks=_KBANK,
+        card_banks=_KBANK,
         places=_PLACES,
         terms=_TERMS,
         regis=_REGIS,
@@ -82,6 +101,10 @@ class Env:
         self.advisor = advisor
         self.dms_username = dms_username
         self.company_banks = company_banks
+        self.source_banks = source_banks
+        self.cheque_banks = cheque_banks
+        self.cashier_banks = cashier_banks
+        self.card_banks = card_banks
         self.places = places
         self.terms = terms
         self.regis = regis
@@ -114,16 +137,20 @@ class Env:
 
     def _get_masters(self, ep, **kw):
         self.masters_calls.append((ep, kw))
+        return self.masters()
+
+    def masters(self):
+        """本次会话拿到的主档(快照构造与 mocked 读取共用同一份)。"""
         return {
             "cars": self.cars,
             "place_books": self.places,
             "term_sales": self.terms,
             "regis_behalfs": self.regis,
             "company_banks": self.company_banks,
-            **{
-                key: [["S1", "KBANK", "KBank"]]
-                for key in ("source_banks", "cheque_banks", "cashier_banks", "card_banks")
-            },
+            "source_banks": self.source_banks,
+            "cheque_banks": self.cheque_banks,
+            "cashier_banks": self.cashier_banks,
+            "card_banks": self.card_banks,
         }
 
     def __exit__(self, *a):
@@ -754,7 +781,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(sess["payload"]["qa"]["files"]["slip_mid"])
 
     async def test_transfer_blocks_when_company_bank_master_is_empty(self):
-        with Env(company_banks=[]) as env:
+        with Env(**{**PRODUCTION_BANKS, "company_banks": []}) as env:
             _seed(
                 env,
                 _qa(
@@ -772,6 +799,126 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.handle_text(_TID, _LUID, "SCB", "rt")
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
             self.assertEqual(env.qa_payload()["payments"], [])
+
+    # ── 付款银行目录权威为空(生产形态):手工名称继续,不报「读取失败」 ────────
+    async def test_transfer_with_empty_source_bank_directory_asks_manual_name_not_an_error(self):
+        with Env(**PRODUCTION_BANKS) as env:
+            _seed(env, _qa("pay_channel"))
+            await qa.handle_postback(_TID, _LUID, "qa:pay:transfer", {}, "rt")
+            await qa.handle_text(_TID, _LUID, "10000", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_src_detail")
+            self.assertEqual(_replied_text(env), qa_payment_cards.TXT_ASK_PAY_SRC_MANUAL)
+            self.assertNotEqual(_replied_text(env), qa_cards.TXT_NO_COMPANY_BANK)
+
+            await qa.handle_text(
+                _TID, _LUID, "KBank | สมชาย ใจดี | 1234567890 | ระยอง | 14:36", "rt"
+            )
+            p = env.qa_payload()
+            extra = p["pending_channel"]["extra"]
+            self.assertEqual(extra["src_bank_name"], "KBank")
+            self.assertNotIn("src_bank_id", extra)  # hidden id 允许为空
+            # 继续走公司收款银行(实时目录,2 行)
+            self.assertEqual(p["step"], "pay_dst")
+            self.assertEqual(_replied_items(env)[0]["action"]["data"], "qa:bank:1")
+            await qa.handle_postback(_TID, _LUID, "qa:bank:2", {}, "rt")
+            await qa.handle_text(_TID, _LUID, "Company | 9876543210 | Rayong", "rt")
+            payment = env.qa_payload()["payments"][0]
+            self.assertEqual(payment["extra"]["dst_id"], "2")
+            self.assertEqual(payment["extra"]["src_bank_name"], "KBank")
+
+    async def test_stuck_session_on_pay_src_continues_with_text_without_rescanning(self):
+        """老会话已卡在 pay_src 且快照 source_banks=[]:重试即继续,不重扫身份证、不重开局。"""
+        with Env(**PRODUCTION_BANKS) as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_src",
+                    pending_channel={"channel": "transfer", "amount": "10000.00"},
+                    master_snapshot=master_contract.build_snapshot(env.masters()),
+                ),
+            )
+            await qa.handle_text(
+                _TID, _LUID, "KBank | สมชาย ใจดี | 1234567890 | ระยอง | 14:36", "rt"
+            )
+            p = env.qa_payload()
+            self.assertEqual(p["step"], "pay_dst")
+            self.assertEqual(p["pending_channel"]["extra"]["src_bank_name"], "KBank")
+            self.assertNotEqual(_replied_text(env), qa_cards.TXT_NO_COMPANY_BANK)
+            self.assertEqual(env.live_master_reads(), [])  # 复用会话快照,零新登录
+
+    async def test_source_bank_directory_rows_keep_the_live_selection_step(self):
+        with Env() as env:
+            _seed(env, _qa("pay_amount", pending_channel={"channel": "transfer"}))
+            await qa.handle_text(_TID, _LUID, "10000", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_src")
+            self.assertTrue(_replied_text(env).startswith(qa_cards.TXT_ASK_PAY_SRC))
+            self.assertEqual(_replied_items(env)[0]["action"]["data"], "qa:srcbank:S1")
+
+    async def test_cheque_with_empty_bank_directory_asks_manual_bank_name(self):
+        with Env(cheque_banks=[]) as env:
+            _seed(env, _qa("pay_channel"))
+            await qa.handle_postback(_TID, _LUID, "qa:pay:cheque", {}, "rt")
+            await qa.handle_text(_TID, _LUID, "10000", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_ref")
+            self.assertEqual(_replied_text(env), qa_payment_cards.TXT_ASK_CHEQUE_REF_MANUAL)
+            await qa.handle_text(_TID, _LUID, "123456 | 01 | KBank", "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["step"], "pay_more")
+            self.assertEqual(
+                p["payments"][0]["extra"],
+                {
+                    "bank_manual": "1",
+                    "cheque_no": "123456",
+                    "cheque_book_no": "01",
+                    "bank_name": "KBank",
+                },
+            )
+
+    async def test_card_with_empty_bank_directory_asks_manual_bank_name(self):
+        with Env(card_banks=[]) as env:
+            _seed(env, _qa("pay_channel"))
+            await qa.handle_postback(_TID, _LUID, "qa:pay:card", {}, "rt")
+            await qa.handle_text(_TID, _LUID, "10000", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_ref")
+            self.assertEqual(_replied_text(env), qa_payment_cards.TXT_ASK_CARD_REF_MANUAL)
+            await qa.handle_text(_TID, _LUID, "KBank | VISA", "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["step"], "pay_more")
+            self.assertEqual(
+                p["payments"][0]["extra"],
+                {"bank_manual": "1", "bank_name": "KBank", "card_type": "VISA"},
+            )
+
+    async def test_channel_bank_directory_rows_keep_the_live_selection_step(self):
+        with Env(cashier_banks=_KBANK) as env:
+            _seed(env, _qa("pay_channel"))
+            await qa.handle_postback(_TID, _LUID, "qa:pay:cashier_cheque", {}, "rt")
+            await qa.handle_text(_TID, _LUID, "10000", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_bank")
+            self.assertEqual(_replied_items(env)[0]["action"]["data"], "qa:paybank:S1")
+            await qa.handle_postback(_TID, _LUID, "qa:paybank:S1", {}, "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_ref")
+            await qa.handle_text(_TID, _LUID, "777 | 09", "rt")
+            extra = env.qa_payload()["payments"][0]["extra"]
+            self.assertEqual(extra["bank_id"], "S1")
+            self.assertNotIn("bank_manual", extra)
+
+    async def test_unreadable_bank_directory_fails_closed_instead_of_manual_entry(self):
+        """读取失败(这次没读到该目录)≠ 空目录:必须失败关闭,不许退回手工填写。"""
+        with Env(**PRODUCTION_BANKS) as env:
+            snapshot = master_contract.build_snapshot(env.masters())
+            snapshot["rows"].pop("source_banks")
+            _seed(
+                env,
+                _qa(
+                    "pay_amount",
+                    pending_channel={"channel": "transfer"},
+                    master_snapshot=snapshot,
+                ),
+            )
+            await qa.handle_text(_TID, _LUID, "10000", "rt")
+            self.assertEqual(_replied_text(env), qa_cards.TXT_MASTER_UNAVAILABLE)
+            self.assertEqual(env.qa_payload()["step"], "pay_amount")
 
     async def test_transfer_source_requires_bank_and_complete_native_details(self):
         with Env() as env:

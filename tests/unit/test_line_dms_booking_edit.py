@@ -37,11 +37,25 @@ MASTERS = {
     "term_sales": [["T1", "T", "Finance"]],
     "regis_behalfs": [["R1", "R", "Person"]],
     "company_banks": [["B1", "SCB", "SCB", "Rayong", "1234567890123"]],
-    **{
-        key: [["S1", "KBANK", "KBANK"]]
-        for key in ("source_banks", "cheque_banks", "cashier_banks", "card_banks")
-    },
+    # 每个银行目录各自独立成项:不许再假设「五类目录都必有行」。
+    "source_banks": [["S1", "KBANK", "KBANK"]],
+    "cheque_banks": [["S1", "KBANK", "KBANK"]],
+    "cashier_banks": [["S1", "KBANK", "KBANK"]],
+    "card_banks": [["S1", "KBANK", "KBANK"]],
     "prefixes": [["17", "Mr", "Mr"]],
+}
+
+# 生产租户真形态(2026-09-13):收款账户 2 行,来源/支票/本票/银行卡目录都是 0 行。
+MASTERS_PRODUCTION = {
+    **MASTERS,
+    "company_banks": [
+        ["B1", "SCB", "SCB", "Rayong", "1234567890123"],
+        ["B2", "BBL", "BBL", "Rayong", "9876543210"],
+    ],
+    "source_banks": [],
+    "cheque_banks": [],
+    "cashier_banks": [],
+    "card_banks": [],
 }
 
 
@@ -106,7 +120,7 @@ class BookingEditTests(TestCase):
         self.binding = {"user_id": "U1", "tenant_id": "T1", "line_user_id": "L1"}
         self.payload = {"nonce": "N1", "qa": QA}
 
-    def patches(self):
+    def patches(self, masters=None):
         return (
             mock.patch.object(booking_edit.store, "get_binding_by_user", return_value=self.binding),
             mock.patch.object(
@@ -119,7 +133,7 @@ class BookingEditTests(TestCase):
                 "resolve_dms_endpoint",
                 return_value={"id": "E1"},
             ),
-            mock.patch.object(booking_edit, "get_masters", return_value=MASTERS),
+            mock.patch.object(booking_edit, "get_masters", return_value=masters or MASTERS),
             mock.patch.object(booking_edit, "get_paints", return_value=[["PA1", "RED", "Red"]]),
             mock.patch.object(
                 booking_edit,
@@ -221,6 +235,162 @@ class BookingEditTests(TestCase):
         clean = normalize_editor_payments([payment], masters)
         self.assertEqual(clean[0]["extra"]["dst_account_no"], "987654321")
         self.assertEqual(clean[0]["extra"]["dst_business_name"], "Company")
+
+    def test_load_marks_manual_banks_only_where_the_directory_is_empty(self):
+        with (
+            mock.patch.object(
+                booking_edit,
+                "_review",
+                return_value=(self.binding, self.payload, {"id": "E1"}),
+            ),
+            mock.patch.object(booking_edit, "get_masters", return_value=MASTERS_PRODUCTION),
+            mock.patch.object(booking_edit, "get_paints", return_value=[]),
+        ):
+            out = booking_edit.load(self.user, "N1")
+        self.assertEqual(
+            out["manual_banks"],
+            ["source_banks", "cheque_banks", "cashier_banks", "card_banks"],
+        )
+        self.assertEqual(out["masters"]["source_banks"], [])
+        self.assertEqual(len(out["masters"]["company_banks"]), 2)
+
+    def test_load_keeps_directory_selects_when_every_bank_directory_has_rows(self):
+        with (
+            mock.patch.object(
+                booking_edit,
+                "_review",
+                return_value=(self.binding, self.payload, {"id": "E1"}),
+            ),
+            mock.patch.object(booking_edit, "get_masters", return_value=MASTERS),
+            mock.patch.object(booking_edit, "get_paints", return_value=[]),
+        ):
+            out = booking_edit.load(self.user, "N1")
+        # company_banks 永不手工 → 收款账户永远只出现在这里
+        self.assertEqual(out["manual_banks"], [])
+
+    def test_save_accepts_manual_source_bank_when_its_directory_is_empty(self):
+        submitted = form()
+        extra = submitted["payments"][0]["extra"]
+        extra.pop("src_bank_id")
+        extra["src_bank_name"] = "KBank สาขาระยอง"
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches(masters=MASTERS_PRODUCTION):
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
+            )
+            es.enter_context(mock.patch.object(booking_edit, "_send"))
+            booking_edit.save(self.user, "N1", submitted)
+
+        saved = replace.call_args.args[3]["qa"]
+        payment = saved["payments"][0]["extra"]
+        self.assertEqual(payment["src_bank_name"], "KBank สาขาระยอง")
+        self.assertEqual(payment["src_bank_id"], "")
+        self.assertEqual(payment["bank_manual"], "1")
+        self.assertEqual(payment["dst_id"], "B1")  # 收款账户仍来自实时目录
+        self.assertEqual(saved["master_snapshot"]["counts"]["source_banks"], 0)
+
+    def test_save_rejects_a_source_bank_missing_from_a_non_empty_directory(self):
+        submitted = form()
+        submitted["payments"][0]["extra"]["src_bank_id"] = "S9"  # 目录里已删除的旧选项
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches():
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload")
+            )
+            with self.assertRaisesRegex(booking_edit.BookingEditError, "invalid_bank"):
+                booking_edit.save(self.user, "N1", submitted)
+        replace.assert_not_called()
+
+    def test_save_accepts_a_unique_exact_bank_name_from_a_non_empty_directory(self):
+        submitted = form()
+        extra = submitted["payments"][0]["extra"]
+        extra.pop("src_bank_id")
+        extra["src_bank_name"] = "KBank"
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches():
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
+            )
+            es.enter_context(mock.patch.object(booking_edit, "_send"))
+            booking_edit.save(self.user, "N1", submitted)
+        payment = replace.call_args.args[3]["qa"]["payments"][0]["extra"]
+        self.assertEqual(payment["src_bank_id"], "S1")
+        self.assertEqual(payment["src_bank_name"], "KBANK")
+        self.assertNotIn("bank_manual", payment)
+
+    def test_save_accepts_manual_cheque_bank_when_its_directory_is_empty(self):
+        submitted = form()
+        submitted["payments"] = [
+            {
+                "channel": "cheque",
+                "amount": "500.00",
+                "extra": {
+                    "cheque_no": "123456",
+                    "cheque_book_no": "01",
+                    "bank_name": "KBank สาขาระยอง",
+                },
+            }
+        ]
+        submitted["keep_files"]["slip"] = False
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches(masters=MASTERS_PRODUCTION):
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
+            )
+            es.enter_context(mock.patch.object(booking_edit, "_send"))
+            booking_edit.save(self.user, "N1", submitted)
+        self.assertEqual(
+            replace.call_args.args[3]["qa"]["payments"][0]["extra"],
+            {
+                "bank_id": "",
+                "bank_name": "KBank สาขาระยอง",
+                "cheque_no": "123456",
+                "cheque_book_no": "01",
+                "bank_manual": "1",
+            },
+        )
+
+    def test_save_rejects_a_manual_channel_bank_when_the_directory_has_rows(self):
+        submitted = form()
+        submitted["payments"] = [
+            {
+                "channel": "cheque",
+                "amount": "500.00",
+                "extra": {
+                    "cheque_no": "123456",
+                    "cheque_book_no": "01",
+                    "bank_name": "ธนาคารที่ไม่มีในสารบบ",
+                },
+            }
+        ]
+        submitted["keep_files"]["slip"] = False
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches():
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload")
+            )
+            with self.assertRaisesRegex(booking_edit.BookingEditError, "invalid_bank"):
+                booking_edit.save(self.user, "N1", submitted)
+        replace.assert_not_called()
+
+    def test_receiving_account_cannot_be_entered_manually(self):
+        from services.line_dms.booking_payments import (
+            normalize_editor_payments,
+            PaymentValidationError,
+        )
+
+        masters = {**MASTERS_PRODUCTION, "company_banks": []}
+        payment = form()["payments"][0]
+        payment["extra"]["dst_id"] = ""
+        payment["extra"]["dst_bank_name"] = "SCB"
+        with self.assertRaises(PaymentValidationError) as ctx:
+            normalize_editor_payments([payment], masters)
+        self.assertEqual(ctx.exception.code, "dms_booking.invalid_bank")
 
     def test_load_blocks_when_live_master_bundle_is_incomplete(self):
         with (

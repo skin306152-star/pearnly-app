@@ -14,6 +14,8 @@
     var gateway = window.DmsBookingApi;
     var model = null;
     var masters = null;
+    // 目录权威为空、银行名称要手工填的银行目录(后端与 LINE 对话同一判据)。
+    var manualBanks = [];
     var form = document.getElementById('editor');
     var result = document.getElementById('result');
     var nonce = query('draft');
@@ -146,13 +148,30 @@
         );
     }
     function paymentBank(key, value) {
+        // 手工目录没有目录 id 可选:调用方传的是整笔 extra,回显的是 bank_name,不拿 bank_id 顶替。
+        if (manualBank(key))
+            return paymentField('bank-name', 'bankName', value.bank_name, false, true);
         return (
             '<div class="field"><label>' +
             t('bankName') +
             '</label><select class="bank-id" required>' +
-            bankOptions(masters[key], value) +
+            bankOptions(masters[key], value.bank_id) +
             '</select></div>'
         );
+    }
+    function sourceBankField(x) {
+        if (manualBank('source_banks'))
+            return paymentField('src-bank-name', 'sourceBank', x.src_bank_name, false, true);
+        return (
+            '<div class="field"><label>' +
+            t('sourceBank') +
+            '</label><select class="src-bank" required>' +
+            bankOptions(masters.source_banks, x.src_bank_id) +
+            '</select></div>'
+        );
+    }
+    function manualBank(key) {
+        return manualBanks.indexOf(key) >= 0;
     }
     function legacySource(x) {
         if (x.src_bank_name || x.src_account_no) return x;
@@ -176,11 +195,7 @@
         var extra =
             p.channel === 'transfer'
                 ? '<div class="extra grid">' +
-                  '<div class="field"><label>' +
-                  t('sourceBank') +
-                  '</label><select class="src-bank" required>' +
-                  bankOptions(masters.source_banks, x.src_bank_id) +
-                  '</select></div>' +
+                  sourceBankField(x) +
                   paymentField('src-account', 'sourceAccount', x.src_account_no, false, true) +
                   paymentField('src-name', 'sourceAccountName', x.src_account_name, false, true) +
                   paymentField('src-branch', 'sourceBranch', x.src_branch_name, false, true) +
@@ -199,7 +214,7 @@
                   : p.channel === 'cheque'
                     ? '<div class="extra grid">' +
                       paymentField('cheque-no', 'chequeNo', x.cheque_no || x.ref, false, true) +
-                      paymentBank('cheque_banks', x.bank_id) +
+                      paymentBank('cheque_banks', x) +
                       paymentField(
                           'cheque-book-no',
                           'chequeBookNo',
@@ -217,7 +232,7 @@
                             false,
                             true
                         ) +
-                        paymentBank('cashier_banks', x.bank_id) +
+                        paymentBank('cashier_banks', x) +
                         paymentField(
                             'cashier-book-no',
                             'cashierBookNo',
@@ -228,7 +243,7 @@
                         '</div>'
                       : p.channel === 'card'
                         ? '<div class="extra grid">' +
-                          paymentBank('card_banks', x.bank_id) +
+                          paymentBank('card_banks', x) +
                           paymentField('card-type', 'cardType', x.card_type || x.ref, false, true) +
                           '</div>'
                         : '<div class="field extra"><label>' +
@@ -384,6 +399,7 @@
             }
         }
         masters = model.masters;
+        manualBanks = model.manual_banks || [];
         render();
         await hydrateGeo();
     }
@@ -586,7 +602,10 @@
             var ch = row.querySelector('.pay-channel').value,
                 x = {};
             if (ch === 'transfer') {
-                x.src_bank_id = row.querySelector('.src-bank').value;
+                // 目录权威为空 → 输入框里的银行名称就是这一笔的银行身份(bank id 留空)。
+                if (manualBank('source_banks'))
+                    x.src_bank_name = row.querySelector('.src-bank-name').value.trim();
+                else x.src_bank_id = row.querySelector('.src-bank').value;
                 x.src_account_no = row.querySelector('.src-account').value.trim();
                 x.src_account_name = row.querySelector('.src-name').value.trim();
                 x.src_branch_name = row.querySelector('.src-branch').value.trim();
@@ -597,14 +616,20 @@
                 x.dst_branch_name = row.querySelector('.dst-branch').value.trim();
             } else if (ch === 'cheque') {
                 x.cheque_no = row.querySelector('.cheque-no').value.trim();
-                x.bank_id = row.querySelector('.bank-id').value;
+                if (manualBank('cheque_banks'))
+                    x.bank_name = row.querySelector('.bank-name').value.trim();
+                else x.bank_id = row.querySelector('.bank-id').value;
                 x.cheque_book_no = row.querySelector('.cheque-book-no').value.trim();
             } else if (ch === 'cashier_cheque') {
                 x.cashier_no = row.querySelector('.cashier-no').value.trim();
-                x.bank_id = row.querySelector('.bank-id').value;
+                if (manualBank('cashier_banks'))
+                    x.bank_name = row.querySelector('.bank-name').value.trim();
+                else x.bank_id = row.querySelector('.bank-id').value;
                 x.cashier_book_no = row.querySelector('.cashier-book-no').value.trim();
             } else if (ch === 'card') {
-                x.bank_id = row.querySelector('.bank-id').value;
+                if (manualBank('card_banks'))
+                    x.bank_name = row.querySelector('.bank-name').value.trim();
+                else x.bank_id = row.querySelector('.bank-id').value;
                 x.card_type = row.querySelector('.card-type').value.trim();
             } else if (ch === 'other') {
                 x.detail = row.querySelector('.detail').value.trim();

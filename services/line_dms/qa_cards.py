@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from services.erp.erp_dms_push import _DMS_FRIENDLY
 from services.line_dms import booking_car_details, edit_link
 from services.line_dms.qa_payment_cards import (
+    ask_pay_ref as ask_pay_ref,
     ask_pay_src as ask_pay_src,
     ask_payment_bank as ask_payment_bank,
     ask_transfer_details as ask_transfer_details,
@@ -35,7 +36,6 @@ from services.line_dms.cards import (
 )
 from services.erp.mrerp_dms_company_banks import company_bank_label
 from services.line_dms.booking_payments import payment_preview_detail
-from services.line_dms.qa_util import CHANNEL_EXTRA_SHAPE
 from services.line_dms.qa_util import car_label as _car_label
 from services.line_dms.qa_util import row_name as _name
 
@@ -68,7 +68,10 @@ TXT_ASK_AMOUNT = "ยอดเงิน ({channel}) — พิมพ์จำน
 TXT_BAD_AMOUNT = "จำนวนเงินไม่ถูกต้อง พิมพ์เป็นตัวเลข เช่น 5000 หรือ 5,000.50"
 TXT_ASK_PAY_SRC = "ธนาคารต้นทาง — เลือกธนาคารที่ลูกค้าโอนเงินออก"
 TXT_ASK_PAY_DST = "ธนาคารปลายทาง — เลือกธนาคารที่บริษัทได้รับเงิน แล้วระบุบัญชีรับเงิน"
-TXT_NO_COMPANY_BANK = "ยังอ่านรายการธนาคารจาก DMS ไม่ได้ กรุณาลองใหม่อีกครั้ง"
+# 目录为空说的是「公司还没配收款账户」,不是「读不到」(读失败另有 TXT_MASTER_UNAVAILABLE)。
+TXT_NO_COMPANY_BANK = (
+    "ยังไม่มีข้อมูลบัญชีรับเงินของบริษัท กรุณาให้ผู้ดูแลตั้งค่าใน DMS แล้วลองใหม่อีกครั้ง"
+)
 TXT_MASTER_UNAVAILABLE = _DMS_FRIENDLY["ERR_DMS_MASTER_UNAVAILABLE"]["th"]
 TXT_MASTER_EMPTY = _DMS_FRIENDLY["ERR_DMS_MASTER_EMPTY"]["th"]
 TXT_MASTER_CHANGED = _DMS_FRIENDLY["ERR_DMS_MASTER_CHANGED"]["th"]
@@ -323,14 +326,6 @@ def master_problem(code: str) -> Dict[str, Any]:
 
 def master_changed() -> Dict[str, Any]:
     return _msg(TXT_MASTER_CHANGED)
-
-
-def ask_pay_ref(channel: str) -> Dict[str, Any]:
-    """渠道补充信息文案:分类查 CHANNEL_EXTRA_SHAPE 单表,不再各处硬编码渠道子集。"""
-    shape = CHANNEL_EXTRA_SHAPE.get(channel)
-    if shape == "ref":
-        return _msg(TXT_ASK_CARD_REF if channel == "card" else TXT_ASK_CHEQUE_REF)
-    return _msg(TXT_ASK_OTHER_REF)
 
 
 def ask_more() -> Dict[str, Any]:

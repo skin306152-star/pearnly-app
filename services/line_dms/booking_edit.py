@@ -11,7 +11,12 @@ from services.erp import dms_id_ocr
 from services.erp.erp_dms_intake import _run_logged_in, geo_mrerp_dms
 from services.erp.dms_id_validate import is_valid_thai_id, normalize_thai_id
 from services.erp.dms_masters_cache import get_masters, get_paints
-from services.erp.mrerp_dms_company_banks import company_bank_label, PAYMENT_BANK_MASTERS
+from services.erp.mrerp_dms_company_banks import (
+    company_bank_label,
+    manual_bank_allowed_for_rows,
+    MANUAL_BANK_KEYS,
+    PAYMENT_BANK_MASTERS,
+)
 from services.line_dms import booking_payments, qa_cards, store
 from services.line_dms._out import _send
 from services.line_dms.master_contract import MasterSyncError, build_paint_snapshot, build_snapshot
@@ -99,6 +104,14 @@ def _payment_bank_options(key: str, rows: list) -> list[dict]:
     ]
 
 
+def _manual_bank_keys(masters: dict) -> list[str]:
+    """目录权威为空的四类付款银行 —— 编辑器据此把下拉换成可填写的银行名称输入框。
+
+    company_banks(公司收款账户)永不入列。读取失败(masters 里该 key 不是 list)不算空目录,
+    由 _live_masters 抛 dms_booking.master_unavailable fail closed。"""
+    return [key for key in MANUAL_BANK_KEYS if manual_bank_allowed_for_rows(key, masters.get(key))]
+
+
 def _form(qa: dict) -> dict:
     draft = dict(qa.get("draft") or {})
     draft["name"] = str((qa.get("customer") or {}).get("name") or draft.get("name") or "")
@@ -155,6 +168,8 @@ def load(user: dict, nonce: str) -> dict:
             },
             "prefixes": _options(prefix_rows or []),
         },
+        # 与 LINE 对话同一条规则:这几类目录权威为空 → 银行名称手工填,hidden id 留空。
+        "manual_banks": _manual_bank_keys(masters),
     }
 
 

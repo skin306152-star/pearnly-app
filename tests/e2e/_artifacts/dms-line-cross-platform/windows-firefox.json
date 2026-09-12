@@ -9,10 +9,10 @@
   "menu1Postback": "action=menu_customer",
   "menu2Postback": "action=menu_booking",
   "portal": {
-    "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-windows-firefox-portal&state=line-state-windows-firefox-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+    "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-windows-firefox-portal&state=line-state-windows-firefox-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
     "callbackHttpStatus": 200,
     "callbackRedirectedFrom": null,
-    "finalUrl": "http://127.0.0.1:62313/home/dms-booking/portal?ticket=opaque-windows-firefox",
+    "finalUrl": "http://127.0.0.1:55048/home/dms-booking/portal?ticket=opaque-windows-firefox",
     "liffInitCalls": [
       {
         "liffId": "DMS-LIFF"
@@ -34,10 +34,10 @@
     "redirectResponses": []
   },
   "credentials": {
-    "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-firefox-credentials&state=line-state-windows-firefox-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+    "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-firefox-credentials&state=line-state-windows-firefox-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
     "callbackHttpStatus": 200,
     "callbackRedirectedFrom": null,
-    "finalUrl": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-firefox-credentials&state=line-state-windows-firefox-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+    "finalUrl": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-firefox-credentials&state=line-state-windows-firefox-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
     "liffInitCalls": [
       {
         "liffId": "DMS-LIFF"

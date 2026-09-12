@@ -135,6 +135,78 @@ class TestPaymentFormFields(unittest.TestCase):
                 payment_form_fields(({"channel": channel, "amount": "1000", "extra": extra},))
             self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
 
+    def test_manual_source_bank_writes_the_name_without_faking_a_directory_id(self):
+        """目录权威为空的手工来源银行:名称进原生文本框,banktffromval 留空不伪造。"""
+        fields = payment_form_fields(
+            (
+                {
+                    "channel": "transfer",
+                    "amount": "1500.00",
+                    "extra": {
+                        "src_bank_name": "KBank",
+                        "src_bank_id": "",
+                        "src_account_name": "สมชาย ใจดี",
+                        "src_account_no": "1234567890",
+                        "src_branch_name": "ระยอง",
+                        "src_time": "14:36",
+                        "dst_business_name": "บริษัท ตัวอย่าง จำกัด",
+                        "dst_account_no": "9876543210",
+                        "dst_bank_name": "SCB",
+                        "dst_bank_id": "1",
+                        "dst_branch_name": "ระยอง",
+                        "bank_manual": "1",
+                    },
+                },
+            )
+        )
+        self.assertEqual(fields["txtbanknametffrom"], "KBank")
+        self.assertNotIn("banktffromval", fields)
+        self.assertEqual(fields["banktfmonval"], "1")
+        self.assertEqual(fields["txtmoneytfmon"], "1500.00")
+
+    def test_manual_flag_only_exempts_the_bank_id_of_that_channel(self):
+        """手工标记只豁免银行 id 一个槽位:名称和其它原生字段照旧必填。"""
+        with self.assertRaises(DMSClientError) as ctx:
+            payment_form_fields(
+                (
+                    {
+                        "channel": "transfer",
+                        "amount": "1500.00",
+                        "extra": {
+                            "src_bank_id": "",
+                            "src_account_no": "1",
+                            "src_account_name": "Customer",
+                            "src_branch_name": "Bangkok",
+                            "src_time": "14:36",
+                            "dst_business_name": "Company",
+                            "dst_bank_id": "1",
+                            "dst_account_no": "2",
+                            "dst_branch_name": "Rayong",
+                            "bank_manual": "1",
+                        },
+                    },
+                )
+            )
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
+        self.assertIn("src_bank_name", str(ctx.exception))
+
+        fields = payment_form_fields(
+            (
+                {
+                    "channel": "cheque",
+                    "amount": "500.00",
+                    "extra": {
+                        "cheque_no": "123456",
+                        "cheque_book_no": "01",
+                        "bank_name": "KBank",
+                        "bank_manual": "1",
+                    },
+                },
+            )
+        )
+        self.assertEqual(fields["txtbanknamecheque"], "KBank")
+        self.assertNotIn("bankchequeval", fields)
+
     def test_duplicate_channel_raises_instead_of_merging_two_business_events(self):
         with self.assertRaisesRegex(ValueError, "duplicate payment channel"):
             payment_form_fields(

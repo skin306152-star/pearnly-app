@@ -60,12 +60,42 @@ _PAYMENT_TEXT_FIELD = {
     "other": {"detail": "txtdetailother"},
 }
 
+# 该渠道原生银行目录「权威为空」、银行名称由用户手工填写时挂在 extra 上的标记。
+# 它只说明「名称来自手工输入」,自身不构成提交依据:目录非空时 validate_company_bank_payments
+# 与 normalize_editor_payments 都按实时目录判,命中目录后会把标记就地清掉。
+MANUAL_BANK_FLAG = "bank_manual"
+
+# 目录权威为空时可省的原生字段:银行 id 由目录行产生,手工填名称时留空(名称字段照旧必填)。
+# company_banks(公司收款账户)不在此列 —— 收款账户永不手工,必须实时目录选择。
+_MANUAL_OPTIONAL_FIELDS = {
+    "transfer": frozenset({"src_bank_id"}),
+    "cheque": frozenset({"bank_id"}),
+    "cashier_cheque": frozenset({"bank_id"}),
+    "card": frozenset({"bank_id"}),
+}
+
+
+def manual_bank_entry(extra: dict) -> bool:
+    """这笔付款的银行名称是否来自「目录权威为空时的手工填写」。"""
+    return str((extra or {}).get(MANUAL_BANK_FLAG) or "").strip() == "1"
+
 
 def missing_transfer_fields(extra: dict) -> list[str]:
-    """Native DMS transfer fields are required together, including the bank IDs."""
+    """Native DMS transfer fields are required together; only a manual bank name may omit
+    the source bank id when that directory is authoritatively empty."""
+    return _missing_fields("transfer", extra)
+
+
+def _missing_fields(channel: str, extra: dict) -> list[str]:
+    optional = (
+        _MANUAL_OPTIONAL_FIELDS.get(channel, frozenset())
+        if manual_bank_entry(extra)
+        else frozenset()
+    )
     return [
         key
-        for key in _PAYMENT_TEXT_FIELD["transfer"]
+        for key in _PAYMENT_TEXT_FIELD.get(channel, {})
+        if key not in optional
         if not str(extra.get(key) or "").strip() or str(extra.get(key)).strip() == "-"
     ]
 
@@ -75,11 +105,7 @@ def validate_payment_completeness(payments) -> None:
     for payment in payments or ():
         channel = payment.get("channel")
         extra = payment.get("extra") or {}
-        missing = [
-            key
-            for key in _PAYMENT_TEXT_FIELD.get(channel, {})
-            if not str(extra.get(key) or "").strip() or str(extra.get(key)).strip() == "-"
-        ]
+        missing = _missing_fields(channel, extra)
         if missing:
             raise DMSClientError(
                 str(channel) + " payment is incomplete; missing=" + ",".join(missing),

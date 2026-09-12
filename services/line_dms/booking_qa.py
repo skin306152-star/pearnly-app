@@ -16,7 +16,6 @@ from services.erp import dms_advisor
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.mrerp_dms_client_base import to_be_date
 from services.line_dms import (
-    booking_payments,
     booking_qa_start,
     booking_qa_pages,
     booking_qa_payment,
@@ -30,14 +29,11 @@ from services.line_dms import (
 from services.line_dms._out import _send, _thr
 from services.line_dms.master_contract import MasterSyncError
 from services.line_dms.qa_util import (
-    CHANNEL_EXTRA_SHAPE,
     car_label,
     car_label_of,
-    complete_channel,
     find_row,
     norm,
     norm_row,
-    parse_amount,
     row_name,
 )
 
@@ -112,9 +108,22 @@ async def handle_text(tenant_id, line_user_id, text, reply_token, sess=None) -> 
         return False
     step = qa.get("step") or ""
     await _audit(tenant_id, line_user_id, qa, step, text)
-    handler = _TEXT_HANDLERS.get(step, _reask)
     try:
-        await handler(tenant_id, line_user_id, qa, text, reply_token)
+        if step in booking_qa_transfer.TEXT_STEPS:
+            # 付款资料文本步(金额/银行/渠道资料)整体归 booking_qa_transfer,状态机只做派发。
+            await booking_qa_transfer.handle_text(
+                step,
+                tenant_id,
+                line_user_id,
+                qa,
+                text,
+                reply_token,
+                persist=_persist,
+                send_step=send_step,
+                reask=_reask,
+            )
+        else:
+            await _TEXT_HANDLERS.get(step, _reask)(tenant_id, line_user_id, qa, text, reply_token)
     except MasterSyncError as exc:
         _send(line_user_id, qa_cards.master_problem(exc.code), reply_token)
     return True
@@ -296,47 +305,6 @@ async def _on_regis_name(tenant_id, line_user_id, qa, text, reply_token) -> None
     await send_step(tenant_id, line_user_id, qa, "pay_channel", reply_token)
 
 
-async def _on_pay_amount(tenant_id, line_user_id, qa, text, reply_token) -> None:
-    amount = parse_amount(text)
-    if amount is None:
-        _send(line_user_id, qa_cards.bad_amount(), reply_token)
-        return
-    pending = qa["pending_channel"]
-    pending["amount"] = f"{amount:.2f}"
-    shape = CHANNEL_EXTRA_SHAPE.get(pending.get("channel", ""))
-    if shape == "src_dst":
-        qa["step"] = next_step = "pay_src"
-    elif shape == "ref":
-        qa["step"] = next_step = "pay_bank"
-    elif shape == "detail":
-        qa["step"] = next_step = "pay_ref"
-    else:  # cash:金额即渠道完结
-        complete_channel(qa)
-        next_step = "pay_more"
-    await _persist(tenant_id, line_user_id, qa)
-    await send_step(tenant_id, line_user_id, qa, next_step, reply_token)
-
-
-async def _on_transfer_detail(tenant_id, line_user_id, qa, text, reply_token) -> None:
-    await booking_qa_transfer.collect_details(
-        tenant_id, line_user_id, qa, text, reply_token, persist=_persist, send_step=send_step
-    )
-
-
-async def _on_pay_ref(tenant_id, line_user_id, qa, text, reply_token) -> None:
-    pending = qa["pending_channel"]
-    channel = str(pending.get("channel") or "")
-    detail = booking_payments.parse_payment_detail(channel, text)
-    if detail is None:
-        _send(line_user_id, qa_cards.bad_payment_detail(), reply_token)
-        return
-    extra = pending.setdefault("extra", {})
-    extra.update(detail)
-    complete_channel(qa)
-    await _persist(tenant_id, line_user_id, qa)
-    await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
-
-
 async def _on_slip_after(tenant_id, line_user_id, qa, text, reply_token) -> None:
     # 用户已声明有转账渠道:打 เงินสด 也不放行,必须先送凭证图才能看总结。
     _send(line_user_id, qa_cards.need_slip(), reply_token)
@@ -357,13 +325,7 @@ _TEXT_HANDLERS = {
     "regis": _reask,
     "regis_name": _on_regis_name,
     "pay_channel": _reask,
-    "pay_amount": _on_pay_amount,
-    "pay_src": _reask,
-    "pay_src_detail": _on_transfer_detail,
-    "pay_dst_detail": _on_transfer_detail,
     "pay_dst": _reask,
-    "pay_bank": _reask,
-    "pay_ref": _on_pay_ref,
     "pay_more": _reask,
     "slip_after": _on_slip_after,
     "slip_conflict": _reask,

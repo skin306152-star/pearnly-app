@@ -1,17 +1,48 @@
 # -*- coding: utf-8 -*-
 
+import json
 import unittest
 from unittest import mock
 
 from services.erp.mrerp_dms_client_base import DMSClientError
 from services.erp.mrerp_dms_company_banks import (
+    PAYMENT_BANK_MASTERS,
+    bank_row_name,
     company_bank_label,
     company_bank_payment_extra,
     fetch_company_banks,
     fetch_payment_bank_masters,
+    manual_bank_allowed_for_rows,
     normalize_company_bank_rows,
+    resolve_bank_identity,
     validate_company_bank_payments,
 )
+from services.erp.mrerp_dms_payments import MANUAL_BANK_FLAG
+
+# 生产租户真形态(2026-09-13 OA A):收款账户 2 行,来源/支票/本票/银行卡目录都是 0 行。
+PRODUCTION_BANKS = {
+    "company_banks": [
+        ["1", "SCB", "SCB", "ระยอง", "1234567890123"],
+        ["2", "BBL", "BBL", "ระยอง", "9876543210"],
+    ],
+    "source_banks": [],
+    "cheque_banks": [],
+    "cashier_banks": [],
+    "card_banks": [],
+}
+
+
+def _transfer_extra(**over):
+    extra = {
+        "src_account_name": "สมชาย ใจดี",
+        "src_account_no": "1234567890",
+        "src_branch_name": "ระยอง",
+        "src_time": "14:36",
+        "dst_business_name": "บริษัท ตัวอย่าง จำกัด",
+        "dst_id": "1",
+    }
+    extra.update(over)
+    return extra
 
 
 class _Client:
@@ -165,6 +196,228 @@ class CompanyBankTests(unittest.TestCase):
                     ],
                 )
         self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
+
+
+class ManualBankDirectoryTests(unittest.TestCase):
+    """目录权威为空 vs 读取失败:「空」才允许手工银行名称,「没读到」一律不放行。"""
+
+    def test_empty_directory_allows_a_manual_name_only_for_channel_banks(self):
+        self.assertTrue(manual_bank_allowed_for_rows("source_banks", []))
+        self.assertFalse(manual_bank_allowed_for_rows("company_banks", []))
+        self.assertFalse(manual_bank_allowed_for_rows("source_banks", None))
+        self.assertFalse(manual_bank_allowed_for_rows("source_banks", [["S1", "KBANK", "KBank"]]))
+        self.assertEqual(
+            resolve_bank_identity([], "source_banks", "", "KBank"),
+            {"id": "", "name": "KBank", "manual": True},
+        )
+        self.assertIsNone(resolve_bank_identity([], "company_banks", "", "SCB"))
+        self.assertIsNone(resolve_bank_identity(None, "source_banks", "", "KBank"))
+        self.assertIsNone(resolve_bank_identity([], "source_banks", "", "  "))
+
+    def test_directory_rows_need_a_real_match_and_never_fall_back_by_name(self):
+        rows = [["S1", "KBANK", "KBank"], ["S2", "SCB", "SCB"]]
+        self.assertEqual(bank_row_name(rows[0]), "KBank")
+        self.assertEqual(
+            resolve_bank_identity(rows, "source_banks", "S1", ""),
+            {
+                "id": "S1",
+                "name": "KBank",
+                "manual": False,
+            },
+        )
+        # 只给名称:唯一精确同名(含大小写)可认领;歧义/对不上都不放行。
+        self.assertEqual(resolve_bank_identity(rows, "source_banks", "", "kbank")["id"], "S1")
+        self.assertIsNone(resolve_bank_identity(rows, "source_banks", "", "KB"))
+        self.assertIsNone(resolve_bank_identity(rows, "source_banks", "S9", "KBank"))
+        self.assertIsNone(
+            resolve_bank_identity(rows + [["S3", "K", "KBank"]], "source_banks", "", "KBank")
+        )
+
+
+class _BshsdTransport:
+    """复刻 DMS bshsd 端点在两个真实协议形态上的原始响应:
+    · 已登录、目录 0 行 → HTTP 200 + 空正文(0 字节,本租户四类付款银行目录);
+    · 已登录、目录有行 → HTTP 200 + JSON 数组(公司收款账户 2 行)。
+    """
+
+    def __init__(self, bodies):
+        self.bodies = dict(bodies)
+
+    def post(self, url, data=None, files=None, timeout_ms=None):
+        elem = str((data or {}).get("elemname") or "")
+        status = 200
+        text = self.bodies.get(elem, "")
+        if isinstance(text, tuple):
+            status, text = text
+        return mock.Mock(status_code=status, text=text, content=text.encode())
+
+
+class ProductionProtocolShapeTests(unittest.TestCase):
+    """0 字节空正文 / 非 JSON 壳在真实 DMSClient 取数层上的分流(不连真 DMS)。"""
+
+    def _client(self, bodies):
+        from services.erp.mrerp_dms_client import DMSClient
+
+        return DMSClient(_BshsdTransport(bodies), "https://x/dms/")
+
+    def test_two_company_banks_plus_four_empty_bodies_form_a_complete_bank_snapshot(self):
+        """company_banks=2 行 + 四类 0 字节空目录 → 完整快照,四类可走手工付款字段。"""
+        company_rows = json.dumps(PRODUCTION_BANKS["company_banks"], ensure_ascii=False)
+        bodies = {PAYMENT_BANK_MASTERS["company_banks"]: company_rows}
+        for key in ("source_banks", "cheque_banks", "cashier_banks", "card_banks"):
+            bodies[PAYMENT_BANK_MASTERS[key]] = ""  # 0 字节空正文
+        banks = fetch_payment_bank_masters(object(), client=self._client(bodies))
+
+        self.assertEqual(
+            sorted(banks),
+            ["card_banks", "cashier_banks", "cheque_banks", "company_banks", "source_banks"],
+        )
+        self.assertEqual(len(banks["company_banks"]), 2)
+        for key in ("source_banks", "cheque_banks", "cashier_banks", "card_banks"):
+            with self.subTest(key=key):
+                self.assertEqual(banks[key], [])  # 权威空目录,不是 None
+                self.assertTrue(manual_bank_allowed_for_rows(key, banks[key]))
+
+        # 快照带完整银行键(含四类空表)→ 手工来源银行名称这一笔走通。
+        payments = [
+            {
+                "channel": "transfer",
+                "amount": "1500.00",
+                "extra": _transfer_extra(src_bank_name="KBank", src_bank_id=""),
+            }
+        ]
+        out = validate_company_bank_payments(object(), payments, client=self._client(bodies))
+        extra = out[0]["extra"]
+        self.assertEqual(extra[MANUAL_BANK_FLAG], "1")
+        self.assertEqual(extra["src_bank_name"], "KBank")
+        self.assertEqual(extra["dst_bank_name"], "SCB")
+
+    def test_unauthenticated_non_json_body_fails_closed(self):
+        """未登录/认证失效 = 65 字节非 JSON 壳 → 取数层 None → 失败关闭,绝不落成空目录。"""
+        from services.erp.mrerp_dms_client_base import DMSClientError
+
+        unauth = "0" * 65  # 非 JSON、非数组:模拟未登录壳
+        bodies = {elem: unauth for elem in PAYMENT_BANK_MASTERS.values()}
+        with self.assertRaises(DMSClientError) as ctx:
+            fetch_payment_bank_masters(object(), client=self._client(bodies))
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
+
+        # 提交前校验同样失败关闭:「读到非 JSON」不等于「公司没配这类银行」,不许退回手工填写。
+        payments = [
+            {
+                "channel": "transfer",
+                "amount": "1500.00",
+                "extra": _transfer_extra(src_bank_name="KBank", src_bank_id=""),
+            }
+        ]
+        with self.assertRaises(DMSClientError) as ctx:
+            validate_company_bank_payments(object(), payments, client=self._client(bodies))
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
+
+    def test_http_non_200_still_fails_closed(self):
+        """HTTP 非 200 → 技术异常 fail closed,不落成空目录。"""
+        from services.erp.mrerp_dms_client_base import DMSClientError
+
+        bodies = {PAYMENT_BANK_MASTERS["company_banks"]: (500, "")}
+        with self.assertRaises(DMSClientError) as ctx:
+            fetch_payment_bank_masters(object(), client=self._client(bodies))
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
+
+
+class ProductionShapeSubmitTests(unittest.TestCase):
+    """提交前校验按生产真形态:收款账户 2 行 + 其余四类 0 行。"""
+
+    def test_manual_source_bank_passes_when_that_directory_is_empty(self):
+        payments = [
+            {
+                "channel": "transfer",
+                "amount": "1500.00",
+                "extra": _transfer_extra(src_bank_name="KBank", src_bank_id=""),
+            }
+        ]
+        with mock.patch(
+            "services.erp.mrerp_dms_company_banks._fetch_banks",
+            side_effect=[PRODUCTION_BANKS["company_banks"], []],
+        ):
+            out = validate_company_bank_payments(object(), payments)  # 不抛 = 放行
+        extra = out[0]["extra"]
+        self.assertEqual(extra["src_bank_name"], "KBank")
+        self.assertEqual(extra["src_bank_id"], "")
+        self.assertEqual(extra[MANUAL_BANK_FLAG], "1")
+        self.assertEqual(extra["dst_id"], "1")  # 收款账户仍来自实时目录
+        self.assertEqual(extra["dst_bank_name"], "SCB")
+
+    def test_manual_source_bank_without_a_name_is_incomplete(self):
+        payments = [
+            {
+                "channel": "transfer",
+                "amount": "1500.00",
+                "extra": _transfer_extra(src_bank_id=""),
+            }
+        ]
+        with mock.patch(
+            "services.erp.mrerp_dms_company_banks._fetch_banks",
+            side_effect=[PRODUCTION_BANKS["company_banks"], []],
+        ):
+            with self.assertRaises(DMSClientError) as ctx:
+                validate_company_bank_payments(object(), payments)
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
+
+    def test_manual_channel_bank_passes_but_only_where_the_directory_is_empty(self):
+        manual = {
+            "channel": "cheque",
+            "amount": "500.00",
+            "extra": {"cheque_no": "123456", "cheque_book_no": "01", "bank_name": "KBank"},
+        }
+        with mock.patch("services.erp.mrerp_dms_company_banks._fetch_banks", return_value=[]):
+            out = validate_company_bank_payments(object(), [manual])
+        self.assertEqual(out[0]["extra"]["bank_id"], "")
+        self.assertEqual(out[0]["extra"][MANUAL_BANK_FLAG], "1")
+
+        # 目录里有行 → 手工名称必须能唯一精确命中;否则就是已删除/不存在的选项,不放行。
+        with mock.patch(
+            "services.erp.mrerp_dms_company_banks._fetch_banks",
+            return_value=[["1", "SCB", "SCB"]],
+        ):
+            with self.assertRaises(DMSClientError) as ctx:
+                validate_company_bank_payments(object(), [manual])
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNMATCHED")
+
+    def test_receiving_account_stays_strict_even_with_an_empty_source_directory(self):
+        payments = [
+            {
+                "channel": "transfer",
+                "amount": "1500.00",
+                "extra": _transfer_extra(dst_id="9", src_bank_name="KBank", src_bank_id=""),
+            }
+        ]
+        with mock.patch(
+            "services.erp.mrerp_dms_company_banks._fetch_banks",
+            side_effect=[PRODUCTION_BANKS["company_banks"], []],
+        ):
+            with self.assertRaises(DMSClientError) as ctx:
+                validate_company_bank_payments(object(), payments)
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNMATCHED")
+
+    def test_unreadable_directory_cannot_be_used_as_an_empty_one(self):
+        """目录取数失败 → 抛错失败关闭;绝不当成「公司没配这类银行」再退回手工填写。"""
+        payments = [
+            {
+                "channel": "transfer",
+                "amount": "1500.00",
+                "extra": _transfer_extra(src_bank_name="KBank", src_bank_id=""),
+            }
+        ]
+        with mock.patch(
+            "services.erp.mrerp_dms_company_banks._fetch_banks",
+            side_effect=[
+                PRODUCTION_BANKS["company_banks"],
+                DMSClientError("bank master not ready", "ERR_DMS_MASTER_UNAVAILABLE"),
+            ],
+        ):
+            with self.assertRaises(DMSClientError) as ctx:
+                validate_company_bank_payments(object(), payments)
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
 
 
 if __name__ == "__main__":

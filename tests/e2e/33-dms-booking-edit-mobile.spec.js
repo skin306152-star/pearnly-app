@@ -139,6 +139,65 @@ const PAYMENT_DRAFT = {
     },
 };
 
+// 生产租户真形态:来源银行目录权威为空 → 编辑器给可填写的银行名称,不再是下拉。
+const PAYMENT_MANUAL_DRAFT = {
+    ...PAYMENT_DRAFT,
+    form: {
+        ...PAYMENT_DRAFT.form,
+        payments: [
+            {
+                channel: 'transfer',
+                amount: '1000.00',
+                extra: {
+                    src_bank_name: 'KBank ระยอง',
+                    src_account_no: '111222333',
+                    src_account_name: 'Customer',
+                    src_branch_name: 'Bangkok',
+                    src_time: '15:06',
+                    dst_id: '2',
+                },
+            },
+        ],
+    },
+    masters: {
+        ...PAYMENT_DRAFT.masters,
+        source_banks: [],
+    },
+    manual_banks: ['source_banks', 'cheque_banks', 'cashier_banks', 'card_banks'],
+};
+
+// 同一「目录权威为空」形态下的渠道银行草稿:对话里已存的是手工 bank_name(没有目录 id)。
+const PAYMENT_MANUAL_CHANNEL_DRAFT = {
+    ...PAYMENT_MANUAL_DRAFT,
+    form: {
+        ...PAYMENT_MANUAL_DRAFT.form,
+        files: { id_card: true, slip: false },
+        payments: [
+            {
+                channel: 'cheque',
+                amount: '500.00',
+                extra: { cheque_no: '123456', cheque_book_no: '01', bank_name: 'KBank ระยอง' },
+            },
+            {
+                channel: 'cashier_cheque',
+                amount: '600.00',
+                extra: { cashier_no: '778899', cashier_book_no: '02', bank_name: 'SCB ระยอง' },
+            },
+            {
+                channel: 'card',
+                amount: '700.00',
+                extra: { bank_name: 'BBL ระยอง', card_type: 'VISA' },
+            },
+        ],
+    },
+    masters: {
+        ...PAYMENT_MANUAL_DRAFT.masters,
+        cheque_banks: [],
+        cashier_banks: [],
+        card_banks: [],
+    },
+};
+
 const GEO_DRAFT = {
     ...DRAFT,
     form: {
@@ -636,6 +695,146 @@ test('payment editor keeps bank, account and company destination as separate fie
             dst_id: '2',
         },
     });
+});
+
+test('empty source bank directory falls back to a typed bank name', async ({ page }) => {
+    let submitted;
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', async (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
+        if (route.request().method() === 'POST') {
+            submitted = route.request().postDataJSON();
+            return route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: { saved: true } }),
+            });
+        }
+        const url = new URL(route.request().url());
+        const level = url.searchParams.get('level');
+        const parent = url.searchParams.get('parent_id');
+        const data = url.pathname.endsWith('/draft')
+            ? PAYMENT_MANUAL_DRAFT
+            : level === 'provinces'
+              ? GEO.provinces
+              : GEO[level]?.[parent] || [];
+        return route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data }),
+        });
+    });
+
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=manual-source-bank`);
+    await page.waitForSelector('#editor:not([hidden])');
+    // 目录为空 → 银行名称可填写、hidden bank id 不留下拉;草稿里的手工名称原样回显。
+    await expect(page.locator('.src-bank-name')).toHaveValue('KBank ระยอง');
+    await expect(page.locator('.src-bank')).toHaveCount(0);
+    await expect(page.locator('.dst')).toHaveValue('2');
+    await page.locator('.dst').selectOption('2');
+    await page.locator('.dst-name').fill('Example Company');
+    await page.locator('.dst-account').fill('987654321');
+    await page.locator('.dst-branch').fill('Rayong');
+    await page.screenshot({ path: path.join(OUT, 'manual-source-bank-390.png'), fullPage: true });
+    await page.locator('#save').click();
+    await expect.poll(() => submitted).toBeTruthy();
+    expect(submitted.form.payments[0]).toEqual({
+        channel: 'transfer',
+        amount: '1000.00',
+        extra: {
+            src_bank_name: 'KBank ระยอง',
+            src_account_no: '111222333',
+            src_account_name: 'Customer',
+            src_branch_name: 'Bangkok',
+            src_time: '15:06',
+            dst_id: '2',
+            dst_business_name: 'Example Company',
+            dst_account_no: '987654321',
+            dst_branch_name: 'Rayong',
+        },
+    });
+});
+
+test('empty channel bank directories show the saved manual bank name, not an id', async ({
+    page,
+}) => {
+    let submitted;
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', async (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
+        if (route.request().method() === 'POST') {
+            submitted = route.request().postDataJSON();
+            return route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: { saved: true } }),
+            });
+        }
+        const url = new URL(route.request().url());
+        const level = url.searchParams.get('level');
+        const parent = url.searchParams.get('parent_id');
+        const data = url.pathname.endsWith('/draft')
+            ? PAYMENT_MANUAL_CHANNEL_DRAFT
+            : level === 'provinces'
+              ? GEO.provinces
+              : GEO[level]?.[parent] || [];
+        return route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data }),
+        });
+    });
+
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=manual-channel-bank`);
+    await page.waitForSelector('#editor:not([hidden])');
+    await page.screenshot({ path: path.join(OUT, 'manual-channel-bank-390.png'), fullPage: true });
+    /* 支票目录为空 → 银行名称可填写;草稿里的 bank_name 必须回显,不能拿空 bank_id 顶替。 */
+    await expect(page.locator('.bank-name').nth(0)).toHaveValue('KBank ระยอง');
+    await expect(page.locator('.bank-name').nth(1)).toHaveValue('SCB ระยอง');
+    await expect(page.locator('.bank-name').nth(2)).toHaveValue('BBL ระยอง');
+    await expect(page.locator('.bank-id')).toHaveCount(0);
+    await expect(page.locator('.cheque-no')).toHaveValue('123456');
+    await expect(page.locator('.cheque-book-no')).toHaveValue('01');
+    await expect(page.locator('.cashier-no')).toHaveValue('778899');
+    await expect(page.locator('.cashier-book-no')).toHaveValue('02');
+    await expect(page.locator('.card-type')).toHaveValue('VISA');
+    await page.locator('#save').click();
+    await expect.poll(() => submitted).toBeTruthy();
+    expect(submitted.form.payments).toEqual([
+        {
+            channel: 'cheque',
+            amount: '500.00',
+            extra: { cheque_no: '123456', cheque_book_no: '01', bank_name: 'KBank ระยอง' },
+        },
+        {
+            channel: 'cashier_cheque',
+            amount: '600.00',
+            extra: { cashier_no: '778899', cashier_book_no: '02', bank_name: 'SCB ระยอง' },
+        },
+        {
+            channel: 'card',
+            amount: '700.00',
+            extra: { bank_name: 'BBL ระยอง', card_type: 'VISA' },
+        },
+    ]);
 });
 
 test('restored LIFF draft callback opens the booking editor instead of Cowork login', async ({

@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 from services.line_dms import qa_cards
 from services.erp.mrerp_dms_company_banks import PAYMENT_CHANNEL_BANKS
+from services.line_dms import booking_qa_transfer
 from services.line_dms._out import _send
 from services.line_dms.qa_util import car_label_of
 
@@ -32,9 +33,11 @@ def static_question(step, qa) -> Optional[Dict[str, Any]]:
         "regis_name": qa_cards.ask_regis_name(),
         "pay_channel": qa_cards.ask_pay_channel(qa.get("payments") or []),
         "pay_amount": qa_cards.ask_amount(qa_cards.PAY_LABELS.get(channel, "")),
-        "pay_src_detail": qa_cards.ask_transfer_details(False),
-        "pay_dst_detail": qa_cards.ask_transfer_details(True),
-        "pay_ref": qa_cards.ask_pay_ref(channel),
+        # 转账/渠道资料问法都带「该目录是否权威为空」的判据:空目录时多问一项银行名称,
+        # 与 collect_details / booking_qa_transfer 的解析同源,不留第二份渠道子集。
+        "pay_src_detail": booking_qa_transfer.transfer_details_question(qa),
+        "pay_dst_detail": booking_qa_transfer.transfer_details_question(qa),
+        "pay_ref": booking_qa_transfer.channel_ref_question(qa),
         "pay_more": qa_cards.ask_more(),
         "slip_after": qa_cards.need_slip(),
         "slip_conflict": qa_cards.slip_conflict(),
@@ -61,8 +64,11 @@ async def question(line_user_id, qa, step, masters, paints) -> Optional[Dict[str
             car_label_of(qa), await paints(line_user_id, qa), pages.get("paints", 0)
         )
     if step == "pay_bank":
-        key = PAYMENT_CHANNEL_BANKS[(qa.get("pending_channel") or {}).get("channel")]
-        return qa_cards.ask_payment_bank(await masters(line_user_id, qa, key), pages.get(key, 0))
+        channel = (qa.get("pending_channel") or {}).get("channel")
+        key = PAYMENT_CHANNEL_BANKS[channel]
+        return qa_cards.ask_payment_bank(
+            await masters(line_user_id, qa, key), pages.get(key, 0), channel
+        )
     if step == "pay_src":
         return qa_cards.ask_pay_src(
             await masters(line_user_id, qa, "source_banks"), pages.get("source_banks", 0)

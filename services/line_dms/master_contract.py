@@ -10,9 +10,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 from services.erp.mrerp_dms_company_banks import (
+    assign_bank_identity,
     company_bank_label,
     company_bank_payment_extra,
     PAYMENT_CHANNEL_BANKS,
+    resolve_bank_identity,
 )
 from services.line_dms.qa_util import car_label, find_row, row_name
 
@@ -227,14 +229,16 @@ def reconcile(qa: dict, masters: Dict[str, Any], paints: Optional[List[list]]) -
             continue
         extra = payment.setdefault("extra", {})
         if channel in PAYMENT_CHANNEL_BANKS:
-            bank = find_row(
-                masters.get(PAYMENT_CHANNEL_BANKS[channel]), str(extra.get("bank_id") or "")
+            # 四类付款银行目录权威为空时(生产租户常见)允许手工银行名称:判据在
+            # resolve_bank_identity 里统一 —— 目录非空则仍必须命中,已删除的旧选项不放行。
+            key = PAYMENT_CHANNEL_BANKS[channel]
+            identity = resolve_bank_identity(
+                masters.get(key), key, extra.get("bank_id"), extra.get("bank_name")
             )
-            if bank is None:
+            if identity is None:
                 return _missing_result(updated, channel + "_bank", snapshot, paints or [])
-            label = row_name(bank)
-            _change(changes, "bank", str(extra.get("bank_name") or ""), label)
-            extra["bank_name"] = label
+            _change(changes, "bank", str(extra.get("bank_name") or ""), identity["name"])
+            assign_bank_identity(extra, identity, id_key="bank_id", name_key="bank_name")
             continue
         if channel != "transfer":
             continue
@@ -253,12 +257,16 @@ def reconcile(qa: dict, masters: Dict[str, Any], paints: Optional[List[list]]) -
             ):
                 _change(changes, "bank", str(extra.get(key) or ""), mapped[key])
         extra.update(mapped)
-        source = find_row(masters.get("source_banks"), str(extra.get("src_bank_id") or ""))
+        source = resolve_bank_identity(
+            masters.get("source_banks"),
+            "source_banks",
+            extra.get("src_bank_id"),
+            extra.get("src_bank_name"),
+        )
         if source is None:
             return _missing_result(updated, "source_bank", snapshot, paints or [])
-        source_name = row_name(source)
-        _change(changes, "source_bank", str(extra.get("src_bank_name") or ""), source_name)
-        extra["src_bank_name"] = source_name
+        _change(changes, "source_bank", str(extra.get("src_bank_name") or ""), source["name"])
+        assign_bank_identity(extra, source, id_key="src_bank_id", name_key="src_bank_name")
 
     car_id = str((answers.get("car") or {}).get("id") or "")
     paint_snapshot = build_paint_snapshot(car_id, paints or [])

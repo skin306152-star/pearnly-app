@@ -115,15 +115,21 @@ class BookingLiffChannelContractTests(unittest.TestCase):
                 self.assertIn("liffUnavailable", i18n)
 
     def test_shell_bumps_changed_scripts(self):
-        html = _read("static/dms-booking-edit/dms-booking-edit.html")
-        for needle in (
-            "dms-booking-i18n.js?v=9",
-            "dms-booking-api.js?v=7",
-            "dms-credentials.js?v=5",
-            "dms-booking-edit.js?v=16",
-        ):
-            with self.subTest(needle=needle):
-                self.assertIn(needle, html)
+        # 源页与部署壳(dist)同批核对:源 bump 了 ?v= 而 dist 没重打包 = 生产继续命中旧缓存。
+        shells = (
+            "static/dms-booking-edit/dms-booking-edit.html",
+            "static/dist/dms-booking-edit.html",
+        )
+        for rel in shells:
+            html = _read(rel)
+            for needle in (
+                "dms-booking-i18n.js?v=9",
+                "dms-booking-api.js?v=7",
+                "dms-credentials.js?v=5",
+                "dms-booking-edit.js?v=17",
+            ):
+                with self.subTest(shell=rel, needle=needle):
+                    self.assertIn(needle, html)
 
 
 if __name__ == "__main__":

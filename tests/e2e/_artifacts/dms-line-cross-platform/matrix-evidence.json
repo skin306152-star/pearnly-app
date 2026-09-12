@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-12T15:31:07.087Z",
+  "generatedAt": "2026-09-12T17:50:35.368Z",
   "disclaimer": "Browser-engine and device-profile emulation on macOS; this is not native LINE, iOS, Android, or Windows device proof.",
   "platforms": {
     "ios-webkit": {
@@ -13,10 +13,10 @@
       "menu1Postback": "action=menu_customer",
       "menu2Postback": "action=menu_booking",
       "portal": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fportal%3Ddms%26openExternalBrowser%3D1&code=line-code-ios-webkit-portal&state=line-state-ios-webkit-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fportal%3Ddms%26openExternalBrowser%3D1&code=line-code-ios-webkit-portal&state=line-state-ios-webkit-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home/dms-booking/portal?ticket=opaque-ios-webkit",
+        "finalUrl": "http://127.0.0.1:55048/home/dms-booking/portal?ticket=opaque-ios-webkit",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -38,10 +38,10 @@
         "redirectResponses": []
       },
       "credentials": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-ios-webkit-credentials&state=line-state-ios-webkit-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-ios-webkit-credentials&state=line-state-ios-webkit-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-ios-webkit-credentials&state=line-state-ios-webkit-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "finalUrl": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-ios-webkit-credentials&state=line-state-ios-webkit-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -73,10 +73,10 @@
       "menu1Postback": "action=menu_customer",
       "menu2Postback": "action=menu_booking",
       "portal": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fportal%3Ddms%26openExternalBrowser%3D1&code=line-code-android-chromium-portal&state=line-state-android-chromium-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fportal%3Ddms%26openExternalBrowser%3D1&code=line-code-android-chromium-portal&state=line-state-android-chromium-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home/dms-booking/portal?ticket=opaque-android-chromium",
+        "finalUrl": "http://127.0.0.1:55048/home/dms-booking/portal?ticket=opaque-android-chromium",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -98,10 +98,10 @@
         "redirectResponses": []
       },
       "credentials": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-android-chromium-credentials&state=line-state-android-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-android-chromium-credentials&state=line-state-android-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-android-chromium-credentials&state=line-state-android-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "finalUrl": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-android-chromium-credentials&state=line-state-android-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -133,10 +133,10 @@
       "menu1Postback": "action=menu_customer",
       "menu2Postback": "action=menu_booking",
       "portal": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-macos-chromium-portal&state=line-state-macos-chromium-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-macos-chromium-portal&state=line-state-macos-chromium-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home/dms-booking/portal?ticket=opaque-macos-chromium",
+        "finalUrl": "http://127.0.0.1:55048/home/dms-booking/portal?ticket=opaque-macos-chromium",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -158,10 +158,10 @@
         "redirectResponses": []
       },
       "credentials": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-macos-chromium-credentials&state=line-state-macos-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-macos-chromium-credentials&state=line-state-macos-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-macos-chromium-credentials&state=line-state-macos-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "finalUrl": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-macos-chromium-credentials&state=line-state-macos-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -193,10 +193,10 @@
       "menu1Postback": "action=menu_customer",
       "menu2Postback": "action=menu_booking",
       "portal": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-windows-firefox-portal&state=line-state-windows-firefox-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-windows-firefox-portal&state=line-state-windows-firefox-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home/dms-booking/portal?ticket=opaque-windows-firefox",
+        "finalUrl": "http://127.0.0.1:55048/home/dms-booking/portal?ticket=opaque-windows-firefox",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -218,10 +218,10 @@
         "redirectResponses": []
       },
       "credentials": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-firefox-credentials&state=line-state-windows-firefox-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-firefox-credentials&state=line-state-windows-firefox-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-firefox-credentials&state=line-state-windows-firefox-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "finalUrl": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-firefox-credentials&state=line-state-windows-firefox-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -253,10 +253,10 @@
       "menu1Postback": "action=menu_customer",
       "menu2Postback": "action=menu_booking",
       "portal": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-windows-chromium-portal&state=line-state-windows-chromium-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-windows-chromium-portal&state=line-state-windows-chromium-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home/dms-booking/portal?ticket=opaque-windows-chromium",
+        "finalUrl": "http://127.0.0.1:55048/home/dms-booking/portal?ticket=opaque-windows-chromium",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -278,10 +278,10 @@
         "redirectResponses": []
       },
       "credentials": {
-        "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-chromium-credentials&state=line-state-windows-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-chromium-credentials&state=line-state-windows-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "callbackHttpStatus": 200,
         "callbackRedirectedFrom": null,
-        "finalUrl": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-chromium-credentials&state=line-state-windows-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+        "finalUrl": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-chromium-credentials&state=line-state-windows-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
         "liffInitCalls": [
           {
             "liffId": "DMS-LIFF"
@@ -304,7 +304,7 @@
     }
   },
   "server": {
-    "base": "http://127.0.0.1:62313",
+    "base": "http://127.0.0.1:55048",
     "runtime": "real local uvicorn app:app"
   },
   "menuContracts": {
@@ -518,10 +518,10 @@
     "dms_a": {
       "menu4Uri": "https://liff.line.me/PROVIDER-LIFF/dms-booking?credentials=dms&channel=dms_a",
       "menu4DesktopUri": "https://pearnly.com/home/dms-booking?credentials=dms&channel=dms_a",
-      "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms%26channel%3Ddms_a&code=line-code-macos-chromium-credentials-dms_a&state=line-state-macos-chromium-credentials-dms_a&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+      "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms%26channel%3Ddms_a&code=line-code-macos-chromium-credentials-dms_a&state=line-state-macos-chromium-credentials-dms_a&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
       "callbackHttpStatus": 200,
       "callbackRedirectedFrom": null,
-      "finalUrl": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms%26channel%3Ddms_a&code=line-code-macos-chromium-credentials-dms_a&state=line-state-macos-chromium-credentials-dms_a&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+      "finalUrl": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms%26channel%3Ddms_a&code=line-code-macos-chromium-credentials-dms_a&state=line-state-macos-chromium-credentials-dms_a&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
       "liffInitCalls": [
         {
           "liffId": "PROVIDER-LIFF"
@@ -544,10 +544,10 @@
     "dms_b": {
       "menu4Uri": "https://liff.line.me/PROVIDER-LIFF/dms-booking?credentials=dms&channel=dms_b",
       "menu4DesktopUri": "https://pearnly.com/home/dms-booking?credentials=dms&channel=dms_b",
-      "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms%26channel%3Ddms_b&code=line-code-macos-chromium-credentials-dms_b&state=line-state-macos-chromium-credentials-dms_b&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+      "requestedCallback": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms%26channel%3Ddms_b&code=line-code-macos-chromium-credentials-dms_b&state=line-state-macos-chromium-credentials-dms_b&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
       "callbackHttpStatus": 200,
       "callbackRedirectedFrom": null,
-      "finalUrl": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms%26channel%3Ddms_b&code=line-code-macos-chromium-credentials-dms_b&state=line-state-macos-chromium-credentials-dms_b&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
+      "finalUrl": "http://127.0.0.1:55048/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms%26channel%3Ddms_b&code=line-code-macos-chromium-credentials-dms_b&state=line-state-macos-chromium-credentials-dms_b&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A55048%2Fhome%3Fliff.state%3D%252Fdms-booking",
       "liffInitCalls": [
         {
           "liffId": "PROVIDER-LIFF"
@@ -568,5 +568,5 @@
       "redirectResponses": []
     }
   },
-  "completedAt": "2026-09-12T15:31:10.928Z"
+  "completedAt": "2026-09-12T17:50:38.898Z"
 }

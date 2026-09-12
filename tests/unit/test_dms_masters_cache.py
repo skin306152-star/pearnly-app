@@ -312,5 +312,52 @@ class PaintFetchLayerTests(unittest.TestCase):
         self.assertEqual(out, [["p1", "PC1", "Red"]])
 
 
+# 2026-09-13 同会话只读原始响应勘查(租户 bshsd)记录的两个真实协议形态:
+#   · 已登录、目录 0 行 → HTTP 200 + **空正文**(0 字节);
+#   · 未登录/认证失效  → HTTP 200 + **65 字节非 JSON 正文**(strip 后 37 字符,非数组)。
+# 下面第二条用等长占位正文表示「非 JSON 的认证失败壳」,断言的是协议分流本身(非 JSON → None),
+# 不是逐字节复原那段正文。空正文 = 该目录 0 行,必须仍是合法空表。
+_UNAUTHENTICATED_BODY = "0" * 65  # 非 JSON、非数组:模拟未登录壳(与真实响应同为非 JSON)
+
+
+class BshsdBodyHonestyTests(unittest.TestCase):
+    """bshsd 正文协议:空正文 = 合法 0 行目录;非 JSON 正文 = 取数失败(fail closed)。"""
+
+    def test_blank_body_is_the_tenant_legitimate_empty_directory(self):
+        """已登录、该目录 0 行 → 空正文 → []。空正文不是"没读到"。"""
+        from services.erp.mrerp_dms_master_rows import parse_rows
+
+        for body in ("", "   ", "\n\t \n"):
+            with self.subTest(body=body):
+                self.assertEqual(parse_rows("txtbanknametffrom", body), [])
+        # 空数组 JSON 也是合法空表(不是唯一形态)。
+        self.assertEqual(parse_rows("txtbanknametffrom", "[]"), [])
+        self.assertEqual(parse_rows("txtbanknametffrom", '[["1","SCB","SCB"]]')[0][1], "SCB")
+
+    def test_non_json_or_non_array_body_is_a_fetch_failure(self):
+        """未登录壳(非 JSON)/HTML/对象/null/异常 JSON → None,不许被读成空目录。"""
+        from services.erp.mrerp_dms_master_rows import parse_rows
+
+        for body in (_UNAUTHENTICATED_BODY, "<html></html>", "{}", "[1,2", "null", '"x"'):
+            with self.subTest(body=body):
+                self.assertIsNone(parse_rows("txtbanknametffrom", body))
+
+    def test_failed_login_never_writes_an_authoritative_empty_bank_row(self):
+        """完整强制抓取里登录失败 → fail closed,不落任何权威缓存(含空表)。"""
+        from services.erp import erp_dms_intake
+
+        self.mem = _Mem()
+        with (
+            mock.patch.object(mc, "_read", side_effect=self.mem.read),
+            mock.patch.object(mc, "_write", side_effect=self.mem.write),
+            mock.patch.object(erp_dms_intake, "_run_logged_in", return_value=None),
+            mock.patch.object(mc, "write_authoritative_snapshot") as write,
+        ):
+            out = mc.get_masters(_EP, force_refresh=True, require_complete=True)
+        self.assertEqual(out, {})  # fail closed:不拿空表冒充实时主档
+        write.assert_not_called()
+        self.assertEqual(self.mem.rows, {})
+
+
 if __name__ == "__main__":
     unittest.main()

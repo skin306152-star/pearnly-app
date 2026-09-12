@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-10 18:22（Asia/Bangkok，UTC+7）。状态：**盘点导出表格边框修正已上线，Web/Worker 各 100% 新版本；用户重新导出验收待确认。**
+更新时间：2026-09-12 13:32（Asia/Bangkok，UTC+7）。状态：**WeKan / COWORK 统一登录已上线，Web/Worker 各 100% 新版本；独立 WeKan 正式域名、持久存储及备份恢复已验证。用户真机验收待确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -21,11 +21,26 @@
 | 密钥和账号 | Secret Manager `pearnly-web-env` / `pearnly-worker-env`；各自独立运行账号，只读取各自密钥 |
 | 发布 | GitHub `Manual CD`（当前 `manual-deploy.yml`）→ WIF → Artifact Registry → schema Job → 候选验证 → 两服务切流 |
 | 旧 Vultr | `66.42.49.213` / UUID `25a6d7e9-bbcd-4c00-958b-c771f503cdbc` 已于2026-09-05 18:25销毁；控制台回读已终止、No Instances |
+| WeKan | `work.pearnly.com` → DNS-only A `136.85.65.80` → VM `pearnly-work`（`asia-southeast1-b`，e2-medium / 4 GiB）；Caddy TLS，私有 MongoDB/WeKan，保留 30 GiB 数据盘 |
 | ERPNext | 独立仓库 `/Users/skin/pearnly-erp`，GCP `project-d0fbd530-1ee3-436d-b58`，VM `pearnly-erp-dev`；只读回查 RUNNING，本次未修改 |
 
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- Pearnly 完整 SHA：`6ae1a234fa19c38d8292c2b67e1ed6aee130eaef`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:d9820d8a4c51990e086d4f182e42155e4e3edb09b219e80ce7921cf190908cd3`。
+- Web revision：`pearnly-web-6ae1a234fa19-s3`；Worker revision：`pearnly-worker-6ae1a234fa19-s3`；两端各 100% 流量。
+- [Manual CD 34677083103](https://github.com/skin306152-star/pearnly-app/actions/runs/34677083103) 成功；串行 schema execution `pearnly-schema-8288h` 于 06:05:59 UTC 成功，追加 `0128_work_bridge`。候选和正式两端均通过精确 SHA、digest、revision、health/readiness 及安装包完整下载校验；06:08:38 UTC 完成最终 Web 验证。
+- Web/Worker runtime secret 各由 v2 升为 v3，只追加共享 `WORK_BRIDGE_URL` / `WORK_BRIDGE_SECRET`，原有字段完整保留。旧 `2a954babe147-s2` revision 作为兼容回退版本保留。
+- 全部 COWORK 用户都有工作协作菜单，无事务所开关或首家 owner 配置。Pearnly 普通员工权限和原生 WeKan 看板/站点权限分别保留，WeKan 管理员身份不会赋予 Pearnly owner/superadmin。
+- WeKan 最终 addon 源码：`130cb0840030fffb42f7ad17f29e45c5c7e62495`；镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/wekan@sha256:7aa18bace45290ec69325e6304fba58423c078296ca279fb33e4dfd9d076a058`；amd64、revision label 和运行状态回读一致。使用官方 11.58.0 固定底图，最后仅更新独立服务的退出及无邮箱邀请兼容，不重发 Pearnly Cloud Run。
+- WeKan 专用 runtime secret 为 `pearnly-work-env:2`；VM 服务账号只能读取该 secret 和镜像仓库，无 Pearnly SQL 凭据。8096 只绑定 loopback，8080/27017 无主机端口，公网仅 80/443；SSH 仅 IAP。主域名/www Worker 路由、邮件 DNS 和现有 TLS 策略保留。
+- 数据盘 `pearnly-work-data` 独立保留，`/srv/pearnly-work` 按 UUID 挂载，Docker 依赖挂载启动。策略 `pearnly-work-consistent-daily` 每日 20:00 UTC，保留七天，guest-flush；pre-hook 锁 MongoDB、sync、冻结文件系统，post-hook 解冻解锁，另有 240 秒安全解冻计时器。初次 `db.currentOp()` 不返回锁标志的问题已修正为原始 `currentOp` 命令，真实 pre/post 再验通过且数据库未锁定。
+- 快照 `pearnly-work-verified-20260912` 已恢复到隔离克隆盘和 `--network none` MongoDB，数据库标记与文件字节一致。第一次未 sync 的验收快照不能作为恢复证据，已删除；两块恢复测试盘与旧未使用策略已删除。首次定时执行尚未到时间，不能把手工恢复验证写成定时备份已运行。
+- 验收证据及未覆盖边界见 [WeKan 任务记录](../project/WEKAN_SSO_20260912.md)。
+
+### 上一次发布：盘点边框（2026-09-10 18:22）
 
 - 完整 SHA：`2a954babe1471af869a7f69eb1d3fdb6bdf37fac`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:37ef28c5e4e3aae18570ddc50ff1a1f071dac4dbef0305c370978bbfc203af12`。

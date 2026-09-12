@@ -1,7 +1,9 @@
-# Pearnly / WeKan deployment candidate
+# Pearnly / WeKan deployment
 
-**Not deployed.** Current evidence and blockers are in
-[the active task record](../../docs/project/WEKAN_SSO_20260912.md).
+Production entry: **https://pearnly.com/cowork** → การทำงานร่วมกัน →
+**https://work.pearnly.com**. Exact release identities and acceptance limits are in
+[the deployment ledger](../../docs/deployment/MIGRATION_STATUS.md) and
+[the task record](../../docs/project/WEKAN_SSO_20260912.md).
 
 All COWORK accounts use one service. There is no firm allowlist, first-owner
 configuration or per-firm activation. Pearnly's ordinary employee permissions
@@ -18,6 +20,7 @@ running image reports WeKan 11.58.0. Pearnly integration code lives here and in
 
 The installer preserves native permission checks. It adds missing awaits in
 the pinned `setCreateUser` and `inviteUserToBoard` account-creation and enrollment calls, and
+allows username-only invitations to finish without attempting an absent email, and
 extends SockJS's allowed request headers with the two private gateway identity
 headers. It fails if those upstream code shapes change.
 
@@ -39,11 +42,12 @@ membership. New email invitations use Pearnly's existing password-setup flow.
 Pearnly account and tenant suspension govern access to Pearnly; WeKan role
 changes and account suspension govern WeKan only.
 
-## Durable hosting plan
+## Durable hosting
 
-Keep the existing Pearnly Web/Worker Cloud Run deployment. Host this separate
-stateful service in GCP project `pearnly`, Singapore, on a dedicated 4 GiB VM
-with a retained persistent disk. Do not reuse or modify the ERPNext VM or its
+Pearnly Web/Worker retain Cloud Run. The separate stateful service runs in GCP
+project `pearnly`, zone `asia-southeast1-b`, on VM `pearnly-work` (e2-medium,
+4 GiB). Static address: `136.85.65.80`; retained 30 GiB data disk:
+`pearnly-work-data`, mounted at `/srv/pearnly-work`. Do not reuse or modify the ERPNext VM or its
 project. The WeKan/MongoDB disk must not be an ephemeral Cloud Run filesystem.
 
 `compose.yml` is the local stack. Add `compose.production.yml` for authenticated
@@ -64,22 +68,64 @@ The application MongoDB user has only `readWrite` on database `wekan`; it is
 created only when the data volume is empty. Changing environment variables
 does not rotate an existing database user's password.
 
-On the new host, after the exact source/image is verified:
+The host uses dedicated Secret Manager secret `pearnly-work-env`; Web and
+Worker runtime secrets are separate. Fetch only the pinned secret version with
+the host service account, write it root-owned mode 0600, and pull the immutable
+image using short-lived registry authentication. Do not print secret contents.
+
+From `/srv/pearnly-work/app`, after the exact source/image is verified:
 
 ```sh
-docker compose --env-file /root/pearnly-work.env -p pearnly-work \
+docker compose --env-file /srv/pearnly-work/app/runtime.env -p pearnly-work \
   -f compose.yml -f compose.production.yml config --quiet
-docker compose --env-file /root/pearnly-work.env -p pearnly-work \
+docker compose --env-file /srv/pearnly-work/app/runtime.env -p pearnly-work \
   -f compose.yml -f compose.production.yml up -d
 ```
 
 The runtime file must be root-owned, mode 0600. Preserve database, files and
 certificate volumes on image updates; never use `down -v` in production.
-Schedule retained daily disk snapshots and verify restoration into a separate
-test VM before calling backup recovery accepted. Before changing MongoDB or
+Use the application-consistent snapshot procedure below; test restoration from
+a cloned disk and an isolated MongoDB container, never over the live database. Before changing MongoDB or
 WeKan versions, take a version-labelled database/file backup and validate the
 upgrade against its copy. Initial single-instance hosting has no automatic
 failover; its capacity and monthly infrastructure cost require live readback.
+
+## Application-consistent snapshots
+
+The attached policy `pearnly-work-consistent-daily` snapshots the data disk at
+20:00 UTC (03:00 Bangkok), retains seven days, and keeps automatic snapshots
+when the source disk is deleted. It has `guestFlush=true` and regional storage
+in `asia-southeast1`. The retained data disk contains Docker volumes, MongoDB,
+attachments, Caddy certificates and the private runtime file.
+
+Install the supplied hooks on this dedicated host:
+
+```sh
+sudo install -d /etc/google/snapshots
+sudo install -m 755 snapshot-pre.sh /etc/google/snapshots/pre.sh
+sudo install -m 755 snapshot-post.sh /etc/google/snapshots/post.sh
+```
+
+In `/etc/default/instance_configs.cfg`, preserve existing sections and add or
+update `[Snapshots]` with `enabled = true` and `timeout_in_seconds = 60`, then
+restart `google-guest-agent`. The pre-hook locks MongoDB, runs `sync`, and freezes
+the data filesystem. The post-hook thaws it and unlocks MongoDB. A 240-second
+systemd timer invokes the same idempotent thaw if the guest agent fails.
+MongoDB lock status must be checked with the raw admin `currentOp` command;
+`db.currentOp()` omits that flag in this mongosh version.
+
+Recovery acceptance on 2026-09-12 restored snapshot
+`pearnly-work-verified-20260912` to a separate disk, mounted the clone with normal
+ext4 journal recovery, and copied its database into a disposable authenticated
+MongoDB container with `--network none`. Both a database marker and attachment
+volume bytes matched the originals. Temporary containers, copied data and clone
+disks were removed after verification. This proves recovery from the manual
+snapshot; the first scheduled execution is still to occur.
+
+Before a version upgrade, take a guest-flush snapshot, verify hook completion and
+an unlocked database, then validate that version against a clone. A live image
+rollback must keep the same volumes and use a previously recorded digest.
+See [Google's guest-flush instructions](https://docs.cloud.google.com/compute/docs/disks/creating-linux-application-consistent-pd-snapshots).
 
 ## Pearnly release order
 
@@ -102,3 +148,12 @@ failover; its capacity and monthly infrastructure cost require live readback.
 Keep the previous verified Pearnly revision and WeKan image. Code rollback
 retains the additive identity tables and persistent volumes. Disabling WeKan
 must not disable COWORK accounts or promote/demote their Pearnly roles.
+
+## Acceptance limits
+
+The formal browser login/menu/logout, native employee issuance through Pearnly,
+board roles, file upload/download, revocation and backup restoration passed.
+Actual invitation-email receipt and user-device acceptance remain unverified.
+The pinned upstream's optional HTTP/DDP attachment-upload APIs fail; webpage
+upload/download works and has been checked byte-for-byte. See the task record
+for those exact failed API paths before implementing an API-based upload client.

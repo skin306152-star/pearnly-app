@@ -32,15 +32,14 @@ def card_from_customer(client: Any, *, customer_id: str, people_id: str) -> Thai
     try:
         return _card_from_fields(fields or {}, customer_id=customer_id, expected=expected)
     except DMSClientError:
-        resolve_admin = getattr(client, "_resolve_admin_transport", None)
-        admin = resolve_admin() if resolve_admin else None
-        if admin is None:
-            raise
-        from services.erp.mrerp_dms_client import DMSClient
+        # 统一走权威只读层判定(未配管理员 → 原样抛本会话的错;配了但登录失败 → 明确失败关闭)。
+        from services.erp.dms_admin_read import authoritative_read_client
 
+        reader = authoritative_read_client(client)
+        if reader is client:
+            raise
         # Same configured base URL, same exact customer ID; no broad search,
         # source switch, cached fields, or elevation of the booking writer.
-        reader = DMSClient(admin, client.base_url)
         try:
             fields = reader.read_customer(str(customer_id))
         except DMSClientError as exc:

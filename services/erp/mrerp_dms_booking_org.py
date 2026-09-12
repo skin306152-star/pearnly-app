@@ -83,15 +83,14 @@ def resolve_booking_org(client, advisor_id: str, defaults: BookingDefaults) -> B
     try:
         org = parse_booking_org(client._post_text(_PATH, {"idusers": advisor_id}))
     except DMSClientError:
-        resolve_admin = getattr(client, "_resolve_admin_transport", None)
-        admin = resolve_admin() if resolve_admin else None
-        if admin is None:
+        # 统一走权威只读层判定(未配管理员 → 原样抛本会话的错;配了但登录失败 → 明确失败关闭)。
+        from services.erp.dms_admin_read import authoritative_read_client
+
+        reader = authoritative_read_client(client)
+        if reader is client:
             raise
         # A separate reader prevents principal switches from sharing client memo
         # state. The transport is still the adapter's authenticated browser API.
-        from services.erp.mrerp_dms_client import DMSClient
-
-        reader = DMSClient(admin, client.base_url)
         org = parse_booking_org(reader._post_text(_PATH, {"idusers": advisor_id}))
     if (defaults.branch_id and defaults.branch_id != org.branch.id) or (
         defaults.team_id and defaults.team_id != org.team.id

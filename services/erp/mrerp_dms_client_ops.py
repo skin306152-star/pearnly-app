@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, timedelta
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from services.erp import dms_employees, mrerp_dms_docno
@@ -18,8 +18,14 @@ from services.erp.mrerp_dms_models import (
     DMSMasterRef,
     ThaiIdCardPayload,
 )
-from services.erp.mrerp_dms_client_base import DMSClientError, to_be_date
+from services.erp.mrerp_dms_booking_payload import (
+    advisor_ref_strict,
+    payload_from_refs,
+    ref_from_rows,
+)
+from services.erp.mrerp_dms_client_base import DMSClientError
 from services.erp.mrerp_dms_master_rows import memo as _memo
+from services.erp.mrerp_dms_master_rows import row_by_id  # noqa: F401  既有对外名(dms_advisor)
 from services.erp.mrerp_dms_master_rows import parse_rows as _parse_bshsd_rows
 from services.erp.mrerp_dms_payments import payment_form_fields
 from services.erp.mrerp_dms_booking_submit import submit_booking
@@ -49,14 +55,6 @@ def _is_duplicate_docno_error(body: str) -> bool:
 def _bump_docno(docno: str) -> str:
     """末尾连续数字段 +1 并保持位宽:BK2606000001 → BK2606000002。无数字尾则补 1。"""
     return mrerp_dms_docno.bump_docno(docno)
-
-
-def row_by_id(rows: Optional[List[list]], rid: str) -> Optional[list]:
-    """bshsd 主档行按 id 命中(首列即 id),取首个;没有 → None。"""
-    for row in rows or []:
-        if row and str(row[0]) == str(rid):
-            return row
-    return None
 
 
 class DMSClientOpsMixin:
@@ -311,10 +309,11 @@ class DMSClientOpsMixin:
         self, defaults: BookingDefaults, card: ThaiIdCardPayload, *, today: Optional[date] = None
     ) -> DMSBookingPayload:
         """Build a DMSBookingPayload from endpoint defaults, resolving any
-        master ref the user did not pin from live DMS master data."""
-        today = today or date.today()
-        delivery = today + timedelta(days=defaults.delivery_days)
+        master ref the user did not pin from live DMS master data.
 
+        按需实时取数版(单凭据兼容路径):每个主档一次 bshsd。订车提交路径不走这里 ——
+        那里吃 readonly_preflight 已取到的权威快照(build_booking_payload),不重复取数。
+        """
         advisor = self._advisor_ref_strict(defaults)
         car = self._ref_from_default("txtcar", defaults.car_id, defaults.car_code, "")
         paint = self._ref_from_default(
@@ -325,18 +324,16 @@ class DMSClientOpsMixin:
         org = resolve_booking_org(self, advisor.id, defaults)
         regis = self._ref_from_default("txtregisbehalf", defaults.regis_behalf_id, "", "")
 
-        return DMSBookingPayload(
-            doc_date_be=to_be_date(today),
-            delivery_date_be=to_be_date(delivery),
+        return payload_from_refs(
+            defaults,
             advisor=advisor,
             car=car,
             paint=paint,
-            place_book=place,
-            term_sale=term,
-            branch=org.branch,
-            team=org.team,
-            organization_fields=org.form_fields,
-            regis_behalf=regis,
+            place=place,
+            term=term,
+            org=org,
+            regis=regis,
+            today=today,
         )
 
     def search_customer(self, text: str) -> Optional[str]:
@@ -376,23 +373,7 @@ class DMSClientOpsMixin:
         逐问开局已按操作员的 DMS 账号匹配好归属(services/erp/dms_advisor.py),到这里必有
         id;落错人只有月底对账才看得出来,所以宁可当场报错也不猜。
         """
-        if not defaults.advisor_id:
-            raise DMSClientError(
-                "booking advisor not pinned for operator", "ERR_DMS_ADVISOR_REQUIRED"
-            )
-        rows = self._advisor_rows()
-        row = row_by_id(rows, defaults.advisor_id)
-        if row is not None:
-            return self._ref_from_row(row)
-        if rows is None:
-            raise DMSClientError(
-                "DMS advisor master unavailable while validating the selected advisor",
-                "ERR_DMS_MASTER_UNAVAILABLE",
-            )
-        raise DMSClientError(
-            f"booking advisor id {defaults.advisor_id!r} not in DMS advisor master",
-            "ERR_DMS_ADVISOR_UNMATCHED",
-        )
+        return advisor_ref_strict(self._advisor_rows, defaults)
 
     def _ref_from_default(
         self, elemname: str, pinned_id: str, pinned_code: str, pinned_name: str, **extra
@@ -401,51 +382,9 @@ class DMSClientOpsMixin:
 
         只在第 1 页里找 pinned id,id 在第 2 页会被误判成「不存在」然后悄悄回落首行,
         建单就填错车/店。故最终解析与 fetch_masters 一样走 _bshsd_all 全量翻页。
-
-        pinned id 一旦存在就不许回落首行或钉死标量:主档读不到/已变更时提交旧值,
-        月底对账才会暴露填错。取数失败(rows None)→ ERR_DMS_MASTER_UNAVAILABLE
-        (可重试);主档真空或找不到 pinned → ERR_DMS_MASTER_UNMATCHED(重试无意义,
-        必须让操作员重新选择)。
         """
-        rows = self._bshsd_all(elemname, **extra)
-        if pinned_id:
-            if rows is None:
-                raise DMSClientError(
-                    f"DMS master {elemname} unavailable while resolving pinned id {pinned_id!r}",
-                    "ERR_DMS_MASTER_UNAVAILABLE",
-                )
-            chosen = row_by_id(rows, pinned_id)
-            if chosen is None:
-                raise DMSClientError(
-                    f"pinned id {pinned_id!r} not in DMS master {elemname}",
-                    "ERR_DMS_MASTER_UNMATCHED",
-                )
-            return self._ref_from_row(chosen)
-        if rows is None:
-            raise DMSClientError(f"DMS master {elemname} unavailable", "ERR_DMS_MASTER_UNAVAILABLE")
-        chosen = [
-            row
-            for row in rows
-            if (pinned_code and len(row) > 1 and str(row[1]) == str(pinned_code))
-            or (
-                not pinned_code and pinned_name and len(row) > 2 and str(row[2]) == str(pinned_name)
-            )
-        ]
-        if len(chosen) != 1:
-            raise DMSClientError(
-                f"DMS master {elemname} requires an explicit unambiguous selection",
-                "ERR_DMS_MASTER_UNMATCHED",
-            )
-        return self._ref_from_row(chosen[0])
-
-    @staticmethod
-    def _ref_from_row(row: list) -> DMSMasterRef:
-        """bshsd 行 [id, code, name, ...] → DMSMasterRef(尾列进 extra 供表单原样回显)。"""
-        return DMSMasterRef(
-            id=str(row[0]),
-            code=str(row[1]) if len(row) > 1 else str(row[0]),
-            name=str(row[2]) if len(row) > 2 else (str(row[1]) if len(row) > 1 else ""),
-            extra=tuple(row[3:]),
+        return ref_from_rows(
+            elemname, self._bshsd_all(elemname, **extra), pinned_id, pinned_code, pinned_name
         )
 
     def _bshsd(self, elemname: str, **extra) -> Optional[List[List[Any]]]:

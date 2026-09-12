@@ -59,3 +59,14 @@ class DMSClient(DMSClientOpsMixin, DMSClientFormsMixin, DMSClientIntakeMixin):
         if self._admin_transport_cached is None:
             self._admin_transport_cached = src() if callable(src) else src
         return self._admin_transport_cached
+
+    @property
+    def admin_transport(self) -> Any:
+        """已解析的 admin transport;配了但还没懒起会话时返回工厂本身(非 None)。
+
+        只用于「配没配独立管理员」的判据,读它绝不会触发管理员登录 —— 权威只读层据此决定
+        要不要走管理员会话,不制造多余的会话。
+        """
+        if self._admin_transport_cached is not None:
+            return self._admin_transport_cached
+        return self._admin_transport

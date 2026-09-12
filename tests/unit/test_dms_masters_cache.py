@@ -154,6 +154,100 @@ class MastersCacheTests(unittest.TestCase):
         self.assertEqual(self.paint_calls["c1"], 1)
 
 
+class AuthoritativeSnapshotTests(unittest.TestCase):
+    """write_authoritative_snapshot:权威空表 = 删除事实,不许被旧缓存合并回来。
+
+    用户口径是「DMS 增删必须实时映射」:`[]` 与 `None` 必须分开 —— `_bshsd_all` 回 `[]`
+    是权威读取成功的空表(该车型颜色/该类银行已在 DMS 删光),回 `None` 才是读取失败。
+    """
+
+    def setUp(self):
+        self.mem = _Mem()
+        self.es = contextlib.ExitStack()
+        self.es.enter_context(mock.patch.object(mc, "_read", side_effect=self.mem.read))
+        self.es.enter_context(mock.patch.object(mc, "_write", side_effect=self.mem.write))
+        self.addCleanup(self.es.close)
+
+    def _seed(self, masters):
+        self.mem.write("E1", masters)
+        return masters
+
+    def _written(self):
+        return self.mem.rows["E1"]["masters"]
+
+    def test_authoritative_empty_paints_clear_the_selected_car(self):
+        """选中车型权威回 [] → 旧颜色必须被清掉,不是「没拿到所以留旧色」。"""
+        self._seed(
+            {
+                "cars": _MASTERS["cars"],
+                "paints_by_car": {"c1": [["p1", "PC1", "Red"]], "c2": [["p2", "PC2", "Blue"]]},
+            }
+        )
+
+        mc.write_authoritative_snapshot(
+            _EP, {**_MASTERS, "paints_by_car": {}}, car_id="c1", paints=[]
+        )
+
+        written = self._written()
+        self.assertEqual(written["paints_by_car"]["c1"], [])
+        # 没读的其它车型旧色原样保留(安全合并)
+        self.assertEqual(written["paints_by_car"]["c2"], [["p2", "PC2", "Blue"]])
+
+    def test_authoritative_empty_paints_for_the_last_car_do_not_resurrect_on_next_write(self):
+        """唯一一条颜色被清空后,下一次不带颜色读取的落库不许把旧色从那行缓存合并回来。"""
+        self._seed({"cars": _MASTERS["cars"], "paints_by_car": {"c1": [["p1", "PC1", "Red"]]}})
+
+        mc.write_authoritative_snapshot(_EP, _MASTERS, car_id="c1", paints=[])
+        self.assertEqual(self._written()["paints_by_car"], {"c1": []})
+
+        mc.write_authoritative_snapshot(_EP, _MASTERS)
+        self.assertEqual(self._written()["paints_by_car"], {"c1": []})
+
+    def test_none_paints_keep_the_old_row_for_that_car(self):
+        """paints=None 是「这次没读到」→ 该车型旧条目原样保留(与 [] 明确分开)。"""
+        old_paints = [["p1", "PC1", "Red"]]
+        self._seed({"cars": _MASTERS["cars"], "paints_by_car": {"c1": old_paints}})
+
+        mc.write_authoritative_snapshot(_EP, _MASTERS, car_id="c1", paints=None)
+
+        self.assertEqual(self._written()["paints_by_car"]["c1"], old_paints)
+
+    def test_authoritative_empty_bank_list_clears_the_old_row(self):
+        """权威银行表回 [] = DMS 里这类银行已删光 → 不许用 falsy 判断恢复旧银行。"""
+        self._seed(
+            {
+                "cars": _MASTERS["cars"],
+                "company_banks": [["9", "OLD", "Old Bank"]],
+                "source_banks": [["9", "OLD", "Old Bank"]],
+            }
+        )
+        authoritative = {**_MASTERS, "company_banks": [], "source_banks": []}
+
+        mc.write_authoritative_snapshot(_EP, authoritative)
+
+        written = self._written()
+        self.assertEqual(written["company_banks"], [])
+        self.assertEqual(written["source_banks"], [])
+
+    def test_bank_key_missing_from_the_snapshot_falls_back_to_the_old_row(self):
+        """兼容边界:key 根本不在这次快照里(这次没读这类目录)→ 保留旧行,不误清。"""
+        self._seed(
+            {
+                "cars": _MASTERS["cars"],
+                "company_banks": [["9", "OLD", "Old Bank"]],
+                "source_banks": [["9", "OLD", "Old Bank"]],
+            }
+        )
+        authoritative = {k: v for k, v in _MASTERS.items() if k != "company_banks"}
+        authoritative["source_banks"] = []
+
+        mc.write_authoritative_snapshot(_EP, authoritative)
+
+        written = self._written()
+        self.assertEqual(written["company_banks"], [["9", "OLD", "Old Bank"]])  # 缺 key → 兼容旧值
+        self.assertEqual(written["source_banks"], [])  # 有 key 且 [] → 权威删除
+
+
 class PaintFetchLayerTests(unittest.TestCase):
     """登录抓取层(不打桩本体):_bshsd 取数失败与登录失败在这里都必须落成 None。"""
 
@@ -170,7 +264,7 @@ class PaintFetchLayerTests(unittest.TestCase):
         client = mock.Mock()
         client.fetch_masters.return_value = {"cars": []}
 
-        def run(endpoint, fn):
+        def run(endpoint, fn, **kwargs):
             return fn(client, object())
 
         with (
@@ -189,7 +283,7 @@ class PaintFetchLayerTests(unittest.TestCase):
         client = mock.Mock()
         client.fetch_masters.return_value = {"cars": []}
 
-        def run(endpoint, fn):
+        def run(endpoint, fn, **kwargs):
             return fn(client, object())
 
         with (
@@ -209,7 +303,7 @@ class PaintFetchLayerTests(unittest.TestCase):
         client = mock.Mock()
         client._bshsd_all.return_value = [["p1", "PC1", "Red"]]
 
-        def run(endpoint, fn):
+        def run(endpoint, fn, **kwargs):
             return fn(client, object())
 
         with mock.patch.object(erp_dms_intake, "_run_logged_in", side_effect=run):

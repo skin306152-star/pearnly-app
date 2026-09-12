@@ -41,9 +41,14 @@ def _err(code: str, raw: str = "") -> Dict[str, Any]:
     }
 
 
-def _run_logged_in(endpoint: Dict[str, Any], fn):
+def _run_logged_in(endpoint: Dict[str, Any], fn, *, authoritative_read: bool = False):
     """Build adapter → login → fn(client, adapter). Maps DMS errors to friendly
-    dicts. NEVER raises. 会话随 adapter 退出即注销,不缓存 cookie 复用。"""
+    dicts. NEVER raises. 会话随 adapter 退出即注销,不缓存 cookie 复用。
+
+    authoritative_read=True:整块 DMS 读取借管理员会话(配了独立管理员凭据组时),
+    销售的挑选/匹配因此看到的是权威映射而不是自己的不完整视图。整块只解析一次管理员
+    transport;未配管理员照样走销售;配了但管理员登录失败 → ERR_DMS_ADMIN_AUTH 明确
+    失败关闭,不静默降级。写操作(upload/提交)不走这个入口。"""
     from services.line_dms.binding_guard import BindingChanged, require_current
 
     require_current()
@@ -72,7 +77,14 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
                     raise
                 try:
                     require_current()
-                    out = fn(adapter._client(), adapter)
+                    client = adapter._client()
+                    if authoritative_read:
+                        from services.erp.dms_admin_read import authoritative_read_session
+
+                        with authoritative_read_session(client):
+                            out = fn(client, adapter)
+                    else:
+                        out = fn(client, adapter)
                 except DMSClientError as e:
                     if getattr(adapter, "concurrent_login_detected", False) and not getattr(
                         e, "response_body", {}
@@ -167,7 +179,10 @@ def recognize_lookup_mrerp_dms(
     fallback_customer_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """OCR 后:查 DMS 客户 + 解析 OCR 地址级联 + 选项 + 称谓 + 相似候选。
-    scenario:exact(身份证号命中)/ similar(按姓名找到候选)/ none(都没有)。"""
+    scenario:exact(身份证号命中)/ similar(按姓名找到候选)/ none(都没有)。
+
+    客户匹配必须用权威视图:销售账号看不到的客户在销售搜索里就是「不存在」,会被误判成
+    新客户。整块读取借管理员会话一次(未配管理员则照旧用销售)。"""
 
     def _do(cl, adapter):
         from services.erp.mrerp_dms_models import ThaiAddress
@@ -263,12 +278,14 @@ def recognize_lookup_mrerp_dms(
             "prefixes": prefixes,
         }
 
-    return _run_logged_in(endpoint, _do)
+    return _run_logged_in(endpoint, _do, authoritative_read=True)
 
 
 def customer_fields_mrerp_dms(endpoint: Dict[str, Any], *, customer_id: str) -> Dict[str, Any]:
     """载入指定 DMS 客户的全字段(供相似场景选定候选后填充全字段表单)。
-    返回 current_fields(含三套地址+下拉选中标签)+ 府选项 + 称谓。"""
+    返回 current_fields(含三套地址+下拉选中标签)+ 府选项 + 称谓。
+
+    按客户号直读属于权威读:销售账号读不到时不能把「读不到」当成「这个客户没有资料」。"""
 
     def _do(cl, adapter):
         page = cl._post_text("cus/form.php", {"status": "e", "id": customer_id})
@@ -281,16 +298,19 @@ def customer_fields_mrerp_dms(endpoint: Dict[str, Any], *, customer_id: str) -> 
             "prefixes": cl.list_prefixes(),
         }
 
-    return _run_logged_in(endpoint, _do)
+    return _run_logged_in(endpoint, _do, authoritative_read=True)
 
 
 def geo_mrerp_dms(endpoint: Dict[str, Any], *, level: str, parent_id: str = "") -> Dict[str, Any]:
-    """地址级联选项。直接走 _run_logged_in 的真实 Playwright 会话(不复用已注销 cookie)。"""
+    """地址级联选项。直接走 _run_logged_in 的真实 Playwright 会话(不复用已注销 cookie)。
+
+    级联是建档表单的选项来源,同样按权威视图读;面板改地址时不额外多登一次 ——
+    管理员 transport 由适配器复用,未配管理员即销售会话。"""
 
     def _do(cl, adapter):
         return {"ok": True, "options": cl.list_geo(level, parent_id)}
 
-    return _run_logged_in(endpoint, _do)
+    return _run_logged_in(endpoint, _do, authoritative_read=True)
 
 
 def push_idcard_fields_mrerp_dms(

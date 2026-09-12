@@ -8,7 +8,6 @@ qa.files 下载并同会话挂载(attach 结果进 result 与台账 response_bod
 """
 
 import contextlib
-import dataclasses
 import json
 import os
 import unittest
@@ -71,23 +70,15 @@ class FakeStore:
         return False
 
 
-@dataclasses.dataclass(frozen=True)
-class _FakeBooking:
-    delivery_date_be: str = "old"
-    regis_name: str = ""
-    payments: tuple = ()
-
-
 class _FakeClient:
-    """记录建单/附件入参,供断言逐问选择与附件透传。"""
+    """记录建单/附件入参,供断言逐问选择与附件透传。
+
+    载荷解析(resolve_booking_payload/组织级联)不再被打桩:订车提交路径吃 readonly_preflight
+    已取到的权威快照,所以这里只要给得出主档行与顾问组织,解析走真代码。
+    """
 
     def __init__(self, rec):
         self.rec = rec
-
-    def resolve_booking_payload(self, defaults, card, today=None):
-        self.rec["defaults"] = defaults
-        self.rec["card"] = card
-        return _FakeBooking()
 
     def save_customer(self, **kwargs):
         self.rec["customer_save"] = kwargs
@@ -124,6 +115,17 @@ class _FakeClient:
         if elemname.startswith("txtbankname"):
             return [["1", "SCB", "SCB", "ระยอง", "1234567890123"]]
         return []
+
+    def _post_text(self, path, data):
+        """顾问组织级联(detailbooksell)是提交前唯一一次单独实时读;其余读取本文不关心。"""
+        if path == "drfcbc/component/detailbooksell.php":
+            return _ORG_BODY
+        return ""
+
+
+_ORG_BODY = json.dumps(
+    ["1", "Rayong", "30", "Sales team", "289", "Manager", None, None, None, None, None, None]
+)
 
 
 class _FakeAdapter:
@@ -238,7 +240,8 @@ class _Env:
             bf._out.line_client, "download_message_content", return_value=self._download
         )
         p(bf._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
-        self.insert_log = p(bf.db, "insert_push_log", return_value="LOG1")
+        # 台账写入已拆到 booking_ledger(booking_flow 过 500 行硬闸),打桩点跟着搬。
+        self.insert_log = p(bf.booking_ledger.db, "insert_push_log", return_value="LOG1")
         if self._book_result is not None:
             p(bf, "_book_in_session", return_value=self._book_result)
         return self
@@ -366,7 +369,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 "services.erp.mrerp_dms_booking_customer.card_from_customer",
                 side_effect=lambda client, customer_id, people_id: bf._card_payload({"qa": qa}),
             ),
-            mock.patch.object(bf.masters_cache, "refresh_from_client"),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
         ):
             result = bf._book_in_session({"id": "E1", "config": {}}, {"qa": qa})
 
@@ -428,10 +431,23 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                     or bf._card_payload(_review())
                 ),
             ),
-            mock.patch.object(bf.masters_cache, "refresh_from_client"),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
         ):
             res = bf._book_in_session(
-                {"id": "E1", "config": {}},
+                # 端点默认全钉成别的 id:逐问选择必须覆盖它们(否则建单填错车/店/归属)。
+                {
+                    "id": "E1",
+                    "config": {
+                        "booking_defaults": {
+                            "advisor_id": "zz9",
+                            "car_id": "zz9",
+                            "paint_id": "zz9",
+                            "place_book_id": "zz9",
+                            "term_sale_id": "zz9",
+                            "regis_behalf_id": "zz9",
+                        }
+                    },
+                },
                 _review(),
                 attach_files=[
                     {
@@ -454,18 +470,15 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(res["attach_ok"])  # 下载失败件仍在 → 附件不谎报全挂
         self.assertEqual(res["attached"], 2)
         self.assertEqual([f["display_name"] for f in res["attach_failed"]], ["y"])
-        d = rec["defaults"]
-        # 顾问归属:开局匹配好的 id/name 一路传到建单层(建单层按 id 严格解析)
-        self.assertEqual(d.advisor_id, "335")
-        self.assertEqual(d.advisor_name, "sale02")
-        self.assertEqual(d.car_id, "c1")
-        self.assertEqual(d.paint_id, "p1")
-        self.assertEqual(d.place_book_id, "pl1")
-        self.assertEqual(d.term_sale_id, "t1")
-        self.assertEqual(d.regis_behalf_id, "r1")
         self.assertEqual(rec["customer_id"], "C1")
         self.assertEqual(rec["customer_lookup"], ("C1", "1234567890121"))
         b = rec["booking"]
+        # 逐问选择覆盖端点默认,且按权威主档行解析(建单层只认实时主档里的 id)
+        self.assertEqual((b.advisor.id, b.advisor.name), ("335", "sale02"))
+        self.assertEqual(b.car.id, "c1")
+        self.assertEqual(b.paint.id, "p1")
+        self.assertEqual((b.place_book.id, b.term_sale.id, b.regis_behalf.id), ("pl1", "t1", "r1"))
+        self.assertEqual((b.branch.id, b.team.id), ("1", "30"))  # 组织来自顾问级联
         self.assertEqual(b.delivery_date_be, "01/01/2570")  # 逐问交车日覆盖
         self.assertEqual(b.regis_name, "บริษัท สมชาย จำกัด")
         self.assertEqual(
@@ -520,7 +533,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 "services.erp.mrerp_dms_booking_customer.card_from_customer",
                 side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
             ),
-            mock.patch.object(bf.masters_cache, "refresh_from_client"),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
         ):
             res = bf._book_in_session(
                 {"id": "E1", "config": {}},
@@ -572,7 +585,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 "services.erp.mrerp_dms_booking_customer.card_from_customer",
                 side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
             ),
-            mock.patch.object(bf.masters_cache, "refresh_from_client"),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
         ):
             qa = _qa_payload()
             files = qa["files"]
@@ -624,7 +637,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 "services.erp.mrerp_dms_booking_customer.card_from_customer",
                 side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
             ),
-            mock.patch.object(bf.masters_cache, "refresh_from_client"),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
             mock.patch.object(bf, "mrerp_booking_lock", fake_lock),
         ):
             res = bf._book_in_session(

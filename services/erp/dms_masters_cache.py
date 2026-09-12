@@ -118,7 +118,10 @@ def _write(endpoint_id: str, masters: Dict[str, Any]) -> None:
 def _fetch_masters_via_login(
     endpoint: Dict[str, Any], *, require_complete: bool = False
 ) -> Optional[Dict[str, Any]]:
-    """登录 DMS 抓全量主档;登录/抓取失败(_run_logged_in 回 _err dict)→ None。"""
+    """登录 DMS 抓全量主档;登录/抓取失败(_run_logged_in 回 _err dict)→ None。
+
+    配了独立管理员凭据组的租户走管理员会话读(app 侧销售账号常看不到车型/银行全表);
+    管理员登录失败 → ERR_DMS_ADMIN_AUTH 落成 None 由调用方 fail closed,不静默退回销售。"""
     from services.erp.erp_dms_intake import _run_logged_in
 
     def _fetch(client, adapter):
@@ -126,20 +129,26 @@ def _fetch_masters_via_login(
 
         return {
             **client.fetch_masters(strict=require_complete),
-            **fetch_payment_bank_masters(adapter),
+            **fetch_payment_bank_masters(adapter, client=client),
         }
 
-    res = _run_logged_in(endpoint, _fetch)
+    res = _run_logged_in(endpoint, _fetch, authoritative_read=True)
     if isinstance(res, dict) and res.get("ok") is False:
         return None
     return res
 
 
 def _fetch_paints_via_login(endpoint: Dict[str, Any], car_id: str) -> Optional[List[list]]:
-    """登录 DMS 抓某车型的颜色(翻页取全 —— 只取第一页会漏掉第 2 页起的颜色);失败 → None。"""
+    """登录 DMS 抓某车型的颜色(翻页取全 —— 只取第一页会漏掉第 2 页起的颜色);失败 → None。
+
+    同理走管理员会话读:颜色主档在销售账号下可能被裁成空表,空表会被误判成「这车没颜色」。"""
     from services.erp.erp_dms_intake import _run_logged_in
 
-    res = _run_logged_in(endpoint, lambda cl, ad: cl._bshsd_all("txtcarpaint", idcar=car_id))
+    res = _run_logged_in(
+        endpoint,
+        lambda cl, ad: cl._bshsd_all("txtcarpaint", idcar=car_id),
+        authoritative_read=True,
+    )
     if isinstance(res, dict):
         return None
     return res
@@ -227,20 +236,46 @@ def get_paints(
     return paints
 
 
-def refresh_from_client(endpoint: Dict[str, Any], client: Any) -> None:
-    """订车成功后就地全量刷主档(会话已活,零额外登录)。保留 paints_by_car。"""
-    try:
-        masters = client.fetch_masters()
-    except Exception:
-        logger.warning("[dms masters] live refresh failed", exc_info=True)
-        return
+# 银行类目录的键(与 mrerp_dms_company_banks.PAYMENT_BANK_MASTERS 同集)。
+_BANK_KEYS = ("company_banks", "source_banks", "cheque_banks", "cashier_banks", "card_banks")
+
+
+def write_authoritative_snapshot(
+    endpoint: Dict[str, Any],
+    masters: Dict[str, Any],
+    *,
+    car_id: str = "",
+    paints: Optional[List[list]] = None,
+) -> None:
+    """用**本次权威只读复核已取到的**快照落缓存 —— 成功后再二次登录/抓取一律不做。
+
+    旧路径在订车成功后拿手上的会话再抓一次全量主档:销售会话那一抓会把管理员的完整缓存
+    覆盖成销售裁剪视图(车型/银行看起来变空),还白付一轮远程读取。这里只吃调用方已经在
+    提交前抓过的权威行:
+      · masters 整份来自同一次权威会话(管理员视图),直接覆盖主档;
+      · paints 是选中车型的颜色:None = 这次没读到(该车型旧条目原样保留),
+        [] = 权威结论「这车已无颜色」→ 必须清掉该车型旧颜色;其它车型的旧条目保留;
+      · 银行类目录以本次快照为准(空表 = DMS 已删光,不许被旧值盖回去);只有该 key
+        在这次 masters 里根本没有(这次没读这一类目录)才退回旧值。
+    """
     eid = str(endpoint.get("id") or "")
+    if not eid or not masters:
+        return
     cached = _read(eid)
-    if cached:
-        old = cached["masters"] or {}
-        pbc = old.get("paints_by_car")
-        if pbc:
-            masters = {**masters, "paints_by_car": pbc}
-        if "company_banks" in old:
-            masters = {**masters, "company_banks": old["company_banks"]}
-    _write(eid, masters)
+    old = (cached or {}).get("masters") or {}
+    merged = dict(masters)
+    pbc = dict(old.get("paints_by_car") or {})
+    # None 才是「没读到」;[] 是权威读取成功的空表 = DMS 里颜色被删光,必须落成空表
+    # (falsy 判断会把旧颜色留在缓存里,和「增删必须实时映射」冲突)。
+    if paints is not None and car_id:
+        pbc[str(car_id)] = list(paints)
+    # 只要这次真读了某车型颜色(含 [])或本来就有其它车型的颜色,就把 paints_by_car 写进去:
+    # 用 `if pbc:` 会让「刚清空的最后一条」在下次写入时被旧缓存合并回来。
+    if pbc or (paints is not None and car_id):
+        merged["paints_by_car"] = pbc
+    for key in _BANK_KEYS:
+        # 只认「key 不在这次快照里」;存在且为 [] 是权威删除结果,
+        # 用 falsy 判断会把管理员刚删掉的银行从旧缓存恢复回来。
+        if key not in merged and old.get(key):
+            merged[key] = old[key]
+    _write(eid, merged)

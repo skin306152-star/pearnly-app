@@ -199,7 +199,7 @@ class IntakeContractTests(unittest.TestCase):
             return_value={"ok": True, "options": [["65", "กระบี่"]]},
         ) as run:
             out = erp_dms_intake.geo_mrerp_dms(endpoint, level="provinces")
-        run.assert_called_once_with(endpoint, mock.ANY)
+        run.assert_called_once_with(endpoint, mock.ANY, authoritative_read=True)
         self.assertEqual(out["options"], [["65", "กระบี่"]])
 
     def test_lookup_found(self):

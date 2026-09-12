@@ -39,7 +39,7 @@ class _Transport:
         self.bodies = list(bodies)
         self.calls = []
 
-    def post(self, url, *, data):
+    def post(self, url, *, data, timeout_ms=None):
         self.calls.append((url, data))
         return SimpleNamespace(status_code=200, text=self.bodies.pop(0))
 

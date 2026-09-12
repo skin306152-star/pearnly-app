@@ -16,7 +16,7 @@ from services.erp.dms_masters_cache import (  # noqa: F401  LINE 侧沿用原命
     get_masters,
     get_paints,
     read_fresh_masters,
-    refresh_from_client,
+    write_authoritative_snapshot,
 )
 from services.line_dms._out import _thr
 from services.line_dms.master_contract import MasterSyncError, build_snapshot

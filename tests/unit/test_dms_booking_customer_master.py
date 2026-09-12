@@ -163,7 +163,7 @@ class _CustomerTransport:
         self.status = status
         self.calls = []
 
-    def post(self, url, *, data):
+    def post(self, url, *, data, timeout_ms=None):
         if not url.endswith("/cus/form.php") or data != {"status": "e", "id": "119"}:
             raise AssertionError("Only the selected customer's native detail may be read")
         self.calls.append((url, dict(data)))

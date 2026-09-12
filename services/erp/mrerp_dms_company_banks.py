@@ -53,25 +53,31 @@ def normalize_company_bank_rows(rows: Iterable[Any]) -> List[list]:
     return out
 
 
-def fetch_company_banks(adapter: Any, *, timeout_ms: int = 10000) -> List[list]:
+def fetch_company_banks(adapter: Any, *, client: Any = None, timeout_ms: int = 10000) -> List[list]:
     """读取收款银行目录；不能假设银行行含公司收款账户。"""
-    return _fetch_banks(adapter, "txtbanknametfmon")
+    return _fetch_banks(adapter, "txtbanknametfmon", client=client)
 
 
-def fetch_source_banks(adapter: Any, *, timeout_ms: int = 10000) -> List[list]:
+def fetch_source_banks(adapter: Any, *, client: Any = None, timeout_ms: int = 10000) -> List[list]:
     """汇款银行使用独立原生目录，其 ID 和范围可能不同于收款银行。"""
-    return _fetch_banks(adapter, "txtbanknametffrom")
+    return _fetch_banks(adapter, "txtbanknametffrom", client=client)
 
 
-def fetch_payment_bank_masters(adapter: Any) -> dict:
-    return {key: _fetch_banks(adapter, elem) for key, elem in PAYMENT_BANK_MASTERS.items()}
+def fetch_payment_bank_masters(adapter: Any, *, client: Any = None) -> dict:
+    """五类付款银行目录。给了权威只读 client 就走它 —— 销售账号常看不到银行全表,
+    少这一次分叉就等于少一次按字段的重复登录。"""
+    return {
+        key: _fetch_banks(adapter, elem, client=client)
+        for key, elem in PAYMENT_BANK_MASTERS.items()
+    }
 
 
-def _fetch_banks(adapter: Any, elemname: str) -> List[list]:
+def _fetch_banks(adapter: Any, elemname: str, *, client: Any = None) -> List[list]:
     failure = None
     for _ in range(2):
         try:
-            rows = adapter._client()._bshsd_all(elemname, page_size=200)
+            reader = client or adapter._client()
+            rows = reader._bshsd_all(elemname, page_size=200)
             if rows is not None:
                 return normalize_company_bank_rows(rows)
             failure = RuntimeError("DMS bank typeahead returned no result")
@@ -100,8 +106,12 @@ def company_bank_payment_extra(row: list, existing: dict | None = None) -> Dict[
     }
 
 
-def validate_company_bank_payments(adapter: Any, payments: Iterable[dict]) -> List[dict]:
-    """提交前核对银行身份和完整转账资料，不把银行编号当作公司账号。"""
+def validate_company_bank_payments(
+    adapter: Any, payments: Iterable[dict], *, client: Any = None
+) -> List[dict]:
+    """提交前核对银行身份和完整转账资料，不把银行编号当作公司账号。
+
+    client 为权威只读会话上的 DMSClient 时,银行目录也读权威视图。"""
     from services.erp.mrerp_dms_payments import validate_payment_completeness
 
     payments = list(payments or [])
@@ -109,7 +119,7 @@ def validate_company_bank_payments(adapter: Any, payments: Iterable[dict]) -> Li
 
     def current_bank(key, bank_id):
         if key not in by_key:
-            rows = _fetch_banks(adapter, PAYMENT_BANK_MASTERS[key])
+            rows = _fetch_banks(adapter, PAYMENT_BANK_MASTERS[key], client=client)
             by_key[key] = {str(row[0]): row for row in rows}
         row = by_key[key].get(str(bank_id or ""))
         if row is None:

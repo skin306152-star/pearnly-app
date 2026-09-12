@@ -24,8 +24,11 @@
                     document.body.prepend(message);
                 }
             }
-            if (window.Meteor) window.Meteor.logout(finish);
-            else finish();
+            // Meteor.logout invalidates its HTTP token before native reactive
+            // navigation finishes. Revoke the gateway session instead: this
+            // closes DDP and expires both gateway and native HTTP cookies.
+            // A native token alone cannot pass the gateway identity checks.
+            finish();
         },
         true
     );

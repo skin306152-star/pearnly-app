@@ -239,19 +239,33 @@ async def _handle_webhook(request: Request, channel_key: str):
     return {"ok": True}
 
 
-@router.post("/api/line/dms/webhook")
-async def line_dms_webhook(request: Request):
-    """现有 ลั่วหยง DMS OA 入口(channel='dms')· 行为与旧版一致。"""
-    return await _handle_webhook(request, "dms")
+def _channel_entry(channel_key: str):
+    """One OA entry point: the shared handler, pinned to this OA's stable channel key."""
+
+    async def line_dms_webhook(request: Request):
+        return await _handle_webhook(request, channel_key)
+
+    line_dms_webhook.__name__ = f"line_dms_webhook_{channel_key}"
+    line_dms_webhook.__doc__ = (
+        f"DMS OA `{channel_key}` entrance: its own secret verifies the signature and its own "
+        "access token replies. Channel key scopes binding/session/reply."
+    )
+    return line_dms_webhook
 
 
-@router.post("/api/line/dms/webhook/a")
-async def line_dms_webhook_a(request: Request):
-    """A DMS OA 入口(channel='dms_a')· 用 A 的 secret 验签、A 的 token 回复。"""
-    return await _handle_webhook(request, "dms_a")
-
-
-@router.post("/api/line/dms/webhook/b")
-async def line_dms_webhook_b(request: Request):
-    """B DMS OA 入口(channel='dms_b')· 用 B 的 secret 验签、B 的 token 回复。"""
-    return await _handle_webhook(request, "dms_b")
+# 每个注册 OA 一个入口,路径由 registry 推出(dms → /api/line/dms/webhook,dms_a → /…/webhook/a)。
+# 新增 OA 只加 registry 条目即自动有入口;没有 registry 条目 = 没有路由 = 404,绝不会悄悄
+# 用 legacy OA 的 secret/token 收尾。任何新 OA 仍需显式进 PUBLIC_ROUTES(check_authz_coverage)。
+for _channel_key in line_channels.DMS_CHANNELS:
+    _path = line_channels.webhook_path(_channel_key)
+    # 注册表只装合法 key,所以这里不该为空;万一将来有人塞进一个解不出路径的条目,
+    # 宁可少一条路由(404)也不能让 add_api_route("") 在 import 期把整个应用打崩。
+    if not _path:
+        continue
+    router.add_api_route(
+        _path,
+        _channel_entry(_channel_key),
+        methods=["POST"],
+        tags=["line-dms-webhook"],
+        name=f"line_dms_webhook_{_channel_key}",
+    )

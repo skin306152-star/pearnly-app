@@ -9,6 +9,8 @@ async function fixture(page, mode = 'credentials', language = 'th', options = {}
     const state = {
         binding: 'B',
         authCount: 0,
+        authBodies: [],
+        configChannels: [],
         puts: [],
         tickets: [],
         records: { A: 'old-A', B: 'old-B' },
@@ -42,16 +44,22 @@ async function fixture(page, mode = 'credentials', language = 'th', options = {}
         const pathname = new URL(request.url()).pathname;
         const token = request.headers().authorization;
         let data;
-        if (pathname.endsWith('/config')) data = { liff_id: 'test-liff' };
-        else if (pathname.endsWith('/auth')) {
+        if (pathname.endsWith('/config')) {
+            state.configChannels.push(new URL(request.url()).searchParams.get('channel') || '');
+            data = { liff_id: 'test-liff', channel_key: options.channel || 'dms' };
+        } else if (pathname.endsWith('/auth')) {
             state.authCount++;
+            state.authBodies.push(request.postDataJSON());
             if (request.postDataJSON().id_token === 'expired-LINE-token') {
                 return route.fulfill({
                     status: 401,
                     json: { ok: false, error: { code: 'dms_booking.line_auth_required' } },
                 });
             }
-            expect(request.postDataJSON()).toEqual({ id_token: 'verified-LINE-user' });
+            expect(request.postDataJSON()).toEqual({
+                id_token: 'verified-LINE-user',
+                channel: options.channel || 'dms',
+            });
             if (options.unbound)
                 return route.fulfill({
                     status: 403,
@@ -89,7 +97,8 @@ async function fixture(page, mode = 'credentials', language = 'th', options = {}
             body: '<p>Portal opened for current binding</p>',
         })
     );
-    await page.goto(`/home/dms-booking?${mode}=dms`);
+    const channel = options.channel ? `&channel=${encodeURIComponent(options.channel)}` : '';
+    await page.goto(`/home/dms-booking?${mode}=dms${channel}`);
     return state;
 }
 
@@ -163,6 +172,27 @@ test('menu 3 also exchanges current LINE identity before requesting its ticket',
     expect(state.authCount).toBe(1);
     expect(state.tickets).toEqual(['Bearer FRESH_BINDING_B']);
 });
+
+for (const channel of ['dms_a', 'dms_b']) {
+    for (const mode of ['portal', 'credentials']) {
+        test(`${channel} menu ${mode === 'portal' ? '3' : '4'} keeps its OA binding`, async ({
+            page,
+        }) => {
+            const state = await fixture(page, mode, 'th', { channel });
+            // 先等入口跑完(fixture 只 await 到 goto),再断言 config/auth 带的 channel key。
+            if (mode === 'portal') {
+                await expect(page).toHaveURL(/test-portal-complete$/);
+            } else {
+                await expect(page.locator('#credentials-username')).toHaveValue('operator-B');
+            }
+            expect(state.configChannels).toEqual([channel]);
+            expect(state.authBodies).toEqual([{ id_token: 'verified-LINE-user', channel }]);
+            if (mode === 'portal') {
+                expect(state.tickets).toEqual(['Bearer FRESH_BINDING_B']);
+            }
+        });
+    }
+}
 
 test('expired LINE login renews once before showing an editable credential form', async ({
     page,

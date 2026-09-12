@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """订车预览卡「แก้ไข」深链:只解析绑定所属 OA 的 LIFF。
 
-非 legacy OA 未配自己的 LIFF 时返回空字符串,调用方据此省略按钮 —— 绝不回落到别的 OA 的
-LIFF(那会把使用者登进错的 OA)。
+解析顺序 = 本 OA 自己的 LIFF env → registry 里显式声明可复用的共享 Provider LIFF;
+dms/dms_a/dms_b 同属一个 Provider,所以在没有各自 LIFF 时共用登录 App,但 channel_key
+仍随链接下发、绑定查找仍按该 OA 作用域。**只有一个 OA 既没有自己的 LIFF、也没声明共享
+Provider LIFF 时才返回空字符串**(调用方据此省略按钮),绝不回落到别的 OA 的链接。
 """
 
 from __future__ import annotations

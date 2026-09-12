@@ -10,6 +10,9 @@ from services.line_dms.master_contract import build_paint_snapshot, snapshot_row
 
 
 async def _snapshot(tenant_id, line_user_id, qa, *, persist):
+    current = qa.get("master_snapshot")
+    if current:
+        return current
     current = await masters_cache.qa_snapshot(line_user_id, qa.get("endpoint_id"))
     qa["master_snapshot"] = current
     qa.pop("masters_synced", None)
@@ -18,7 +21,7 @@ async def _snapshot(tenant_id, line_user_id, qa, *, persist):
 
 
 async def masters(tenant_id, line_user_id, qa, key, *, persist) -> List[list]:
-    """每次展示或选择都重新读取；会话快照仅用于对比与审计。"""
+    """开局实时抓一次整批主档；本轮按钮与分页复用该快照。"""
     return snapshot_rows(
         await _snapshot(tenant_id, line_user_id, qa, persist=persist),
         key,
@@ -27,12 +30,19 @@ async def masters(tenant_id, line_user_id, qa, key, *, persist) -> List[list]:
 
 async def paints(tenant_id, line_user_id, qa, *, persist) -> List[list]:
     """颜色按车型保存独立快照；DMS 读取失败或空表不落假快照。"""
+    await _snapshot(tenant_id, line_user_id, qa, persist=persist)
     car_id = str((qa.get("answers") or {}).get("car", {}).get("id") or "")
+    current = (qa.get("paint_snapshots") or {}).get(car_id)
+    if current:
+        return list(current.get("rows") or [])
     rows = await masters_cache.qa_paints(
         line_user_id,
         qa.get("endpoint_id"),
         car_id,
-        force_refresh=True,
+        # _snapshot() forced a fresh full-master read at session start, which clears stale
+        # paints_by_car. The first color lookup is therefore live; later display/select/page
+        # operations reuse the session paint snapshot. Submit preflight reads DMS again.
+        force_refresh=False,
         require_complete=True,
     )
     paint_snapshot = build_paint_snapshot(car_id, rows)

@@ -136,6 +136,10 @@ class Env:
     def qa_payload(self):
         return (self.session() or {}).get("payload", {}).get("qa") or {}
 
+    def live_master_reads(self):
+        """全量主档实时读取(= 一次 DMS 登录);非 force 读走 12h 缓存,不算登录。"""
+        return [kw for _ep, kw in self.masters_calls if kw.get("force_refresh")]
+
 
 def _qa(step="place", **over):
     base = {
@@ -347,31 +351,34 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(qa_cards.TXT_ASK_PAINT.format(car="DMX D-Max"), _replied_text(env))
 
     # ── 主档分页(quick reply 13 项硬限) ───────────────────────────────────
-    async def test_masters_and_paints_first_read_force(self):
-        """主档首读严格抓全量；颜色基于同一会话快照再严格读取。"""
+    async def test_session_start_reads_one_full_live_master_and_paints_once(self):
+        """开局严格抓一份完整实时主档；本轮 place→car→paint→term→regis 全部复用该快照。
+
+        计数口径:一次全量主档 = 一次 DMS 登录(_run_logged_in 会话退出即注销,不缓存 cookie),
+        所以「同一会话多步只 1 次全量」= 不再每步重新登录 DMS。颜色每车型首次 1 次。
+        """
         with Env() as env:
-            _seed(env, _qa("place"))
-            await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
-            self.assertTrue(env.masters_calls)
+            await qa.start(_TID, _LUID, "E1", "C1", "สมชาย ใจดี", "mid-card", "rt")
             self.assertEqual(
-                env.masters_calls[-1][1],
-                {"force_refresh": True, "require_complete": True},
+                env.live_master_reads(),
+                [{"force_refresh": True, "require_complete": True}],
             )
 
-            _seed(env, _qa("paint", answers={"car": {"id": "c1", "label": "DMX D-Max"}}))
-            await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
-            self.assertEqual(
-                env.masters_calls[0][1],
-                {"force_refresh": True, "require_complete": True},
-            )
-            self.assertEqual(
-                env.masters_calls[-1][1],
-                {"force_refresh": True, "require_complete": True},
-            )
-            self.assertIsNotNone(env.paint_masters_calls[-1])  # 颜色带 masters,不吃 12h 缓存
+            await qa.handle_postback(_TID, _LUID, "qa:place:pl1", {}, "rt")  # → car_search
+            await qa.handle_text(_TID, _LUID, "dmax", "rt")  # 搜索命中(快照)
+            await qa.handle_postback(_TID, _LUID, "qa:car:c1", {}, "rt")  # → paint(首次颜色)
+            self.assertEqual(env.paints_calls, ["c1"])
+            await qa.handle_postback(_TID, _LUID, "qa:paint:p1", {}, "rt")  # → date
+            await qa.handle_postback(_TID, _LUID, "qa:date", {"date": "2026-08-20"}, "rt")
+            await qa.handle_postback(_TID, _LUID, "qa:term:t1", {}, "rt")  # → regis
+            await qa.handle_postback(_TID, _LUID, "qa:regis:r1", {}, "rt")  # → regis_name
 
-    async def test_every_master_read_refreshes_and_sees_changed_values(self):
-        """同轮 DMS 主档变化在下一次展示可见，旧快照仅供对比。"""
+            self.assertEqual(env.qa_payload()["step"], "regis_name")
+            self.assertEqual(len(env.live_master_reads()), 1)  # 全程只有开局那一次全量登录
+            self.assertEqual(env.paints_calls, ["c1"])  # 颜色只在该车型首次取一次
+
+    async def test_master_display_reuses_the_session_snapshot_until_submit(self):
+        """同轮展示复用开局快照(不再每步登录);DMS 中途改名/删除留给提交前实时复核。"""
         with Env() as env:
             _seed(env, _qa("place"))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
@@ -384,13 +391,15 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(snapshot["counts"]["place_books"], len(_PLACES))
             self.assertNotIn("masters_synced", env.qa_payload())
 
-            # 模拟 DMS 在两次展示之间新增并改名，旧快照不能遮住新数据。
+            # DMS 在两次展示之间改名:本轮不再登录,问题页仍按开局快照渲染;
+            # 真变化由确认前的 master_contract.reconcile 发现并退回重选(test_line_dms_booking)。
             env.terms = [["new", "NEW", "New term"]]
             before = len(env.masters_calls)
             await qa.send_step(_TID, _LUID, env.qa_payload(), "term", "rt")
-            self.assertEqual(len(env.masters_calls), before + 1)
-            self.assertNotEqual(env.qa_payload()["master_snapshot"]["version"], snapshot["version"])
-            self.assertEqual(env.qa_payload()["master_snapshot"]["rows"]["term_sales"], env.terms)
+            self.assertEqual(len(env.masters_calls), before)
+            payload = env.qa_payload()
+            self.assertEqual(payload["master_snapshot"]["version"], snapshot["version"])
+            self.assertEqual(payload["master_snapshot"]["rows"]["term_sales"], _TERMS)
 
     async def test_empty_master_not_snapshotted_and_next_read_retries_force(self):
         """必需主档为空不落快照，下一次仍严格抓 live，绝不复用旧值。"""
@@ -411,8 +420,8 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(len(env.masters_calls), 2)
 
-    async def test_paints_refresh_again_and_discard_deleted_colors(self):
-        """同车型颜色被删除或替换后，重新展示使用实时结果。"""
+    async def test_paints_are_live_once_per_car_then_reused_from_the_session(self):
+        """颜色每车型首次实时取一次并落 qa.paint_snapshots;同轮翻页/重问复用,不重复登录。"""
         with Env() as env:
             _seed(env, _qa("paint", answers={"car": {"id": "c1", "label": "DMX D-Max"}}))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
@@ -420,20 +429,22 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                 env.masters_calls[0][1],
                 {"force_refresh": True, "require_complete": True},
             )
-            self.assertEqual(
-                env.masters_calls[-1][1],
-                {"force_refresh": True, "require_complete": True},
-            )
-            self.assertIsNotNone(env.paint_masters_calls[-1])
-            self.assertIn("c1", env.qa_payload()["paint_snapshots"])
-            masters_before = len(env.masters_calls)
-            paints_before = len(env.paints_calls)
-            env.paints = [["PNEW", "NEW", "New paint"]]
+            self.assertEqual(env.paints_calls, ["c1"])
+            self.assertEqual(env.qa_payload()["paint_snapshots"]["c1"]["rows"], _PAINTS)
 
+            # DMS 删/换颜色:同一步重问仍用会话快照(变化由提交前复核拦),不再登录一次
+            env.paints = [["PNEW", "NEW", "New paint"]]
+            masters_before = len(env.masters_calls)
             await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
-            self.assertEqual(len(env.masters_calls), masters_before + 1)
-            self.assertEqual(len(env.paints_calls), paints_before + 1)
-            self.assertEqual(env.qa_payload()["paint_snapshots"]["c1"]["rows"], env.paints)
+            self.assertEqual(len(env.masters_calls), masters_before)
+            self.assertEqual(env.paints_calls, ["c1"])
+            self.assertEqual(env.qa_payload()["paint_snapshots"]["c1"]["rows"], _PAINTS)
+
+            # 换车型:该车型第一次使用照样实时取一次
+            env.qa_payload()["answers"]["car"] = {"id": "c2", "label": "MUX MU-X"}
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
+            self.assertEqual(env.paints_calls, ["c1", "c2"])
+            self.assertEqual(len(env.live_master_reads()), 1)
 
     async def test_place_pagination_reaches_last_row(self):
         places = [[f"pl{i}", "", f"สาขา {i}"] for i in range(14)]

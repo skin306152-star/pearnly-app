@@ -23,15 +23,31 @@ from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Env vars holding a LINE Login (LIFF) app id owned by the shared Pearnly Provider. A DMS OA may
+# reuse one of these only when its ``LineChannel`` declares it in ``provider_liff_env``; a new OA
+# that declares nothing resolves to no LIFF at all and fails closed (see
+# ``tests/unit/test_dms_channel_registry_contract.py``). Never widen this implicitly.
+PROVIDER_LIFF_ENVS: Tuple[str, ...] = ("LINE_LIFF_ID",)
+
 # Third-party QR renderer already used by the DMS bind-code dialog (CSP img-src allows it).
 # The QR payload is always the channel's public add-friend URL, so QR / link / ID cannot diverge.
 QR_IMAGE_ENDPOINT = "https://api.qrserver.com/v1/create-qr-code/"
 _FRIEND_URL_PREFIX = "https://line.me/R/ti/p/"
 
+# Webhook entry points are derived from the stable key so a registry entry can never be half
+# wired: ``dms`` keeps the historical path, every other OA gets ``/<key without dms_ prefix>``.
+_WEBHOOK_BASE = "/api/line/dms/webhook"
+
 
 @dataclass(frozen=True)
 class LineChannel:
-    """Public identity + credential env names for one OA. Never holds a secret value."""
+    """Public identity + credential env names for one OA. Never holds a secret value.
+
+    ``liff_env`` names this OA's own LIFF app id. ``provider_liff_env`` names the shared Provider
+    LIFF app the OA is explicitly allowed to reuse while it has no LIFF of its own; leaving it
+    empty is the fail-closed default, so an OA only borrows the shared login app when the registry
+    says so (never because of its key prefix or its Provider).
+    """
 
     key: str
     product: str
@@ -41,6 +57,7 @@ class LineChannel:
     token_env: str
     credentials_env: str = ""
     liff_env: str = ""
+    provider_liff_env: str = ""
 
     @property
     def add_friend_url(self) -> str:
@@ -59,6 +76,10 @@ class LineChannel:
 
 # Stable keys are API/DB values. Display names / Basic IDs are the only OA-specific facts here;
 # secrets stay in the environment (individual vars or a JSON/dotenv blob mounted per key).
+# All three DMS Messaging API channels and the shared LINE Login channel live under the same
+# LINE Provider. LINE therefore gives the same user id to their ID tokens and webhook events;
+# channel_key still scopes every Pearnly binding, session and ticket. The LIFF reuse that follows
+# from sharing a Provider is declared per OA through ``provider_liff_env`` (see the class doc).
 DMS_CHANNELS: Dict[str, LineChannel] = {
     "dms": LineChannel(
         key="dms",
@@ -69,6 +90,7 @@ DMS_CHANNELS: Dict[str, LineChannel] = {
         token_env="LINE_DMS_CHANNEL_ACCESS_TOKEN",
         credentials_env="LINE_DMS_CREDENTIALS",
         liff_env="LINE_DMS_LIFF_ID",
+        provider_liff_env="LINE_LIFF_ID",
     ),
     "dms_a": LineChannel(
         key="dms_a",
@@ -79,6 +101,7 @@ DMS_CHANNELS: Dict[str, LineChannel] = {
         token_env="LINE_DMS_A_CHANNEL_ACCESS_TOKEN",
         credentials_env="LINE_DMS_A_CREDENTIALS",
         liff_env="LINE_DMS_A_LIFF_ID",
+        provider_liff_env="LINE_LIFF_ID",
     ),
     "dms_b": LineChannel(
         key="dms_b",
@@ -89,6 +112,7 @@ DMS_CHANNELS: Dict[str, LineChannel] = {
         token_env="LINE_DMS_B_CHANNEL_ACCESS_TOKEN",
         credentials_env="LINE_DMS_B_CREDENTIALS",
         liff_env="LINE_DMS_B_LIFF_ID",
+        provider_liff_env="LINE_LIFF_ID",
     ),
 }
 
@@ -141,24 +165,50 @@ def list_public() -> List[dict]:
     return [DMS_CHANNELS[key].public() for key in DMS_CHANNELS]
 
 
-def liff_id(channel_key: Optional[str]) -> str:
-    """LIFF app id for an OA. Non-legacy OAs never fall back to the legacy LIFF id.
+def _env_value(name: str) -> str:
+    return (os.environ.get(name) or "").strip() if name else ""
 
-    Falling back would open a link owned by another OA and silently log the user into the wrong
-    channel, so an unset A/B LIFF id simply disables the LIFF-backed entry (honest degradation).
+
+def liff_id(channel_key: Optional[str]) -> str:
+    """LIFF app id for an OA: its own app, else the Provider LIFF it explicitly declares.
+
+    A/B and the legacy DMS OA are Messaging API channels under the same LINE Provider, while LIFF
+    belongs to its LINE Login channel. They therefore reuse the Provider LIFF while
+    ``provider_liff_env`` says so. The URL and backend token still carry ``channel_key`` and
+    resolve the matching binding, so sharing login identity does not merge OA sessions or
+    credentials. Unknown / undeclared keys → "" (fail closed, never another OA's link).
     """
-    key = normalize(channel_key)
+    key = resolve(channel_key)
+    if key is None:
+        return ""
     cfg = DMS_CHANNELS[key]
-    value = (os.environ.get(cfg.liff_env) or "").strip() if cfg.liff_env else ""
-    if not value and key == DEFAULT_DMS_CHANNEL:
-        value = (os.environ.get("LINE_LIFF_ID") or "").strip()
-    return value
+    return _env_value(cfg.liff_env) or _env_value(cfg.provider_liff_env)
 
 
 def liff_env_name(channel_key: Optional[str]) -> str:
-    """Env var that holds this OA's LIFF id; unknown key → "" (caller must fail closed)."""
-    cfg = DMS_CHANNELS.get((channel_key or "").strip())
-    return cfg.liff_env if cfg else ""
+    """Env var holding this OA's effective LIFF id; "" = no declared LIFF (fail closed).
+
+    Token verification derives its ``client_id`` from this env name, so an OA that declares no
+    LIFF ownership is refused before any verify request instead of borrowing the Provider app.
+    """
+    cfg = get(channel_key)
+    if not cfg:
+        return ""
+    if _env_value(cfg.liff_env):
+        return cfg.liff_env
+    if _env_value(cfg.provider_liff_env):
+        return cfg.provider_liff_env
+    return ""
+
+
+def webhook_path(channel_key: Optional[str]) -> str:
+    """POST path serving one OA's webhook; unknown non-empty key → "" (no route, so 404)."""
+    key = resolve(channel_key)
+    if key is None:
+        return ""
+    if key == DEFAULT_DMS_CHANNEL:
+        return _WEBHOOK_BASE
+    return f"{_WEBHOOK_BASE}/{key[4:] if key.startswith('dms_') else key}"
 
 
 def menu_name(base: str, channel_key: Optional[str]) -> str:

@@ -66,15 +66,15 @@ class PublicIdentityTests(unittest.TestCase):
         self.assertEqual(channels.resolve(" dms_a "), "dms_a")
         self.assertIsNone(channels.resolve(" nope "))
 
-    def test_liff_id_never_falls_back_across_oas(self):
+    def test_dms_oas_reuse_their_provider_liff_unless_overridden(self):
         with mock.patch.dict(
             "os.environ",
             {"LINE_DMS_LIFF_ID": "DMS-LIFF", "LINE_LIFF_ID": "SHARED-LIFF"},
             clear=True,
         ):
             self.assertEqual(channels.liff_id("dms"), "DMS-LIFF")
-            self.assertEqual(channels.liff_id("dms_a"), "")  # 不给 A/B 回落旧 LIFF
-            self.assertEqual(channels.liff_id("dms_b"), "")
+            self.assertEqual(channels.liff_id("dms_a"), "SHARED-LIFF")
+            self.assertEqual(channels.liff_id("dms_b"), "SHARED-LIFF")
         with mock.patch.dict("os.environ", {"LINE_DMS_A_LIFF_ID": "A-LIFF"}, clear=True):
             self.assertEqual(channels.liff_id("dms_a"), "A-LIFF")
 
@@ -84,11 +84,77 @@ class PublicIdentityTests(unittest.TestCase):
             channels.menu_name("pearnly-dms-basic", "dms_a"), "pearnly-dms-basic-dms_a"
         )
 
-    def test_liff_env_name_is_per_channel_and_unknown_is_empty(self):
-        self.assertEqual(channels.liff_env_name("dms"), "LINE_DMS_LIFF_ID")
-        self.assertEqual(channels.liff_env_name("dms_a"), "LINE_DMS_A_LIFF_ID")
-        self.assertEqual(channels.liff_env_name("dms_b"), "LINE_DMS_B_LIFF_ID")
-        self.assertEqual(channels.liff_env_name("nope"), "")
+    def test_liff_env_name_tracks_override_or_provider_fallback(self):
+        with mock.patch.dict("os.environ", {"LINE_LIFF_ID": "SHARED"}, clear=True):
+            self.assertEqual(channels.liff_env_name("dms"), "LINE_LIFF_ID")
+            self.assertEqual(channels.liff_env_name("dms_a"), "LINE_LIFF_ID")
+            self.assertEqual(channels.liff_env_name("dms_b"), "LINE_LIFF_ID")
+            self.assertEqual(channels.liff_env_name("nope"), "")
+        with mock.patch.dict("os.environ", {"LINE_DMS_A_LIFF_ID": "A-LIFF"}, clear=True):
+            self.assertEqual(channels.liff_env_name("dms_a"), "LINE_DMS_A_LIFF_ID")
+
+
+class RegistryDeclarationGateTests(unittest.TestCase):
+    """新增 OA 的门禁:registry 条目必须显式声明 LIFF 归属与独立凭据 env 名。
+
+    同 Provider 复用共享 LINE Login 应用是**声明式**的:只写在 ``provider_liff_env`` 里。
+    没有声明(未来新 OA 忘了填)→ liff_id/liff_env_name 都是空、签名入口不借共享 LIFF,
+    由下面这条失败关闭断言与 test_dms_channel_registry_contract 的公共契约一起拦住。
+    """
+
+    def test_every_channel_declares_its_liff_ownership(self):
+        for key, cfg in channels.DMS_CHANNELS.items():
+            with self.subTest(channel=key):
+                self.assertTrue(cfg.liff_env, f"{key} 缺自己的 LIFF env 名")
+                self.assertIn(
+                    cfg.provider_liff_env,
+                    channels.PROVIDER_LIFF_ENVS,
+                    f"{key} 的 provider LIFF 必须是 registry 声明的共享 Provider 应用",
+                )
+
+    def test_credential_and_liff_envs_are_unique_per_channel(self):
+        for field in ("secret_env", "token_env", "credentials_env", "liff_env"):
+            values = [getattr(cfg, field) for cfg in channels.DMS_CHANNELS.values()]
+            with self.subTest(field=field):
+                self.assertEqual(len(values), len(set(values)), values)
+
+    def test_provider_liff_envs_are_verifiable_login_channels(self):
+        from services.line_platform import liff
+
+        self.assertTrue(
+            set(channels.PROVIDER_LIFF_ENVS) <= set(liff._SHARED_LOGIN_CHANNEL_ENVS),
+            "共享 Provider LIFF env 必须能通过 verify_id_token 的共享登录频道判定",
+        )
+
+    def test_channel_without_liff_declaration_fails_closed(self):
+        bare = channels.LineChannel(
+            key="dms_c",
+            product="dms",
+            display_name="C DMS",
+            basic_id="@000c",
+            secret_env="LINE_DMS_C_CHANNEL_SECRET",
+            token_env="LINE_DMS_C_CHANNEL_ACCESS_TOKEN",
+        )
+        with (
+            mock.patch.dict(channels.DMS_CHANNELS, {"dms_c": bare}),
+            mock.patch.dict("os.environ", {"LINE_LIFF_ID": "SHARED-LIFF"}, clear=True),
+        ):
+            self.assertEqual(channels.liff_id("dms_c"), "")
+            self.assertEqual(channels.liff_env_name("dms_c"), "")
+            self.assertEqual(channels.webhook_path("dms_c"), "/api/line/dms/webhook/c")
+
+    def test_unknown_channel_has_no_liff_and_no_webhook(self):
+        with mock.patch.dict("os.environ", {"LINE_LIFF_ID": "SHARED-LIFF"}, clear=True):
+            self.assertEqual(channels.liff_id("dms_zzz"), "")
+            self.assertEqual(channels.liff_env_name("dms_zzz"), "")
+        self.assertEqual(channels.webhook_path("dms_zzz"), "")
+        self.assertEqual(channels.webhook_path("nope"), "")
+
+    def test_webhook_paths_match_the_registered_entrances(self):
+        self.assertEqual(channels.webhook_path(""), "/api/line/dms/webhook")
+        self.assertEqual(channels.webhook_path("dms"), "/api/line/dms/webhook")
+        self.assertEqual(channels.webhook_path("dms_a"), "/api/line/dms/webhook/a")
+        self.assertEqual(channels.webhook_path("dms_b"), "/api/line/dms/webhook/b")
 
 
 class CredentialResolutionTests(unittest.TestCase):

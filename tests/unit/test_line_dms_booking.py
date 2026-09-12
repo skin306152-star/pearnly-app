@@ -497,6 +497,42 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([f["filename"] for f in rec["attach_files"]], ["idcard.jpg", "slip.jpg"])
         self.assertEqual(rec["attach_files"][0]["content_type"], "image/jpeg")
 
+    async def test_submit_preflight_reads_live_masters_and_selected_paints_once(self):
+        """提交前实时复核:新 DMS 会话里完整主档 1 次 + 选中车型颜色 1 次,插在建单前。"""
+        rec = {}
+
+        class RecordingClient(_FakeClient):
+            def fetch_masters(self, *, strict=False):
+                self.rec["masters_reads"] = self.rec.get("masters_reads", 0) + 1
+                return super().fetch_masters(strict=strict)
+
+            def _bshsd_all(self, elemname, **kwargs):
+                if elemname == "txtcarpaint":
+                    self.rec.setdefault("paint_reads", []).append(kwargs.get("idcar"))
+                return super()._bshsd_all(elemname, **kwargs)
+
+        def fake_run(ep, do):
+            return do(RecordingClient(rec), _FakeAdapter())
+
+        with (
+            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
+            ),
+            mock.patch.object(bf.masters_cache, "refresh_from_client"),
+        ):
+            res = bf._book_in_session(
+                {"id": "E1", "config": {}},
+                _review(),
+                on_attempt=lambda no: rec.setdefault("attempts", []).append(no),
+            )
+        self.assertTrue(res["ok"])
+        self.assertEqual(rec["masters_reads"], 1)  # 逐问的会话快照不算数,提交前实时抓一次
+        self.assertTrue(rec["strict_masters"])  # 且必须严格完整
+        self.assertEqual(rec["paint_reads"], ["c1"])  # 只抓选中车型的颜色
+        self.assertEqual(rec["attempts"], ["BK123"])  # 越过写边界前先记本次尝试
+
     async def test_d4_attach_failure_appends_attach_note(self):
         """建单成功但附件没挂全 → 回执如实追加 TXT_ATTACH_FAIL,不谎报附件成功。"""
         result = {

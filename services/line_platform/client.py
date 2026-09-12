@@ -11,6 +11,8 @@ import urllib.request
 import urllib.error
 from typing import Optional, List, Dict, Any
 
+from services.line_platform import channels as line_channels
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,13 +39,12 @@ def pick_lang_from_line_event(ev: dict) -> str:
     return "th"
 
 
-# 三个产品共用 LINE 传输，凭据按产品隔离。DMS 多 OA：每个 stable channel key 一套 env。
+# 三个产品共用 LINE 传输，凭据按产品隔离。DMS 多 OA：每个 stable channel key 一套 env，
+# 名字只在 channels registry 声明一次 —— 新增 OA 改 registry 即可,不会漏改这张表。
 _CHANNEL_ENV = {
     "cowork": ("LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN"),
-    "dms": ("LINE_DMS_CHANNEL_SECRET", "LINE_DMS_CHANNEL_ACCESS_TOKEN"),
-    "dms_a": ("LINE_DMS_A_CHANNEL_SECRET", "LINE_DMS_A_CHANNEL_ACCESS_TOKEN"),
-    "dms_b": ("LINE_DMS_B_CHANNEL_SECRET", "LINE_DMS_B_CHANNEL_ACCESS_TOKEN"),
     "erp": ("LINE_ERP_CHANNEL_SECRET", "LINE_ERP_CHANNEL_ACCESS_TOKEN"),
+    **{key: (cfg.secret_env, cfg.token_env) for key, cfg in line_channels.DMS_CHANNELS.items()},
 }
 
 
@@ -59,8 +60,6 @@ def _credentials_blob_env(channel: str) -> str:
     """DMS 多 OA 允许把每个 OA 的凭据作为一个 Secret 挂到单个 env(JSON/dotenv 皆可)。"""
     if not channel.startswith("dms"):
         return ""
-    from services.line_platform import channels as line_channels
-
     channel_cfg = line_channels.get(channel)
     return channel_cfg.credentials_env if channel_cfg else ""
 

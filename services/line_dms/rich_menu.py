@@ -15,8 +15,8 @@ from services.line_platform import client as line_client
 
 logger = logging.getLogger(__name__)
 
-MENU_NAME = "pearnly-dms-basic-v3-liff"
-QUERY_MENU_NAME = "pearnly-dms-query-v3-liff"
+MENU_NAME = "pearnly-dms-basic-v4-provider-liff"
+QUERY_MENU_NAME = "pearnly-dms-query-v4-provider-liff"
 _IMAGE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "static",

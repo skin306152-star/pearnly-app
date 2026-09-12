@@ -132,29 +132,36 @@ function readMenuContracts() {
         'import json',
         'from services.line_dms.menu_cards import menu_card',
         'from services.line_dms.rich_menu import build_payload',
-        "flex = [row['action'] for row in menu_card()['contents']['body']['contents'] if row.get('action')]",
-        "rich = [area['action'] for area in build_payload()['areas']]",
-        "print(json.dumps({'flex': flex, 'rich': rich}, ensure_ascii=False))",
+        'from services.line_platform import channels',
+        'keys = list(channels.DMS_CHANNELS)',
+        'build = lambda c: {"flex": [row["action"] for row in menu_card(channel=c)["contents"]["body"]["contents"] if row.get("action")], "rich": [area["action"] for area in build_payload(channel=c)["areas"]]}',
+        'print(json.dumps({"keys": keys, "channels": {k: build(k) for k in keys}, **build("dms")}, ensure_ascii=False))',
     ].join(';');
     return JSON.parse(
         execFileSync(PYTHON, ['-c', source], {
             cwd: ROOT,
             encoding: 'utf8',
-            env: { ...process.env, PYTHONUTF8: '1', LINE_DMS_LIFF_ID: 'DMS-LIFF' },
+            env: {
+                ...process.env,
+                PYTHONUTF8: '1',
+                LINE_DMS_LIFF_ID: 'DMS-LIFF',
+                LINE_LIFF_ID: 'PROVIDER-LIFF',
+            },
         })
     );
 }
 
-function stateFor(mode, platform) {
+function stateFor(mode, platform, channel = '') {
     const external = platform.mobile && mode === 'portal' ? '&openExternalBrowser=1' : '';
-    return `/dms-booking?${mode}=dms${external}`;
+    const scoped = channel ? `&channel=${channel}` : '';
+    return `/dms-booking?${mode}=dms${scoped}${external}`;
 }
 
-function callbackUrl(mode, platform) {
+function callbackUrl(mode, platform, channel = '') {
     const params = new URLSearchParams({
-        'liff.state': stateFor(mode, platform),
-        code: `line-code-${platform.id}-${mode}`,
-        state: `line-state-${platform.id}-${mode}`,
+        'liff.state': stateFor(mode, platform, channel),
+        code: `line-code-${platform.id}-${mode}${channel ? `-${channel}` : ''}`,
+        state: `line-state-${platform.id}-${mode}${channel ? `-${channel}` : ''}`,
         liffClientId: 'DMS-LIFF',
         liffRedirectUri: `${base}/home?liff.state=%2Fdms-booking`,
     });
@@ -217,11 +224,14 @@ function liffSdk(platform, mode) {
     `;
 }
 
-async function newHarnessPage(context, platform, mode) {
+async function newHarnessPage(context, platform, mode, channel = '') {
     const page = await context.newPage();
     const events = [];
     const responses = [];
     let authBody = null;
+    // DMS OA 自己的 LIFF(dms)与显式复用 Provider LIFF 的 A/B:入口 OA 决定用哪一个。
+    const expectedLiff = channel && channel !== 'dms' ? 'PROVIDER-LIFF' : 'DMS-LIFF';
+    const expectedChannelKey = channel || 'dms';
 
     await page.addInitScript(() => {
         try {
@@ -241,11 +251,20 @@ async function newHarnessPage(context, platform, mode) {
     await page.route('https://static.line-scdn.net/**', (route) =>
         route.fulfill({ contentType: 'application/javascript', body: liffSdk(platform, mode) })
     );
-    await page.route('**/api/line/dms-booking/config', async (route) => {
+    // Regex(不是 glob):带 ?channel=<oa> 的 config 请求也必须命中桩,否则会打到真服务。
+    await page.route(/\/api\/line\/dms-booking\/config(\?|$)/, async (route) => {
         events.push({ type: 'config' });
+        const requested = new URL(route.request().url()).searchParams.get('channel') || '';
         await route.fulfill({
             contentType: 'application/json',
-            body: JSON.stringify({ ok: true, data: { liff_id: 'DMS-LIFF' } }),
+            body: JSON.stringify({
+                ok: true,
+                data: {
+                    liff_id: requested && requested !== 'dms' ? 'PROVIDER-LIFF' : 'DMS-LIFF',
+                    channel_key: requested || 'dms',
+                    available: true,
+                },
+            }),
         });
     });
     await page.route('**/api/line/dms-booking/auth', async (route) => {
@@ -295,14 +314,16 @@ async function newHarnessPage(context, platform, mode) {
         });
     }
 
-    const requestedCallback = callbackUrl(mode, platform);
+    const requestedCallback = callbackUrl(mode, platform, channel);
     const committed = await page.goto(requestedCallback, { waitUntil: 'commit' });
     expect(committed, `${platform.id} ${mode} callback response`).not.toBeNull();
     expect(committed.status(), `${platform.id} ${mode} callback must be HTTP 200`).toBe(200);
     expect(committed.url(), `${platform.id} ${mode} callback URL must stay intact`).toBe(
         requestedCallback
     );
-    expect(new URL(committed.url()).searchParams.get('liff.state')).toBe(stateFor(mode, platform));
+    expect(new URL(committed.url()).searchParams.get('liff.state')).toBe(
+        stateFor(mode, platform, channel)
+    );
     expect(
         committed.request().redirectedFrom(),
         `${platform.id} ${mode} callback must not be redirected before LIFF consumes OAuth params`
@@ -337,10 +358,13 @@ async function newHarnessPage(context, platform, mode) {
     expect(liffTrace.callbackConsumed, 'liff.init must consume the callback before auth').toBe(
         true
     );
-    expect(liffTrace.initCalls).toEqual([{ liffId: 'DMS-LIFF' }]);
+    expect(liffTrace.initCalls).toEqual([{ liffId: expectedLiff }]);
     expect(liffTrace.loginCalls, `${platform.id} ${mode} must not restart LINE Login`).toEqual([]);
     expect(liffTrace.idTokenCalls).toBe(1);
-    expect(authBody).toEqual({ id_token: `LINE-ID-TOKEN-${platform.id}` });
+    expect(authBody).toEqual({
+        id_token: `LINE-ID-TOKEN-${platform.id}`,
+        channel: expectedChannelKey,
+    });
 
     const eventTypes = events.map((event) => event.type);
     expect(eventTypes.slice(0, 3)).toEqual(['config', 'liff.init', 'auth']);
@@ -370,6 +394,7 @@ async function newHarnessPage(context, platform, mode) {
             liffInitCalls: liffTrace.initCalls,
             liffLoginCount: liffTrace.loginCalls.length,
             authBody,
+            liffChannelKey: expectedChannelKey,
             eventSequence: eventTypes,
             redirectResponses: redirects,
         },
@@ -421,26 +446,39 @@ test.afterAll(() => {
 });
 
 test('LINE menu 1-4 contracts preserve postbacks, separate mobile destinations, and desktop altUri', () => {
-    const [customer, booking, portal, credentialsAction] = contracts.flex;
-    expect(customer).toEqual({ type: 'postback', data: 'action=menu_customer' });
-    expect(booking).toEqual({ type: 'postback', data: 'action=menu_booking' });
-    expect(portal).toMatchObject({
-        type: 'uri',
-        uri: 'https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1',
-        altUri: { desktop: 'https://pearnly.com/home/dms-booking?portal=dms' },
-    });
-    expect(credentialsAction).toMatchObject({
-        type: 'uri',
-        uri: 'https://liff.line.me/DMS-LIFF/dms-booking?credentials=dms',
-        altUri: { desktop: 'https://pearnly.com/home/dms-booking?credentials=dms' },
-    });
-
-    expect(contracts.rich.map((action) => [action.type, action.data || action.uri])).toEqual([
-        ['postback', 'action=menu_customer'],
-        ['postback', 'action=menu_booking'],
-        ['uri', 'https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1'],
-        ['uri', 'https://liff.line.me/DMS-LIFF/dms-booking?credentials=dms'],
-    ]);
+    // 遍历 registry 里的每个已注册 OA(不是写死 A/B):菜单 1/2 postback 一致,菜单 3/4 必须
+    // 带上该 channel 且落到该 OA 生效的 LIFF(dms 自己的 DMS-LIFF,A/B 显式复用 Provider LIFF)。
+    expect(contracts.keys).toEqual(expect.arrayContaining(['dms', 'dms_a', 'dms_b']));
+    for (const channel of contracts.keys) {
+        const legacy = channel === 'dms';
+        const liff = legacy ? 'DMS-LIFF' : 'PROVIDER-LIFF';
+        const flex = contracts.channels[channel].flex;
+        const rich = contracts.channels[channel].rich;
+        expect(flex[0]).toEqual({ type: 'postback', data: 'action=menu_customer' });
+        expect(flex[1]).toEqual({ type: 'postback', data: 'action=menu_booking' });
+        expect(rich.map((action) => [action.type, action.data || action.uri])).toEqual([
+            ['postback', 'action=menu_customer'],
+            ['postback', 'action=menu_booking'],
+            ['uri', flex[2].uri],
+            ['uri', flex[3].uri],
+        ]);
+        expect(flex[2]).toMatchObject({
+            type: 'uri',
+            uri: `https://pearnly.com/home/dms-booking?portal=dms&channel=${channel}&openExternalBrowser=1`,
+            altUri: {
+                desktop: `https://pearnly.com/home/dms-booking?portal=dms&channel=${channel}`,
+            },
+        });
+        expect(flex[3]).toMatchObject({
+            type: 'uri',
+            uri: `https://liff.line.me/${liff}/dms-booking?credentials=dms&channel=${channel}`,
+            altUri: {
+                desktop: `https://pearnly.com/home/dms-booking?credentials=dms&channel=${channel}`,
+            },
+        });
+        expect(rich[2].uri).toBe(flex[2].uri);
+        expect(rich[3].uri).toBe(flex[3].uri);
+    }
 });
 
 for (const platform of PLATFORMS) {
@@ -500,6 +538,43 @@ for (const platform of PLATFORMS) {
                 `${JSON.stringify(platformEvidence, null, 2)}\n`,
                 'utf8'
             );
+        } finally {
+            await context.close();
+            await browser.close();
+        }
+    });
+}
+
+for (const channel of ['dms_a', 'dms_b']) {
+    test(`${channel} menu 4 entry keeps its OA through the shared Provider LIFF`, async () => {
+        test.setTimeout(90_000);
+        const platform = PLATFORMS.find((entry) => entry.id === 'macos-chromium');
+        const flex = contracts.channels[channel].flex;
+        // 该 OA 没有自己的 LIFF env(A/B 生产现状):菜单 4 必须显式走 Provider LIFF + channel key。
+        expect(flex[3].uri).toBe(
+            `https://liff.line.me/PROVIDER-LIFF/dms-booking?credentials=dms&channel=${channel}`
+        );
+        expect(flex[3].altUri.desktop).toBe(
+            `https://pearnly.com/home/dms-booking?credentials=dms&channel=${channel}`
+        );
+
+        const browser = await platform.browserType.launch({ headless: true });
+        const context = await browser.newContext(platform.context);
+        try {
+            const flow = await newHarnessPage(context, platform, 'credentials', channel);
+            expect(flow.facts.liffChannelKey).toBe(channel);
+            expect(flow.facts.authBody).toEqual({
+                id_token: `LINE-ID-TOKEN-${platform.id}`,
+                channel,
+            });
+            evidence.menuChannelEntries = {
+                ...(evidence.menuChannelEntries || {}),
+                [channel]: {
+                    menu4Uri: flex[3].uri,
+                    menu4DesktopUri: flex[3].altUri.desktop,
+                    ...flow.facts,
+                },
+            };
         } finally {
             await context.close();
             await browser.close();

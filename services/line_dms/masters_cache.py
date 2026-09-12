@@ -46,8 +46,8 @@ async def qa_masters(
 ) -> List[list]:
     """某类主档(cars/place_books/…)。端点解不出就给空表 —— 发问层据此重问,不炸会话。
 
-    当前建档订车调用方每次展示/选择均强制读取；会话快照只供变化对比。
-    不以旧缓存作为可提交主档。
+    建档/订车开局强制读取一次完整主档，本轮步骤复用会话快照；提交前再做实时复核。
+    不以跨会话旧缓存作为可提交主档。
     """
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:

@@ -3,84 +3,46 @@
 from __future__ import annotations
 
 import hashlib
-import re
-from decimal import Decimal, InvalidOperation
+import logging
+import time
 
 from services.erp import mrerp_dms_docno
-from services.erp.dms_id_validate import normalize_thai_id
-from services.erp.mrerp_dms_client_base import DMSClientError
-from services.erp.mrerp_dms_payments import _PAYMENT_MONEY_FIELD, _PAYMENT_TEXT_FIELD
-
-_IDENTITY_FIELDS = ("txtdocno", "cusval", "txtpeopleid", "usersval", "carval", "carpaintval")
-_BUSINESS_FIELDS = (
-    "branch_bookval",
-    "team_bookval",
-    "branch_sellval",
-    "team_sellval",
-    "placebookval",
-    "termsaleval",
-    "regisbehalfval",
-    "txtregisname",
-    "txtcardeliverydate",
-    "txtearnestmoney",
-    "txtusers",
-    "txtuserstel",
-    "txtplacebook",
-    "txtcus",
-    "prefixval",
-    "txtprefix",
-    "txtbirthday",
-    "txttel",
-    "txtcar",
-    "carbrandval",
-    "txtcarbrand",
-    "typecarval",
-    "txttypecar",
-    "typecardescval",
-    "txttypecardesc",
-    "gradeval",
-    "txtgrade",
-    "cargearval",
-    "txtcargear",
-    "txtmanuyear",
-    "enginepowerval",
-    "txtenginepower",
-    "carpaintname",
-    "txtcarpaint",
-    "txtprice",
-    "txttermsale",
-    "txtbranch_book",
-    "txtteam_book",
-    "txtbranch_sell",
-    "txtteam_sell",
-    "txtregisbehalf",
-    "txthousenum",
-    "txtbuilding",
-    "txtfloor",
-    "txtroom",
-    "txtvillage",
-    "txtmoo",
-    "txtsoi",
-    "txtroad",
-    "provincesval",
-    "txtprovinces",
-    "districtsval",
-    "txtdistricts",
-    "subdistrictsval",
-    "txtsubdistricts",
-    "zipcodesval",
-    "txtzipcodes",
+from services.erp.mrerp_dms_booking_readback import (
+    MAX_READBACK_CANDIDATE_IDS,
+    READBACK_MAX_ATTEMPTS,
+    STAGE_AMBIGUOUS,
+    STAGE_SEARCH_EMPTY,
+    STAGE_VERIFIED,
+    evaluate_candidate,
+    merge_stage,
+    page_is_last,
+    parse_row_ids,
+    readback_backoff_seconds,
 )
-_MONEY_FIELDS = {"txtprice", "txtearnestmoney", *_PAYMENT_MONEY_FIELD.values()}
-_PAYMENT_FIELDS = _MONEY_FIELDS | {
-    field for channel in _PAYMENT_TEXT_FIELD.values() for field in channel.values()
-}
+from services.erp.mrerp_dms_client_base import DMSClientError
+
+logger = logging.getLogger(__name__)
+
+# 原生订车单列表搜索(只读)。绝不含 drfcbc/new.php —— 回读永不写。
+_BOOKING_LIST_PATH = "drfcbc/component/showdata.php"
+_BOOKING_FORM_PATH = "drfcbc/form.php"
+_SEARCH_PAGE_SIZE = 30
+_MAX_SEARCH_PAGES = 2
 
 
 class DMSBookingOutcomeUnknown(DMSClientError):
     """A write was attempted; callers must retain the draft and forbid a new POST."""
 
-    def __init__(self, docno: str, *, http_status=None, body: str = ""):
+    def __init__(
+        self,
+        docno: str,
+        *,
+        http_status=None,
+        body: str = "",
+        stage: str = "",
+        source: str = "",
+        readback_attempts: int = 0,
+    ):
         super().__init__(
             f"booking {docno!r} was submitted but its stored result could not be verified",
             "ERR_DMS_BOOKING_OUTCOME_UNKNOWN",
@@ -92,84 +54,202 @@ class DMSBookingOutcomeUnknown(DMSClientError):
             "submitted": True,
             "retry_safe": False,
             "http_status": http_status,
+            # 定因阶段(search_empty / identity_mismatch / critical_mismatch / ambiguous)
+            # + 只读来源/尝试次数。都没有单号以外的业务值,更无 PII/token。
+            "readback_stage": stage or STAGE_SEARCH_EMPTY,
+            "readback_source": source or "unknown",
+            "readback_attempts": readback_attempts,
             # Keep evidence of the acknowledgement without persisting arbitrary HTML/PII.
             "response_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest() if body else "",
         }
 
 
-def _same(field: str, expected: str, actual: str) -> bool:
-    if field == "txtpeopleid":
-        return bool(normalize_thai_id(expected)) and normalize_thai_id(
-            expected
-        ) == normalize_thai_id(actual)
-    if field in _MONEY_FIELDS:
-        try:
-            return Decimal(expected.replace(",", "") or "0") == Decimal(
-                actual.replace(",", "") or "0"
-            )
-        except InvalidOperation:
-            return False
-    return " ".join(expected.split()) == " ".join(actual.split())
-
-
-def _matches(form: dict, submitted: dict, booking_id: str) -> bool:
-    if str(form.get("idsel") or "") != booking_id:
-        return False
-    if not all(str(submitted.get(field) or "").strip() for field in _IDENTITY_FIELDS):
-        return False
-    fields = set(_IDENTITY_FIELDS + _BUSINESS_FIELDS) | _PAYMENT_FIELDS
-    # Native advisor organization fields include all approval managers, not just branch/team.
-    fields.update(key for key in submitted if "usersposi" in key.lower())
-    return all(
-        field in form and _same(field, str(submitted[field]), str(form[field]))
-        for field in fields
-        if field in submitted
+def _read_candidate(client, row_id: str) -> dict:
+    return client._parse_form_defaults(
+        client._post_text(_BOOKING_FORM_PATH, {"status": "e", "id": row_id})
     )
 
 
-def _verify_session(client, docno: str, submitted: dict) -> str | None:
+def _readback_once(client, docno: str, submitted: dict) -> tuple:
+    """一轮只读回读。返回 (booking_id, 阶段, 脱敏字段名, 告警字段名, 搜索页数)。
+
+    只读:showdata + form.php。任何一轮都不会 POST `drfcbc/new.php`。
+    首页已确认就停,不白翻第二页;首页没结论才按需翻页(上限 `_MAX_SEARCH_PAGES`)。
+    """
     # Native view initializes visibility filters in fresh DMS sessions. It performs no write.
     client._post_text("drfcbc/view.php", {"idmenu": "25", "menulv": "2"})
-    body = client._post_text(
-        "drfcbc/component/showdata.php",
-        {
-            "sdtamt": "30",
-            "sdtpage": "1",
-            "sd": docno,
-            "ftd": "1",
-            "selcolsort": "1",
-            "selcolsorttype": "1",
-        },
-    )
-    # DMS search is not exact: never accept the first row or another customer's booking.
-    candidates = list(dict.fromkeys(re.findall(r'data-val=["\']([^"\']+)["\']', body or "")))[:30]
-    matches = []
-    for booking_id in candidates:
-        form = client._parse_form_defaults(
-            client._post_text("drfcbc/form.php", {"status": "e", "id": booking_id})
+    seen: list = []
+    mismatch_stage = None
+    mismatch_fields: tuple = ()
+    pages = 0
+    warnings: tuple = ()
+    for page in range(1, _MAX_SEARCH_PAGES + 1):
+        body = client._post_text(
+            _BOOKING_LIST_PATH,
+            {
+                "sdtamt": str(_SEARCH_PAGE_SIZE),
+                "sdtpage": str(page),
+                "sd": docno,
+                "ftd": "1",
+                "selcolsort": "1",
+                "selcolsorttype": "1",
+            },
         )
-        if _matches(form, submitted, booking_id):
-            matches.append(booking_id)
-    return matches[0] if len(matches) == 1 else None
+        pages = page
+        row_ids = parse_row_ids(body, limit=MAX_READBACK_CANDIDATE_IDS)
+        identity_hits = []
+        for row_id in row_ids:
+            if row_id in seen:
+                continue
+            seen.append(row_id)
+            form = _read_candidate(client, row_id)
+            outcome = evaluate_candidate(submitted, form, row_id)
+            if outcome.status == STAGE_VERIFIED:
+                identity_hits.append(row_id)
+                warnings = outcome.warnings
+            elif mismatch_stage is None:
+                # 只要有一行是我们那张单,别的模糊命中就不算事;它们只在全军覆没时定因。
+                mismatch_stage = outcome.status
+                mismatch_fields = outcome.diagnostic_fields
+        if len(identity_hits) > 1:
+            # 多张完全匹配的单据无法区分是哪一张 —— 报歧义,不许随便挑一张。
+            return None, STAGE_AMBIGUOUS, (), warnings, pages
+        if identity_hits:
+            return identity_hits[0], STAGE_VERIFIED, (), warnings, pages
+        if page_is_last(body, _SEARCH_PAGE_SIZE):
+            break
+    return None, mismatch_stage or STAGE_SEARCH_EMPTY, mismatch_fields, warnings, pages
 
 
-def verify_created_booking(client, docno: str, submitted: dict) -> str | None:
-    """Fresh salesperson read, then configured same-endpoint admin read of only this booking."""
-    try:
-        booking_id = _verify_session(client, docno, submitted)
+def _log_readback(
+    stage: str, source: str, pages: int, attempts: int, fields: tuple, warnings: tuple
+):
+    """脱敏回读日志:只有阶段、来源、次数与**字段名**,没有单号以外的业务值。"""
+    extra = {
+        "readback_stage": stage,
+        "readback_source": source,
+        "readback_pages": pages,
+        "readback_attempts": attempts,
+        "readback_fields": list(fields),
+        "readback_display_warnings": list(warnings),
+    }
+    if stage == STAGE_SEARCH_EMPTY:
+        logger.warning("[dms] booking readback found no record: %s", extra)
+    elif stage != STAGE_VERIFIED:
+        logger.warning("[dms] booking readback not conclusive: %s", extra)
+    elif warnings:
+        logger.info("[dms] booking readback display-only differences: %s", extra)
+
+
+def _readback_with_retries(client, docno: str, submitted: dict, source: str) -> tuple:
+    """同一会话内有限次重查:短时搜索不可见/索引延迟不该直接判「订单不存在」。"""
+    stage = None
+    diagnostic: tuple = ()
+    warnings: tuple = ()
+    pages = 0
+    attempts = 0
+    for attempt in range(1, READBACK_MAX_ATTEMPTS + 1):
+        attempts = attempt
+        try:
+            booking_id, outcome, fields, found_warnings, pages = _readback_once(
+                client, docno, submitted
+            )
+        except Exception as exc:  # 传输/解析异常:只读失败也要留下定因
+            logger.warning(
+                "[dms] booking readback %s attempt %s failed: %s",
+                source,
+                attempt,
+                type(exc).__name__,
+            )
+            pages = 0
+            booking_id, outcome, fields, found_warnings = None, STAGE_SEARCH_EMPTY, (), ()
         if booking_id:
-            return booking_id
-    except Exception:
-        pass
-    try:
-        admin = client._resolve_admin_transport()
-        if admin is not None:
-            from services.erp.mrerp_dms_client import DMSClient
+            _log_readback(STAGE_VERIFIED, source, pages, attempts, (), found_warnings)
+            return booking_id, STAGE_VERIFIED, attempts, 0, found_warnings
+        stage = merge_stage(stage, outcome)
+        if not diagnostic:
+            diagnostic = fields
+        if not warnings:
+            warnings = found_warnings
+        if outcome != STAGE_SEARCH_EMPTY or attempt == READBACK_MAX_ATTEMPTS:
+            break
+        delay = readback_backoff_seconds(attempt)
+        if delay:
+            time.sleep(delay)
+    final = stage or STAGE_SEARCH_EMPTY
+    _log_readback(final, source, pages, attempts, diagnostic, warnings)
+    return None, final, attempts, pages, warnings
 
-            # A new client prevents salesperson master memo entries leaking into the admin read.
-            return _verify_session(DMSClient(admin, client.base_url), docno, submitted)
-    except Exception:
-        pass
+
+def _admin_reader(client):
+    """配置了 admin 凭据组时返回一个独立 reader(避免销售端 memo 串味),否则 None。"""
+    admin = client._resolve_admin_transport()
+    if admin is None:
+        return None
+    from services.erp.mrerp_dms_client import DMSClient
+
+    return DMSClient(admin, client.base_url)
+
+
+def verify_created_booking(
+    client, docno: str, submitted: dict, *, stage_out: dict | None = None
+) -> str | None:
+    """Fresh salesperson read (bounded re-search), then a configured same-endpoint admin read.
+
+    只读:两条会话都只用列表搜索 + 详情表单读取,绝不重发 `drfcbc/new.php`。
+    """
+    stage = None
+    diagnostic: tuple = ()
+    warnings: tuple = ()
+    attempts = 0
+    booking_id = None
+    try:
+        booking_id, stage, attempts, _pages, warnings = _readback_with_retries(
+            client, docno, submitted, "sales"
+        )
+        if booking_id:
+            if stage_out is not None:
+                stage_out.update({"stage": STAGE_VERIFIED, "attempts": attempts, "vendor": "sales"})
+            return booking_id
+    except Exception as exc:
+        logger.warning("[dms] sales booking readback failed: %s", type(exc).__name__)
+    if stage not in (None, STAGE_SEARCH_EMPTY):
+        # 销售会话已经**看得见**这张单,只是身份/关键字段对不上或有多张候选:
+        # 换管理员权限不会让这些字段变得一致,不必多起一个会话。
+        if stage_out is not None:
+            stage_out.update({"stage": stage, "attempts": attempts, "vendor": "sales"})
+        return None
+    try:
+        reader = _admin_reader(client)
+        if reader is None:
+            if stage_out is not None:
+                stage_out.update(
+                    {
+                        "stage": STAGE_SEARCH_EMPTY,
+                        "attempts": attempts,
+                        "vendor": "admin_unavailable",
+                    }
+                )
+            return None
+        booking_id, admin_stage, admin_attempts, _pages, admin_warnings = _readback_with_retries(
+            reader, docno, submitted, "admin"
+        )
+        stage = merge_stage(stage, admin_stage)
+        attempts += admin_attempts
+        if not warnings:
+            warnings = admin_warnings
+        if booking_id:
+            stage = STAGE_VERIFIED
+    except Exception as exc:
+        logger.warning("[dms] admin booking readback failed: %s", type(exc).__name__)
+        if stage_out is not None:
+            stage_out.setdefault("vendor", "admin_unavailable")
+    if stage == STAGE_VERIFIED and booking_id:
+        if stage_out is not None:
+            stage_out.update({"stage": STAGE_VERIFIED, "attempts": attempts, "vendor": "admin"})
+        return booking_id
+    if stage_out is not None:
+        stage_out.update({"stage": stage or STAGE_SEARCH_EMPTY, "attempts": attempts})
     return None
 
 
@@ -196,8 +276,16 @@ def submit_booking(client, base: dict, docno: str, *, on_attempt=None) -> tuple[
                 docno = mrerp_dms_docno.bump_docno(docno)
                 continue
             raise DMSClientError(f"booking create rejected: {last_body[:300]!r}", "ERR_DMS_IMPORT")
-        booking_id = verify_created_booking(client, docno, data)
+        readback = {}
+        booking_id = verify_created_booking(client, docno, data, stage_out=readback)
         if booking_id:
             return booking_id, docno
-        raise DMSBookingOutcomeUnknown(docno, http_status=status, body=last_body)
+        raise DMSBookingOutcomeUnknown(
+            docno,
+            http_status=status,
+            body=last_body,
+            stage=str(readback.get("stage") or ""),
+            source=str(readback.get("vendor") or ""),
+            readback_attempts=int(readback.get("attempts") or 0),
+        )
     raise DMSClientError(f"booking create rejected: {last_body[:300]!r}", "ERR_DMS_IMPORT")

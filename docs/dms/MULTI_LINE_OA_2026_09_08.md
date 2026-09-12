@@ -24,9 +24,18 @@
 - `resolve_credentials`:先读单项 env,再回退单个 blob env(JSON 或 dotenv)。A/B Secret Manager
   以单变量挂载时无需改代码。
 - 未知 key fail-closed:`is_valid=False`,`client._get_channel_token` 返回 `""`。
-- LIFF:`liff_id(key)` 只读该 OA 的 `liff_env`;非 legacy OA **不回落** `LINE_LIFF_ID`(避免
-  用别的 OA 的 LIFF 登录)。A/B 未配 LIFF 时相关入口退化为 `/dms`,不跨 OA。
-- Rich menu 名按 OA 加后缀(`pearnly-dms-basic-v3-liff-dms_a`),读写都用该 OA token。
+- LIFF(2026-09-12 更正):每个 `LineChannel` 显式声明 LIFF 归属 —— `liff_env`(该 OA 自己的
+  app)与 `provider_liff_env`(允许复用的共享 Provider app)。三个 DMS OA 的 Messaging API
+  channel 与共享 LINE Login channel 同属一个 Provider,故 A/B 在**没有自己的 LIFF env**
+  时按声明复用 `LINE_LIFF_ID`,而不是退化成 `/dms`(生产实测:A/B 只有 `LINE_LIFF_ID`,
+  `LINE_DMS_A/B_LIFF_ID` 从未配置,旧「不回落」规则让菜单 3/4 与预览卡「แก้ไข」全部失效)。
+  `liff_env_name(key)` 同步返回生效的 env 名,验签按它取 client_id。未声明(未来新增 OA 忘
+  填 `provider_liff_env`)或未知 key → `liff_id=""`、`liff_env_name=""`,验签前就失败关闭;
+  `tests/unit/test_dms_channel_registry_contract.py` 遍历 registry 把这条钉住。
+  绑定/会话/ticket/回复/菜单仍严格按 channel key 隔离,共享的只是登录身份。
+- Rich menu 名按 OA 加后缀(`pearnly-dms-basic-v4-provider-liff-dms_a`),读写都用该 OA token;
+  webhook 入口路径由 registry 推出(`dms`→`/api/line/dms/webhook`,`dms_a`→`/a`,…),
+  没有 registry 条目就没有路由(404),不会借用 legacy OA 的 secret/token。
 
 ## 2. 数据模型与迁移
 

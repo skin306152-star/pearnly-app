@@ -3,16 +3,16 @@
   "engine": "chromium",
   "nativeDeviceOrOs": false,
   "selectedMenuUris": {
-    "menu3": "https://pearnly.com/home/dms-booking?portal=dms",
-    "menu4": "https://pearnly.com/home/dms-booking?credentials=dms"
+    "menu3": "https://pearnly.com/home/dms-booking?portal=dms&channel=dms",
+    "menu4": "https://pearnly.com/home/dms-booking?credentials=dms&channel=dms"
   },
   "menu1Postback": "action=menu_customer",
   "menu2Postback": "action=menu_booking",
   "portal": {
-    "requestedCallback": "http://127.0.0.1:56004/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-windows-chromium-portal&state=line-state-windows-chromium-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A56004%2Fhome%3Fliff.state%3D%252Fdms-booking",
+    "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-windows-chromium-portal&state=line-state-windows-chromium-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
     "callbackHttpStatus": 200,
     "callbackRedirectedFrom": null,
-    "finalUrl": "http://127.0.0.1:56004/home/dms-booking/portal?ticket=opaque-windows-chromium",
+    "finalUrl": "http://127.0.0.1:62313/home/dms-booking/portal?ticket=opaque-windows-chromium",
     "liffInitCalls": [
       {
         "liffId": "DMS-LIFF"
@@ -20,8 +20,10 @@
     ],
     "liffLoginCount": 0,
     "authBody": {
-      "id_token": "LINE-ID-TOKEN-windows-chromium"
+      "id_token": "LINE-ID-TOKEN-windows-chromium",
+      "channel": "dms"
     },
+    "liffChannelKey": "dms",
     "eventSequence": [
       "config",
       "liff.init",
@@ -32,10 +34,10 @@
     "redirectResponses": []
   },
   "credentials": {
-    "requestedCallback": "http://127.0.0.1:56004/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-chromium-credentials&state=line-state-windows-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A56004%2Fhome%3Fliff.state%3D%252Fdms-booking",
+    "requestedCallback": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-chromium-credentials&state=line-state-windows-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
     "callbackHttpStatus": 200,
     "callbackRedirectedFrom": null,
-    "finalUrl": "http://127.0.0.1:56004/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-chromium-credentials&state=line-state-windows-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A56004%2Fhome%3Fliff.state%3D%252Fdms-booking",
+    "finalUrl": "http://127.0.0.1:62313/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-windows-chromium-credentials&state=line-state-windows-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A62313%2Fhome%3Fliff.state%3D%252Fdms-booking",
     "liffInitCalls": [
       {
         "liffId": "DMS-LIFF"
@@ -43,8 +45,10 @@
     ],
     "liffLoginCount": 0,
     "authBody": {
-      "id_token": "LINE-ID-TOKEN-windows-chromium"
+      "id_token": "LINE-ID-TOKEN-windows-chromium",
+      "channel": "dms"
     },
+    "liffChannelKey": "dms",
     "eventSequence": [
       "config",
       "liff.init",

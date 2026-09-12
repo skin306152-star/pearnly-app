@@ -50,8 +50,8 @@ async def liff_dms_booking_entry():
 async def dms_booking_liff_config(channel: str = ""):
     """Resolve the LIFF app of the OA that owns this browser entry.
 
-    Unknown non-empty channel → 404; A/B without its own LIFF id returns an empty id so the page
-    degrades honestly instead of silently opening the legacy OA's LIFF.
+    Unknown non-empty channel → 404. DMS OAs under the same LINE Provider reuse its shared LIFF
+    unless an OA-specific LIFF id is configured; channel_key still scopes the binding lookup.
     """
     from services.line_platform import channels
 
@@ -75,11 +75,6 @@ async def dms_booking_liff_auth(req: LiffAuthIn):
         raise PosError("dms_booking.liff_unavailable", 403, detail="unknown_channel")
     key = raw or channels.DEFAULT_DMS_CHANNEL
     liff_env = channels.liff_env_name(key)
-    if key != channels.DEFAULT_DMS_CHANNEL and not channels.liff_id(key):
-        # An A/B OA without its own LIFF app must not authenticate through the legacy / shared
-        # login channel; refuse before any verify request is sent.
-        logger.warning("DMS browser authentication rejected: liff_unavailable")
-        raise PosError("dms_booking.liff_unavailable", 403, detail="liff_unavailable")
     claims = await asyncio.to_thread(verify_id_token, req.id_token, liff_env)
     if not claims or not claims.get("sub"):
         logger.warning("DMS browser authentication rejected: line_token_invalid")

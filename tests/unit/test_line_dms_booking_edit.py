@@ -393,7 +393,7 @@ class BookingEditTests(TestCase):
 
 
 class EditLinkChannelTests(TestCase):
-    """编辑入口只认绑定所属 OA 的 LIFF,非 legacy OA 绝不回落到别的 OA。"""
+    """编辑入口带绑定所属 OA；同 Provider 的 DMS OA 共用登录 LIFF。"""
 
     _BINDING = {
         "id": "b1",
@@ -417,11 +417,14 @@ class EditLinkChannelTests(TestCase):
                 "https://liff.line.me/A-LIFF?draft=N1&channel=dms_a",
             )
 
-    def test_non_legacy_without_liff_is_empty_not_legacy(self):
+    def test_non_legacy_without_override_uses_provider_liff(self):
         with mock.patch.dict(
             "os.environ", {"LINE_DMS_LIFF_ID": "DMS-LIFF", "LINE_LIFF_ID": "SHARED"}, clear=True
         ):
-            self.assertEqual(qa_cards._edit_url("N1", "dms_b"), "")
+            self.assertEqual(
+                qa_cards._edit_url("N1", "dms_b"),
+                "https://liff.line.me/SHARED?draft=N1&channel=dms_b",
+            )
 
     def test_binding_scope_selects_channel(self):
         with mock.patch.dict("os.environ", {"LINE_DMS_A_LIFF_ID": "A-LIFF"}, clear=True):
@@ -431,8 +434,8 @@ class EditLinkChannelTests(TestCase):
                     "https://liff.line.me/A-LIFF?draft=N1&channel=dms_a",
                 )
 
-    def test_preview_omits_edit_button_when_oa_has_no_liff(self):
-        with mock.patch.dict("os.environ", {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=True):
+    def test_preview_keeps_edit_button_on_provider_liff(self):
+        with mock.patch.dict("os.environ", {"LINE_LIFF_ID": "SHARED"}, clear=True):
             with binding_guard.scope({**self._BINDING, "channel_key": "dms_b"}):
                 card = qa_cards.preview_card(QA, "N-NO-LIFF")
-        self.assertNotIn(qa_cards.BTN_EDIT, str(card))
+        self.assertIn(qa_cards.BTN_EDIT, str(card))

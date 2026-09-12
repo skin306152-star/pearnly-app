@@ -111,7 +111,7 @@ class TestBookingDocnoRetry(unittest.TestCase):
         # empty sales visibility and admin fallback, has its own transport-level suite.
         probe = patch(
             "services.erp.mrerp_dms_booking_submit.verify_created_booking",
-            side_effect=lambda client, docno, submitted: client.search_booking(docno),
+            side_effect=lambda client, docno, submitted, **kwargs: client.search_booking(docno),
         )
         probe.start()
         self.addCleanup(probe.stop)

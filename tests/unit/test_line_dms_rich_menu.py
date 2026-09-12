@@ -67,7 +67,7 @@ class DmsRichMenuTests(unittest.TestCase):
                 "https://pearnly.com/home/dms-booking?portal=dms&channel=dms&openExternalBrowser=1",
             )
 
-    def test_non_legacy_channel_uses_its_own_liff_or_falls_back_to_portal(self):
+    def test_non_legacy_channel_uses_override_or_provider_liff(self):
         with patch.dict(
             os.environ,
             {"LINE_DMS_LIFF_ID": "DMS-LIFF", "LINE_DMS_A_LIFF_ID": "A-LIFF"},
@@ -81,10 +81,15 @@ class DmsRichMenuTests(unittest.TestCase):
                 rich_menu.credentials_liff_url("dms_a"),
                 "https://liff.line.me/A-LIFF/dms-booking?credentials=dms&channel=dms_a",
             )
-        with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=True):
-            # A has no LIFF of its own: never borrow the legacy LIFF id.
-            self.assertEqual(rich_menu.portal_external_url("dms_a"), "https://pearnly.com/dms")
-            self.assertEqual(rich_menu.credentials_liff_url("dms_a"), "https://pearnly.com/dms")
+        with patch.dict(os.environ, {"LINE_LIFF_ID": "SHARED-LIFF"}, clear=True):
+            self.assertEqual(
+                rich_menu.portal_external_url("dms_a"),
+                "https://pearnly.com/home/dms-booking?portal=dms&channel=dms_a&openExternalBrowser=1",
+            )
+            self.assertEqual(
+                rich_menu.credentials_liff_url("dms_a"),
+                "https://liff.line.me/SHARED-LIFF/dms-booking?credentials=dms&channel=dms_a",
+            )
 
     def test_payload_has_query_in_fifth_cell(self):
         with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=False):

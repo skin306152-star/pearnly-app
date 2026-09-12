@@ -12,7 +12,7 @@ globalThis.Request = class extends NativeRequest {
     }
 };
 
-test('only DMS page, credentials and LIFF auth bypass cache', async () => {
+test('DMS portal, credentials and LIFF auth bypass cache', async () => {
     let options;
     const previous = globalThis.fetch;
     globalThis.fetch = async (_request, value) => {
@@ -21,6 +21,14 @@ test('only DMS page, credentials and LIFF auth bypass cache', async () => {
     };
     try {
         for (const path of [
+            '/dms',
+            '/dms/',
+            '/dms/records',
+            '/api/dms/geo?level=province',
+            '/api/dms/customer-fields',
+            '/api/line/dms-booking/paints?nonce=draft-1',
+            '/api/line/dms-booking/draft?nonce=draft-1',
+            '/api/line/dms-portal/ticket',
             '/home/dms-booking?credentials=dms',
             '/login/dms-booking',
             '/liff/dms-booking',
@@ -64,6 +72,7 @@ test('other products retain original fetch options and response headers', async 
                 '/pos',
                 '/cashier',
                 '/earn',
+                '/dms-pick',
                 '/api/history',
                 '/api/uploads/image',
                 '/api/erp/agent/lease',

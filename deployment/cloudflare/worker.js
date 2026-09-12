@@ -12,7 +12,13 @@ export default {
         }
         const state = original.searchParams.get('liff.state') || '';
         const stateQuery = new URLSearchParams(state.slice(state.indexOf('?') + 1));
-        const dmsCredentials =
+        const dmsNoStore =
+            original.pathname === '/dms' ||
+            original.pathname.startsWith('/dms/') ||
+            original.pathname === '/api/dms' ||
+            original.pathname.startsWith('/api/dms/') ||
+            original.pathname.startsWith('/api/line/dms-booking/') ||
+            original.pathname.startsWith('/api/line/dms-portal/') ||
             ['/home/dms-booking', '/login/dms-booking', '/liff/dms-booking'].includes(
                 original.pathname
             ) ||
@@ -43,7 +49,7 @@ export default {
         });
         const response = await fetch(
             upstream,
-            dmsCredentials
+            dmsNoStore
                 ? { cache: 'no-store' }
                 : {
                       cf: cacheable
@@ -55,7 +61,7 @@ export default {
                   }
         );
         const result = new Response(response.body, response);
-        if (dmsCredentials || original.pathname.endsWith('/latest.json')) {
+        if (dmsNoStore || original.pathname.endsWith('/latest.json')) {
             result.headers.set('cache-control', 'no-store');
         }
         const location = result.headers.get('location');

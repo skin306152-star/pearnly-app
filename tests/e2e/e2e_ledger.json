@@ -24,6 +24,10 @@
     "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
   ],
   "stale_ack": {
+    "_stocktake_verify.cjs": {
+      "why": "本次只因共享 i18n-data.js 新增 WeKan 导航词条，同步把手机盘点页的词典缓存指纹 stocktake-5 升到 stocktake-6；该页其余字节、mobile.js、盘点接口和摄像头逻辑均未改。缓存资源登记与容器页面测试已通过，盘点全量实机 E2E 未重跑，本条明确保留这一证据限制。",
+      "until": "2026-09-13"
+    },
     "_erp_cowork_split_verify.cjs": {
       "why": "WeKan 接入仅新增 COWORK/主站协作链接及入口参数，未改 ERP 导航、登录门、跨壳路由白名单或移动样式。已在外部 Chrome 用真实本地普通账号验证 COWORK 登录、菜单进入 WeKan、私密看板创建和退出返回；本会话 UI 操作限定 CUA，未运行依赖 Playwright token/API 注入的旧全量双壳脚本。该脚本的 ERP/手机/快捷键全矩阵仍欠验收，证据及限制见 docs/project/WEKAN_SSO_20260912.md。",
       "until": "2026-09-13"

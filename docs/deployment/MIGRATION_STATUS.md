@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-13 01:13（Asia/Bangkok，UTC+7）。状态：**DMS 银行目录空响应修复已上线，Web/Worker 各 100%；合法空目录改走手填银行资料，Cloudflare 沿用既有 DMS no-store 规则，本次未发布新 Worker。真实 LINE 手机一笔业务验收待用户确认。独立 WeKan 保持原发布。**
+更新时间：2026-09-13 02:33（Asia/Bangkok，UTC+7）。状态：**DMS 原生订车编号、回读、实时主档快照、编辑返回与常用分隔符修复已上线，Web/Worker 各 100%；Cloudflare 沿用既有 DMS no-store 规则，本次未发布新边缘 Worker。历史单 `BK000002609000007` 已只读确认落库但没有附件，禁止自动重提；真实 LINE 手机新单验收与历史单附件补传仍待确认。独立 WeKan 保持原发布。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -28,16 +28,23 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
+- Pearnly 完整 SHA：`bdd34d3b951e8ca41319c9cf517128e98ccb9148`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:6f44375bac8036d98fc32127a53ed060ce35049155c1eec2b4f8f7fc8926f819`。
+- Web revision：`pearnly-web-bdd34d3b951e-s3`；Worker revision：`pearnly-worker-bdd34d3b951e-s3`；两端 Ready、各 100% 流量，同一 digest。
+- [Manual CD 34713962528](https://github.com/skin306152-star/pearnly-app/actions/runs/34713962528) 于 2026-09-13 02:28 Bangkok 完成，conclusion success；HEAD 精确为上述 SHA，构建不可变镜像、schema、候选验证、两服务切流和正式验证全部通过。
+- 原生订车编号：从 DMS `autonum.php` 与分店 `autonumdetail.php` 实时取得可配置前缀、数字主体、`idatndt`、`natn`，按原生表单协议提交并推进计数器；`BK` 只是在当前 MR.ERP 实例读取到的配置，不是写死规则。实际号段落后时只读扫描已占用号，并按流水差值同步推进 `natn`。
+- 回读：完整外部单号与 DMS 分开的“前缀 + 数字主体”做精确等价比较；保留客户、身份证、顾问、车型、颜色及关键金额/归属校验。历史单 `BK000002609000007` 已只读唯一命中 row 82，台账原始客户/顾问/车型/颜色 ID 与该行全部一致，确认旧版 `identity_mismatch` 是完整号与数字主体直接比较造成的假失败，不是用户录错，也不是权限问题。
+- 主档与交互：网页编辑器每次加载只做一份管理员实时主档快照，保存只校验相关字段；LINE 对话和编辑器共用银行、车型、颜色、组织与地址映射。保存后的新版预览改由持久 Cloud Task 异步发送，返回 LINE 不再等待消息发送；多 OA 菜单 3/4、最终卡片编辑按钮、菜单 1 附件续接纳入回归。常用 `|`、全角竖线、逗号、斜杠与中点分隔均支持，并保护日期、时间、金额和账号中的符号。
+- 测试：DeepSeek 原生编号定向 26 项加 22 subtests，编号/回读/权威读取 81 项加 49 subtests，扩展受影响 DMS/LINE-DMS 961 passed、33 skipped、250 subtests；随后完整 pre-push 1181 模块/6 分片及 ruff、Black、import、i18n、Prettier、文件规模、棘轮、e2e stub、authz 机械闸全部通过，未跳过 hook。以上各批为独立口径，不跨批相加。
+- 线上回读：`/api/health` 200、应用版本 `0.18.5-v105`；`/api/ready?dms_native_booking=bdd34d3b951e` 200 且 ready=true，数据库、Gemini、SMTP、LINE 全部 ok；`/dms/` 200、`Cache-Control: no-store`、`CF-Cache-Status: DYNAMIC`。新 Web/Worker revision 的 ERROR 级日志为空。
+- Cloudflare 继续使用既有 Active Latest `b24c28cb`／源码 `05f52eb9` 的 DMS no-store 规则；应用发布在 Cloud Run，经 Cloudflare 提供服务，本次没有边缘脚本改动，因此未重新发布 Cloudflare Worker。
+- 业务边界：没有自动重提任何真实订车单。历史单 `BK000002609000007` 已存在于 DMS，但回读假失败中断了后续附件上传，row 82 当前附件数为 0；其原 LINE 会话已不存在，补传需要对既有外部单据执行单独写操作。新版本尚未由用户在真实 LINE 手机提交一笔新单验收。
+
+### 上一次 Pearnly 发布：DMS 银行空目录兼容（2026-09-13 01:13）
+
 - Pearnly 完整 SHA：`6ccf1a23ffc6bea5a2831dd5be15a4f698ff69a9`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:4624d72c94ed51c68ce681d30d5ced821281fb586fc00ee3683cb1fc05a0e453`。
-- Web revision：`pearnly-web-6ccf1a23ffc6-s3`；Worker revision：`pearnly-worker-6ccf1a23ffc6-s3`；两端 Ready、各 100% 流量，同一 digest。
-- [Manual CD 34710177971](https://github.com/skin306152-star/pearnly-app/actions/runs/34710177971) 于 2026-09-13 01:13 Bangkok 完成，conclusion success；构建不可变镜像、再次核对 master、schema、候选验证、两服务切流和正式验证全部通过。
-- DMS 银行目录空响应修复：`b78697f3` 把原先允许手填的 source/cheque/cashier/card bank 目录改成必选实时目录，罗勇生产 DMS 只返回 `company_banks=2`，另外四个目录以合法 0 字节空响应返回，用户在转账金额后必然卡在读取银行列表；不是用户操作或账号权限问题。合法空目录现在进入手填银行资料，目录有数据仍严格实时选择和精确匹配，已删除的 ID 不兜底，`company_banks` 始终严格；非 JSON、HTTP、认证错误继续 fail closed；内部 `bank_manual` 不发给 DMS。
-- 对话流程与网页编辑器同步；既有 `pay_src` 空目录草稿在未过期时可继续；预览编辑按钮与多 OA 菜单 3/4 回归纳入覆盖；静态脚本 v16 升 v17。
-- 测试：DeepSeek 定向 407 项 Python 与 23 项 Playwright 通过，协议修复后 195 项定向通过；扩展 DMS/LINE-DMS/MRERP 1270 passed、1 skipped（临时 worker 环境无 DATABASE_URL）；完整 pre-push 1179 模块/6 分片与机械闸全部通过，未跳过 hook。以上各批为独立口径，不跨批相加。
-- 线上：`/api/health` 200；`/api/ready?dms_bank_release=6ccf1a23` 200 且 ready=true；`/home/dms-booking` 返回 `Cache-Control: no-store`、`CF-Cache-Status: DYNAMIC`，引用 `dms-booking-edit.js?v=17`，该线上脚本 SHA256 `d4778db38f00deee339c6515036101f1b3d3edb7c393dc8836c8f727da8f9226` 与提交字节一致；新 Web/Worker revision 最近 30 分钟 ERROR 日志为空。
-- Cloudflare 继续使用既有 Active Latest `b24c28cb`／源码 `05f52eb9` 的 DMS no-store 规则，本次无需发布新 Worker。
-- 业务边界：没有写真实 DMS，也没有自动重提 `BK000002609000006`；该单已由用户在 DMS 查到，因此不作为修复后的新写入验证。真实 LINE 手机继续一笔业务仍待用户验收；旧会话如已过期需重新开始。
+- Web/Worker revision 分别为 `pearnly-web-6ccf1a23ffc6-s3`、`pearnly-worker-6ccf1a23ffc6-s3`；[Manual CD 34710177971](https://github.com/skin306152-star/pearnly-app/actions/runs/34710177971) 成功。合法空银行目录进入手填，有实时目录仍精确选择；对话、编辑器、预览编辑按钮及多 OA 菜单回归通过。完整证据保留于该运行记录和提交历史。
 
 ### 上一次 Pearnly 发布：DMS 实时映射与 Cloudflare DMS no-store（2026-09-12）
 

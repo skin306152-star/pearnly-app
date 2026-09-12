@@ -159,6 +159,11 @@ _DMS_PUSH_FRIENDLY: Dict[str, Dict[str, str]] = {
 }
 
 
+from services.erp.dms_booking_errors import BOOKING_MAPPING_ERRORS
+
+_DMS_PUSH_FRIENDLY.update(BOOKING_MAPPING_ERRORS)
+
+
 def dms_push_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
     """命中身份证订车错误码 → 返回 {zh,th,en,ja} dict;否则 None。
     按码长度降序匹配(长码先于其前缀短码,如 ERR_DMS_IMPORT_REPORT 先于 ERR_DMS_IMPORT)

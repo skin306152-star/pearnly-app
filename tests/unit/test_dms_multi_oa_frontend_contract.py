@@ -117,10 +117,10 @@ class BookingLiffChannelContractTests(unittest.TestCase):
     def test_shell_bumps_changed_scripts(self):
         html = _read("static/dms-booking-edit/dms-booking-edit.html")
         for needle in (
-            "dms-booking-i18n.js?v=8",
+            "dms-booking-i18n.js?v=9",
             "dms-booking-api.js?v=7",
             "dms-credentials.js?v=5",
-            "dms-booking-edit.js?v=15",
+            "dms-booking-edit.js?v=16",
         ):
             with self.subTest(needle=needle):
                 self.assertIn(needle, html)

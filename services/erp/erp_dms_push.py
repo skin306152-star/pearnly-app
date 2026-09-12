@@ -173,6 +173,11 @@ _DMS_FRIENDLY = {
 }
 
 
+from services.erp.dms_booking_errors import BOOKING_MAPPING_ERRORS
+
+_DMS_FRIENDLY.update(BOOKING_MAPPING_ERRORS)
+
+
 def _dms_friendly(code: str) -> Dict[str, str]:
     return _DMS_FRIENDLY.get(code, _DMS_FRIENDLY["ERR_UNEXPECTED"])
 

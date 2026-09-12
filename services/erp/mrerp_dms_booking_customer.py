@@ -11,11 +11,47 @@ from services.erp.mrerp_dms_models import ThaiAddress, ThaiIdCardPayload
 
 
 def card_from_customer(client: Any, *, customer_id: str, people_id: str) -> ThaiIdCardPayload:
-    """在当前订车账号中直读已选客户，核验完整证号后使用实时主档。"""
+    """直读已选客户并核验完整证号;销售不可读时只读借用本端点管理员。"""
     expected = normalize_thai_id(people_id)
-    if not str(customer_id or "").strip() or not expected:
+    if (
+        not str(customer_id or "").strip()
+        or len(expected) != 13
+        or not expected.isascii()
+        or not expected.isdigit()
+    ):
         raise DMSClientError("booking customer identity missing", "ERR_DMS_CUSTOMER_LOOKUP")
-    fields = client.read_customer(str(customer_id))
+    try:
+        fields = client.read_customer(str(customer_id))
+    except DMSClientError:
+        fields = {}
+    actual = normalize_thai_id(str((fields or {}).get("people_id") or ""))
+    if actual and actual != expected:
+        # A contradictory identity is not a visibility failure. Stop before
+        # consulting another account, so no other customer's data can escape.
+        raise DMSClientError("selected customer identity mismatch", "ERR_DMS_CUSTOMER_LOOKUP")
+    try:
+        return _card_from_fields(fields or {}, customer_id=customer_id, expected=expected)
+    except DMSClientError:
+        resolve_admin = getattr(client, "_resolve_admin_transport", None)
+        admin = resolve_admin() if resolve_admin else None
+        if admin is None:
+            raise
+        from services.erp.mrerp_dms_client import DMSClient
+
+        # Same configured base URL, same exact customer ID; no broad search,
+        # source switch, cached fields, or elevation of the booking writer.
+        reader = DMSClient(admin, client.base_url)
+        try:
+            fields = reader.read_customer(str(customer_id))
+        except DMSClientError as exc:
+            raise DMSClientError(
+                "configured admin could not read selected customer", "ERR_DMS_CUSTOMER_LOOKUP"
+            ) from exc
+        return _card_from_fields(fields, customer_id=customer_id, expected=expected)
+
+
+def _card_from_fields(fields: dict, *, customer_id: str, expected: str) -> ThaiIdCardPayload:
+    """Both principals must pass the same identity and completeness checks."""
     if normalize_thai_id(str(fields.get("people_id") or "")) != expected:
         raise DMSClientError(
             f"booking customer {customer_id!r} identity could not be verified",
@@ -57,7 +93,7 @@ def card_from_customer(client: Any, *, customer_id: str, people_id: str) -> Thai
         address.zipcode_id,
         address.zipcode,
     )
-    if not all(required):
+    if not all(str(value or "").strip() for value in required):
         raise DMSClientError(
             f"booking customer {customer_id!r} has incomplete master data",
             "ERR_DMS_CUSTOMER_LOOKUP",

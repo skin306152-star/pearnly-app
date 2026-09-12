@@ -94,20 +94,27 @@
         if (f.type === 'select-title') opts = S.prefixes;
         else if (f.type === 'select-province')
             opts = S.provinces.length ? S.provinces : C.currentOpt(f.key, v);
-        else opts = C.currentOpt(f.key, v);
-        var body = opts
-            .map(function (o) {
-                return (
-                    '<option value="' +
-                    esc(o[0]) +
-                    '"' +
-                    (String(o[0]) === String(v) ? ' selected' : '') +
-                    '>' +
-                    esc(o[1]) +
-                    '</option>'
-                );
-            })
-            .join('');
+        else opts = S.geoOptions[f.key] || C.currentOpt(f.key, v);
+        var known = opts.some(function (o) {
+            return String(o[0]) === String(v);
+        });
+        var body =
+            '<option value=""' +
+            (known ? '' : ' selected') +
+            '>—</option>' +
+            opts
+                .map(function (o) {
+                    return (
+                        '<option value="' +
+                        esc(o[0]) +
+                        '"' +
+                        (String(o[0]) === String(v) ? ' selected' : '') +
+                        '>' +
+                        esc(o[1]) +
+                        '</option>'
+                    );
+                })
+                .join('');
         return (
             '<select class="dx-sel' +
             changed +

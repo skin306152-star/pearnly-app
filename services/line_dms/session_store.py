@@ -143,6 +143,8 @@ def consume_nonce(
             binding_state.lock_scope(cur, line_user_id, key)
             cur.execute(
                 "UPDATE dms_line_sessions SET payload = payload || '{\"nonce\":null}'::jsonb "
+                "|| CASE WHEN state='booking_review' THEN "
+                "jsonb_build_object('_booking_claim', payload->>'nonce') ELSE '{}'::jsonb END "
                 "WHERE tenant_id=%s AND channel_key=%s AND line_user_id=%s AND state=%s "
                 "AND expires_at>now() AND payload->>'nonce'=%s RETURNING payload",
                 (str(tenant_id), key, line_user_id, expect_state, nonce),
@@ -151,6 +153,124 @@ def consume_nonce(
             return {**dict(row["payload"]), "nonce": nonce} if row else None
 
     return _dal("consume_nonce", None)(_run)
+
+
+def record_booking_attempt(tenant_id, line_user_id, nonce, booking_no, owner, previous_no=None):
+    """Mark only the consumed draft; another execution or a new draft cannot be replaced."""
+    from core import db
+    from services.line_dms.store import _with_heal
+    from services.line_dms import binding_state
+
+    if not nonce or not booking_no or not owner:
+        return False
+    key = _channel(None)
+    marker = {"nonce": nonce, "booking_no": booking_no, "owner": owner}
+
+    def _run():
+        with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
+            binding_state.lock_scope(cur, line_user_id, key)
+            cur.execute(
+                "UPDATE dms_line_sessions SET payload = payload || "
+                "jsonb_build_object('booking_attempt', %s::jsonb), "
+                "expires_at=now()+interval '24 hours' "
+                "WHERE tenant_id=%s AND channel_key=%s AND line_user_id=%s "
+                "AND state='booking_review' AND expires_at>now() "
+                "AND payload->>'nonce' IS NULL AND payload->>'_booking_claim'=%s "
+                "AND ((%s::text IS NULL AND NOT (payload ? 'booking_attempt')) "
+                "OR (payload->'booking_attempt'->>'owner'=%s "
+                "AND payload->'booking_attempt'->>'booking_no'=%s))",
+                (
+                    json.dumps(marker),
+                    str(tenant_id),
+                    key,
+                    str(line_user_id),
+                    nonce,
+                    previous_no,
+                    owner,
+                    previous_no,
+                ),
+            )
+            return cur.rowcount == 1
+
+    try:
+        return bool(_with_heal(_run))
+    except Exception:
+        logger.warning("[line_dms] booking attempt save failed; write blocked", exc_info=True)
+        return False
+
+
+def clear_booking_attempt(tenant_id, line_user_id, nonce):
+    """A completed old task may only clear its own claimed draft."""
+    from core import db
+    from services.line_dms.store import _with_heal
+    from services.line_dms import binding_state
+
+    if not nonce:
+        return False
+    key = _channel(None)
+
+    def _run():
+        with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
+            binding_state.lock_scope(cur, line_user_id, key)
+            cur.execute(
+                "DELETE FROM dms_line_sessions WHERE tenant_id=%s AND channel_key=%s "
+                "AND line_user_id=%s AND state='booking_review' "
+                "AND payload->>'nonce' IS NULL AND payload->>'_booking_claim'=%s "
+                "AND payload->'booking_attempt'->>'nonce'=%s",
+                (str(tenant_id), key, str(line_user_id), nonce, nonce),
+            )
+            return cur.rowcount == 1
+
+    try:
+        return bool(_with_heal(_run))
+    except Exception:
+        logger.warning("[line_dms] completed booking draft clear failed", exc_info=True)
+        return False
+
+
+def replace_claimed_booking_payload(
+    tenant_id, line_user_id, expected_nonce, state, payload, ttl_minutes=None
+):
+    """Resume only the consumed draft before a write; state=None discards that draft."""
+    from core import db
+    from services.line_dms.store import _with_heal, state_ttl_minutes
+    from services.line_dms import binding_state
+
+    if not expected_nonce or state not in {None, "booking_review", "booking_qa"}:
+        return False
+    if state == "booking_review" and not (payload or {}).get("nonce"):
+        return False
+    key = _channel(None)
+    clean_payload = {
+        k: v for k, v in (payload or {}).items() if k not in {"_booking_claim", "booking_attempt"}
+    }
+    ttl = state_ttl_minutes(state) if ttl_minutes is None else int(ttl_minutes)
+
+    def _run():
+        with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
+            binding_state.lock_scope(cur, line_user_id, key)
+            guard = (
+                " WHERE tenant_id=%s AND channel_key=%s AND line_user_id=%s "
+                "AND state='booking_review' AND expires_at>now() "
+                "AND payload->>'nonce' IS NULL AND payload->>'_booking_claim'=%s "
+                "AND NOT (payload ? 'booking_attempt')"
+            )
+            params = (str(tenant_id), key, str(line_user_id), expected_nonce)
+            if state is None:
+                cur.execute("DELETE FROM dms_line_sessions" + guard, params)
+            else:
+                cur.execute(
+                    "UPDATE dms_line_sessions SET state=%s, payload=%s::jsonb, "
+                    "expires_at=now()+make_interval(mins => %s)" + guard,
+                    (state, json.dumps(clean_payload), ttl, *params),
+                )
+            return cur.rowcount == 1
+
+    try:
+        return bool(_with_heal(_run))
+    except Exception:
+        logger.warning("[line_dms] claimed booking draft transition failed", exc_info=True)
+        return False
 
 
 def replace_review_payload(

@@ -31,14 +31,12 @@ def list_options(endpoint: Dict[str, Any]) -> Optional[List[Dict[str, str]]]:
     """老板端点的顾问选项;取数失败 → None。
 
     None 与空表是两件事:名册真的没人 → 前端给空态指路,取数失败 → 前端给可重试的错态。
-    先读已暖的缓存,miss 才触发一次登录冷抓(缓存 12h,开一次弹窗抓一次不划算)。
+    每次打开和保存均实时读取，DMS 删除/改名后不能沿用旧选项。
     """
     from services.erp import dms_masters_cache
 
     try:
-        masters = dms_masters_cache.read_fresh_masters(endpoint)
-        if masters is None:
-            masters = dms_masters_cache.get_masters(endpoint)
+        masters = dms_masters_cache.get_masters(endpoint, force_refresh=True, require_complete=True)
     except Exception:
         logger.warning("[dms_roster] load advisors failed", exc_info=True)
         return None

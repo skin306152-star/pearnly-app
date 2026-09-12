@@ -139,7 +139,7 @@ class ResolveOperatorAdvisorTests(unittest.TestCase):
         self.assertEqual((advisor or {}).get("id"), "335")
         masters.assert_called_once()
 
-    def test_cold_cache_fetches_once_without_forcing(self):
+    def test_cold_cache_fetches_once_with_force(self):
         with (
             mock.patch.object(
                 erp_dms_push, "_dms_resolve_creds", return_value=("dmstest", "p", "", "")
@@ -154,13 +154,13 @@ class ResolveOperatorAdvisorTests(unittest.TestCase):
         self.assertEqual(username, "dmstest")  # 拦截话术要报出是哪个账号没对上
         # 缓存本来就冷:get_masters 自己会现抓,再 force 等于同一请求连登两遍。
         masters.assert_called_once()
-        self.assertEqual(masters.call_args.kwargs.get("force_refresh"), False)
+        self.assertEqual(masters.call_args.kwargs.get("force_refresh"), True)
 
     def test_just_added_advisor_is_seen_after_forced_refresh(self):
         added = _ADVISORS + [["401", "dmstest", "น้องใหม่"]]
         calls = []
 
-        def _masters(ep, *, force_refresh=False):
+        def _masters(ep, *, force_refresh=False, require_complete=False):
             calls.append(force_refresh)
             return {"advisors": added}
 
@@ -178,7 +178,7 @@ class ResolveOperatorAdvisorTests(unittest.TestCase):
         self.assertEqual(calls, [True])
         self.assertEqual((advisor or {}).get("id"), "401")
 
-    def test_exact_layer_wins_from_warm_cache(self):
+    def test_exact_layer_wins_from_fresh_master(self):
         with (
             mock.patch.object(
                 erp_dms_push, "_dms_resolve_creds", return_value=("sale02", "p", "", "")
@@ -188,11 +188,15 @@ class ResolveOperatorAdvisorTests(unittest.TestCase):
                 "read_fresh_masters",
                 return_value={"advisors": _TRAP_ADVISORS, "employees": _TRAP_EMPLOYEES},
             ),
-            mock.patch.object(dms_masters_cache, "get_masters") as masters,
+            mock.patch.object(
+                dms_masters_cache,
+                "get_masters",
+                return_value={"advisors": _TRAP_ADVISORS, "employees": _TRAP_EMPLOYEES},
+            ) as masters,
         ):
             advisor, _ = dms_advisor.resolve_operator_advisor(_EP)
         self.assertEqual((advisor or {}).get("id"), "335")  # 启发层会答 297
-        masters.assert_not_called()
+        masters.assert_called_once()
 
     def test_unqualified_employee_stays_blocked_after_forced_refresh(self):
         blocked = {"advisors": _BAIT_ADVISORS, "employees": [_UNQUALIFIED]}
@@ -223,7 +227,7 @@ class ResolveOperatorAdvisorTests(unittest.TestCase):
         # 陈旧缓存里没员工表 → 启发层比 code/name 都不中;重抓后精确层认出 297。
         self.assertEqual((advisor or {}).get("id"), "297")
 
-    def test_pinned_advisor_wins_without_touching_master(self):
+    def test_pinned_advisor_is_verified_in_live_master(self):
         ep = {
             "id": "E1",
             "config": {
@@ -236,25 +240,27 @@ class ResolveOperatorAdvisorTests(unittest.TestCase):
                 },
             },
         }
-        with mock.patch.object(dms_masters_cache, "get_masters") as masters:
+        with mock.patch.object(
+            dms_masters_cache, "get_masters", return_value={"advisors": _ADVISORS}
+        ) as masters:
             advisor, username = dms_advisor.resolve_operator_advisor(ep)
-        masters.assert_not_called()
+        masters.assert_called_once()
         self.assertEqual(advisor, {"id": "335", "name": "sale02"})
         self.assertEqual(username, "")
 
-    def test_pinned_without_name_fills_from_warm_cache(self):
+    def test_pinned_without_name_fills_from_live_master(self):
         ep = {"id": "E1", "config": {"booking_defaults": {"advisor_id": "297"}}}
         with mock.patch.object(
-            dms_masters_cache, "read_fresh_masters", return_value={"advisors": _ADVISORS}
+            dms_masters_cache, "get_masters", return_value={"advisors": _ADVISORS}
         ):
             advisor, _ = dms_advisor.resolve_operator_advisor(ep)
         self.assertEqual((advisor or {}).get("name"), "สมชาย")
 
-    def test_pinned_passes_even_with_cold_cache(self):
+    def test_pinned_blocks_when_live_fetch_fails(self):
         ep = {"id": "E1", "config": {"booking_defaults": {"advisor_id": "297"}}}
-        with mock.patch.object(dms_masters_cache, "read_fresh_masters", return_value=None):
+        with mock.patch.object(dms_masters_cache, "get_masters", return_value={}):
             advisor, _ = dms_advisor.resolve_operator_advisor(ep)
-        self.assertEqual((advisor or {}).get("id"), "297")  # 名字回头由建单层解析
+        self.assertIsNone(advisor)
 
     def test_live_bundle_refreshes_pinned_name(self):
         ep = {
@@ -278,7 +284,11 @@ class ResolveOperatorAdvisorTests(unittest.TestCase):
     def test_credential_decrypt_failure_blocks_without_guessing(self):
         with (
             mock.patch.object(erp_dms_push, "_dms_resolve_creds", side_effect=ValueError("boom")),
-            mock.patch.object(dms_masters_cache, "get_masters") as masters,
+            mock.patch.object(
+                dms_masters_cache,
+                "get_masters",
+                return_value={"advisors": _TRAP_ADVISORS, "employees": _TRAP_EMPLOYEES},
+            ) as masters,
             self.assertLogs(dms_advisor.logger, "WARNING"),  # 解密失败要留痕,不静默
         ):
             advisor, username = dms_advisor.resolve_operator_advisor(_EP)

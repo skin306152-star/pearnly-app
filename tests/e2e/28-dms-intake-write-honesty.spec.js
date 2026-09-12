@@ -459,3 +459,169 @@ test('四语 · 泰文(真实用户语言)新文案落地', async ({ page }) => 
     await expect(page.locator('#dms-w-prefix')).toHaveCount(0);
     await page.screenshot({ path: path.join(ART, 'th-wizard.png') });
 });
+
+async function recognitionWith(page, scenario, mutate) {
+    const body = JSON.parse(JSON.stringify(recognizeBody(scenario)));
+    mutate(body);
+    await page.route('**/api/dms/id-card/recognize', (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+    );
+}
+
+test('完整映射 · OCR 称谓未知时保持未选，不能代选第一项提交', async ({ page }) => {
+    pushed.length = 0;
+    await boot(page, 'none');
+    await recognitionWith(page, 'none', (body) => {
+        body.id_card.prefix_name = 'เด็กหญิง';
+    });
+    await toConfirm(page);
+    await page.click('[data-tab="allfields"]');
+    await expect(page.locator('#dx-f-prefix_id')).toHaveValue('');
+    expect(await page.evaluate(() => globalThis.DXST.S.newVals.prefix_id)).toBe('');
+    await page.click('#dx-f-phone');
+    await page.keyboard.type('0811111111');
+    await page.click('.dx-tabview.active .dx-save-btn');
+    await page.click('#dx-m-ok');
+    await expect(page.getByText('请选择称谓并补齐地址选项后再保存', { exact: true })).toBeVisible();
+    expect(pushed).toEqual([]);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator('#dx-f-prefix_id')).toHaveValue('');
+    await page.screenshot({
+        path: path.join(ART, 'mapping-unmatched-prefix-mobile.png'),
+        fullPage: true,
+    });
+});
+
+test('完整映射 · 选择未映射 OCR 地址不得继续沿用旧 DMS 地区 ID', async ({ page }) => {
+    pushed.length = 0;
+    await boot(page, 'exact');
+    await recognitionWith(page, 'exact', (body) => {
+        body.id_card.address.province = 'Unmapped OCR province';
+        body.dms.geo.selected = {};
+    });
+    await toConfirm(page);
+    await page.click('[data-tab="allfields"]');
+    for (const field of ['province_id', 'district_id', 'subdistrict_id', 'zipcode_id']) {
+        await expect(page.locator('#dx-f-' + field)).toHaveValue('');
+    }
+    await page.click('.dx-tabview.active .dx-save-btn');
+    await page.click('#dx-m-ok');
+    await expect(page.getByText('请选择称谓并补齐地址选项后再保存', { exact: true })).toBeVisible();
+    expect(pushed).toEqual([]);
+    await page.screenshot({
+        path: path.join(ART, 'mapping-ocr-address-needs-selection.png'),
+        fullPage: true,
+    });
+});
+
+test('完整映射 · 地区每级必须明确选择，单个选项也不能递归代选', async ({ page }) => {
+    await boot(page, 'none');
+    await recognitionWith(page, 'none', (body) => {
+        body.dms.geo.provinces.push(['20', 'New province']);
+    });
+    const reads = [];
+    await page.route('**/api/dms/geo?**', (route) => {
+        const url = new URL(route.request().url());
+        const level = url.searchParams.get('level');
+        reads.push([level, url.searchParams.get('parent_id')]);
+        const options = {
+            districts: [['2001', 'New district']],
+            subdistricts: [['200101', 'New subdistrict']],
+            zipcodes: [['20100', '20100']],
+        };
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ options: options[level] }),
+        });
+    });
+    await toConfirm(page);
+    await page.click('[data-tab="allfields"]');
+    await page.selectOption('#dx-f-province_id', '20');
+    await expect(page.locator('#dx-f-district_id option')).toHaveCount(2);
+    for (const field of ['district_id', 'subdistrict_id', 'zipcode_id'])
+        await expect(page.locator('#dx-f-' + field)).toHaveValue('');
+    expect(reads).toEqual([['districts', '20']]);
+    await page.selectOption('#dx-f-district_id', '2001');
+    await expect(page.locator('#dx-f-subdistrict_id option')).toHaveCount(2);
+    await expect(page.locator('#dx-f-subdistrict_id')).toHaveValue('');
+    expect(reads).toEqual([
+        ['districts', '20'],
+        ['subdistricts', '2001'],
+    ]);
+    await page.selectOption('#dx-f-subdistrict_id', '200101');
+    await expect(page.locator('#dx-f-zipcode_id option')).toHaveCount(2);
+    await expect(page.locator('#dx-f-zipcode_id')).toHaveValue('');
+    await page.selectOption('#dx-f-zipcode_id', '20100');
+    expect(await page.evaluate(() => globalThis.DXST.S.form.zipcode_id)).toBe('20100');
+    expect(await page.evaluate(() => globalThis.DXST.S.form.zipcode_id_ct)).toBe('20100');
+    await page.screenshot({ path: path.join(ART, 'mapping-explicit-cascade.png'), fullPage: true });
+});
+
+test('完整映射 · 慢旧请求和空列表不得恢复上一地区选项', async ({ page }) => {
+    await boot(page, 'none');
+    await recognitionWith(page, 'none', (body) => {
+        body.dms.geo.provinces.push(
+            ['20', 'Slow province'],
+            ['21', 'Current province'],
+            ['22', 'Empty province']
+        );
+    });
+    let releaseOld;
+    const oldReleased = new Promise((resolve) => {
+        releaseOld = resolve;
+    });
+    let oldFinished = false;
+    await page.route('**/api/dms/geo?**', async (route) => {
+        const parent = new URL(route.request().url()).searchParams.get('parent_id');
+        if (parent === '20') await oldReleased;
+        const options = parent === '22' ? [] : [[parent + '01', 'District ' + parent]];
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ options }),
+        });
+        if (parent === '20') oldFinished = true;
+    });
+    await toConfirm(page);
+    await page.click('[data-tab="allfields"]');
+    await page.selectOption('#dx-f-province_id', '20');
+    await page.selectOption('#dx-f-province_id', '21');
+    await expect(page.locator('#dx-f-district_id option[value="2101"]')).toHaveCount(1);
+    releaseOld();
+    await expect.poll(() => oldFinished).toBe(true);
+    await expect(page.locator('#dx-f-district_id option[value="2001"]')).toHaveCount(0);
+    await page.selectOption('#dx-f-province_id', '22');
+    await expect(page.locator('#dx-f-district_id option')).toHaveCount(1);
+    await expect(page.locator('#dx-f-district_id')).toHaveValue('');
+    expect(await page.evaluate(() => globalThis.DXST.S.form.zipcode_id)).toBe('');
+});
+
+for (const [lang, message] of Object.entries({
+    zh: '地址选项读取失败，请重新选择上一级重试',
+    th: 'อ่านตัวเลือกที่อยู่ไม่สำเร็จ กรุณาเลือกข้อมูลระดับก่อนหน้าอีกครั้ง',
+    en: 'Address options could not be loaded. Select the parent field again to retry.',
+    ja: '住所の選択肢を取得できませんでした。上位項目を選び直してください。',
+})) {
+    test('完整映射 · 地区读取失败保持空选并显示当前语言 ' + lang, async ({ page }) => {
+        await boot(page, 'none');
+        await page.click('[data-dms-lang="' + lang + '"]');
+        await recognitionWith(page, 'none', (body) => {
+            body.dms.geo.provinces.push(['20', 'New province']);
+        });
+        await page.route('**/api/dms/geo?**', (route) =>
+            route.fulfill({ status: 503, body: '{}' })
+        );
+        await toConfirm(page);
+        await page.click('[data-tab="allfields"]');
+        await page.selectOption('#dx-f-province_id', '20');
+        await expect(page.getByText(message, { exact: true })).toBeVisible();
+        await expect(page.locator('#dx-f-district_id')).toHaveValue('');
+        await expect(page.locator('#dx-f-district_id')).toBeEnabled();
+        if (lang === 'th')
+            await page.screenshot({
+                path: path.join(ART, 'mapping-read-failure-th.png'),
+                fullPage: true,
+            });
+    });
+}

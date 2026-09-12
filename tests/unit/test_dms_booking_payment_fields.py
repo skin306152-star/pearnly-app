@@ -9,6 +9,7 @@ import unittest
 
 from services.erp.mrerp_dms_client_ops import DMSClientOpsMixin
 from services.erp.mrerp_dms_payments import payment_form_fields
+from services.erp.mrerp_dms_client_base import DMSClientError
 from services.erp.mrerp_dms_models import (
     DMSBookingPayload,
     DMSMasterRef,
@@ -45,7 +46,7 @@ def _booking(**kw):
     base = dict(
         doc_date_be="01/08/2569",
         delivery_date_be="16/08/2569",
-        advisor=_ref("a1"),
+        advisor=DMSMasterRef(id="a1", code="A", name="Advisor", extra=("0811111111",)),
         car=_ref("c1"),
         paint=_ref("p1"),
         place_book=_ref("pb1"),
@@ -113,39 +114,26 @@ class TestPaymentFormFields(unittest.TestCase):
         self.assertEqual(fields["txtbranchnametfmon"], "Rayong")
         self.assertEqual(fields["txtearnestmoney"], "2000.50")
 
-    def test_transfer_dash_src_skipped(self):
-        fields = payment_form_fields(
-            (
-                {
-                    "channel": "transfer",
-                    "amount": "1000",
-                    "extra": {"src": "-", "dst_account_no": "ACC-DST"},
-                },
-            )
-        )
-        self.assertNotIn("txtaccountnumtffrom", fields)
-        self.assertEqual(fields["txtaccountnumtfmon"], "ACC-DST")
-        self.assertEqual(fields["txtmoneytfmon"], "1000.00")
+    def test_partial_and_legacy_transfer_data_cannot_bypass_native_required_fields(self):
+        for extra in (
+            {"src": "-", "dst_account_no": "ACC-DST"},
+            {"src": "ธนาคาร 123456789"},
+            {"src": "SCB"},
+        ):
+            with self.subTest(extra=extra), self.assertRaises(DMSClientError) as ctx:
+                payment_form_fields(({"channel": "transfer", "amount": "1000", "extra": extra},))
+            self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
 
-    def test_legacy_combined_transfer_source_is_split_safely(self):
-        fields = payment_form_fields(
-            (
-                {
-                    "channel": "transfer",
-                    "amount": "1000",
-                    "extra": {"src": "ธนาคาร 123456789"},
-                },
-            )
-        )
-        self.assertEqual(fields["txtbanknametffrom"], "ธนาคาร")
-        self.assertEqual(fields["txtaccountnumtffrom"], "123456789")
-
-    def test_legacy_bank_name_is_never_written_into_account_number(self):
-        fields = payment_form_fields(
-            ({"channel": "transfer", "amount": "1000", "extra": {"src": "SCB"}},)
-        )
-        self.assertEqual(fields["txtbanknametffrom"], "SCB")
-        self.assertNotIn("txtaccountnumtffrom", fields)
+    def test_other_payment_channels_require_native_reference_and_bank_id(self):
+        for channel, extra in (
+            ("cheque", {"cheque_no": "123", "bank_name": "SCB"}),
+            ("cashier_cheque", {"cashier_no": "123", "bank_name": "SCB"}),
+            ("card", {"card_type": "VISA", "bank_name": "SCB"}),
+            ("other", {}),
+        ):
+            with self.subTest(channel=channel), self.assertRaises(DMSClientError) as ctx:
+                payment_form_fields(({"channel": channel, "amount": "1000", "extra": extra},))
+            self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
 
     def test_duplicate_channel_raises_instead_of_merging_two_business_events(self):
         with self.assertRaisesRegex(ValueError, "duplicate payment channel"):
@@ -162,22 +150,44 @@ class TestPaymentFormFields(unittest.TestCase):
             {
                 "channel": "transfer",
                 "amount": "200",
-                "extra": {"src_bank_name": "SCB", "src_account_no": "S", "dst_account_no": "D"},
+                "extra": {
+                    "src_bank_name": "SCB",
+                    "src_account_no": "S",
+                    "dst_account_no": "D",
+                    "src_account_name": "Customer",
+                    "src_branch_name": "Bangkok",
+                    "src_bank_id": "1",
+                    "src_time": "12:34",
+                    "dst_business_name": "Company",
+                    "dst_bank_name": "BBL",
+                    "dst_bank_id": "2",
+                    "dst_branch_name": "Rayong",
+                },
             },
             {
                 "channel": "cheque",
                 "amount": "300",
-                "extra": {"cheque_no": "CHQ1", "bank_name": "KBank", "cheque_book_no": "B1"},
+                "extra": {
+                    "cheque_no": "CHQ1",
+                    "bank_name": "KBank",
+                    "bank_id": "1",
+                    "cheque_book_no": "B1",
+                },
             },
             {
                 "channel": "cashier_cheque",
                 "amount": "400",
-                "extra": {"cashier_no": "CCQ1", "bank_name": "BBL", "cashier_book_no": "B2"},
+                "extra": {
+                    "cashier_no": "CCQ1",
+                    "bank_name": "BBL",
+                    "bank_id": "2",
+                    "cashier_book_no": "B2",
+                },
             },
             {
                 "channel": "card",
                 "amount": "500",
-                "extra": {"bank_name": "SCB", "card_type": "VISA"},
+                "extra": {"bank_name": "SCB", "bank_id": "3", "card_type": "VISA"},
             },
             {"channel": "other", "amount": "600", "extra": {"detail": "cash on delivery"}},
         )
@@ -213,6 +223,20 @@ class TestPaymentFormFields(unittest.TestCase):
 
 
 class TestApplyBookingFormFields(unittest.TestCase):
+    def test_missing_advisor_phone_is_not_replaced_with_fake_text(self):
+        from services.erp.mrerp_dms_client_base import DMSClientError
+
+        for extra in ((), (None,), ("",), ("   ",)):
+            with self.subTest(extra=extra):
+                data = {}
+                advisor = DMSMasterRef(id="a1", code="A", name="Advisor", extra=extra)
+                with self.assertRaises(DMSClientError) as raised:
+                    _FormClient()._apply_booking_form_fields(
+                        data, customer_id="100", booking=_booking(advisor=advisor), card=_card()
+                    )
+                self.assertEqual(raised.exception.error_code, "ERR_DMS_ADVISOR_UNMATCHED")
+                self.assertEqual(data, {})
+
     def test_empty_payments_keeps_legacy_defaults(self):
         """空渠道 → 与现状逐字节一致:txtearnestmoney 0.00、无任何渠道键。"""
         data = {}

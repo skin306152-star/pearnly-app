@@ -120,6 +120,10 @@ class Env:
             "term_sales": self.terms,
             "regis_behalfs": self.regis,
             "company_banks": self.company_banks,
+            **{
+                key: [["S1", "KBANK", "KBank"]]
+                for key in ("source_banks", "cheque_banks", "cashier_banks", "card_banks")
+            },
         }
 
     def __exit__(self, *a):
@@ -362,12 +366,12 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(
                 env.masters_calls[-1][1],
-                {"force_refresh": False, "require_complete": True},
+                {"force_refresh": True, "require_complete": True},
             )
             self.assertIsNotNone(env.paint_masters_calls[-1])  # 颜色带 masters,不吃 12h 缓存
 
-    async def test_first_master_read_forces_then_session_reuses_snapshot(self):
-        """本轮首个主档严格登录一次并落版本快照，后续按钮不再读共享缓存。"""
+    async def test_every_master_read_refreshes_and_sees_changed_values(self):
+        """同轮 DMS 主档变化在下一次展示可见，旧快照仅供对比。"""
         with Env() as env:
             _seed(env, _qa("place"))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
@@ -380,11 +384,13 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(snapshot["counts"]["place_books"], len(_PLACES))
             self.assertNotIn("masters_synced", env.qa_payload())
 
-            # 同一 booking_qa 会话再取主档 → 直接读会话快照，不再调用缓存层。
+            # 模拟 DMS 在两次展示之间新增并改名，旧快照不能遮住新数据。
+            env.terms = [["new", "NEW", "New term"]]
             before = len(env.masters_calls)
             await qa.send_step(_TID, _LUID, env.qa_payload(), "term", "rt")
-            self.assertEqual(len(env.masters_calls), before)
-            self.assertEqual(env.qa_payload()["master_snapshot"]["version"], snapshot["version"])
+            self.assertEqual(len(env.masters_calls), before + 1)
+            self.assertNotEqual(env.qa_payload()["master_snapshot"]["version"], snapshot["version"])
+            self.assertEqual(env.qa_payload()["master_snapshot"]["rows"]["term_sales"], env.terms)
 
     async def test_empty_master_not_snapshotted_and_next_read_retries_force(self):
         """必需主档为空不落快照，下一次仍严格抓 live，绝不复用旧值。"""
@@ -405,8 +411,8 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(len(env.masters_calls), 2)
 
-    async def test_paints_force_once_then_reuse_cache(self):
-        """颜色首次严格拉取并落车型快照，后续同会话不再碰缓存层。"""
+    async def test_paints_refresh_again_and_discard_deleted_colors(self):
+        """同车型颜色被删除或替换后，重新展示使用实时结果。"""
         with Env() as env:
             _seed(env, _qa("paint", answers={"car": {"id": "c1", "label": "DMX D-Max"}}))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
@@ -416,16 +422,18 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(
                 env.masters_calls[-1][1],
-                {"force_refresh": False, "require_complete": True},
+                {"force_refresh": True, "require_complete": True},
             )
             self.assertIsNotNone(env.paint_masters_calls[-1])
             self.assertIn("c1", env.qa_payload()["paint_snapshots"])
             masters_before = len(env.masters_calls)
             paints_before = len(env.paints_calls)
+            env.paints = [["PNEW", "NEW", "New paint"]]
 
             await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
-            self.assertEqual(len(env.masters_calls), masters_before)
-            self.assertEqual(len(env.paints_calls), paints_before)
+            self.assertEqual(len(env.masters_calls), masters_before + 1)
+            self.assertEqual(len(env.paints_calls), paints_before + 1)
+            self.assertEqual(env.qa_payload()["paint_snapshots"]["c1"]["rows"], env.paints)
 
     async def test_place_pagination_reaches_last_row(self):
         places = [[f"pl{i}", "", f"สาขา {i}"] for i in range(14)]
@@ -516,8 +524,8 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(items[-1]["action"]["data"], "qa:bank:13")
             await qa.handle_postback(_TID, _LUID, "qa:bank:13", {}, "rt")
             p = env.qa_payload()
-            self.assertEqual(p["step"], "pay_more")
-            self.assertEqual(p["payments"][0]["extra"]["dst_id"], "13")
+            self.assertEqual(p["step"], "pay_dst_detail")
+            self.assertEqual(p["pending_channel"]["extra"]["dst_id"], "13")
 
     async def test_page_token_never_written_as_row_id(self):
         """导航 token 只翻页:步不推进,不进 answers(旧/非法/串步仍由 _reask 兜底)。"""
@@ -618,14 +626,19 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.handle_text(_TID, _LUID, "10000", "rt")
             p = env.qa_payload()
             self.assertEqual(p["step"], "pay_src")
-            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_PAY_SRC)
+            self.assertTrue(_replied_text(env).startswith(qa_cards.TXT_ASK_PAY_SRC))
             await qa.handle_text(_TID, _LUID, "-", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_src")
+            await qa.handle_postback(_TID, _LUID, "qa:srcbank:S1", {}, "rt")
+            await qa.handle_text(_TID, _LUID, "Customer | 999 | Bangkok | 14:36", "rt")
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
             self.assertTrue(_replied_text(env).startswith(qa_cards.TXT_ASK_PAY_DST))
             self.assertEqual(_replied_items(env)[0]["action"]["data"], "qa:bank:1")
             await qa.handle_text(_TID, _LUID, "SCB", "rt")
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
             await qa.handle_postback(_TID, _LUID, "qa:bank:1", {}, "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_dst_detail")
+            await qa.handle_text(_TID, _LUID, "Company | 1234567890123 | ระยอง", "rt")
             p = env.qa_payload()
             self.assertEqual(p["step"], "slip_after")
             self.assertEqual(p["after_slip"], "pay_more")
@@ -633,6 +646,13 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 p["payments"][0]["extra"],
                 {
+                    "src_bank_id": "S1",
+                    "src_bank_name": "KBank",
+                    "src_account_name": "Customer",
+                    "src_account_no": "999",
+                    "src_branch_name": "Bangkok",
+                    "src_time": "14:36",
+                    "dst_business_name": "Company",
                     "dst_id": "1",
                     "dst": "SCB · 1234567890123 · ระยอง",
                     "dst_bank_id": "1",
@@ -742,34 +762,19 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
             self.assertEqual(env.qa_payload()["payments"], [])
 
-    async def test_transfer_source_is_split_before_persisting(self):
+    async def test_transfer_source_requires_bank_and_complete_native_details(self):
         with Env() as env:
-            _seed(
-                env,
-                _qa(
-                    "pay_src",
-                    pending_channel={"channel": "transfer", "amount": "1000.00"},
-                ),
-            )
-            await qa.handle_text(_TID, _LUID, "ธนาคาร | 123456789", "rt")
-            self.assertEqual(
-                env.qa_payload()["pending_channel"]["extra"],
-                {"src_bank_name": "ธนาคาร", "src_account_no": "123456789"},
-            )
+            _seed(env, _qa("pay_src", pending_channel={"channel": "transfer", "amount": "1000.00"}))
+            await qa.handle_postback(_TID, _LUID, "qa:srcbank:S1", {}, "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_src_detail")
+            for text in ("-", "Customer | 123", "Customer | 123 | Bangkok | 27:00"):
+                await qa.handle_text(_TID, _LUID, text, "rt")
+                self.assertEqual(env.qa_payload()["step"], "pay_src_detail")
+            await qa.handle_text(_TID, _LUID, "Customer | 123456789 | Bangkok | 14:36", "rt")
+            extra = env.qa_payload()["pending_channel"]["extra"]
+            self.assertEqual(extra["src_bank_id"], "S1")
+            self.assertEqual(extra["src_account_no"], "123456789")
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
-
-    async def test_malformed_transfer_source_does_not_advance(self):
-        with Env() as env:
-            _seed(
-                env,
-                _qa(
-                    "pay_src",
-                    pending_channel={"channel": "transfer", "amount": "1000.00"},
-                ),
-            )
-            await qa.handle_text(_TID, _LUID, "ธนาคารเท่านั้น", "rt")
-            self.assertEqual(env.qa_payload()["step"], "pay_src")
-            self.assertEqual(_replied_text(env), qa_cards.TXT_BAD_PAYMENT_DETAIL)
 
     # ── 支付:cheque 补充信息 ──────────────────────────────────────────────
     async def test_cheque_ref(self):
@@ -777,13 +782,19 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             _seed(env, _qa("pay_channel"))
             await qa.handle_postback(_TID, _LUID, "qa:pay:cheque", {}, "rt")
             await qa.handle_text(_TID, _LUID, "5000", "rt")
-            self.assertEqual(env.qa_payload()["step"], "pay_ref")
+            self.assertEqual(env.qa_payload()["step"], "pay_bank")
+            await qa.handle_postback(_TID, _LUID, "qa:paybank:S1", {}, "rt")
             self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_CHEQUE_REF)
-            await qa.handle_text(_TID, _LUID, "CHK123 | KTB", "rt")
+            await qa.handle_text(_TID, _LUID, "CHK123 | 01", "rt")
             p = env.qa_payload()
             self.assertEqual(
                 p["payments"][0]["extra"],
-                {"cheque_no": "CHK123", "bank_name": "KTB"},
+                {
+                    "cheque_no": "CHK123",
+                    "cheque_book_no": "01",
+                    "bank_id": "S1",
+                    "bank_name": "KBank",
+                },
             )
             self.assertEqual(p["step"], "pay_more")
 

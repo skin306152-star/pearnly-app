@@ -17,6 +17,10 @@ def _masters():
             ["b1", "SCB", "SCB", "Bangna", "1234567890"],
             ["b2", "BBL", "BBL", "Rayong", "9876543210"],
         ],
+        **{
+            key: [["S1", "KBANK", "KBank"]]
+            for key in ("source_banks", "cheque_banks", "cashier_banks", "card_banks")
+        },
         "advisors": [["a1", "sale02", "Advisor One"]],
     }
 
@@ -39,12 +43,15 @@ def _qa():
                 "channel": "transfer",
                 "amount": "1000.00",
                 "extra": {
+                    "src_bank_id": "S1",
+                    "src_bank_name": "KBank",
                     "dst_id": "b1",
                     "dst": "SCB · 1234567890 · Bangna",
                 },
             }
         ],
         "pending_channel": {},
+        "master_snapshot": master_contract.build_snapshot(_masters()),
     }
 
 
@@ -115,6 +122,45 @@ class MasterSnapshotTests(unittest.TestCase):
 
 
 class MasterReconcileTests(unittest.TestCase):
+    def test_removed_cheque_bank_keeps_payment_type_and_other_payments(self):
+        qa = _qa()
+        qa["payments"] = [
+            {"channel": "cash", "amount": "100"},
+            {
+                "channel": "cheque",
+                "amount": "200",
+                "extra": {"bank_id": "removed", "cheque_no": "10", "cheque_book_no": "01"},
+            },
+        ]
+        result = master_contract.reconcile(qa, _masters(), [["p1", "R", "Red"]])
+        self.assertEqual(result["status"], "unmatched")
+        self.assertEqual(result["qa"]["pending_channel"]["channel"], "cheque")
+        self.assertEqual(result["qa"]["pending_channel"]["extra"]["cheque_no"], "10")
+        self.assertEqual(result["qa"]["step"], "pay_bank")
+        self.assertEqual(result["qa"]["payments"], [{"channel": "cash", "amount": "100"}])
+
+    def test_same_car_name_with_changed_price_requires_visible_reconfirmation(self):
+        qa = _qa()
+        masters = _masters()
+        masters["cars"][0] += [""] * 14
+        masters["cars"][0][16] = "900000"
+        result = master_contract.reconcile(qa, masters, [["p1", "R", "Red"]])
+        self.assertEqual(result["status"], "changed")
+        self.assertIn("car_details", [change["field"] for change in result["changes"]])
+        self.assertEqual(result["qa"]["master_snapshot"]["rows"]["cars"][0][16], "900000")
+        again = master_contract.reconcile(result["qa"], masters, [["p1", "R", "Red"]])
+        self.assertEqual(again["status"], "ok")
+
+    def test_legacy_three_column_snapshot_requires_one_reconfirmation(self):
+        qa = _qa()
+        qa["master_snapshot"]["rows"]["cars"][0] = ["c1", "DMX", "D-Max"]
+        result = master_contract.reconcile(qa, _masters(), [["p1", "R", "Red"]])
+        self.assertEqual(result["status"], "changed")
+        self.assertEqual(
+            master_contract.reconcile(result["qa"], _masters(), [["p1", "R", "Red"]])["status"],
+            "ok",
+        )
+
     def test_all_selected_labels_are_refreshed_and_require_second_confirm(self):
         masters = _masters()
         masters["place_books"][0][2] = "Bangna New"
@@ -128,7 +174,7 @@ class MasterReconcileTests(unittest.TestCase):
         self.assertEqual(result["status"], "changed")
         self.assertEqual(
             {change["field"] for change in result["changes"]},
-            {"advisor", "place", "car", "paint", "term", "regis", "bank"},
+            {"advisor", "place", "car", "car_details", "paint", "term", "regis", "bank"},
         )
         updated = result["qa"]
         self.assertEqual(updated["answers"]["car"], {"id": "c1", "label": "DMX2 D-Max New"})

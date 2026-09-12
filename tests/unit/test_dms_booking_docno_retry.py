@@ -7,6 +7,7 @@
 """
 
 import unittest
+from unittest.mock import patch
 
 from services.erp.mrerp_dms_client_base import DMSClientError
 from services.erp.mrerp_dms_client_ops import (
@@ -105,6 +106,16 @@ class TestListingDocnos(unittest.TestCase):
 
 
 class TestBookingDocnoRetry(unittest.TestCase):
+    def setUp(self):
+        # This suite isolates numbering. Exact persisted-form verification, including
+        # empty sales visibility and admin fallback, has its own transport-level suite.
+        probe = patch(
+            "services.erp.mrerp_dms_booking_submit.verify_created_booking",
+            side_effect=lambda client, docno, submitted: client.search_booking(docno),
+        )
+        probe.start()
+        self.addCleanup(probe.stop)
+
     def test_starts_after_latest_docno_from_listing(self):
         used = [f"BK2608{str(i).zfill(6)}" for i in range(1, 26)]
         tr = _FakeTransport(used)

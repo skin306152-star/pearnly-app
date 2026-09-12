@@ -37,6 +37,10 @@ MASTERS = {
     "term_sales": [["T1", "T", "Finance"]],
     "regis_behalfs": [["R1", "R", "Person"]],
     "company_banks": [["B1", "SCB", "SCB", "Rayong", "1234567890123"]],
+    **{
+        key: [["S1", "KBANK", "KBANK"]]
+        for key in ("source_banks", "cheque_banks", "cashier_banks", "card_banks")
+    },
     "prefixes": [["17", "Mr", "Mr"]],
 }
 
@@ -81,6 +85,8 @@ def form():
                 "channel": "transfer",
                 "amount": "12,000",
                 "extra": {
+                    "src_bank_id": "S1",
+                    "dst_business_name": "Company",
                     "src_bank_name": "KBANK",
                     "src_account_no": "99",
                     "src_account_name": "Customer",
@@ -149,6 +155,8 @@ class BookingEditTests(TestCase):
         self.assertEqual(
             qa["payments"][0]["extra"],
             {
+                "src_bank_id": "S1",
+                "dst_business_name": "Company",
                 "src_bank_name": "KBANK",
                 "src_account_no": "99",
                 "src_account_name": "Customer",
@@ -188,8 +196,31 @@ class BookingEditTests(TestCase):
         self.assertEqual(out["masters"]["prefixes"], [{"id": "17", "label": "Mr"}])
         self.assertEqual(
             out["masters"]["company_banks"],
-            [{"id": "B1", "label": "SCB · 1234567890123 · Rayong"}],
+            [
+                {
+                    "id": "B1",
+                    "label": "SCB · 1234567890123 · Rayong",
+                    "account_no": "1234567890123",
+                    "branch_name": "Rayong",
+                }
+            ],
         )
+
+    def test_generic_receiving_bank_requires_account_details_in_editor(self):
+        from services.line_dms.booking_payments import (
+            normalize_editor_payments,
+            PaymentValidationError,
+        )
+
+        masters = {**MASTERS, "company_banks": [["B1", "SCB", "SCB", "", ""]]}
+        payment = form()["payments"][0]
+        with self.assertRaises(PaymentValidationError) as ctx:
+            normalize_editor_payments([payment], masters)
+        self.assertEqual(ctx.exception.code, "dms_booking.payment_detail_required")
+        payment["extra"].update(dst_account_no="987654321", dst_branch_name="Rayong")
+        clean = normalize_editor_payments([payment], masters)
+        self.assertEqual(clean[0]["extra"]["dst_account_no"], "987654321")
+        self.assertEqual(clean[0]["extra"]["dst_business_name"], "Company")
 
     def test_load_blocks_when_live_master_bundle_is_incomplete(self):
         with (

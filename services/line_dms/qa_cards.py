@@ -14,7 +14,12 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from services.erp.erp_dms_push import _DMS_FRIENDLY
-from services.line_dms import edit_link
+from services.line_dms import booking_car_details, edit_link
+from services.line_dms.qa_payment_cards import (
+    ask_pay_src as ask_pay_src,
+    ask_payment_bank as ask_payment_bank,
+    ask_transfer_details as ask_transfer_details,
+)
 from services.line_dms.cards import (
     ACT_CANCEL_BOOKING,
     ACT_CONFIRM_BOOKING,
@@ -61,19 +66,15 @@ PAY_LABELS = {
 }
 TXT_ASK_AMOUNT = "ยอดเงิน ({channel}) — พิมพ์จำนวนเงิน เช่น 5000"
 TXT_BAD_AMOUNT = "จำนวนเงินไม่ถูกต้อง พิมพ์เป็นตัวเลข เช่น 5000 หรือ 5,000.50"
-TXT_ASK_PAY_SRC = (
-    "บัญชีต้นทาง — พิมพ์ ธนาคาร | เลขบัญชี เช่น SCB | 1234567890 หรือพิมพ์ - เพื่อข้าม"
-)
-TXT_ASK_PAY_DST = "บัญชีปลายทาง (บัญชีบริษัท) — กดเลือกจากธนาคารของบริษัทด้านล่าง"
-TXT_NO_COMPANY_BANK = (
-    "ยังไม่มีข้อมูลธนาคารของบริษัท กรุณาให้ผู้ดูแลตั้งค่าใน DMS แล้วลองใหม่อีกครั้ง"
-)
+TXT_ASK_PAY_SRC = "ธนาคารต้นทาง — เลือกธนาคารที่ลูกค้าโอนเงินออก"
+TXT_ASK_PAY_DST = "ธนาคารปลายทาง — เลือกธนาคารที่บริษัทได้รับเงิน แล้วระบุบัญชีรับเงิน"
+TXT_NO_COMPANY_BANK = "ยังอ่านรายการธนาคารจาก DMS ไม่ได้ กรุณาลองใหม่อีกครั้ง"
 TXT_MASTER_UNAVAILABLE = _DMS_FRIENDLY["ERR_DMS_MASTER_UNAVAILABLE"]["th"]
 TXT_MASTER_EMPTY = _DMS_FRIENDLY["ERR_DMS_MASTER_EMPTY"]["th"]
 TXT_MASTER_CHANGED = _DMS_FRIENDLY["ERR_DMS_MASTER_CHANGED"]["th"]
 TXT_MASTER_UNMATCHED = _DMS_FRIENDLY["ERR_DMS_MASTER_UNMATCHED"]["th"]
-TXT_ASK_CHEQUE_REF = "พิมพ์ เลขที่เช็ค | ธนาคาร เช่น 123456 | SCB"
-TXT_ASK_CARD_REF = "พิมพ์ ธนาคาร | ประเภทบัตร เช่น SCB | VISA"
+TXT_ASK_CHEQUE_REF = "พิมพ์ เลขที่เช็ค | เล่มที่เช็ค เช่น 123456 | 01"
+TXT_ASK_CARD_REF = "พิมพ์ประเภทบัตร เช่น VISA"
 TXT_ASK_OTHER_REF = "รายละเอียดช่องทาง — พิมพ์"
 TXT_BAD_PAYMENT_DETAIL = "รูปแบบไม่ถูกต้อง กรุณาพิมพ์ข้อมูลทั้ง 2 ช่องโดยคั่นด้วย |"
 TXT_ASK_MORE = "มีช่องทางอื่นอีกไหม"
@@ -306,10 +307,6 @@ def bad_payment_detail() -> Dict[str, Any]:
     return _msg(TXT_BAD_PAYMENT_DETAIL)
 
 
-def ask_pay_src() -> Dict[str, Any]:
-    return _msg(TXT_ASK_PAY_SRC)
-
-
 def ask_pay_dst(company_banks: List[list], page: int = 0) -> Dict[str, Any]:
     if not company_banks:
         return _msg(TXT_NO_COMPANY_BANK)
@@ -452,6 +449,7 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
         *([_kv_row(LBL_ADVISOR, advisor)] if advisor else []),
         _kv_row(LBL_PLACE, str((answers.get("place") or {}).get("name") or "")),
         _kv_row(LBL_CAR, _car_paint_line(answers)),
+        *booking_car_details.rows(qa),
         _kv_row(LBL_DELIVERY, str(answers.get("delivery_date_be") or "")),
         _kv_row(LBL_TERM, str((answers.get("term") or {}).get("name") or "")),
         _kv_row(LBL_REGIS, _regis_line(answers)),

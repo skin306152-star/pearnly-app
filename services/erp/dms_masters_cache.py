@@ -28,6 +28,10 @@ _COMPLETE_KEYS = (
     "regis_behalfs",
     "advisors",
     "company_banks",
+    "source_banks",
+    "cheque_banks",
+    "cashier_banks",
+    "card_banks",
 )
 
 _DDL = """
@@ -118,11 +122,11 @@ def _fetch_masters_via_login(
     from services.erp.erp_dms_intake import _run_logged_in
 
     def _fetch(client, adapter):
-        from services.erp.mrerp_dms_company_banks import fetch_company_banks
+        from services.erp.mrerp_dms_company_banks import fetch_payment_bank_masters
 
         return {
             **client.fetch_masters(strict=require_complete),
-            "company_banks": fetch_company_banks(adapter),
+            **fetch_payment_bank_masters(adapter),
         }
 
     res = _run_logged_in(endpoint, _fetch)
@@ -154,8 +158,8 @@ def get_masters(
     必须真抓:成功时按 DMS 现状落库(旧 paints_by_car 不合并回去,否则 DMS 新增/删除的
     颜色被旧色遮住),失败时返回空 dict(fail closed,不拿旧主档冒充刷新过)。"""
     eid = str(endpoint.get("id") or "")
-    cached = _read(eid)
-    cache_usable = cached and "company_banks" in cached["masters"]
+    cached = None if force_refresh else _read(eid)
+    cache_usable = cached and all(key in cached["masters"] for key in _COMPLETE_KEYS)
     if require_complete and cache_usable:
         cache_usable = all(isinstance(cached["masters"].get(key), list) for key in _COMPLETE_KEYS)
     if not force_refresh and cache_usable and cached["age_seconds"] < CACHE_TTL_SECONDS:
@@ -195,6 +199,7 @@ def get_paints(
     masters: Optional[Dict[str, Any]] = None,
     *,
     require_complete: bool = False,
+    force_refresh: bool = False,
 ) -> List[list]:
     """某车型的颜色主档(惰性)。已缓存直接回;否则登录抓 + 并入 paints_by_car 落缓存。
 
@@ -205,7 +210,7 @@ def get_paints(
         cached = _read(eid)
         masters = (cached["masters"] if cached else {}) or {}
     pbc = dict(masters.get("paints_by_car") or {})
-    if car_id in pbc:
+    if car_id in pbc and not force_refresh:
         return pbc[car_id]
     paints = _fetch_paints_via_login(endpoint, car_id)
     if paints is None:

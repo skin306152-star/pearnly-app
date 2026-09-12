@@ -151,6 +151,8 @@ window.__DMS_I18N_ZH__ = {
     'dic-needs-review': '证件识别不完整 · 请拍清晰后重试',
     'dic-need-fields': '请填写姓名和身份证号',
     'dic-push-fail': '推送失败 · 请稍后重试',
+    'dx-select-required': '请选择称谓并补齐地址选项后再保存',
+    'dx-geo-load-fail': '地址选项读取失败，请重新选择上一级重试',
     'dx-erp-h': '推送到 ERP',
     'dx-erp-checking': '检查连接中…',
     'dx-erp-not-connected': '未连接',

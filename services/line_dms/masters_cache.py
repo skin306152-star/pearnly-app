@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LINE 逐问的 DMS 主档取数薄壳:按 LINE 用户解端点 → 读缓存。
+"""LINE 逐问的 DMS 主档取数薄壳:按 LINE 用户解端点 → 实时读取。
 
 缓存本体是通道无关的基建,住在 services/erp/dms_masters_cache.py;本文件只做 LINE 侧那层
 「会话只存 endpoint_id,取数前现解端点」的异步包装。缓存函数在这里逐名 re-export,既有
@@ -41,13 +41,13 @@ async def qa_masters(
     endpoint_id: Any,
     key: str,
     *,
-    force_refresh: bool = False,
+    force_refresh: bool = True,
     require_complete: bool = False,
 ) -> List[list]:
     """某类主档(cars/place_books/…)。端点解不出就给空表 —— 发问层据此重问,不炸会话。
 
-    force_refresh 只在本轮订车第一次进主档时开(当天改的主档当天可见);
-    同轮后续按钮复用 12h 缓存快照,不再每步登录一遍 DMS。
+    当前建档订车调用方每次展示/选择均强制读取；会话快照只供变化对比。
+    不以旧缓存作为可提交主档。
     """
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
@@ -77,7 +77,7 @@ async def qa_paints(
     endpoint_id: Any,
     car_id: str,
     *,
-    force_refresh: bool = False,
+    force_refresh: bool = True,
     require_complete: bool = False,
 ) -> List[list]:
     """某车型的颜色主档(逐问选完车才有 car_id)。force_refresh 语义同 qa_masters。
@@ -103,7 +103,14 @@ async def qa_paints(
         return []
     try:
         return (
-            await _thr(get_paints, ep, car_id, masters, require_complete=require_complete)
+            await _thr(
+                get_paints,
+                ep,
+                car_id,
+                masters,
+                require_complete=require_complete,
+                force_refresh=force_refresh,
+            )
         ) or []
     except Exception as exc:
         if require_complete and getattr(exc, "error_code", "") == "ERR_DMS_MASTER_UNAVAILABLE":

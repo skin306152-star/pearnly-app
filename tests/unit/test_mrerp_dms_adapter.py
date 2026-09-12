@@ -10,7 +10,7 @@ _resolve_address_geo 把 OCR 出来的泰文地址文本(府/县/区/邮编)映�
 这是身份证识别两步流(/api/dms/id-card/recognize)预填面板地址的核心,必须可靠:
   1. 文本精确匹配 → 各级 master id。
   2. 带行政前缀(จังหวัด/เขต/แขวง)的标签仍能匹配。
-  3. 匹配不到的府 → 回退到表单默认府 + 各级第一个选项(空 select 会被 DMS 拒)。
+  3. 匹配不到的层级及其下级保持未选,由用户确认,不擅自填第一项。
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from services.erp.mrerp_dms_adapter import MrerpDmsAdapter  # noqa: E402
 from services.erp.mrerp_dms_client import DMSClient  # noqa: E402
+from services.erp.mrerp_dms_client_base import DMSClientError  # noqa: E402
 from services.erp.mrerp_dms_models import ThaiAddress, ThaiIdCardPayload  # noqa: E402
 
 
@@ -125,20 +126,49 @@ class GeoResolveTests(unittest.TestCase):
         self.assertEqual(r.district_id, "47")
         self.assertEqual(r.subdistrict_id, "149")
 
-    def test_unmatched_name_falls_back_to_valid_chain(self):
-        # An unknown province must NOT leave the geo selects empty (cus/new.php
-        # rejects empty geo); it falls back to the form's default province and
-        # the first option at each level so creation still succeeds.
+    def test_unmatched_province_remains_unselected_without_using_form_default(self):
         t = GeoFakeTransport(
             districts=[("800", "เมือง")],
             subdistricts=[("9000", "ในเมือง")],
             zipcodes=[("106", "81000")],
         )
         r = self._resolve(t, _geo_address(province="ไม่มีจริง", district="ไม่มี"))
-        self.assertEqual(r.province_id, "65")  # form default
-        self.assertEqual(r.district_id, "800")  # first option
-        self.assertEqual(r.subdistrict_id, "9000")
-        self.assertEqual(r.zipcode_id, "106")
+        self.assertEqual(
+            (r.province_id, r.district_id, r.subdistrict_id, r.zipcode_id), ("", "", "", "")
+        )
+        self.assertEqual(r.province_name, "ไม่มีจริง")
+        self.assertEqual(t.calls, [])
+
+    def test_changed_or_deleted_child_does_not_pick_first_remaining_option(self):
+        t = GeoFakeTransport(districts=[("800", "Other district")], subdistricts=[], zipcodes=[])
+        r = self._resolve(t, _geo_address())
+        self.assertEqual(
+            (r.province_id, r.district_id, r.subdistrict_id, r.zipcode_id), ("1", "", "", "")
+        )
+        self.assertEqual(len(t.calls), 1)
+
+    def test_new_child_is_resolved_from_current_native_options(self):
+        t = GeoFakeTransport(
+            districts=[("800", "Other district")],
+            subdistricts=[("149", "บางนา")],
+            zipcodes=[("106", "10260")],
+        )
+        self.assertEqual(self._resolve(t, _geo_address()).district_id, "")
+        t._districts.append(("47", "บางนา"))
+        self.assertEqual(self._resolve(t, _geo_address()).district_id, "47")
+
+    def test_ambiguous_matching_names_remain_unselected(self):
+        t = GeoFakeTransport(
+            districts=[("47", "บางนา"), ("48", "บางนา")], subdistricts=[], zipcodes=[]
+        )
+        self.assertEqual(self._resolve(t, _geo_address()).district_id, "")
+
+    def test_missing_province_form_is_fetch_failure(self):
+        with self.assertRaises(DMSClientError) as ctx:
+            DMSClient(None, "https://x/dms/")._resolve_address_geo(
+                _geo_address(), "<html>login</html>"
+            )
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
 
 
 class LogoutCleanupTests(unittest.TestCase):

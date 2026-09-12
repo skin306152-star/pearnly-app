@@ -44,11 +44,31 @@ class FakeStore:
         payload = (sess or {}).get("payload") or {}
         if not sess or sess["state"] != state or not nonce or payload.get("nonce") != nonce:
             return None
-        self.set_session(tenant, luid, state, {**payload, "nonce": None})
+        self.set_session(tenant, luid, state, {**payload, "nonce": None, "_booking_claim": nonce})
         return payload
 
     def clear_session(self, tenant, luid):
         self.data.pop((str(tenant), str(luid)), None)
+
+    def replace_claimed_booking_payload(
+        self, tenant, luid, nonce, state, payload, ttl_minutes=None
+    ):
+        current = self.get_session(tenant, luid)
+        old = (current or {}).get("payload") or {}
+        if old.get("_booking_claim") != nonce or old.get("nonce") or old.get("booking_attempt"):
+            return False
+        if state is None:
+            self.clear_session(tenant, luid)
+        else:
+            self.set_session(tenant, luid, state, payload, ttl_minutes or 120)
+        return True
+
+    def clear_booking_attempt(self, tenant, luid, nonce):
+        current = self.get_session(tenant, luid)
+        if current and current["payload"].get("_booking_claim") == nonce:
+            self.clear_session(tenant, luid)
+            return True
+        return False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -73,7 +93,9 @@ class _FakeClient:
         self.rec["customer_save"] = kwargs
         return kwargs.get("customer_id"), False
 
-    def create_booking_via_form(self, *, customer_id, booking, card):
+    def create_booking_via_form(self, *, customer_id, booking, card, on_attempt=None):
+        if on_attempt:
+            on_attempt("BK123")
         self.rec["customer_id"] = customer_id
         self.rec["booking"] = booking
         return ("BID1", "BK123")
@@ -99,7 +121,14 @@ class _FakeClient:
     def _bshsd_all(self, elemname, **kwargs):
         if elemname == "txtcarpaint":
             return [["p1", "WHITE", "ขาว"]]
+        if elemname.startswith("txtbankname"):
+            return [["1", "SCB", "SCB", "ระยอง", "1234567890123"]]
         return []
+
+
+class _FakeAdapter:
+    def _client(self):
+        return _FakeClient({})
 
 
 def _qa_payload(**over):
@@ -126,6 +155,17 @@ def _qa_payload(**over):
                 "amount": "5000.00",
                 "extra": {
                     "src": "SCB",
+                    "src_bank_id": "1",
+                    "src_bank_name": "SCB",
+                    "src_account_name": "Customer",
+                    "src_account_no": "1111111111",
+                    "src_branch_name": "Rayong",
+                    "src_time": "14:00",
+                    "dst_bank_id": "1",
+                    "dst_bank_name": "SCB",
+                    "dst_business_name": "Company",
+                    "dst_account_no": "1234567890123",
+                    "dst_branch_name": "ระยอง",
                     "dst_id": "1",
                     "dst": "SCB · 1234567890123 · ระยอง",
                 },
@@ -134,6 +174,21 @@ def _qa_payload(**over):
         "pending_channel": {},
         "audit": [{"step": "slip", "input": "image:mid-slip"}],
     }
+    qa["master_snapshot"] = bf.master_contract.build_snapshot(
+        {
+            **_FakeClient({}).fetch_masters(),
+            **{
+                key: [["1", "SCB", "SCB", "ระยอง", "1234567890123"]]
+                for key in (
+                    "company_banks",
+                    "source_banks",
+                    "cheque_banks",
+                    "cashier_banks",
+                    "card_banks",
+                )
+            },
+        }
+    )
     qa.update(over)
     return qa
 
@@ -164,6 +219,16 @@ class _Env:
         p(bf.store, "get_session", side_effect=self.store.get_session)
         p(bf.store, "set_session", side_effect=self.store.set_session)
         p(bf.store, "clear_session", side_effect=self.store.clear_session)
+        p(
+            bf.booking_attempt.session_store,
+            "clear_booking_attempt",
+            side_effect=self.store.clear_booking_attempt,
+        )
+        p(
+            bf.booking_attempt.session_store,
+            "replace_claimed_booking_payload",
+            side_effect=self.store.replace_claimed_booking_payload,
+        )
         p(bf, "_spawn", side_effect=self.spawned.append)
         self.reply = p(bf._out.line_client, "reply_text")
         self.push_text = p(bf._out.line_client, "push_text")
@@ -201,16 +266,10 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 return masters
 
         def fake_run(ep, do):
-            return do(ChangedClient(rec), object())
+            return do(ChangedClient(rec), _FakeAdapter())
 
         payload = _review()
-        with (
-            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
-        ):
+        with (mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),):
             result = bf._book_in_session({"id": "E1", "config": {}}, payload)
 
         self.assertEqual(result["preflight"], "changed")
@@ -229,15 +288,9 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 return masters
 
         def fake_run(ep, do):
-            return do(DeletedClient(rec), object())
+            return do(DeletedClient(rec), _FakeAdapter())
 
-        with (
-            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
-        ):
+        with (mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),):
             result = bf._book_in_session({"id": "E1", "config": {}}, _review())
 
         self.assertEqual(result["preflight"], "unmatched")
@@ -286,11 +339,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch(
                 "services.erp.erp_dms_intake._run_logged_in",
-                side_effect=lambda ep, do: do(WrongCustomer(rec), object()),
-            ),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
+                side_effect=lambda ep, do: do(WrongCustomer(rec), _FakeAdapter()),
             ),
         ):
             with self.assertRaises(DMSClientError) as ctx:
@@ -304,7 +353,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         rec = {}
 
         def fake_run(ep, do):
-            return do(_FakeClient(rec), object())
+            return do(_FakeClient(rec), _FakeAdapter())
 
         qa = _qa_payload(
             customer_dirty=True,
@@ -318,10 +367,6 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 side_effect=lambda client, customer_id, people_id: bf._card_payload({"qa": qa}),
             ),
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
         ):
             result = bf._book_in_session({"id": "E1", "config": {}}, {"qa": qa})
 
@@ -372,7 +417,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         rec = {}
 
         def fake_run(ep, do):
-            return do(_FakeClient(rec), object())
+            return do(_FakeClient(rec), _FakeAdapter())
 
         with (
             mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
@@ -384,10 +429,6 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 ),
             ),
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
         ):
             res = bf._book_in_session(
                 {"id": "E1", "config": {}},
@@ -435,12 +476,19 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                     "amount": "5000.00",
                     "extra": {
                         "src": "SCB",
-                        "dst_id": "1",
-                        "dst": "SCB · 1234567890123 · ระยอง",
+                        "src_bank_id": "1",
+                        "src_bank_name": "SCB",
+                        "src_account_name": "Customer",
+                        "src_account_no": "1111111111",
+                        "src_branch_name": "Rayong",
+                        "src_time": "14:00",
                         "dst_bank_id": "1",
                         "dst_bank_name": "SCB",
-                        "dst_branch_name": "ระยอง",
+                        "dst_business_name": "Company",
                         "dst_account_no": "1234567890123",
+                        "dst_branch_name": "ระยอง",
+                        "dst_id": "1",
+                        "dst": "SCB · 1234567890123 · ระยอง",
                     },
                 },
             ),
@@ -480,7 +528,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         rec = {}
 
         def fake_run(ep, do):
-            return do(_FakeClient(rec), object())
+            return do(_FakeClient(rec), _FakeAdapter())
 
         with (
             mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
@@ -489,10 +537,6 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
             ),
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
         ):
             qa = _qa_payload()
             files = qa["files"]
@@ -524,7 +568,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             lock_events.append("exit")
 
         class _ProbeClient(_FakeClient):
-            def create_booking_via_form(self, *, customer_id, booking, card):
+            def create_booking_via_form(self, *, customer_id, booking, card, on_attempt=None):
                 rec["create_in_lock"] = lock_events == ["enter"]
                 return super().create_booking_via_form(
                     customer_id=customer_id, booking=booking, card=card
@@ -535,7 +579,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 return super().attach_booking_files(booking_id=booking_id, files=files)
 
         def fake_run(ep, do):
-            return do(_ProbeClient(rec), object())
+            return do(_ProbeClient(rec), _FakeAdapter())
 
         ep = {"id": "E1", "config": {"system_url": "https://dms.example.com/dms/index.php"}}
         with (
@@ -545,10 +589,6 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
             ),
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
             mock.patch.object(bf, "mrerp_booking_lock", fake_lock),
         ):
             res = bf._book_in_session(

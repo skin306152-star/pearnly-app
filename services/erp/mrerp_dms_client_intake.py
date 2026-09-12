@@ -245,6 +245,10 @@ class DMSClientIntakeMixin:
         if mode == "create" and not (fields.get("people_id") and data.get("txtcuscode")):
             data["txtcuscode"] = fields.get("people_id") or data.get("txtcuscode") or ""
 
+        if mode == "create":
+            from services.erp.mrerp_dms_customer_geo import clear_customer_select_defaults
+
+            clear_customer_select_defaults(data)
         self._apply_customer_fields(data, fields, addresses)
         self._guard_required_selects(data, form_html)
 
@@ -332,21 +336,10 @@ class DMSClientIntakeMixin:
                     data[dms + sfx] = str(blk.get(fk) or "")
 
     def _guard_required_selects(self, data: Dict[str, str], form_html: str) -> None:
-        """空必填 select 触发误导性 "already in use" → 补成有效值(实测坑)。"""
-        if not data.get("selprefix"):
-            opts = self._select_options(form_html, "selprefix")
-            if opts:
-                data["selprefix"] = opts[0][0]
-        for sfx in _ADDR_SUFFIXES:
-            zk = "selzipcodes" + sfx
-            if not data.get(zk):
-                sub = data.get("selsubdistricts" + sfx) or data.get("selsubdistricts")
-                if sub:
-                    z = self._fetch_options(
-                        "cus/component/listzipcodes.php", {"selsubdistricts": sub}
-                    )
-                    if z:
-                        data[zk] = z[0][0]
+        """必须匹配实时称谓/地址级联;空值和被删值不再用第一项补齐。"""
+        from services.erp.mrerp_dms_customer_geo import validate_customer_selects
+
+        validate_customer_selects(self, data, form_html)
 
     def _verify_saved(self, mode: str, fields: Dict[str, Any], customer_id: Optional[str]) -> str:
         """PHP 成功码 ≠ 真写库(铁律#9):建→search 复核;改→重读姓名复核。"""

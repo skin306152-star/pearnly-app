@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """DMSClientIntakeMixin 契约单测(假 transport · 不连真 DMS)。
 
-锁:lookup_customer / save_customer(create+overwrite·空 select 兜底)/ list_geo /
+锁:lookup_customer / save_customer(create+overwrite·实时 select 校验)/ list_geo /
 list_prefixes 的表单字段映射与提交端点(new.php / edit.php)。
 """
 
@@ -60,8 +60,12 @@ def _edit_form(name="Old Name", tel="0811111111", house_no=""):
         .replace('name="txttel" value=""', f'name="txttel" value="{tel}"')
         .replace('name="txthousenum" value=""', f'name="txthousenum" value="{house_no}"')
         .replace(
-            'name="selzipcodes"><option value="">--</option>',
-            'name="selzipcodes"><option value="6477" selected>81120</option>',
+            '<option value="">--</option></select>',
+            '<option value="6477" selected>81120</option></select>',
+        )
+        .replace(
+            '<option value="17">นาย</option>',
+            '<option value="17" selected>นาย</option>',
         )
     )
 
@@ -276,6 +280,7 @@ class IntakeContractTests(unittest.TestCase):
         c = DMSClient(t, "https://x/dms/")
         fields = {
             "name": "Heal Person",
+            "prefix_id": "17",
             "people_id": "1234567890123",
             "province_id": "65",
             "district_id": "804",
@@ -295,6 +300,7 @@ class IntakeContractTests(unittest.TestCase):
         c = DMSClient(t, "https://x/dms/")
         fields = {
             "name": "X",
+            "prefix_id": "17",
             "people_id": "1234567890123",
             "province_id": "65",
             "district_id": "804",
@@ -305,8 +311,8 @@ class IntakeContractTests(unittest.TestCase):
             with self.assertRaises(DMSClientError):
                 c.save_customer(fields=fields, mode="create")
 
-    def test_save_fills_empty_prefix_and_zipcode(self):
-        """空 selprefix/selzipcodes 触发 DMS 误导性 'already in use' → 提交前兜底补全。"""
+    def test_save_blocks_empty_prefix_and_zipcode_before_writing(self):
+        """Native required selections cannot be invented from the first option."""
         self.t.search_hits = []  # 真新建路径
         fields = {
             "name": "X",
@@ -315,10 +321,11 @@ class IntakeContractTests(unittest.TestCase):
             "district_id": "804",
             "subdistrict_id": "6472",
         }
-        self.c.save_customer(fields=fields, mode="create")
-        save = [p for p in self.t.posts if p[0].endswith("cus/new.php")][0][1]
-        self.assertTrue(save["selprefix"])  # 不为空
-        self.assertTrue(save["selzipcodes"])  # 从 subdistrict 兜底取到
+        for partial in (fields, {**fields, "prefix_id": "17"}):
+            with self.subTest(partial=partial), self.assertRaises(DMSClientError) as ctx:
+                self.c.save_customer(fields=partial, mode="create")
+            self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNMATCHED")
+        self.assertFalse(any(p[0].endswith("cus/new.php") for p in self.t.posts))
 
     def test_save_overwrite_requires_customer_id(self):
         with self.assertRaises(DMSClientError):

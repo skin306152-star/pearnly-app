@@ -48,18 +48,17 @@ _MASTER_DRAFT_KEYS = (
 
 
 def build_draft(id_card: dict, geo: dict, prefixes: List[list], phone: str) -> Dict[str, str]:
-    """OCR 身份证 + 地址级联 → 写库字段值。称谓 OCR 优先,不命中时回退主档首项。"""
+    """OCR 身份证 + 实时地址/称谓 → 写库字段;未唯一匹配的称谓留给用户确认。"""
     addr = id_card.get("address") or {}
     sel = geo.get("selected") or {}
     txt = geo.get("text") or {}
     pn = id_card.get("prefix_name") or ""
-    prefix = next(
-        (opt for opt in prefixes or [] if opt and len(opt) > 1 and opt[1] == pn),
-        None,
-    )
-    if prefix is None:
-        prefix = next((opt for opt in prefixes or [] if opt and opt[0] is not None), None)
-    prefix_id = str(prefix[0]) if prefix else ""
+    matches = {
+        str(opt[0])
+        for opt in prefixes or []
+        if opt and len(opt) > 1 and opt[0] is not None and opt[1] == pn
+    }
+    prefix_id = next(iter(matches)) if len(matches) == 1 else ""
     return {
         "prefix_id": prefix_id,
         "name": id_card.get("name") or "",

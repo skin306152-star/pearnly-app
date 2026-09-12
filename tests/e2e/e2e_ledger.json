@@ -1114,6 +1114,9 @@
     },
     "28-dms-intake-write-honesty.spec.js": {
       "covers": [
+        "static/dms/**",
+        "static/dist/dms.*",
+        "scripts/build-home-js.mjs",
         "src/home/**",
         "static/home-*.css",
         "home.html",

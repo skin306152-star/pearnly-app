@@ -8,6 +8,7 @@ from services.erp.mrerp_dms_company_banks import (
     company_bank_label,
     company_bank_payment_extra,
     fetch_company_banks,
+    fetch_payment_bank_masters,
     normalize_company_bank_rows,
     validate_company_bank_payments,
 )
@@ -86,6 +87,11 @@ class CompanyBankTests(unittest.TestCase):
                 "amount": "1500.00",
                 "extra": {
                     "src_bank_name": "KBank",
+                    "src_bank_id": "S1",
+                    "src_account_name": "Customer",
+                    "src_branch_name": "Bangkok",
+                    "src_time": "14:36",
+                    "dst_business_name": "Company",
                     "src_account_no": "123",
                     "dst_id": "1",
                     "dst": "old",
@@ -93,8 +99,11 @@ class CompanyBankTests(unittest.TestCase):
             }
         ]
         with mock.patch(
-            "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-            return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
+            "services.erp.mrerp_dms_company_banks._fetch_banks",
+            side_effect=[
+                [["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
+                [["S1", "KBANK", "KBank"]],
+            ],
         ):
             out = validate_company_bank_payments(object(), payments)
         self.assertEqual(out[0]["extra"]["dst"], "SCB · 1234567890123 · ระยอง")
@@ -104,12 +113,58 @@ class CompanyBankTests(unittest.TestCase):
 
     def test_submit_rejects_removed_or_legacy_free_text_bank(self):
         payment = {"channel": "transfer", "amount": "1.00", "extra": {"dst": "SCB"}}
-        with mock.patch(
-            "services.erp.mrerp_dms_company_banks.fetch_company_banks", return_value=[]
-        ):
+        with mock.patch("services.erp.mrerp_dms_company_banks._fetch_banks", return_value=[]):
             with self.assertRaises(DMSClientError) as ctx:
                 validate_company_bank_payments(object(), [payment])
         self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNMATCHED")
+
+    def test_generic_bank_row_preserves_explicit_receiving_account(self):
+        extra = company_bank_payment_extra(
+            ["3", "000002", "Bangkok", "", ""],
+            {
+                "dst_account_no": "1234567890",
+                "dst_branch_name": "Rayong",
+            },
+        )
+        self.assertEqual(extra["dst_account_no"], "1234567890")
+        self.assertEqual(extra["dst_branch_name"], "Rayong")
+        self.assertEqual(extra["dst_bank_id"], "3")
+
+    def test_every_payment_channel_reads_its_own_native_bank_selector(self):
+        adapter = _Adapter([[[str(n), "CODE", "Bank"]] for n in range(5)])
+        masters = fetch_payment_bank_masters(adapter)
+        self.assertEqual(
+            list(masters),
+            ["company_banks", "source_banks", "cheque_banks", "cashier_banks", "card_banks"],
+        )
+        self.assertEqual(
+            [call[0] for call in adapter.client.calls],
+            [
+                "txtbanknametfmon",
+                "txtbanknametffrom",
+                "txtbanknamecheque",
+                "txtbanknamecashiercq",
+                "txtbanknamecddbc",
+            ],
+        )
+
+    def test_generic_bank_and_amount_do_not_count_as_complete_payment(self):
+        with mock.patch(
+            "services.erp.mrerp_dms_company_banks._fetch_banks",
+            return_value=[["1", "SCB", "SCB", "", ""]],
+        ):
+            with self.assertRaises(DMSClientError) as ctx:
+                validate_company_bank_payments(
+                    object(),
+                    [
+                        {
+                            "channel": "transfer",
+                            "amount": "1000",
+                            "extra": {"dst_id": "1", "src_bank_id": "1"},
+                        }
+                    ],
+                )
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
 
 
 if __name__ == "__main__":

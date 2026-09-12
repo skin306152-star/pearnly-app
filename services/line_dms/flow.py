@@ -28,6 +28,7 @@ from services.erp import erp_dms_intake as _dms_intake
 from services.line_dms import (
     _out,
     approval_flow,
+    booking_attempt,
     booking_flow,
     booking_qa,
     cards,
@@ -91,7 +92,7 @@ async def _dispatch_image(binding: dict, line_user_id: str, message_id: str) -> 
             _push(line_user_id, qa_cards.TXT_NO_IMAGE_NEEDED)
         return
     if state == "booking_review":
-        _push(line_user_id, qa_cards.TXT_CONFIRM_ABOVE)
+        _push(line_user_id, booking_attempt.review_message(sess, qa_cards.TXT_CONFIRM_ABOVE))
         return
     await process_image(binding, line_user_id, message_id)
 

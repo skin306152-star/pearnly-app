@@ -10,6 +10,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Dict
 
+from services.erp.mrerp_dms_client_base import DMSClientError
+
 # 订金支付渠道闭集 —— 未知渠道必须报错,不许静默丢。
 _PAYMENT_CHANNELS = ("cash", "transfer", "cheque", "cashier_cheque", "card", "other")
 
@@ -58,11 +60,31 @@ _PAYMENT_TEXT_FIELD = {
     "other": {"detail": "txtdetailother"},
 }
 
-_LEGACY_EXTRA = {
-    "cheque": {"cheque_no": "ref"},
-    "cashier_cheque": {"cashier_no": "ref"},
-    "card": {"card_type": "ref"},
-}
+
+def missing_transfer_fields(extra: dict) -> list[str]:
+    """Native DMS transfer fields are required together, including the bank IDs."""
+    return [
+        key
+        for key in _PAYMENT_TEXT_FIELD["transfer"]
+        if not str(extra.get(key) or "").strip() or str(extra.get(key)).strip() == "-"
+    ]
+
+
+def validate_payment_completeness(payments) -> None:
+    """Stop incomplete native payment data before any DMS write, including non-LINE callers."""
+    for payment in payments or ():
+        channel = payment.get("channel")
+        extra = payment.get("extra") or {}
+        missing = [
+            key
+            for key in _PAYMENT_TEXT_FIELD.get(channel, {})
+            if not str(extra.get(key) or "").strip() or str(extra.get(key)).strip() == "-"
+        ]
+        if missing:
+            raise DMSClientError(
+                str(channel) + " payment is incomplete; missing=" + ",".join(missing),
+                "ERR_DMS_PAYMENT_INCOMPLETE",
+            )
 
 
 def payment_form_fields(payments: tuple) -> Dict[str, str]:
@@ -71,6 +93,7 @@ def payment_form_fields(payments: tuple) -> Dict[str, str]:
     DMS 每个渠道只有一组固定字段，因此同渠道重复必须拦截，不能拼接后伪装成一笔。
     空 payments 返回空 dict —— 调用方保留表单默认 txtearnestmoney="0.00"。
     """
+    validate_payment_completeness(payments)
     totals: Dict[str, Decimal] = {}
     extras: Dict[str, dict] = {}
     for pay in payments:
@@ -82,20 +105,6 @@ def payment_form_fields(payments: tuple) -> Dict[str, str]:
         amount = str(pay.get("amount") or "0").replace(",", "")
         totals[channel] = Decimal(amount)
         extra = dict(pay.get("extra") or {})
-        if (
-            channel == "transfer"
-            and extra.get("src")
-            and not (extra.get("src_account_no") or extra.get("src_bank_name"))
-        ):
-            source = str(extra["src"]).strip()
-            parts = source.split()
-            if source != "-" and len(parts) > 1 and any(ch.isdigit() for ch in parts[-1]):
-                extra["src_bank_name"] = " ".join(parts[:-1])
-                extra["src_account_no"] = parts[-1]
-            elif source != "-" and any(ch.isdigit() for ch in source):
-                extra["src_account_no"] = source
-            elif source != "-":
-                extra["src_bank_name"] = source
         extras[channel] = extra
 
     fields: Dict[str, str] = {}
@@ -108,8 +117,6 @@ def payment_form_fields(payments: tuple) -> Dict[str, str]:
         for slot, form_field in _PAYMENT_TEXT_FIELD.get(channel, {}).items():
             extra = extras.get(channel, {})
             value = extra.get(slot)
-            if not value:
-                value = extra.get((_LEGACY_EXTRA.get(channel) or {}).get(slot, ""))
             if value and value != "-":
                 fields[form_field] = str(value)
     if fields:

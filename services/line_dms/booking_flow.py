@@ -23,7 +23,15 @@ from core import db
 from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.session_lock import mrerp_booking_lock
-from services.line_dms import _out, cards, master_contract, masters_cache, qa_cards, store
+from services.line_dms import (
+    _out,
+    booking_attempt,
+    cards,
+    master_contract,
+    masters_cache,
+    qa_cards,
+    store,
+)
 from services.line_dms._out import _push, _reply, _send, _thr
 from services.line_dms.qa_util import find_row
 
@@ -51,6 +59,11 @@ async def handle_postback(
     """预览卡按钮:核对 booking_review 态 + nonce → 建单 / 取消。"""
     tenant = binding["tenant_id"]
     if action == cards.ACT_CANCEL_BOOKING:
+        session = await _thr(store.get_session, tenant, line_user_id)
+        marker = ((session or {}).get("payload") or {}).get("booking_attempt")
+        if marker:
+            _reply(reply_token, booking_attempt.message(marker))
+            return
         await _thr(store.clear_session, tenant, line_user_id)
         _reply(reply_token, cards.TXT_BOOKING_CANCELLED)
         return
@@ -85,13 +98,24 @@ async def handle_postback(
 async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> None:
     tenant, user_id = binding["tenant_id"], binding["user_id"]
     qa = payload.get("qa") or {}
+    pending = await _thr(booking_attempt.pending, tenant, line_user_id, payload)
+    if pending:
+        _push(line_user_id, booking_attempt.message(pending))
+        return
     await _thr(_out.start_loading, line_user_id)
     ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, qa.get("endpoint_id"))
     if not ep:
         _push(line_user_id, cards.TXT_NO_ENDPOINT)
         return
     attach_files, attach_failed = await _download_attach_files(qa)
-    result = await _thr(_book_in_session, ep, payload, attach_files, attach_failed)
+    result = await _thr(
+        _book_in_session,
+        ep,
+        payload,
+        attach_files,
+        attach_failed,
+        on_attempt=booking_attempt.recorder(tenant, line_user_id, payload),
+    )
     if result.get("preflight"):
         await _resume_after_master_change(binding, line_user_id, payload, result)
         return
@@ -108,9 +132,19 @@ async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> N
         if not result.get("attach_ok"):
             text = f"{text}\n{qa_cards.TXT_ATTACH_FAIL}"
         _push(line_user_id, text)
-        await _thr(store.clear_session, tenant, line_user_id)
+        await _thr(booking_attempt.clear_completed, tenant, line_user_id, payload)
     else:
         fr = result.get("error_friendly") or {}
+        if result.get("error_code") == booking_attempt.UNKNOWN:
+            _push(line_user_id, booking_attempt.message(result))
+            return
+        if result.get("error_code") == "ERR_DMS_PAYMENT_INCOMPLETE":
+            nonce = secrets.token_hex(8)
+            if not await _thr(_arm_retry, tenant, line_user_id, payload, nonce):
+                return
+            _push(line_user_id, fr.get("th") or cards.TXT_BOOKING_FAIL)
+            _send(line_user_id, qa_cards.preview_card(qa, nonce))
+            return
         if _retryable_result(result):
             retry_nonce = secrets.token_hex(8)
             armed = await _thr(
@@ -136,19 +170,28 @@ async def _resume_after_master_change(
     binding: dict, line_user_id: str, payload: dict, result: dict
 ) -> None:
     """确认瞬间主档有变化：改名重发摘要，删除则退回对应步骤重选。"""
-    from services.line_dms import booking_qa
+    from services.line_dms import booking_qa, session_store
 
     tenant = binding["tenant_id"]
     qa = result.get("qa") or payload.get("qa") or {}
-    if result.get("preflight") == "changed":
-        nonce = secrets.token_hex(8)
-        await _thr(
-            store.set_session,
-            tenant,
-            line_user_id,
-            "booking_review",
-            {**payload, "qa": qa, "nonce": nonce},
-        )
+    changed = result.get("preflight") == "changed"
+    nonce = secrets.token_hex(8) if changed else None
+    state = (
+        "booking_review"
+        if changed
+        else (None if result.get("field") == "advisor" else "booking_qa")
+    )
+    updated = {**payload, "qa": qa, "nonce": nonce} if changed else {"qa": qa}
+    if not await _thr(
+        session_store.replace_claimed_booking_payload,
+        tenant,
+        line_user_id,
+        payload.get("nonce"),
+        state,
+        updated,
+    ):
+        return
+    if changed:
         _send(line_user_id, qa_cards.master_changed())
         _send(line_user_id, qa_cards.preview_card(qa, nonce))
         return
@@ -156,9 +199,7 @@ async def _resume_after_master_change(
     code = str(result.get("error_code") or "ERR_DMS_MASTER_UNMATCHED")
     _send(line_user_id, qa_cards.master_problem(code))
     if result.get("field") == "advisor":
-        await _thr(store.clear_session, tenant, line_user_id)
         return
-    await _thr(store.set_session, tenant, line_user_id, "booking_qa", {"qa": qa})
     await booking_qa.send_step(tenant, line_user_id, qa, qa.get("step") or "place")
 
 
@@ -168,7 +209,7 @@ def _retryable_result(result: Dict[str, Any]) -> bool:
     主档暂时读不到(ERR_DMS_MASTER_UNAVAILABLE)可等主档恢复后重试;主档已变更
     (ERR_DMS_MASTER_UNMATCHED)重试只会拿到同一份主档,必须让操作员重新选择。
     """
-    if result.get("booking_id"):
+    if result.get("booking_id") or (result.get("response_body") or {}).get("submitted"):
         return False
     if result.get("error_code") == "ERR_DMS_MASTER_UNMATCHED":
         return False
@@ -185,15 +226,17 @@ def _retryable_result(result: Dict[str, Any]) -> bool:
 
 
 def _arm_retry(tenant: str, line_user_id: str, payload: dict, nonce: str) -> bool:
-    """把失败后的完整订车草稿重新挂回 booking_review,只保留 30 分钟。"""
-    store.set_session(
+    """只重挂本次尚未提交的草稿；不得覆盖用户后续新建或取消的会话。"""
+    from services.line_dms.session_store import replace_claimed_booking_payload
+
+    return replace_claimed_booking_payload(
         tenant,
         line_user_id,
+        payload.get("nonce"),
         "booking_review",
         {**payload, "nonce": nonce},
         ttl_minutes=_RETRY_TTL_MINUTES,
     )
-    return store.verify_nonce(store.get_session(tenant, line_user_id), nonce, "booking_review")
 
 
 async def _download_attach_files(qa: dict) -> Tuple[List[dict], List[dict]]:
@@ -237,6 +280,8 @@ def _book_in_session(
     payload: dict,
     attach_files: Optional[List[dict]] = None,
     attach_failed: Optional[List[dict]] = None,
+    *,
+    on_attempt=None,
 ) -> Dict[str, Any]:
     """一个 DMS 会话内:解析订车载荷 → 建单 → 挂附件 → 顺手全量刷主档缓存(零额外登录)。
 
@@ -272,13 +317,16 @@ def _book_in_session(
         from services.erp.mrerp_dms_booking_customer import card_from_customer
         from services.erp.mrerp_dms_client_base import DMSClientError
         from services.erp.mrerp_dms_company_banks import (
-            fetch_company_banks,
+            fetch_payment_bank_masters,
             validate_company_bank_payments,
         )
+        from services.erp.mrerp_dms_payments import validate_payment_completeness
+
+        validate_payment_completeness(qa.get("payments") or [])
 
         live_masters = {
             **cl.fetch_masters(strict=True),
-            "company_banks": fetch_company_banks(adapter),
+            **fetch_payment_bank_masters(adapter),
         }
         selected_car_id = str((answers.get("car") or {}).get("id") or "")
         selected_car = find_row(live_masters.get("cars"), selected_car_id)
@@ -322,15 +370,20 @@ def _book_in_session(
         # 账套级互斥只护「取号→提交」:同账套不同销售账号并发时别撞单号。
         # 客户写入/附件挂载/主档刷新等慢步骤不进共享锁。
         with mrerp_booking_lock(ep):
+            create_options = {"on_attempt": on_attempt} if on_attempt is not None else {}
             booking_id, booking_no = cl.create_booking_via_form(
-                customer_id=customer_id, booking=booking, card=master_card
+                customer_id=customer_id, booking=booking, card=master_card, **create_options
             )
         attached = 0
         failed = list(attach_failed or [])
         if attach_files:
-            res = cl.attach_booking_files(booking_id=booking_id, files=attach_files)
-            attached = int(res.get("attached") or 0)
-            failed += list(res.get("failed") or [])
+            try:
+                res = cl.attach_booking_files(booking_id=booking_id, files=attach_files)
+                attached = int(res.get("attached") or 0)
+                failed += list(res.get("failed") or [])
+            except Exception:
+                logger.warning("DMS booking exists but attachment upload failed", exc_info=True)
+                failed += [{"error": "attachment upload failed"}]
         masters_cache.refresh_from_client(ep, cl)
         return {
             "ok": True,
@@ -419,6 +472,7 @@ def _log_booking(user_id: str, ep: dict, payload: dict, result: dict) -> None:
         },
     }
     response_body = {
+        **(result.get("response_body") or {}),
         "booking_id": result.get("booking_id", ""),
         "booking_no": result.get("booking_no", ""),
     }

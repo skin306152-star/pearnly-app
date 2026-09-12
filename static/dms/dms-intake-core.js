@@ -15,6 +15,7 @@
         geo: {},
         prefixes: [],
         provinces: [],
+        geoOptions: {},
         newVals: {},
         dmsVals: {},
         pick: {},
@@ -110,12 +111,12 @@
         var addr = (S.ocr || {}).address || {};
         var sel = S.geo.selected || {};
         var txt = S.geo.text || {};
-        // 称谓:身份证 OCR 命中 DMS 主档优先;不命中时使用 DMS 第一项,不自造值。
-        var hit = S.prefixes.find(function (p) {
+        // 未匹配或同名多个 ID 的称谓必须让用户选择，不能代选第一项。
+        var hits = S.prefixes.filter(function (p) {
             return p[1] === ic.prefix_name;
         });
-        var chosenPrefix = hit || S.prefixes[0] || null;
-        S.prefixUnmappable = !!ic.prefix_name && !hit && !chosenPrefix;
+        var chosenPrefix = hits.length === 1 ? hits[0] : null;
+        S.prefixUnmappable = !!ic.prefix_name && !chosenPrefix;
         S.newVals = {
             prefix_id: chosenPrefix ? chosenPrefix[0] : '',
             prefix_name: chosenPrefix ? chosenPrefix[1] : ic.prefix_name || '',
@@ -147,6 +148,8 @@
     // ── 取值模型 ──
     function initForm() {
         S.form = {};
+        S.geoOptions = {};
+        S.geoEpoch = (S.geoEpoch || 0) + 1;
         S.pick = {};
         DX_COMPARE.forEach(function (c) {
             var nv = S.newVals[c.key] || '';
@@ -194,12 +197,15 @@
         ID_KEYS.concat(['tax_id']).forEach(function (k) {
             var cmpKey = k === 'prefix_id' ? 'prefix_name' : k;
             var picked = S.pick[cmpKey] || 'dms';
-            S.form[k] = useNew(picked) && S.newVals[k] ? S.newVals[k] : S.dmsVals[k] || '';
+            S.form[k] =
+                useNew(picked) && (k === 'prefix_id' || S.newVals[k])
+                    ? S.newVals[k] || ''
+                    : S.dmsVals[k] || '';
         });
         ADDR_KEYS.forEach(function (k) {
             var pk = ADDR_PICK[k];
             var picked = (pk && S.pick[pk]) || 'dms';
-            S.form[k] = useNew(picked) && S.newVals[k] ? S.newVals[k] : S.dmsVals[k] || '';
+            S.form[k] = pk && useNew(picked) ? S.newVals[k] || '' : S.dmsVals[k] || '';
         });
         ['province', 'district', 'subdistrict', 'zipcode'].forEach(function (b) {
             var nameKey = b + '_name';
@@ -209,11 +215,24 @@
                     ? S.newVals[nameKey]
                     : S.dmsVals[nameKey] || '';
         });
+        // 地址级联不能拼接来自不同父级的新旧 ID，尤其不能给未映射的 OCR 名称配旧 ID。
+        ['district', 'subdistrict', 'zipcode'].forEach(function (b, index) {
+            var parent = ['province', 'district', 'subdistrict'][index] + '_id';
+            var source = useNew(S.pick[b + '_name'] || 'dms') ? S.newVals : S.dmsVals;
+            if (!S.form[parent] || String(S.form[parent]) !== String(source[parent] || '')) {
+                S.form[b + '_id'] = '';
+            }
+        });
     }
     function syncMirror() {
         ['_ct', '_sd'].forEach(function (sfx) {
             if (S.sameAs[sfx])
-                ADDR_KEYS.forEach(function (k) {
+                ADDR_KEYS.concat([
+                    'province_name',
+                    'district_name',
+                    'subdistrict_name',
+                    'zipcode_name',
+                ]).forEach(function (k) {
                     S.form[k + sfx] = S.form[k] || '';
                 });
         });

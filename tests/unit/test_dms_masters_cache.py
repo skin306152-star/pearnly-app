@@ -14,7 +14,7 @@ _EP = {"id": "E1", "config": {}}
 _MASTERS = {
     "cars": [["c1", "CODE1", "Car One"]],
     "advisors": [["a1", "A1", "Adv"]],
-    "company_banks": [["1", "SCB", "SCB"]],
+    **{key: [["1", "SCB", "SCB"]] for key in mc._COMPLETE_KEYS},
 }
 _PAINTS = [["p1", "PC1", "Red"]]
 
@@ -176,8 +176,8 @@ class PaintFetchLayerTests(unittest.TestCase):
         with (
             mock.patch.object(erp_dms_intake, "_run_logged_in", side_effect=run),
             mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB"]],
+                "services.erp.mrerp_dms_company_banks.fetch_payment_bank_masters",
+                return_value={"company_banks": [["1", "SCB", "SCB"]]},
             ),
         ):
             out = mc._fetch_masters_via_login(_EP)
@@ -195,8 +195,8 @@ class PaintFetchLayerTests(unittest.TestCase):
         with (
             mock.patch.object(erp_dms_intake, "_run_logged_in", side_effect=run),
             mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[],
+                "services.erp.mrerp_dms_company_banks.fetch_payment_bank_masters",
+                return_value={},
             ),
         ):
             mc._fetch_masters_via_login(_EP, require_complete=True)

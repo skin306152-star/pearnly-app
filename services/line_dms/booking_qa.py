@@ -14,13 +14,13 @@ from typing import Any, Dict, Optional
 
 from services.erp import dms_advisor
 from services.erp import dms_id_ocr as _id_ocr
-from services.erp.mrerp_dms_company_banks import company_bank_payment_extra
 from services.erp.mrerp_dms_client_base import to_be_date
 from services.line_dms import (
     booking_payments,
     booking_qa_start,
     booking_qa_pages,
     booking_qa_payment,
+    booking_qa_transfer,
     booking_qa_sync,
     commands,
     masters_cache,
@@ -85,7 +85,7 @@ async def start(
 async def send_step(tenant_id, line_user_id, qa, step, reply_token=None) -> None:
     """按步发问。reply_token 有则 reply,无则 push(逐问可被 postback / 收料两种上下文调)。"""
     try:
-        if step in ("place", "paint", "term", "regis", "pay_dst"):
+        if step in ("place", "paint", "term", "regis", "pay_src", "pay_dst", "pay_bank"):
             msg = await booking_qa_pages.question(
                 line_user_id,
                 qa,
@@ -154,6 +154,8 @@ _POSTBACK_ACTIONS = {
     "regis": "regis",
     "regis_name": "regisname",
     "pay_channel": "pay",
+    "pay_src": "srcbank",
+    "pay_bank": "paybank",
     "pay_dst": "bank",
     "pay_more": "more",
     "slip_conflict": "slipconflict",
@@ -221,8 +223,18 @@ async def _handle_postback(tenant_id, line_user_id, data, params, reply_token) -
             reask=_reask,
             to_preview=_to_preview,
         )
-    elif action == "bank":
-        await _pick_company_bank(tenant_id, line_user_id, qa, value, reply_token)
+    elif action in {"bank", "srcbank", "paybank"}:
+        await booking_qa_transfer.pick_bank(
+            tenant_id,
+            line_user_id,
+            qa,
+            value,
+            reply_token,
+            source=action == "srcbank",
+            masters=booking_qa_sync.masters,
+            persist=_persist,
+            send_step=send_step,
+        )
     return True
 
 
@@ -294,7 +306,9 @@ async def _on_pay_amount(tenant_id, line_user_id, qa, text, reply_token) -> None
     shape = CHANNEL_EXTRA_SHAPE.get(pending.get("channel", ""))
     if shape == "src_dst":
         qa["step"] = next_step = "pay_src"
-    elif shape in ("ref", "detail"):
+    elif shape == "ref":
+        qa["step"] = next_step = "pay_bank"
+    elif shape == "detail":
         qa["step"] = next_step = "pay_ref"
     else:  # cash:金额即渠道完结
         complete_channel(qa)
@@ -303,16 +317,10 @@ async def _on_pay_amount(tenant_id, line_user_id, qa, text, reply_token) -> None
     await send_step(tenant_id, line_user_id, qa, next_step, reply_token)
 
 
-async def _on_pay_src(tenant_id, line_user_id, qa, text, reply_token) -> None:
-    detail = booking_payments.parse_payment_detail("transfer", text)
-    if detail is None:
-        _send(line_user_id, qa_cards.bad_payment_detail(), reply_token)
-        return
-    extra = qa["pending_channel"].setdefault("extra", {})
-    extra.update(detail)
-    qa["step"] = "pay_dst"
-    await _persist(tenant_id, line_user_id, qa)
-    await send_step(tenant_id, line_user_id, qa, "pay_dst", reply_token)
+async def _on_transfer_detail(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    await booking_qa_transfer.collect_details(
+        tenant_id, line_user_id, qa, text, reply_token, persist=_persist, send_step=send_step
+    )
 
 
 async def _on_pay_ref(tenant_id, line_user_id, qa, text, reply_token) -> None:
@@ -350,8 +358,11 @@ _TEXT_HANDLERS = {
     "regis_name": _on_regis_name,
     "pay_channel": _reask,
     "pay_amount": _on_pay_amount,
-    "pay_src": _on_pay_src,
+    "pay_src": _reask,
+    "pay_src_detail": _on_transfer_detail,
+    "pay_dst_detail": _on_transfer_detail,
     "pay_dst": _reask,
+    "pay_bank": _reask,
     "pay_ref": _on_pay_ref,
     "pay_more": _reask,
     "slip_after": _on_slip_after,
@@ -381,33 +392,6 @@ async def _pick_master(
     qa["step"] = next_step
     await _persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, next_step, reply_token)
-
-
-async def _pick_company_bank(tenant_id, line_user_id, qa, value, reply_token) -> None:
-    rows = await booking_qa_sync.masters(
-        tenant_id, line_user_id, qa, "company_banks", persist=_persist
-    )
-    row = find_row(rows, value)
-    if row is None:
-        await _reask(tenant_id, line_user_id, qa, "", reply_token)
-        return
-    (qa.get("pages") or {}).pop("company_banks", None)
-    extra = qa["pending_channel"].setdefault("extra", {})
-    extra.update(company_bank_payment_extra(row))
-    complete_channel(qa)
-    if not (qa.get("files") or {}).get("slip_mid"):
-        await booking_qa_payment.request_slip(
-            tenant_id,
-            line_user_id,
-            qa,
-            "pay_more",
-            reply_token,
-            persist=_persist,
-            send_step=send_step,
-        )
-        return
-    await _persist(tenant_id, line_user_id, qa)
-    await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
 
 
 async def _pick_car(tenant_id, line_user_id, qa, value, reply_token) -> None:

@@ -408,6 +408,7 @@ const BUNDLES = [
             'dms/dms-gate.js',
             'dms/dms-intake-html.js',
             'dms/dms-intake-core.js',
+            'dms/dms-intake-geo.js',
             'dms/dms-intake-erp-cards.js',
             'dms/dms-intake-form.js',
             'dms/dms-intake-confirm.js',

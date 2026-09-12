@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""DMS 公司银行主档的浏览器读取与订车支付校验。"""
+"""DMS 银行目录读取与订车转账校验；银行不等于公司收款账户。"""
 
 from __future__ import annotations
 
@@ -10,9 +10,22 @@ from typing import Any, Dict, Iterable, List
 
 from services.erp.mrerp_dms_client_base import DMSClientError
 
+PAYMENT_BANK_MASTERS = {
+    "company_banks": "txtbanknametfmon",
+    "source_banks": "txtbanknametffrom",
+    "cheque_banks": "txtbanknamecheque",
+    "cashier_banks": "txtbanknamecashiercq",
+    "card_banks": "txtbanknamecddbc",
+}
+PAYMENT_CHANNEL_BANKS = {
+    "cheque": "cheque_banks",
+    "cashier_cheque": "cashier_banks",
+    "card": "card_banks",
+}
+
 
 def company_bank_label(row: list) -> str:
-    """公司银行行 [id, code, name, branch, account] 的稳定展示值。"""
+    """银行行 [id, code, name, branch, account] 的展示值；后两列可能为空。"""
     code = str(row[1]).strip() if len(row) > 1 else ""
     name = str(row[2]).strip() if len(row) > 2 else ""
     branch = str(row[3]).strip() if len(row) > 3 else ""
@@ -41,11 +54,24 @@ def normalize_company_bank_rows(rows: Iterable[Any]) -> List[list]:
 
 
 def fetch_company_banks(adapter: Any, *, timeout_ms: int = 10000) -> List[list]:
-    """从订车单实际使用的银行 typeahead 读取完整公司账户；失败重试一次。"""
+    """读取收款银行目录；不能假设银行行含公司收款账户。"""
+    return _fetch_banks(adapter, "txtbanknametfmon")
+
+
+def fetch_source_banks(adapter: Any, *, timeout_ms: int = 10000) -> List[list]:
+    """汇款银行使用独立原生目录，其 ID 和范围可能不同于收款银行。"""
+    return _fetch_banks(adapter, "txtbanknametffrom")
+
+
+def fetch_payment_bank_masters(adapter: Any) -> dict:
+    return {key: _fetch_banks(adapter, elem) for key, elem in PAYMENT_BANK_MASTERS.items()}
+
+
+def _fetch_banks(adapter: Any, elemname: str) -> List[list]:
     failure = None
     for _ in range(2):
         try:
-            rows = adapter._client()._bshsd_all("txtbanknametfmon", page_size=200)
+            rows = adapter._client()._bshsd_all(elemname, page_size=200)
             if rows is not None:
                 return normalize_company_bank_rows(rows)
             failure = RuntimeError("DMS bank typeahead returned no result")
@@ -59,40 +85,55 @@ def fetch_company_banks(adapter: Any, *, timeout_ms: int = 10000) -> List[list]:
     )
 
 
-def company_bank_payment_extra(row: list) -> Dict[str, str]:
-    """把公司银行主档行转换成订车单转账目的地字段。"""
+def company_bank_payment_extra(row: list, existing: dict | None = None) -> Dict[str, str]:
+    """更新银行身份；目录缺少账户时保留已明确填写的收款资料。"""
+    existing = existing or {}
     return {
         "dst_id": str(row[0]),
         "dst": company_bank_label(row),
         "dst_bank_id": str(row[0]),
         "dst_bank_name": str(row[2]).strip() if len(row) > 2 else "",
-        "dst_branch_name": str(row[3]).strip() if len(row) > 3 else "",
-        "dst_account_no": str(row[4]).strip() if len(row) > 4 else "",
+        "dst_branch_name": (str(row[3]).strip() if len(row) > 3 else "")
+        or str(existing.get("dst_branch_name") or "").strip(),
+        "dst_account_no": (str(row[4]).strip() if len(row) > 4 else "")
+        or str(existing.get("dst_account_no") or "").strip(),
     }
 
 
 def validate_company_bank_payments(adapter: Any, payments: Iterable[dict]) -> List[dict]:
-    """提交前确认每笔转账仍指向现存公司银行，并用主档当前名称覆盖会话旧值。"""
+    """提交前核对银行身份和完整转账资料，不把银行编号当作公司账号。"""
+    from services.erp.mrerp_dms_payments import validate_payment_completeness
+
     payments = list(payments or [])
-    if not any(payment.get("channel") == "transfer" for payment in payments):
-        return [dict(payment) for payment in payments]
-    rows = fetch_company_banks(adapter)
-    by_id = {str(row[0]): row for row in rows}
+    by_key = {}
+
+    def current_bank(key, bank_id):
+        if key not in by_key:
+            rows = _fetch_banks(adapter, PAYMENT_BANK_MASTERS[key])
+            by_key[key] = {str(row[0]): row for row in rows}
+        row = by_key[key].get(str(bank_id or ""))
+        if row is None:
+            raise DMSClientError(
+                "selected bank is not in the current DMS list", "ERR_DMS_MASTER_UNMATCHED"
+            )
+        return row
+
     validated = []
     for payment in payments:
         current = dict(payment)
-        if current.get("channel") == "transfer":
-            extra = dict(current.get("extra") or {})
-            row = by_id.get(str(extra.get("dst_id") or ""))
-            if row is None:
-                # 已选公司银行不在当前 live 主档:主档已变更,不许拿会话旧值提交。
-                raise DMSClientError(
-                    "selected company bank is no longer available",
-                    "ERR_DMS_MASTER_UNMATCHED",
-                )
-            extra.update(company_bank_payment_extra(row))
-            current["extra"] = extra
+        channel = current.get("channel")
+        extra = dict(current.get("extra") or {})
+        if channel == "transfer":
+            row = current_bank("company_banks", extra.get("dst_id"))
+            extra.update(company_bank_payment_extra(row, extra))
+            source = current_bank("source_banks", extra.get("src_bank_id"))
+            extra["src_bank_name"] = str(source[2] or source[1]).strip()
+        elif channel in PAYMENT_CHANNEL_BANKS:
+            row = current_bank(PAYMENT_CHANNEL_BANKS[channel], extra.get("bank_id"))
+            extra["bank_name"] = str(row[2] or row[1]).strip()
+        current["extra"] = extra
         validated.append(current)
+    validate_payment_completeness(validated)
     return validated
 
 

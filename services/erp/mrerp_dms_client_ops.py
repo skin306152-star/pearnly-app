@@ -22,6 +22,8 @@ from services.erp.mrerp_dms_client_base import DMSClientError, to_be_date
 from services.erp.mrerp_dms_master_rows import memo as _memo
 from services.erp.mrerp_dms_master_rows import parse_rows as _parse_bshsd_rows
 from services.erp.mrerp_dms_payments import payment_form_fields
+from services.erp.mrerp_dms_booking_submit import submit_booking
+from services.erp.mrerp_dms_booking_org import resolve_booking_org
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +70,14 @@ class DMSClientOpsMixin:
     ) -> None:
         """填订车单业务字段(顾问/车/颜色/客户/身份/地址…)· 建(new)与改(edit)共用。
         不含 stsel/idsel/txtdocno —— 由调用方按建/改设置。"""
+        advisor_phone = str((booking.advisor.extra or ("",))[0] or "").strip()
+        if not advisor_phone:
+            raise DMSClientError("DMS advisor phone is missing", "ERR_DMS_ADVISOR_UNMATCHED")
         data.update(
             {
                 "usersval": booking.advisor.id,
                 "txtusers": booking.advisor.name,
-                "txtuserstel": booking.advisor.extra[0] if booking.advisor.extra else ".",
+                "txtuserstel": advisor_phone,
                 "placebookval": booking.place_book.id,
                 "txtplacebook": booking.place_book.name,
                 "cusval": customer_id,
@@ -118,12 +123,18 @@ class DMSClientOpsMixin:
                 "txtregisname": booking.regis_name or card.full_name,
             }
         )
+        data.update(dict(booking.organization_fields))
         # 有订金渠道时覆盖上面的 0.00 默认与新增渠道字段;空 payments 则保持现状。
         data.update(payment_form_fields(booking.payments))
         self._apply_address_to_booking_form(data, card.address)
 
     def create_booking_via_form(
-        self, *, customer_id: str, booking: DMSBookingPayload, card: ThaiIdCardPayload
+        self,
+        *,
+        customer_id: str,
+        booking: DMSBookingPayload,
+        card: ThaiIdCardPayload,
+        on_attempt=None,
     ) -> tuple:
         """A1:走 DMS 原生订车单表单建单 · DMS autonum 出 BK 号(符合公司规则·零手填)。
         取代 Excel 导入 + patch 两步。返回 (booking_id, booking_no)。
@@ -143,24 +154,7 @@ class DMSClientOpsMixin:
             raise DMSClientError("booking auto number unavailable", "ERR_DMS_IMPORT")
         digits = getattr(self, "_booking_docno_digits", 6)
         docno = mrerp_dms_docno.next_unoccupied_docno(docno, digits, self._post_text)
-        last_body = ""
-        for _ in range(_BOOKING_DOCNO_MAX_TRIES):
-            data = dict(base)
-            data["txtdocno"] = docno
-            resp = self.transport.post(self._url("drfcbc/new.php"), data=data, timeout_ms=120000)
-            last_body = (resp.text or "").strip()
-            if resp.status_code == 200 and not last_body.startswith("err::"):
-                booking_id = self.search_booking(docno)
-                if not booking_id:
-                    raise DMSClientError(
-                        "booking create returned ok but search failed", "ERR_DMS_IMPORT"
-                    )
-                return booking_id, docno
-            if resp.status_code == 200 and _is_duplicate_docno_error(last_body):
-                docno = _bump_docno(docno)
-                continue
-            break
-        raise DMSClientError(f"booking create failed: {last_body[:300]!r}", "ERR_DMS_IMPORT")
+        return submit_booking(self, base, docno, on_attempt=on_attempt)
 
     def _next_booking_docno(self, branch_id: str) -> str:
         """取 DMS 订车单下一个自动编号(BK+期间+流水)。autonum 关/异常时返回空。"""
@@ -328,10 +322,7 @@ class DMSClientOpsMixin:
         )
         place = self._ref_from_default("txtplacebook", defaults.place_book_id, "", "")
         term = self._ref_from_default("txttermsale", defaults.term_sale_id, "", "")
-        branch = self._ref_from_default("txtbranch_book", defaults.branch_id, "", "")
-        team = self._ref_from_default(
-            "txtteam_book", defaults.team_id, "", "", branch_book=branch.id
-        )
+        org = resolve_booking_org(self, advisor.id, defaults)
         regis = self._ref_from_default("txtregisbehalf", defaults.regis_behalf_id, "", "")
 
         return DMSBookingPayload(
@@ -342,8 +333,9 @@ class DMSClientOpsMixin:
             paint=paint,
             place_book=place,
             term_sale=term,
-            branch=branch,
-            team=team,
+            branch=org.branch,
+            team=org.team,
+            organization_fields=org.form_fields,
             regis_behalf=regis,
         )
 
@@ -392,12 +384,10 @@ class DMSClientOpsMixin:
         row = row_by_id(rows, defaults.advisor_id)
         if row is not None:
             return self._ref_from_row(row)
-        if rows is None and defaults.advisor_name:
-            # 名册取数失败(接口抖 / 200 里塞了不可解析的 body):有名字才敢放行,按钉死标量
-            # 提交,DMS 侧仍按 id 认人。名册真空(rows == [])不走这条 —— 那种单 DMS 必拒,
-            # 降级只会把「建不了单」拖到更晚才暴露。
-            return DMSMasterRef(
-                id=defaults.advisor_id, code=defaults.advisor_code, name=defaults.advisor_name
+        if rows is None:
+            raise DMSClientError(
+                "DMS advisor master unavailable while validating the selected advisor",
+                "ERR_DMS_MASTER_UNAVAILABLE",
             )
         raise DMSClientError(
             f"booking advisor id {defaults.advisor_id!r} not in DMS advisor master",
@@ -407,8 +397,7 @@ class DMSClientOpsMixin:
     def _ref_from_default(
         self, elemname: str, pinned_id: str, pinned_code: str, pinned_name: str, **extra
     ) -> DMSMasterRef:
-        """Resolve a master ref: if the user pinned an id, fetch that exact
-        row from the full (paged) live master; else take the first available row.
+        """Resolve a user's explicit selection against the complete live master.
 
         只在第 1 页里找 pinned id,id 在第 2 页会被误判成「不存在」然后悄悄回落首行,
         建单就填错车/店。故最终解析与 fetch_masters 一样走 _bshsd_all 全量翻页。
@@ -432,12 +421,22 @@ class DMSClientOpsMixin:
                     "ERR_DMS_MASTER_UNMATCHED",
                 )
             return self._ref_from_row(chosen)
-        chosen = rows[0] if rows else None
-        if chosen is None:
-            # No live rows and no pin — fall back to the pinned scalars so the
-            # caller still gets a usable (if unverified) ref.
-            return DMSMasterRef(id=pinned_id, code=pinned_code, name=pinned_name)
-        return self._ref_from_row(chosen)
+        if rows is None:
+            raise DMSClientError(f"DMS master {elemname} unavailable", "ERR_DMS_MASTER_UNAVAILABLE")
+        chosen = [
+            row
+            for row in rows
+            if (pinned_code and len(row) > 1 and str(row[1]) == str(pinned_code))
+            or (
+                not pinned_code and pinned_name and len(row) > 2 and str(row[2]) == str(pinned_name)
+            )
+        ]
+        if len(chosen) != 1:
+            raise DMSClientError(
+                f"DMS master {elemname} requires an explicit unambiguous selection",
+                "ERR_DMS_MASTER_UNMATCHED",
+            )
+        return self._ref_from_row(chosen[0])
 
     @staticmethod
     def _ref_from_row(row: list) -> DMSMasterRef:
@@ -455,7 +454,7 @@ class DMSClientOpsMixin:
         同一会话内同参只打一次:一次建单要解六七个主档、还会在成功后就地刷缓存,
         而主档在这一次登录期间不会变。失败不进备忘,允许下次重试。
         """
-        key = (elemname, tuple(sorted(extra.items())))
+        key = (id(getattr(self, "transport", None)), elemname, tuple(sorted(extra.items())))
         memo = _memo(self)
         if key not in memo:
             data = {"bshsdamt": "10", "bshsdcurrpage": "1", "elemname": elemname, "sdt": ""}
@@ -472,9 +471,9 @@ class DMSClientOpsMixin:
         """翻页拉全某主档:不满一页即最后一页。任一页取数失败 → 整体 None。
 
         半份名册比取不到更危险 ——「这个人不在名册」的判断会变成瞎话。撞 max_pages 说明
-        主档比预期大一个量级,截断必须点名留痕(静默截断 = 又一个分页黑洞)。
+        主档比预期大一个量级，必须失败，不能将不完整主档当成可选择的全量结果。
         """
-        key = (elemname, tuple(sorted(extra.items())), "all")
+        key = (id(getattr(self, "transport", None)), elemname, tuple(sorted(extra.items())), "all")
         memo = _memo(self)
         if key in memo:
             return memo[key]
@@ -487,8 +486,9 @@ class DMSClientOpsMixin:
             if len(got) < page_size:
                 break
         else:
-            logger.warning(
-                "[dms] master %s truncated at %d pages / %d rows", elemname, max_pages, len(rows)
+            raise DMSClientError(
+                f"DMS master {elemname} exceeds {max_pages} pages; complete mapping unavailable",
+                "ERR_DMS_MASTER_UNAVAILABLE",
             )
         memo[key] = rows
         return rows

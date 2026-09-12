@@ -11,7 +11,7 @@ from services.erp import dms_id_ocr
 from services.erp.erp_dms_intake import _run_logged_in, geo_mrerp_dms
 from services.erp.dms_id_validate import is_valid_thai_id, normalize_thai_id
 from services.erp.dms_masters_cache import get_masters, get_paints
-from services.erp.mrerp_dms_company_banks import company_bank_label
+from services.erp.mrerp_dms_company_banks import company_bank_label, PAYMENT_BANK_MASTERS
 from services.line_dms import booking_payments, qa_cards, store
 from services.line_dms._out import _send
 from services.line_dms.master_contract import MasterSyncError, build_paint_snapshot, build_snapshot
@@ -86,6 +86,19 @@ def _options(rows: Iterable[list], label=None) -> list[dict]:
     return [_option(row, label) for row in rows if row and row[0] is not None]
 
 
+def _payment_bank_options(key: str, rows: list) -> list[dict]:
+    if key != "company_banks":
+        return _options(rows, company_bank_label)
+    return [
+        {
+            **_option(row, company_bank_label),
+            "account_no": str(row[4] or "") if len(row) > 4 else "",
+            "branch_name": str(row[3] or "") if len(row) > 3 else "",
+        }
+        for row in rows
+    ]
+
+
 def _form(qa: dict) -> dict:
     draft = dict(qa.get("draft") or {})
     draft["name"] = str((qa.get("customer") or {}).get("name") or draft.get("name") or "")
@@ -136,7 +149,10 @@ def load(user: dict, nonce: str) -> dict:
             "paints": (_options(_live_paints(endpoint, car_id, masters)) if car_id else []),
             "terms": _options(masters.get("term_sales") or []),
             "regis": _options(masters.get("regis_behalfs") or []),
-            "company_banks": _options(masters.get("company_banks") or [], company_bank_label),
+            **{
+                key: _payment_bank_options(key, masters.get(key) or [])
+                for key in PAYMENT_BANK_MASTERS
+            },
             "prefixes": _options(prefix_rows or []),
         },
     }

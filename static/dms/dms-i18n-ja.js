@@ -151,6 +151,8 @@ window.__DMS_I18N_JA__ = {
     'dic-needs-review': '身分証の読み取りが不完全です — 鮮明に撮り直してください',
     'dic-need-fields': '氏名とID番号は必須です',
     'dic-push-fail': '送信に失敗しました — 再試行してください',
+    'dx-select-required': '敬称と住所の選択項目を入力してから保存してください',
+    'dx-geo-load-fail': '住所の選択肢を取得できませんでした。上位項目を選び直してください。',
     'dx-erp-h': 'ERP へ送信',
     'dx-erp-checking': '確認中…',
     'dx-erp-not-connected': '未接続',

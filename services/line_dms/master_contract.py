@@ -9,7 +9,11 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
-from services.erp.mrerp_dms_company_banks import company_bank_label
+from services.erp.mrerp_dms_company_banks import (
+    company_bank_label,
+    company_bank_payment_extra,
+    PAYMENT_CHANNEL_BANKS,
+)
 from services.line_dms.qa_util import car_label, find_row, row_name
 
 SNAPSHOT_KEYS = (
@@ -18,9 +22,13 @@ SNAPSHOT_KEYS = (
     "term_sales",
     "regis_behalfs",
     "company_banks",
+    "source_banks",
+    "cheque_banks",
+    "cashier_banks",
+    "card_banks",
 )
-REQUIRED_NONEMPTY_KEYS = frozenset(SNAPSHOT_KEYS[:-1])
-_ROW_WIDTHS = {"company_banks": 5}
+REQUIRED_NONEMPTY_KEYS = frozenset(SNAPSHOT_KEYS[:4])
+_ROW_WIDTHS = {"company_banks": 5, "cars": 17}
 
 _ANSWER_SPECS = (
     ("place", "place_books", "place", "name", row_name),
@@ -125,12 +133,17 @@ def _missing_result(qa: dict, field: str, snapshot: dict, paints: List[list]) ->
             "qa": updated,
             "code": "ERR_DMS_ADVISOR_UNMATCHED",
         }
-    if field == "bank":
-        transfers = [p for p in updated.get("payments") or [] if p.get("channel") == "transfer"]
-        missing = transfers[0] if transfers else {"channel": "transfer", "amount": ""}
+    if field in ("bank", "source_bank", "cheque_bank", "cashier_cheque_bank", "card_bank"):
+        channel = "transfer" if field in ("bank", "source_bank") else field.removesuffix("_bank")
+        matching = [p for p in updated.get("payments") or [] if p.get("channel") == channel]
+        missing = matching[0] if matching else {"channel": channel, "amount": ""}
         updated["payments"] = [p for p in updated.get("payments") or [] if p is not missing]
         updated["pending_channel"] = missing
-        updated["step"] = "pay_dst"
+        updated["step"] = (
+            "pay_bank"
+            if channel != "transfer"
+            else ("pay_src" if field == "source_bank" else "pay_dst")
+        )
         return {
             "status": "unmatched",
             "field": field,
@@ -187,6 +200,17 @@ def reconcile(qa: dict, masters: Dict[str, Any], paints: Optional[List[list]]) -
         current_label = label_fn(row)
         _change(changes, answer_key, str(selected.get(label_key) or ""), current_label)
         answers[answer_key] = {**selected, label_key: current_label}
+        if answer_key == "car":
+            previous_rows = ((qa.get("master_snapshot") or {}).get("rows") or {}).get("cars") or []
+            previous = find_row(previous_rows, str(row[0]))
+            current = _compact([row], 17)[0]
+            if previous is None or len(previous) < 17 or _compact([previous], 17)[0] != current:
+                _change(
+                    changes,
+                    "car_details",
+                    json.dumps(previous, ensure_ascii=False),
+                    json.dumps(current, ensure_ascii=False),
+                )
 
     paint_selected = answers.get("paint") or {}
     paint_row = find_row(paints, str(paint_selected.get("id") or ""))
@@ -198,15 +222,43 @@ def reconcile(qa: dict, masters: Dict[str, Any], paints: Optional[List[list]]) -
 
     banks = masters.get("company_banks") or []
     for payment in updated.get("payments") or []:
-        if payment.get("channel") != "transfer":
+        channel = payment.get("channel")
+        if channel != "transfer" and channel not in PAYMENT_CHANNEL_BANKS:
             continue
         extra = payment.setdefault("extra", {})
+        if channel in PAYMENT_CHANNEL_BANKS:
+            bank = find_row(
+                masters.get(PAYMENT_CHANNEL_BANKS[channel]), str(extra.get("bank_id") or "")
+            )
+            if bank is None:
+                return _missing_result(updated, channel + "_bank", snapshot, paints or [])
+            label = row_name(bank)
+            _change(changes, "bank", str(extra.get("bank_name") or ""), label)
+            extra["bank_name"] = label
+            continue
+        if channel != "transfer":
+            continue
         bank = find_row(banks, str(extra.get("dst_id") or ""))
         if bank is None:
             return _missing_result(updated, "bank", snapshot, paints or [])
         label = company_bank_label(bank)
         _change(changes, "bank", str(extra.get("dst") or ""), label)
         extra["dst"] = label
+        mapped = company_bank_payment_extra(bank, extra)
+        for key in ("dst_account_no", "dst_branch_name"):
+            if str(
+                bank[4 if key == "dst_account_no" else 3]
+                if len(bank) > (4 if key == "dst_account_no" else 3)
+                else ""
+            ):
+                _change(changes, "bank", str(extra.get(key) or ""), mapped[key])
+        extra.update(mapped)
+        source = find_row(masters.get("source_banks"), str(extra.get("src_bank_id") or ""))
+        if source is None:
+            return _missing_result(updated, "source_bank", snapshot, paints or [])
+        source_name = row_name(source)
+        _change(changes, "source_bank", str(extra.get("src_bank_name") or ""), source_name)
+        extra["src_bank_name"] = source_name
 
     car_id = str((answers.get("car") or {}).get("id") or "")
     paint_snapshot = build_paint_snapshot(car_id, paints or [])

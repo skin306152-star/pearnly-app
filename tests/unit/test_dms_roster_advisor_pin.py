@@ -50,7 +50,7 @@ class AdvisorOptionsTest(unittest.TestCase):
     def test_options_expose_id_code_name_only(self):
         with (
             mock.patch("core.db.list_erp_endpoints", side_effect=_endpoints_by_user()),
-            mock.patch("services.erp.dms_masters_cache.read_fresh_masters", return_value=_MASTERS),
+            mock.patch("services.erp.dms_masters_cache.get_masters", return_value=_MASTERS),
         ):
             res = service.list_advisors(OWNER)
         self.assertTrue(res["ok"])
@@ -75,7 +75,6 @@ class AdvisorOptionsTest(unittest.TestCase):
         # 冒充「名册里没人」会让老板以为 DMS 里真没顾问。
         with (
             mock.patch("core.db.list_erp_endpoints", side_effect=_endpoints_by_user()),
-            mock.patch("services.erp.dms_masters_cache.read_fresh_masters", return_value=None),
             mock.patch("services.erp.dms_masters_cache.get_masters", return_value={}),
         ):
             res = service.list_advisors(OWNER)
@@ -85,9 +84,7 @@ class AdvisorOptionsTest(unittest.TestCase):
     def test_empty_roster_is_ok_with_empty_list(self):
         with (
             mock.patch("core.db.list_erp_endpoints", side_effect=_endpoints_by_user()),
-            mock.patch(
-                "services.erp.dms_masters_cache.read_fresh_masters", return_value={"advisors": []}
-            ),
+            mock.patch("services.erp.dms_masters_cache.get_masters", return_value={"advisors": []}),
         ):
             res = service.list_advisors(OWNER)
         self.assertTrue(res["ok"])
@@ -98,7 +95,7 @@ class CreateWithPinTest(unittest.TestCase):
     def test_create_pins_advisor_with_server_resolved_name(self):
         with (
             mock.patch("core.db.list_erp_endpoints", side_effect=_endpoints_by_user()),
-            mock.patch("services.erp.dms_masters_cache.read_fresh_masters", return_value=_MASTERS),
+            mock.patch("services.erp.dms_masters_cache.get_masters", return_value=_MASTERS),
             mock.patch.object(service.store, "create_operator_records", return_value="op-9"),
             mock.patch("core.db.create_erp_endpoint", return_value="ep-9") as ep,
         ):
@@ -128,7 +125,7 @@ class CreateWithPinTest(unittest.TestCase):
     def test_unknown_advisor_id_rejected_before_any_write(self):
         with (
             mock.patch("core.db.list_erp_endpoints", side_effect=_endpoints_by_user()),
-            mock.patch("services.erp.dms_masters_cache.read_fresh_masters", return_value=_MASTERS),
+            mock.patch("services.erp.dms_masters_cache.get_masters", return_value=_MASTERS),
             mock.patch.object(service.store, "create_operator_records") as rec,
             mock.patch("core.db.create_erp_endpoint") as ep,
         ):
@@ -154,7 +151,7 @@ class UpdatePinTest(unittest.TestCase):
                 return_value={"user_id": "op-1", "tenant_id": "tenant-1"},
             ),
             mock.patch("core.db.list_erp_endpoints", side_effect=_endpoints_by_user()),
-            mock.patch("services.erp.dms_masters_cache.read_fresh_masters", return_value=_MASTERS),
+            mock.patch("services.erp.dms_masters_cache.get_masters", return_value=_MASTERS),
             mock.patch("core.db.update_erp_endpoint", return_value=True) as up,
         ):
             res = service.update_operator(OWNER, "op-1", **kw)
@@ -189,7 +186,7 @@ class UpdatePinTest(unittest.TestCase):
                 return_value={"user_id": "op-1", "tenant_id": "tenant-1"},
             ),
             mock.patch("core.db.list_erp_endpoints", side_effect=_endpoints_by_user()),
-            mock.patch("services.erp.dms_masters_cache.read_fresh_masters", return_value=_MASTERS),
+            mock.patch("services.erp.dms_masters_cache.get_masters", return_value=_MASTERS),
             mock.patch.object(service.store, "update_profile") as upp,
             mock.patch("core.db.update_erp_endpoint") as up,
         ):

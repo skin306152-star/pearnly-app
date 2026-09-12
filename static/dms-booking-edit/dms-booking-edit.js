@@ -88,6 +88,12 @@
             })
             .join('');
     }
+    function bankOptions(rows, selected) {
+        return '<option value="">' + t('chooseBank') + '</option>' + options(rows, selected);
+    }
+    function masterOptions(rows, selected) {
+        return '<option value="">' + t('chooseOption') + '</option>' + options(rows, selected);
+    }
     function select(name, label, rows, selected, cls) {
         return (
             '<div class="field ' +
@@ -100,8 +106,8 @@
             name +
             '" name="' +
             name +
-            '">' +
-            options(rows, selected) +
+            '" required>' +
+            masterOptions(rows, selected) +
             '</select></div>'
         );
     }
@@ -123,7 +129,7 @@
             })
             .join('');
     }
-    function paymentField(cls, label, value, wide) {
+    function paymentField(cls, label, value, wide, required) {
         return (
             '<div class="field ' +
             (wide ? 'wide' : '') +
@@ -133,7 +139,19 @@
             cls +
             '" value="' +
             esc(value || '') +
-            '"></div>'
+            '"' +
+            (required ? ' required' : '') +
+            (cls === 'src-time' ? ' type="time"' : '') +
+            '></div>'
+        );
+    }
+    function paymentBank(key, value) {
+        return (
+            '<div class="field"><label>' +
+            t('bankName') +
+            '</label><select class="bank-id" required>' +
+            bankOptions(masters[key], value) +
+            '</select></div>'
         );
     }
     function legacySource(x) {
@@ -158,34 +176,60 @@
         var extra =
             p.channel === 'transfer'
                 ? '<div class="extra grid">' +
-                  paymentField('src-bank', 'sourceBank', x.src_bank_name) +
-                  paymentField('src-account', 'sourceAccount', x.src_account_no) +
-                  paymentField('src-name', 'sourceAccountName', x.src_account_name) +
-                  paymentField('src-branch', 'sourceBranch', x.src_branch_name) +
-                  paymentField('src-time', 'transferTime', x.src_time) +
+                  '<div class="field"><label>' +
+                  t('sourceBank') +
+                  '</label><select class="src-bank" required>' +
+                  bankOptions(masters.source_banks, x.src_bank_id) +
+                  '</select></div>' +
+                  paymentField('src-account', 'sourceAccount', x.src_account_no, false, true) +
+                  paymentField('src-name', 'sourceAccountName', x.src_account_name, false, true) +
+                  paymentField('src-branch', 'sourceBranch', x.src_branch_name, false, true) +
+                  paymentField('src-time', 'transferTime', x.src_time, false, true) +
                   '<div class="field wide"><label>' +
                   t('destination') +
-                  '</label><select class="dst">' +
-                  options(masters.company_banks, x.dst_id) +
-                  '</select></div></div>'
+                  '</label><select class="dst" required>' +
+                  bankOptions(masters.company_banks, x.dst_id) +
+                  '</select></div>' +
+                  paymentField('dst-name', 'destinationName', x.dst_business_name, true, true) +
+                  paymentField('dst-account', 'destinationAccount', x.dst_account_no, false, true) +
+                  paymentField('dst-branch', 'destinationBranch', x.dst_branch_name, false, true) +
+                  '</div>'
                 : p.channel === 'cash'
                   ? '<div class="extra"></div>'
                   : p.channel === 'cheque'
                     ? '<div class="extra grid">' +
-                      paymentField('cheque-no', 'chequeNo', x.cheque_no || x.ref) +
-                      paymentField('bank-name', 'bankName', x.bank_name) +
-                      paymentField('cheque-book-no', 'chequeBookNo', x.cheque_book_no) +
+                      paymentField('cheque-no', 'chequeNo', x.cheque_no || x.ref, false, true) +
+                      paymentBank('cheque_banks', x.bank_id) +
+                      paymentField(
+                          'cheque-book-no',
+                          'chequeBookNo',
+                          x.cheque_book_no,
+                          false,
+                          true
+                      ) +
                       '</div>'
                     : p.channel === 'cashier_cheque'
                       ? '<div class="extra grid">' +
-                        paymentField('cashier-no', 'cashierNo', x.cashier_no || x.ref) +
-                        paymentField('bank-name', 'bankName', x.bank_name) +
-                        paymentField('cashier-book-no', 'cashierBookNo', x.cashier_book_no) +
+                        paymentField(
+                            'cashier-no',
+                            'cashierNo',
+                            x.cashier_no || x.ref,
+                            false,
+                            true
+                        ) +
+                        paymentBank('cashier_banks', x.bank_id) +
+                        paymentField(
+                            'cashier-book-no',
+                            'cashierBookNo',
+                            x.cashier_book_no,
+                            false,
+                            true
+                        ) +
                         '</div>'
                       : p.channel === 'card'
                         ? '<div class="extra grid">' +
-                          paymentField('bank-name', 'bankName', x.bank_name) +
-                          paymentField('card-type', 'cardType', x.card_type || x.ref) +
+                          paymentBank('card_banks', x.bank_id) +
+                          paymentField('card-type', 'cardType', x.card_type || x.ref, false, true) +
                           '</div>'
                         : '<div class="field extra"><label>' +
                           t('detail') +
@@ -247,6 +291,16 @@
     }
     function wirePayments() {
         document.querySelectorAll('.payment').forEach(function (row) {
+            var destination = row.querySelector('.dst');
+            if (destination)
+                destination.onchange = function () {
+                    var bank =
+                        (masters.company_banks || []).find(function (item) {
+                            return String(item.id) === destination.value;
+                        }) || {};
+                    row.querySelector('.dst-account').value = bank.account_no || '';
+                    row.querySelector('.dst-branch').value = bank.branch_name || '';
+                };
             row.querySelector('.remove').onclick = function () {
                 row.remove();
                 syncChannelOptions();
@@ -455,49 +509,69 @@
     }
     function setOptions(id, rows, selected) {
         var el = document.getElementById(id);
-        el.innerHTML = options(rows, selected);
-        if (selected) el.value = selected;
+        el.innerHTML = masterOptions(rows, selected);
+        el.value = (rows || []).some(function (row) {
+            return String(row.id) === String(selected);
+        })
+            ? String(selected)
+            : '';
     }
     async function hydrateGeo() {
         var c = model.form.customer;
         try {
             setOptions('province_id', await geo('provinces', ''), c.province_id);
-            setOptions('district_id', await geo('districts', c.province_id), c.district_id);
-            setOptions(
-                'subdistrict_id',
-                await geo('subdistricts', c.district_id),
-                c.subdistrict_id
-            );
-            setOptions('zipcode_id', await geo('zipcodes', c.subdistrict_id), c.zipcode_id);
+            var levels = [
+                ['districts', 'province_id', 'district_id'],
+                ['subdistricts', 'district_id', 'subdistrict_id'],
+                ['zipcodes', 'subdistrict_id', 'zipcode_id'],
+            ];
+            for (var item of levels) {
+                var parent = document.getElementById(item[1]).value;
+                setOptions(item[2], parent ? await geo(item[0], parent) : [], c[item[2]]);
+            }
             document.getElementById('save').disabled = false;
         } catch (e) {
             showFormError();
         }
     }
     async function cascade(level, parent, target, downstream) {
+        setOptions(target, [], '');
+        if (downstream) {
+            if (target === 'district_id') {
+                setOptions('subdistrict_id', [], '');
+                setOptions('zipcode_id', [], '');
+            }
+            if (target === 'subdistrict_id') setOptions('zipcode_id', [], '');
+        }
+        if (!parent) return;
         try {
             var rows = await geo(level, parent);
+            var parentId = {
+                districts: 'province_id',
+                subdistricts: 'district_id',
+                zipcodes: 'subdistrict_id',
+            }[level];
+            if (document.getElementById(parentId).value !== parent) return;
             setOptions(target, rows, '');
-            if (downstream) {
-                if (target === 'district_id') {
-                    setOptions('subdistrict_id', [], '');
-                    setOptions('zipcode_id', [], '');
-                }
-                if (target === 'subdistrict_id') setOptions('zipcode_id', [], '');
-            }
         } catch (e) {
             showFormError();
         }
     }
     async function loadPaints() {
+        var selectedCar = this.value;
+        masters.paints = [];
+        setOptions('paint_id', [], '');
+        if (!selectedCar) return;
         try {
-            masters.paints = await gateway.api(
+            var rows = await gateway.api(
                 '/api/line/dms-booking/paints?nonce=' +
                     encodeURIComponent(nonce) +
                     '&car_id=' +
-                    encodeURIComponent(this.value)
+                    encodeURIComponent(selectedCar)
             );
-            setOptions('paint_id', masters.paints, '');
+            if (document.getElementById('car_id').value !== selectedCar) return;
+            masters.paints = rows;
+            setOptions('paint_id', rows, '');
         } catch (e) {
             showFormError();
         }
@@ -505,29 +579,32 @@
     var val = (id, fallback) => document.getElementById(id).value.trim() || fallback || '';
     function selectedLabel(id) {
         var el = document.getElementById(id);
-        return el.selectedOptions[0] ? el.selectedOptions[0].textContent : '';
+        return el.value && el.selectedOptions[0] ? el.selectedOptions[0].textContent : '';
     }
     function collectPayments() {
         return Array.from(document.querySelectorAll('.payment')).map(function (row) {
             var ch = row.querySelector('.pay-channel').value,
                 x = {};
             if (ch === 'transfer') {
-                x.src_bank_name = row.querySelector('.src-bank').value.trim();
+                x.src_bank_id = row.querySelector('.src-bank').value;
                 x.src_account_no = row.querySelector('.src-account').value.trim();
                 x.src_account_name = row.querySelector('.src-name').value.trim();
                 x.src_branch_name = row.querySelector('.src-branch').value.trim();
                 x.src_time = row.querySelector('.src-time').value.trim();
                 x.dst_id = row.querySelector('.dst').value;
+                x.dst_business_name = row.querySelector('.dst-name').value.trim();
+                x.dst_account_no = row.querySelector('.dst-account').value.trim();
+                x.dst_branch_name = row.querySelector('.dst-branch').value.trim();
             } else if (ch === 'cheque') {
                 x.cheque_no = row.querySelector('.cheque-no').value.trim();
-                x.bank_name = row.querySelector('.bank-name').value.trim();
+                x.bank_id = row.querySelector('.bank-id').value;
                 x.cheque_book_no = row.querySelector('.cheque-book-no').value.trim();
             } else if (ch === 'cashier_cheque') {
                 x.cashier_no = row.querySelector('.cashier-no').value.trim();
-                x.bank_name = row.querySelector('.bank-name').value.trim();
+                x.bank_id = row.querySelector('.bank-id').value;
                 x.cashier_book_no = row.querySelector('.cashier-book-no').value.trim();
             } else if (ch === 'card') {
-                x.bank_name = row.querySelector('.bank-name').value.trim();
+                x.bank_id = row.querySelector('.bank-id').value;
                 x.card_type = row.querySelector('.card-type').value.trim();
             } else if (ch === 'other') {
                 x.detail = row.querySelector('.detail').value.trim();
@@ -557,7 +634,7 @@
             ],
             customer = {};
         names.forEach(function (n) {
-            customer[n] = val(n, window.DMS_BOOKING_GEO.includes(n) ? model.form.customer[n] : '');
+            customer[n] = val(n);
         });
         customer.province_name = selectedLabel('province_id');
         customer.district_name = selectedLabel('district_id');
@@ -583,6 +660,7 @@
     }
     async function save(ev) {
         ev.preventDefault();
+        if (!form.reportValidity()) return;
         var btn = document.getElementById('save');
         btn.disabled = true;
         document.getElementById('form-error').textContent = '';

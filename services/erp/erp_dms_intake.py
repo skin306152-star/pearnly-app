@@ -74,13 +74,17 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
                     require_current()
                     out = fn(adapter._client(), adapter)
                 except DMSClientError as e:
-                    if getattr(adapter, "concurrent_login_detected", False):
+                    if getattr(adapter, "concurrent_login_detected", False) and not getattr(
+                        e, "response_body", {}
+                    ).get("submitted"):
                         return _err(
                             "ERR_DMS_CONCURRENT_LOGIN",
                             getattr(adapter, "last_dialog", ""),
                         )
                     raise
-                if getattr(adapter, "concurrent_login_detected", False):
+                if getattr(adapter, "concurrent_login_detected", False) and not (
+                    isinstance(out, dict) and out.get("booking_id")
+                ):
                     return _err(
                         "ERR_DMS_CONCURRENT_LOGIN",
                         getattr(adapter, "last_dialog", ""),
@@ -94,7 +98,13 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
         except MrerpDmsTechnicalError as e:
             return _err("ERR_DMS_TECHNICAL", f"{type(e).__name__}: {e}")
         except DMSClientError as e:
-            return _err(e.error_code or "ERR_DMS_TECHNICAL", str(e))
+            result = _err(e.error_code or "ERR_DMS_TECHNICAL", str(e))
+            evidence = getattr(e, "response_body", None)
+            if isinstance(evidence, dict):
+                result["response_body"].update(evidence)
+            if getattr(e, "booking_no", None):
+                result["booking_no"] = e.booking_no
+            return result
     except BindingChanged:
         raise
     except Exception as e:

@@ -10,6 +10,7 @@ import contextlib
 import unittest
 from unittest import mock
 
+from services.dms_roster import store as roster_store
 from services.line_dms import cards, draft, flow, master_contract, ocr_review, qa_cards, text_router
 
 # 网页确认页 fields 键形状(static/dms/dms-intake-core.js)· LINE 侧必须同形。
@@ -74,6 +75,10 @@ _MASTER_SNAPSHOT = master_contract.build_snapshot(
         "term_sales": [["t1", "", "เงินสด"]],
         "regis_behalfs": [["r1", "", "บุคคลธรรมดา"]],
         "company_banks": [],
+        "source_banks": [],
+        "cheque_banks": [],
+        "cashier_banks": [],
+        "card_banks": [],
     },
     captured_at="2026-09-01T00:00:00+00:00",
 )
@@ -86,11 +91,17 @@ class DraftPrefixTests(unittest.TestCase):
         )
         self.assertEqual(out["prefix_id"], "18")
 
-    def test_unmapped_ocr_prefix_falls_back_to_first_dms_option(self):
+    def test_unmapped_ocr_prefix_stays_unselected(self):
         out = draft.build_draft(
             {"prefix_name": "เด็กหญิง", "address": {}}, {}, [["17", "นาย"], ["18", "นางสาว"]], ""
         )
-        self.assertEqual(out["prefix_id"], "17")
+        self.assertEqual(out["prefix_id"], "")
+
+    def test_ambiguous_ocr_prefix_stays_unselected(self):
+        out = draft.build_draft(
+            {"prefix_name": "นาย", "address": {}}, {}, [["17", "นาย"], ["19", "นาย"]], ""
+        )
+        self.assertEqual(out["prefix_id"], "")
 
     def test_empty_dms_prefix_master_stays_empty(self):
         out = draft.build_draft({"prefix_name": "นาย", "address": {}}, {}, [], "")
@@ -178,6 +189,8 @@ class _Env:
         p(flow.store, "set_session", side_effect=self.store.set_session)
         p(flow.store, "clear_session", side_effect=self.store.clear_session)
         p(flow, "_spawn", side_effect=self.spawned.append)
+        p(roster_store, "get_profile", return_value=None)
+        p(flow.menu_flow.booking_qa.masters_cache, "qa_snapshot", return_value=_MASTER_SNAPSHOT)
 
         # 客户档落定后 flow 委托 menu_flow.after_customer_saved → booking_qa.start(DL-7 逐问);
         # 此处存 DL-3 客户写档语义,start 桩成「消费 reviewing 会话」——订车执行在 test_line_dms_booking。
@@ -842,7 +855,7 @@ class PhonePassthroughTests(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch.object(flow.store, "get_session", return_value=sess),
             mock.patch.object(flow, "_merge_session", new_callable=mock.AsyncMock) as merge,
-            mock.patch.object(flow, "_spawn"),
+            mock.patch.object(text_router.cloud_dispatch, "spawn"),
             mock.patch.object(text_router, "_reply"),
         ):
             merge.return_value = {"id_card": {"people_id": "x"}, "phone": "12345678"}

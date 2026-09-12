@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from services.line_dms import qa_cards
+from services.erp.mrerp_dms_company_banks import PAYMENT_CHANNEL_BANKS
 from services.line_dms._out import _send
 from services.line_dms.qa_util import car_label_of
 
@@ -14,6 +15,7 @@ PAGED_MASTER = {
     "term": "term_sales",
     "regis": "regis_behalfs",
     "bank": "company_banks",
+    "srcbank": "source_banks",
     "paint": "paints",
 }
 
@@ -30,7 +32,8 @@ def static_question(step, qa) -> Optional[Dict[str, Any]]:
         "regis_name": qa_cards.ask_regis_name(),
         "pay_channel": qa_cards.ask_pay_channel(qa.get("payments") or []),
         "pay_amount": qa_cards.ask_amount(qa_cards.PAY_LABELS.get(channel, "")),
-        "pay_src": qa_cards.ask_pay_src(),
+        "pay_src_detail": qa_cards.ask_transfer_details(False),
+        "pay_dst_detail": qa_cards.ask_transfer_details(True),
         "pay_ref": qa_cards.ask_pay_ref(channel),
         "pay_more": qa_cards.ask_more(),
         "slip_after": qa_cards.need_slip(),
@@ -56,6 +59,13 @@ async def question(line_user_id, qa, step, masters, paints) -> Optional[Dict[str
     if step == "paint":
         return qa_cards.ask_paint(
             car_label_of(qa), await paints(line_user_id, qa), pages.get("paints", 0)
+        )
+    if step == "pay_bank":
+        key = PAYMENT_CHANNEL_BANKS[(qa.get("pending_channel") or {}).get("channel")]
+        return qa_cards.ask_payment_bank(await masters(line_user_id, qa, key), pages.get(key, 0))
+    if step == "pay_src":
+        return qa_cards.ask_pay_src(
+            await masters(line_user_id, qa, "source_banks"), pages.get("source_banks", 0)
         )
     if step == "pay_dst":
         return qa_cards.ask_pay_dst(
@@ -98,7 +108,11 @@ async def flip_page(
         await persist(tenant_id, line_user_id, qa)
         _send(line_user_id, qa_cards.car_results(hits, len(hits), search["page"]), reply_token)
         return
-    key = PAGED_MASTER.get(action)
+    key = (
+        PAYMENT_CHANNEL_BANKS.get((qa.get("pending_channel") or {}).get("channel"))
+        if action == "paybank"
+        else PAGED_MASTER.get(action)
+    )
     if not key:
         await reask(tenant_id, line_user_id, qa, "", reply_token)
         return

@@ -16,6 +16,7 @@ from services.cloud_tasks import dispatch as cloud_dispatch
 from services.line_platform import client as line_client
 from services.line_dms import (
     binding_guard,
+    booking_attempt,
     booking_qa,
     cards,
     commands,
@@ -67,6 +68,10 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
         ):
             return
     if state == "booking_review":
+        marker = ((sess or {}).get("payload") or {}).get("booking_attempt")
+        if marker:
+            _reply(reply_token, booking_attempt.message(marker))
+            return
         _reply(reply_token, qa_cards.TXT_CONFIRM_ABOVE)
         return
 

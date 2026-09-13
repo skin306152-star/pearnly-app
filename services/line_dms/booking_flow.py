@@ -25,6 +25,7 @@ from services.line_dms import (
     _out,
     booking_attempt,
     booking_ledger,
+    booking_payments,
     cards,
     master_contract,  # noqa: F401  模块对外名保留(会话快照/测试夹具用它构造 qa)
     masters_cache,
@@ -325,6 +326,9 @@ def _book_in_session(
         from services.erp.mrerp_dms_payments import validate_payment_completeness
         from services.line_dms import booking_preflight
 
+        # Cards already issued by the previous collector retained the evidence
+        # that the source directory was empty but missed the payment-level flag.
+        booking_payments.restore_manual_source_bank_marker(qa)
         validate_payment_completeness(qa.get("payments") or [])
 
         # 只读阶段:配了独立管理员凭据组时,这一块里的**一切读**都走管理员权威会话(销售常

@@ -135,6 +135,42 @@ def _write(endpoint_id: str, masters: Dict[str, Any], *, touch_refreshed_at: boo
         logger.warning("[dms masters] write failed", exc_info=True)
 
 
+def _write_full_preserving_paints(endpoint_id: str, masters: Dict[str, Any]) -> None:
+    """Replace the full master bundle without losing concurrent color results.
+
+    A full refresh can take several seconds. A color request may finish during
+    that interval, so preserving the blob read before the DMS call is not enough.
+    Merge the color maps from the current database row in the same SQL statement
+    that replaces the full bundle.
+    """
+    from core import db
+
+    if not endpoint_id:
+        return
+
+    def _run():
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "INSERT INTO dms_masters_cache (endpoint_id, masters, refreshed_at) "
+                "VALUES (%s, %s::jsonb, now()) "
+                "ON CONFLICT (endpoint_id) DO UPDATE SET masters = "
+                "EXCLUDED.masters || jsonb_build_object("
+                "'paints_by_car', "
+                "COALESCE(EXCLUDED.masters->'paints_by_car', '{}'::jsonb) || "
+                "COALESCE(dms_masters_cache.masters->'paints_by_car', '{}'::jsonb), "
+                "'paints_refreshed_at', "
+                "COALESCE(EXCLUDED.masters->'paints_refreshed_at', '{}'::jsonb) || "
+                "COALESCE(dms_masters_cache.masters->'paints_refreshed_at', '{}'::jsonb)), "
+                "refreshed_at = EXCLUDED.refreshed_at",
+                (endpoint_id, json.dumps(masters or {}, ensure_ascii=False)),
+            )
+
+    try:
+        _with_heal(_run)
+    except Exception:
+        logger.warning("[dms masters] full snapshot write failed", exc_info=True)
+
+
 # ── 登录抓取(失败即软回退) ──────────────────────────────────────────────
 def _fetch_masters_via_login(
     endpoint: Dict[str, Any], *, require_complete: bool = False
@@ -171,6 +207,29 @@ def _fetch_paints_via_login(endpoint: Dict[str, Any], car_id: str) -> Optional[L
         authoritative_read=True,
     )
     if isinstance(res, dict):
+        return None
+    return res
+
+
+def _fetch_paints_batch_via_login(
+    endpoint: Dict[str, Any], car_ids: List[str]
+) -> Optional[Dict[str, List[list]]]:
+    """Fetch several known car color lists in one authoritative DMS login."""
+    from services.erp.erp_dms_intake import _run_logged_in
+
+    wanted = [str(car_id) for car_id in car_ids if str(car_id or "")]
+
+    def _fetch(client, _adapter):
+        rows = {}
+        for car_id in wanted:
+            value = client._bshsd_all("txtcarpaint", idcar=car_id)
+            if value is None:
+                return None
+            rows[car_id] = list(value)
+        return rows
+
+    res = _run_logged_in(endpoint, _fetch, authoritative_read=True)
+    if not isinstance(res, dict) or res.get("ok") is False:
         return None
     return res
 

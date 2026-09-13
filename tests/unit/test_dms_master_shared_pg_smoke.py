@@ -96,6 +96,21 @@ class SharedMasterLeasePostgresTests(unittest.TestCase):
         self.assertEqual(stored["company_banks"], [["bank-1"]])
         self.assertEqual(stored["paints_by_car"]["c1"], [["fresh-paint"]])
 
+    def test_full_master_refresh_cannot_erase_concurrent_paint_result(self):
+        full_snapshot_read_before_paint = {"cars": [["c1"], ["c2"]], "company_banks": []}
+        paint_writer = {
+            "paints_by_car": {"c1": [["p1", "", "Red"]]},
+            "paints_refreshed_at": {"c1": 123},
+        }
+        with patch("core.db.get_cursor", self.cursor):
+            cache._write("shared-scope", {"cars": [["c1"]]})
+            cache._write("shared-scope", paint_writer, touch_refreshed_at=False)
+            cache._write_full_preserving_paints("shared-scope", full_snapshot_read_before_paint)
+            stored = cache._read("shared-scope")["masters"]
+        self.assertEqual(stored["cars"], [["c1"], ["c2"]])
+        self.assertEqual(stored["paints_by_car"]["c1"], [["p1", "", "Red"]])
+        self.assertEqual(stored["paints_refreshed_at"]["c1"], 123)
+
 
 if __name__ == "__main__":
     unittest.main()

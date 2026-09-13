@@ -336,8 +336,16 @@ async def collect_details(tenant_id, line_user_id, qa, text, reply_token, *, per
     if details is None:
         _send(line_user_id, transfer_details_question(qa), reply_token)
         return
-    qa["pending_channel"].setdefault("extra", {}).update(details)
+    extra = qa["pending_channel"].setdefault("extra", {})
+    extra.update(details)
     if not destination:
+        # An authoritatively empty source-bank directory has no hidden bank id.
+        # Keep that provenance on the completed payment so the final native-field
+        # guard does not reject an otherwise complete manual source account.
+        if manual_source:
+            extra[MANUAL_BANK_FLAG] = "1"
+        else:
+            extra.pop(MANUAL_BANK_FLAG, None)
         qa["step"] = "pay_dst"
         await persist(tenant_id, line_user_id, qa)
         await send_step(tenant_id, line_user_id, qa, "pay_dst", reply_token)

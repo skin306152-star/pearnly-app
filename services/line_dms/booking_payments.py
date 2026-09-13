@@ -37,6 +37,31 @@ _DETAIL_KEYS = {
 }
 
 
+def restore_manual_source_bank_marker(qa: dict) -> None:
+    """Repair confirmation drafts made while the source-bank directory was empty.
+
+    ``manual_banks`` is the session's authoritative evidence. Older drafts could
+    contain every visible source field but miss the provenance marker, causing
+    the pre-write guard to demand an impossible DMS bank id. Live reconciliation
+    still accepts a bank that now exists or rejects a mismatch.
+    """
+    if "source_banks" not in set(qa.get("manual_banks") or ()):
+        return
+    for payment in qa.get("payments") or ():
+        if payment.get("channel") != "transfer":
+            continue
+        extra = payment.setdefault("extra", {})
+        if (
+            not str(extra.get("src_bank_id") or "").strip()
+            and str(extra.get("src_bank_name") or "").strip()
+            and all(
+                str(extra.get(key) or "").strip()
+                for key in ("src_account_name", "src_account_no", "src_branch_name")
+            )
+        ):
+            extra[MANUAL_BANK_FLAG] = "1"
+
+
 def _two_parts(channel: str, value: str) -> Optional[Tuple[str, str]]:
     """两段拆法:共用分隔符规则先试;只剩空格(或竖线段数不是 2)时沿用老写法。
 

@@ -555,6 +555,78 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rec["paint_reads"], ["c1"])  # 只抓选中车型的颜色
         self.assertEqual(rec["attempts"], ["BK123"])  # 越过写边界前先记本次尝试
 
+    async def test_existing_manual_source_review_submits_once_with_both_attachments(self):
+        """A production card issued before the marker fix remains confirmable.
+
+        The live DMS source-bank directory is empty, the selected destination is
+        still current, and every visible source field is complete. Confirmation
+        repairs provenance, performs one write, then attaches the ID card and slip.
+        """
+        rec = {}
+
+        class EmptySourceBankClient(_FakeClient):
+            def _bshsd_all(self, elemname, **kwargs):
+                if elemname == "txtbanknametffrom":
+                    return []
+                return super()._bshsd_all(elemname, **kwargs)
+
+        review = _review()
+        qa_payload = review["qa"]
+        qa_payload["manual_banks"] = ["source_banks"]
+        qa_payload["master_snapshot"]["rows"]["source_banks"] = []
+        qa_payload["payments"][0]["extra"].update(
+            {
+                "src_bank_id": "",
+                "src_bank_name": "KBank",
+                "src_account_name": "Somchai Jaidee",
+                "src_account_no": "1234567890",
+                "src_branch_name": "Rayong",
+            }
+        )
+        qa_payload["payments"][0]["extra"].pop("bank_manual", None)
+
+        def fake_run(ep, do):
+            return do(EmptySourceBankClient(rec), _FakeAdapter())
+
+        attachments = [
+            {
+                "display_name": "สำเนาบัตรประชาชน",
+                "filename": "idcard.jpg",
+                "content_type": "image/jpeg",
+                "content": _JPEG,
+            },
+            {
+                "display_name": "ใบโอนเงินจอง",
+                "filename": "slip.jpg",
+                "content_type": "image/jpeg",
+                "content": _JPEG,
+            },
+        ]
+        with (
+            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: bf._card_payload(review),
+            ),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
+        ):
+            result = bf._book_in_session(
+                {"id": "E1", "config": {}}, review, attach_files=attachments
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["booking_no"], "BK123")
+        self.assertTrue(result["attach_ok"])
+        self.assertEqual(result["attached"], 2)
+        self.assertEqual(rec["customer_id"], "C1")
+        self.assertEqual(
+            [item["filename"] for item in rec["attach_files"]], ["idcard.jpg", "slip.jpg"]
+        )
+        self.assertEqual(
+            rec["booking"].payments[0]["extra"]["bank_manual"],
+            "1",
+        )
+
     async def test_d4_attach_failure_appends_attach_note(self):
         """建单成功但附件没挂全 → 回执如实追加 TXT_ATTACH_FAIL,不谎报附件成功。"""
         result = {

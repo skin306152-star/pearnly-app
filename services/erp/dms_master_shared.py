@@ -23,6 +23,7 @@ BACKGROUND_MAX_AGE_SECONDS = int(os.environ.get("DMS_MASTER_BACKGROUND_MAX_AGE_S
 PAINT_MAX_AGE_SECONDS = int(os.environ.get("DMS_PAINT_SESSION_MAX_AGE_SECONDS", "90"))
 REFRESH_WAIT_SECONDS = int(os.environ.get("DMS_MASTER_REFRESH_WAIT_SECONDS", "45"))
 REFRESH_LEASE_SECONDS = int(os.environ.get("DMS_MASTER_REFRESH_LEASE_SECONDS", "150"))
+PAINT_WARM_LIMIT = int(os.environ.get("DMS_PAINT_WARM_LIMIT", "8"))
 
 _LOCK_TABLE = "dms_master_refresh_locks"
 _LOCK_DDL = f"""
@@ -200,7 +201,7 @@ def get_session_masters(
             logger.warning("[dms masters] refresh returned an incomplete bundle; cache unchanged")
             return {}
         fresh = _preserve_paints(dict(fresh), cached)
-        cache._write(scope_key, fresh)
+        cache._write_full_preserving_paints(scope_key, fresh)
         return fresh
     finally:
         _release(scope_key, owner)
@@ -247,6 +248,13 @@ def get_session_paints(
     lock_key = scope_key + ":paint:" + car_id
     owner = _acquire(lock_key)
     if not owner:
+        # A scheduled warmer or another operator is already refreshing this car.
+        # Reuse the last complete list instead of making the LINE reply wait for
+        # the DMS session. Final booking preflight still performs a live read.
+        cached = cache._read(scope_key)
+        stale = (((cached or {}).get("masters") or {}).get("paints_by_car") or {}).get(car_id)
+        if isinstance(stale, list):
+            return list(stale)
         deadline = time.monotonic() + REFRESH_WAIT_SECONDS
         while time.monotonic() < deadline:
             existing = _paint_result(scope_key, car_id, max_age_seconds)
@@ -279,3 +287,54 @@ def get_session_paints(
         return list(rows)
     finally:
         _release(lock_key, owner)
+
+
+def warm_cached_paints(
+    endpoint: Dict[str, Any], *, max_age_seconds: float = BACKGROUND_MAX_AGE_SECONDS
+) -> int:
+    """Refresh recently used color lists off the LINE request path.
+
+    Only cars already selected by users are eligible, capped per scope. Their
+    individual leases avoid racing an interactive refresh, while one DMS login
+    serves the whole batch.
+    """
+    from services.erp import dms_masters_cache as cache
+
+    scope_key = cache_scope_id(endpoint)
+    cached = cache._read(scope_key)
+    masters = (cached or {}).get("masters") or {}
+    paints = masters.get("paints_by_car") or {}
+    stamps = masters.get("paints_refreshed_at") or {}
+    candidates = []
+    for car_id in paints:
+        try:
+            age = time.time() - float(stamps.get(car_id))
+        except (TypeError, ValueError):
+            age = float("inf")
+        if age > float(max_age_seconds):
+            candidates.append((float(stamps.get(car_id) or 0), str(car_id)))
+    candidates.sort(reverse=True)
+
+    leases = []
+    for _stamp, car_id in candidates[: max(0, PAINT_WARM_LIMIT)]:
+        owner = _acquire(scope_key + ":paint:" + car_id)
+        if owner:
+            leases.append((car_id, owner))
+    if not leases:
+        return 0
+    try:
+        rows_by_car = cache._fetch_paints_batch_via_login(
+            endpoint, [car_id for car_id, _owner in leases]
+        )
+        if rows_by_car is None:
+            return 0
+        now = time.time()
+        update = {
+            "paints_by_car": {car_id: rows_by_car[car_id] for car_id, _owner in leases},
+            "paints_refreshed_at": {car_id: now for car_id, _owner in leases},
+        }
+        cache._write(scope_key, update, touch_refreshed_at=False)
+        return len(leases)
+    finally:
+        for car_id, owner in leases:
+            _release(scope_key + ":paint:" + car_id, owner)

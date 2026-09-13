@@ -11,6 +11,7 @@ from services.erp.dms_master_shared import (
     get_session_masters,
     is_shared_scope,
     needs_refresh,
+    warm_cached_paints,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,4 +103,8 @@ def refresh_endpoint(endpoint_id: str) -> dict:
     )
     if not masters:
         raise RuntimeError("dms_master_refresh_failed")
-    return {"status": "fresh", "scope": cache_scope_id(endpoint)[:20]}
+    warmed = warm_cached_paints(endpoint, max_age_seconds=BACKGROUND_MAX_AGE_SECONDS)
+    logger.info(
+        "dms_master_refresh scope=%s paints_warmed=%s", cache_scope_id(endpoint)[:20], warmed
+    )
+    return {"status": "fresh", "scope": cache_scope_id(endpoint)[:20], "paints_warmed": warmed}

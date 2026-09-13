@@ -17,6 +17,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-key-for-line-dms-qa-32bytes-lon
 from services.erp import erp_dms_push  # noqa: E402
 from services.line_platform import client as line_client  # noqa: E402
 from services.line_dms import booking_qa as qa  # noqa: E402
+from services.line_dms import booking_payments  # noqa: E402
 from services.line_dms import masters_cache  # noqa: E402
 from services.line_dms import master_contract  # noqa: E402
 from services.line_dms import qa_cards  # noqa: E402
@@ -198,11 +199,86 @@ def _replied_items(env):
     return env.reply.call_args.args[1][0]["quickReply"]["items"]
 
 
+def _replied_actions(env):
+    return [item["action"]["data"] for item in _replied_items(env)]
+
+
 def _pushed_text(env):
     return env.push.call_args.args[1][0]["text"]
 
 
 class BookingQaTests(unittest.IsolatedAsyncioTestCase):
+    async def test_complete_line_dialogue_with_manual_source_bank_reaches_review(self):
+        """Production-shaped conversation: one snapshot, one color read, two attachments.
+
+        The source-bank directory is authoritatively empty, while the company
+        destination list is populated. This is the path that previously built a
+        complete-looking card but failed the hidden native-field validation.
+        """
+        with Env(**PRODUCTION_BANKS) as env:
+            await qa.start(
+                _TID,
+                _LUID,
+                "E1",
+                "C1",
+                "สมชาย ใจดี",
+                "mid-card",
+                "rt-start",
+                draft={"people_id": "1234567890121", "phone": "0812345678"},
+                user_id="U1",
+            )
+            self.assertEqual(env.qa_payload()["step"], "place")
+            self.assertIn("qa:place:pl1", _replied_actions(env))
+
+            await qa.handle_postback(_TID, _LUID, "qa:place:pl1", {}, "rt-place")
+            await qa.handle_text(_TID, _LUID, "dmax", "rt-car-search")
+            self.assertIn("qa:car:c1", _replied_actions(env))
+            await qa.handle_postback(_TID, _LUID, "qa:car:c1", {}, "rt-car")
+            self.assertIn("qa:paint:p1", _replied_actions(env))
+            await qa.handle_postback(_TID, _LUID, "qa:paint:p1", {}, "rt-paint")
+            self.assertIn("qa:date", _replied_actions(env))
+            await qa.handle_postback(_TID, _LUID, "qa:date", {"date": "2026-09-19"}, "rt-date")
+            self.assertIn("qa:term:t1", _replied_actions(env))
+            await qa.handle_postback(_TID, _LUID, "qa:term:t1", {}, "rt-term")
+            self.assertIn("qa:regis:r2", _replied_actions(env))
+            await qa.handle_postback(_TID, _LUID, "qa:regis:r2", {}, "rt-regis")
+            self.assertIn("qa:regisname:card", _replied_actions(env))
+            await qa.handle_postback(_TID, _LUID, "qa:regisname:card", {}, "rt-regis-name")
+            self.assertIn("qa:pay:transfer", _replied_actions(env))
+            await qa.handle_postback(_TID, _LUID, "qa:pay:transfer", {}, "rt-pay-channel")
+            await qa.handle_text(_TID, _LUID, "1000", "rt-amount")
+            self.assertEqual(env.qa_payload()["step"], "pay_src_detail")
+
+            await qa.handle_text(
+                _TID,
+                _LUID,
+                "KBank / Somchai Jaidee / 1234567890 / Rayong",
+                "rt-source",
+            )
+            self.assertIn("qa:bank:2", _replied_actions(env))
+            await qa.handle_postback(_TID, _LUID, "qa:bank:2", {}, "rt-destination")
+            await qa.handle_text(_TID, _LUID, "Example Company Limited", "rt-company")
+            self.assertEqual(env.qa_payload()["step"], "slip_after")
+            await qa.handle_image(_TID, _LUID, "mid-slip", "rt-slip")
+            self.assertIn("qa:more:done", _replied_actions(env))
+            await qa.handle_postback(_TID, _LUID, "qa:more:done", {}, "rt-preview")
+
+            session = env.session()
+            self.assertEqual(session["state"], "booking_review")
+            payload = session["payload"]
+            self.assertTrue(payload["nonce"])
+            finished = payload["qa"]
+            self.assertEqual(finished["files"], {"id_card_mid": "mid-card", "slip_mid": "mid-slip"})
+            self.assertEqual(finished["answers"]["paint"], {"id": "p1", "name": "ขาว"})
+            self.assertEqual(finished["answers"]["delivery_date_be"], "19/09/2569")
+            payment = finished["payments"][0]
+            self.assertEqual(payment["amount"], "1000.00")
+            self.assertEqual(payment["extra"]["bank_manual"], "1")
+            self.assertEqual(payment["extra"]["dst_id"], "2")
+            self.assertEqual(payment["extra"]["dst_account_no"], "9876543210")
+            self.assertEqual(len(env.live_master_reads()), 1)
+            self.assertEqual(env.paints_calls, ["c1"])
+
     async def test_start_initializes_payload_and_asks_place(self):
         with Env() as env:
             await qa.start(_TID, _LUID, "E1", "C1", "สมชาย ใจดี", "mid-card", "rt")
@@ -878,6 +954,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             payment = env.qa_payload()["payments"][0]
             self.assertEqual(payment["extra"]["dst_id"], "2")
             self.assertEqual(payment["extra"]["src_bank_name"], "KBank")
+            self.assertEqual(payment["extra"]["bank_manual"], "1")
 
     async def test_stuck_session_on_pay_src_continues_with_text_without_rescanning(self):
         """老会话已卡在 pay_src 且快照 source_banks=[]:重试即继续,不重扫身份证、不重开局。"""
@@ -898,6 +975,26 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(p["pending_channel"]["extra"]["src_bank_name"], "KBank")
             self.assertNotEqual(_replied_text(env), qa_cards.TXT_NO_COMPANY_BANK)
             self.assertEqual(env.live_master_reads(), [])  # 复用会话快照,零新登录
+
+    def test_existing_review_draft_recovers_manual_source_bank_marker(self):
+        qa_payload = _qa(
+            "pay_more",
+            manual_banks=["source_banks"],
+            payments=[
+                {
+                    "channel": "transfer",
+                    "amount": "1000.00",
+                    "extra": {
+                        "src_bank_name": "KBank",
+                        "src_account_name": "Somchai Jaidee",
+                        "src_account_no": "1234567890",
+                        "src_branch_name": "Rayong",
+                    },
+                }
+            ],
+        )
+        booking_payments.restore_manual_source_bank_marker(qa_payload)
+        self.assertEqual(qa_payload["payments"][0]["extra"]["bank_manual"], "1")
 
     async def test_source_bank_directory_rows_keep_the_live_selection_step(self):
         with Env() as env:

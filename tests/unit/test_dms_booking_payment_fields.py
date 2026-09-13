@@ -124,6 +124,29 @@ class TestPaymentFormFields(unittest.TestCase):
                 payment_form_fields(({"channel": "transfer", "amount": "1000", "extra": extra},))
             self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
 
+    def test_transfer_company_account_name_is_optional_and_left_blank(self):
+        fields = payment_form_fields(
+            (
+                {
+                    "channel": "transfer",
+                    "amount": "1000",
+                    "extra": {
+                        "src_account_name": "Customer",
+                        "src_account_no": "1234567890",
+                        "src_bank_name": "KBank",
+                        "src_bank_id": "7",
+                        "src_branch_name": "Rayong",
+                        "dst_account_no": "123456789000000",
+                        "dst_bank_name": "abcdefg",
+                        "dst_bank_id": "bbc",
+                        "dst_branch_name": "aaa",
+                    },
+                },
+            )
+        )
+        self.assertEqual(fields["txtaccountnumtfmon"], "123456789000000")
+        self.assertNotIn("txtbusinessnametfmon", fields)
+
     def test_other_payment_channels_require_native_reference_and_bank_id(self):
         for channel, extra in (
             ("cheque", {"cheque_no": "123", "bank_name": "SCB"}),

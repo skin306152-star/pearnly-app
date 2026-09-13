@@ -203,7 +203,7 @@
                   '</label><select class="dst" required>' +
                   bankOptions(masters.company_banks, x.dst_id) +
                   '</select></div>' +
-                  paymentField('dst-name', 'destinationName', x.dst_business_name, true, true) +
+                  paymentField('dst-name', 'destinationName', x.dst_business_name, true, false) +
                   paymentField('dst-account', 'destinationAccount', x.dst_account_no, false, true) +
                   paymentField('dst-branch', 'destinationBranch', x.dst_branch_name, false, true) +
                   '</div>'

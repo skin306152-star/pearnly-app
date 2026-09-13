@@ -753,10 +753,6 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.handle_text(_TID, _LUID, "SCB", "rt")
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
             await qa.handle_postback(_TID, _LUID, "qa:bank:1", {}, "rt")
-            self.assertEqual(env.qa_payload()["step"], "pay_dst_detail")
-            self.assertIn("ชื่อบัญชีบริษัท", _replied_text(env))
-            self.assertNotIn("เลขบัญชี | สาขา", _replied_text(env))
-            await qa.handle_text(_TID, _LUID, "Company", "rt")
             p = env.qa_payload()
             self.assertEqual(p["step"], "slip_after")
             self.assertEqual(p["after_slip"], "pay_more")
@@ -769,7 +765,6 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                     "src_account_name": "Customer",
                     "src_account_no": "999",
                     "src_branch_name": "Bangkok",
-                    "dst_business_name": "Company",
                     "dst_id": "1",
                     "dst": "SCB · 1234567890123 · ระยอง",
                     "dst_bank_id": "1",
@@ -794,7 +789,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(env.session()["state"], "booking_review")
 
     async def test_company_bank_complete_draft_skips_redundant_destination_question(self):
-        with Env() as env:
+        with Env(company_banks=[["bbc", "bbc", "abcdefg", "aaa", "123456789000000"]]) as env:
             _seed(
                 env,
                 _qa(
@@ -807,15 +802,45 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                             "src_account_name": "Customer",
                             "src_account_no": "999",
                             "src_branch_name": "Bangkok",
-                            "dst_business_name": "Company",
                         },
                     },
                 ),
             )
-            await qa.handle_postback(_TID, _LUID, "qa:bank:1", {}, "rt")
+            await qa.handle_postback(_TID, _LUID, "qa:bank:bbc", {}, "rt")
             payload = env.qa_payload()
             self.assertEqual(payload["step"], "pay_more")
-            self.assertEqual(payload["payments"][0]["extra"]["dst_account_no"], "1234567890123")
+            extra = payload["payments"][0]["extra"]
+            self.assertEqual(extra["dst_bank_name"], "abcdefg")
+            self.assertEqual(extra["dst_account_no"], "123456789000000")
+            self.assertEqual(extra["dst_branch_name"], "aaa")
+            self.assertNotIn("dst_business_name", payload["payments"][0]["extra"])
+            self.assertNotIn("ชื่อบัญชีบริษัท", _replied_text(env))
+
+    async def test_old_destination_reply_with_optional_name_is_still_accepted(self):
+        with Env(company_banks=[["1", "SCB", "SCB", "00", "00"]]) as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_dst_detail",
+                    files={"id_card_mid": "mid-card", "slip_mid": "mid-slip"},
+                    pending_channel={
+                        "channel": "transfer",
+                        "amount": "1000.00",
+                        "extra": {
+                            "src_account_name": "Customer",
+                            "src_account_no": "999",
+                            "src_branch_name": "Bangkok",
+                            "dst_id": "1",
+                            "dst_bank_id": "1",
+                            "dst_bank_name": "SCB",
+                        },
+                    },
+                ),
+            )
+            await qa.handle_text(_TID, _LUID, "Company | 1234567890 | Rayong", "rt")
+            extra = env.qa_payload()["payments"][0]["extra"]
+            self.assertEqual(extra["dst_business_name"], "Company")
+            self.assertEqual(extra["dst_account_no"], "1234567890")
 
     async def test_company_bank_missing_details_only_asks_the_gaps(self):
         with Env(company_banks=[["1", "SCB", "SCB", "00", "00"]]) as env:

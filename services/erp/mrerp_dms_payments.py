@@ -73,6 +73,11 @@ _MANUAL_OPTIONAL_FIELDS = {
     "card": frozenset({"bank_id"}),
 }
 
+# DMS accepts and persists a transfer while the receiving company-account name stays blank.
+# Keep mapping the field when a trusted source provides it, but never block LINE/editor users
+# or a native booking submission merely because the bank master does not expose it.
+_OPTIONAL_FIELDS = {"transfer": frozenset({"dst_business_name"})}
+
 
 def manual_bank_entry(extra: dict) -> bool:
     """这笔付款的银行名称是否来自「目录权威为空时的手工填写」。"""
@@ -80,13 +85,12 @@ def manual_bank_entry(extra: dict) -> bool:
 
 
 def missing_transfer_fields(extra: dict) -> list[str]:
-    """Native DMS transfer fields are required together; only a manual bank name may omit
-    the source bank id when that directory is authoritatively empty."""
+    """Return missing native transfer fields that DMS actually requires."""
     return _missing_fields("transfer", extra)
 
 
 def _missing_fields(channel: str, extra: dict) -> list[str]:
-    optional = (
+    optional = _OPTIONAL_FIELDS.get(channel, frozenset()) | (
         _MANUAL_OPTIONAL_FIELDS.get(channel, frozenset())
         if manual_bank_entry(extra)
         else frozenset()

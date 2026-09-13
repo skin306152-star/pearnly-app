@@ -170,9 +170,13 @@ def normalize_editor_payments(rows: list, masters: dict) -> list[dict]:
                         "src_account_no",
                         "src_account_name",
                         "src_branch_name",
-                        "dst_business_name",
                     )
                 },
+                **(
+                    {"dst_business_name": str(extra.get("dst_business_name") or "").strip()}
+                    if str(extra.get("dst_business_name") or "").strip() not in {"", "-"}
+                    else {}
+                ),
                 **company_bank_payment_extra(bank, extra),
                 **({MANUAL_BANK_FLAG: "1"} if source["manual"] else {}),
             }

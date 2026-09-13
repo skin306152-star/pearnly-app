@@ -623,7 +623,7 @@ test('mobile payment and attachment controls stay aligned', async ({ page }) => 
     await page.screenshot({ path: path.join(OUT, 'mobile-controls.png'), fullPage: true });
 });
 
-test('payment editor keeps bank, account and company destination as separate fields', async ({
+test('payment editor keeps bank and account details while company name stays optional', async ({
     page,
 }) => {
     let submitted;
@@ -669,10 +669,10 @@ test('payment editor keeps bank, account and company destination as separate fie
     await expect(page.locator('.src-time')).toHaveCount(0);
     await expect(page.locator('.dst')).toHaveValue('2');
     await expect(page.locator('.dst option:checked')).toHaveText('BBL · Bbl 987654321 · ระยอง');
+    await expect(page.locator('.dst-name')).not.toHaveAttribute('required', '');
     await expect(page.locator('[data-t="loading"]')).toBeHidden();
     await page.locator('#save').click();
     expect(submitted).toBeUndefined();
-    await page.locator('.dst-name').fill('Example Company');
     await page.locator('.dst-account').fill('987654321');
     await page.locator('.dst-branch').fill('Rayong');
     await page.locator('.src-bank').selectOption('');
@@ -704,7 +704,7 @@ test('payment editor keeps bank, account and company destination as separate fie
         amount: '1000.00',
         extra: {
             src_bank_id: 'S1',
-            dst_business_name: 'Example Company',
+            dst_business_name: '',
             dst_account_no: '987654321',
             dst_branch_name: 'Rayong',
             src_account_no: '111222333',

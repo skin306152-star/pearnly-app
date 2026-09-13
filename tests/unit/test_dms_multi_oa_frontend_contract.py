@@ -126,7 +126,7 @@ class BookingLiffChannelContractTests(unittest.TestCase):
                 "dms-booking-i18n.js?v=10",
                 "dms-booking-api.js?v=7",
                 "dms-credentials.js?v=5",
-                "dms-booking-edit.js?v=18",
+                "dms-booking-edit.js?v=19",
             ):
                 with self.subTest(shell=rel, needle=needle):
                     self.assertIn(needle, html)

@@ -302,6 +302,14 @@ class BookingEditTests(TestCase):
         self.assertEqual(clean[0]["extra"]["dst_account_no"], "987654321")
         self.assertEqual(clean[0]["extra"]["dst_business_name"], "Company")
 
+    def test_receiving_company_account_name_is_optional_in_editor(self):
+        from services.line_dms.booking_payments import normalize_editor_payments
+
+        payment = form()["payments"][0]
+        payment["extra"].pop("dst_business_name")
+        clean = normalize_editor_payments([payment], MASTERS)
+        self.assertNotIn("dst_business_name", clean[0]["extra"])
+
     def test_load_marks_manual_banks_only_where_the_directory_is_empty(self):
         with (
             mock.patch.object(

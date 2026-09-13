@@ -163,6 +163,33 @@ class CompanyBankTests(unittest.TestCase):
         self.assertEqual(out[0]["extra"]["dst_bank_id"], "1")
         self.assertEqual(payments[0]["extra"]["dst"], "old")
 
+    def test_submit_revalidation_accepts_blank_company_account_name(self):
+        payments = [
+            {
+                "channel": "transfer",
+                "amount": "1000.00",
+                "extra": {
+                    "src_bank_name": "KBank",
+                    "src_bank_id": "S1",
+                    "src_account_name": "Customer",
+                    "src_account_no": "1234567890",
+                    "src_branch_name": "Rayong",
+                    "dst_id": "bbc",
+                },
+            }
+        ]
+        with mock.patch(
+            "services.erp.mrerp_dms_company_banks._fetch_banks",
+            side_effect=[
+                [["bbc", "bbc", "abcdefg", "aaa", "123456789000000"]],
+                [["S1", "KBANK", "KBank"]],
+            ],
+        ):
+            out = validate_company_bank_payments(object(), payments)
+        extra = out[0]["extra"]
+        self.assertEqual(extra["dst_account_no"], "123456789000000")
+        self.assertNotIn("dst_business_name", extra)
+
     def test_submit_rejects_removed_or_legacy_free_text_bank(self):
         payment = {"channel": "transfer", "amount": "1.00", "extra": {"dst": "SCB"}}
         with mock.patch("services.erp.mrerp_dms_company_banks._fetch_banks", return_value=[]):

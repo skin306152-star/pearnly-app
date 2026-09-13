@@ -29,7 +29,8 @@ from services.line_dms.text_fields import split_fields
 
 _SRC_KEYS = ("src_account_name", "src_account_no", "src_branch_name")
 _SRC_MANUAL_KEYS = ("src_bank_name", *_SRC_KEYS)
-_DST_KEYS = ("dst_business_name", "dst_account_no", "dst_branch_name")
+_DST_KEYS = ("dst_account_no", "dst_branch_name")
+_LEGACY_DST_KEYS = ("dst_business_name", *_DST_KEYS)
 _LEGACY_TIME = re.compile(r"(?:[01]?\d|2[0-3]):[0-5]\d")
 
 # 逐问里所有付款资料文本步:金额 / 来源银行(含目录为空时的手工名称)/ 渠道资料。
@@ -56,7 +57,8 @@ def parse_details(text, destination=False, manual_source=False, keys=None):
     分段用共用分隔符规则(text_fields):| ｜ , ， 、 / ／ · 都行,点号另有保守规则;
     一种规则切出的段数必须精确等于字段数,否则照旧重问。"""
     keys = tuple(
-        keys or (_DST_KEYS if destination else (_SRC_MANUAL_KEYS if manual_source else _SRC_KEYS))
+        keys
+        or (_LEGACY_DST_KEYS if destination else (_SRC_MANUAL_KEYS if manual_source else _SRC_KEYS))
     )
     raw = str(text or "").strip()
     parts = [raw] if len(keys) == 1 and raw else split_fields(text, len(keys))
@@ -77,7 +79,7 @@ def parse_details(text, destination=False, manual_source=False, keys=None):
 
 
 def destination_missing_keys(qa) -> tuple:
-    """Only ask for company-account fields absent from the selected DMS row/draft."""
+    """Only ask for DMS-required account fields absent from the selected bank row/draft."""
     extra = (qa.get("pending_channel") or {}).get("extra") or {}
     return tuple(key for key in _DST_KEYS if str(extra.get(key) or "").strip() in {"", "-", "00"})
 
@@ -327,12 +329,22 @@ async def collect_details(tenant_id, line_user_id, qa, text, reply_token, *, per
             send_step=send_step,
         )
         return
-    details = parse_details(
-        text,
-        destination=destination,
-        manual_source=manual_source,
-        keys=fields,
+    # A conversation may have received the old prompt immediately before a release. Try
+    # its optional leading company-name field first so a two-part legacy reply cannot be
+    # mistaken for one account-number field. New prompts never request that leading field.
+    legacy_fields = (
+        tuple(key for key in _LEGACY_DST_KEYS if key == "dst_business_name" or key in fields)
+        if destination
+        else ()
     )
+    details = parse_details(text, destination=True, keys=legacy_fields) if legacy_fields else None
+    if details is None:
+        details = parse_details(
+            text,
+            destination=destination,
+            manual_source=manual_source,
+            keys=fields,
+        )
     if details is None:
         _send(line_user_id, transfer_details_question(qa), reply_token)
         return

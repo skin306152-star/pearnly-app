@@ -28,6 +28,18 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
+- Pearnly 完整 SHA：`0e6cd1b9cbab138d62c50b7e5ec923dcb8308fcb`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:15c93c6216b9b7931afe188a73b1ef62918ca9f44647ab8f0d4ed168d4253a4d`。
+- Web revision：`pearnly-web-0e6cd1b9cbab-s3`；Worker revision：`pearnly-worker-0e6cd1b9cbab-s3`；两端 Ready、各 100% 流量，同一 digest。
+- [Manual CD 34761181296](https://github.com/skin306152-star/pearnly-app/actions/runs/34761181296) 于 2026-09-13 21:02 Bangkok 完成，conclusion success；schema execution `pearnly-schema-l7kbr` 成功，候选和正式两端的精确 SHA、镜像、健康、就绪及安装包完整下载均通过。
+- 公司收款账户户名改为可选：DMS 原生转账并不要求 `txtbusinessnametfmon`，银行主档未返回该字段时，选定银行后应直接用主档带回的银行编码、账号、分行继续，不再追加“公司账户户名”追问。本次把该字段从原生必填集合、LINE 逐问必填字段、编辑器归一化和泰语问法中一并放开：主档提供时照常映射，为空则留空保存，建单照常完成。已看到旧问法的会话按兼容路径接收，不会误把两段旧回包当成单个账号字段。
+- 流程回归：`services/erp/mrerp_dms_payments.py`、`services/line_dms/booking_payments.py`、`services/line_dms/booking_qa_transfer.py`、`services/line_dms/qa_payment_cards.py` 及配套单测、编辑器前端产物与缓存版本同批提交；最终 pre-push 1,183 个模块／6 分片及全部机械闸通过，未跳过 hook。
+- 线上回读：正式域名 `/api/health` 200、`/api/ready` 200；带 nonce `dms_optional_name=0e6cd1b9cbab` 的请求日志命中新 Web revision。
+- 性能观察（同一批次线上日志）：菜单 2 订车一轮共 23 次 DMS webhook，全部 200，耗时 0.23–0.65 秒；LIFF 编辑页 `GET/POST /api/line/dms-booking/draft` 各约 5.2 秒，是该页“每个请求只登录 DMS 一次、实时读权威主档、读不到即失败”的既有设计行为，非本次回归，本次未改动。
+- 业务边界：尚未由真实用户在手机上重跑一遍转账步骤，本次不把本地检查或日志回读当作真机验收；没有为验证创建、重提或修改真实 DMS 订车单。
+
+### 上一次 Pearnly 发布：DMS 订车确认与颜色缓存（2026-09-13 16:29）
+
 - Pearnly 完整 SHA：`64147d04e1426ab329314dae8d74a68e6733dbe5`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:ac596c42da5803818aac6ad3e82794bd28d79a105a0e049ce0593ff6c5e59bc2`。
 - Web revision：`pearnly-web-64147d04e142-s3`；Worker revision：`pearnly-worker-64147d04e142-s3`；两端 Ready、各 100% 流量，同一 digest。

@@ -109,12 +109,38 @@ def company_bank_label(row: list) -> str:
     """银行行 [id, code, name, branch, account] 的展示值；后两列可能为空。"""
     code = str(row[1]).strip() if len(row) > 1 else ""
     name = str(row[2]).strip() if len(row) > 2 else ""
-    branch = str(row[3]).strip() if len(row) > 3 else ""
-    account = str(row[4]).strip() if len(row) > 4 else ""
+    branch = _bank_detail(row[3] if len(row) > 3 else "")
+    account = _bank_detail(row[4] if len(row) > 4 else "")
     bank = (
         f"{code} · {name}" if code and name and code.casefold() != name.casefold() else name or code
     )
     return " · ".join(value for value in (bank, account, branch) if value) or str(row[0])
+
+
+def _bank_detail(value: Any) -> str:
+    """DMS uses 00 as an empty account/branch placeholder; never present it as real data."""
+    text = str(value or "").strip()
+    return "" if text == "00" else text
+
+
+def _bank_code_sort_key(row: list, original_index: int) -> tuple:
+    code = str(row[1] or "").strip() if len(row) > 1 else ""
+    row_id = str(row[0] or "").strip() if row else ""
+    if code.isdecimal():
+        return (0, int(code), code.casefold(), row_id)
+    # Some tenants use mnemonic codes (SCB/KBANK). DMS does not define a
+    # numeric ordering for those, so retain its native response order.
+    return (1, original_index, "", row_id)
+
+
+def sort_bank_rows(rows: Iterable[list]) -> List[list]:
+    """Return DMS bank rows in the same ascending bank-code order as the native screen."""
+    materialized = [list(row) for row in rows or []]
+    indexed = enumerate(materialized)
+    return [
+        row
+        for index, row in sorted(indexed, key=lambda pair: _bank_code_sort_key(pair[1], pair[0]))
+    ]
 
 
 def normalize_company_bank_rows(rows: Iterable[Any]) -> List[list]:
@@ -131,7 +157,7 @@ def normalize_company_bank_rows(rows: Iterable[Any]) -> List[list]:
         if not bank_id:
             continue
         out.append([bank_id, *(details + ["", "", "", ""])[:4]])
-    return out
+    return sort_bank_rows(out)
 
 
 def fetch_company_banks(adapter: Any, *, client: Any = None, timeout_ms: int = 10000) -> List[list]:
@@ -180,9 +206,9 @@ def company_bank_payment_extra(row: list, existing: dict | None = None) -> Dict[
         "dst": company_bank_label(row),
         "dst_bank_id": str(row[0]),
         "dst_bank_name": str(row[2]).strip() if len(row) > 2 else "",
-        "dst_branch_name": (str(row[3]).strip() if len(row) > 3 else "")
+        "dst_branch_name": _bank_detail(row[3] if len(row) > 3 else "")
         or str(existing.get("dst_branch_name") or "").strip(),
-        "dst_account_no": (str(row[4]).strip() if len(row) > 4 else "")
+        "dst_account_no": _bank_detail(row[4] if len(row) > 4 else "")
         or str(existing.get("dst_account_no") or "").strip(),
     }
 

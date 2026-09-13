@@ -312,6 +312,9 @@ def bad_payment_detail() -> Dict[str, Any]:
 
 
 def ask_pay_dst(company_banks: List[list], page: int = 0) -> Dict[str, Any]:
+    from services.erp.mrerp_dms_company_banks import sort_bank_rows
+
+    company_banks = sort_bank_rows(company_banks)
     if not company_banks:
         return _msg(TXT_NO_COMPANY_BANK)
     return _msg(

@@ -15,6 +15,7 @@ from services.erp.mrerp_dms_company_banks import (
     company_bank_payment_extra,
     PAYMENT_CHANNEL_BANKS,
     resolve_bank_identity,
+    sort_bank_rows,
 )
 from services.line_dms.qa_util import car_label, find_row, row_name
 
@@ -100,6 +101,8 @@ def snapshot_rows(snapshot: Dict[str, Any], key: str) -> List[list]:
         raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", key)
     if key in REQUIRED_NONEMPTY_KEYS and not value:
         raise MasterSyncError("ERR_DMS_MASTER_EMPTY", key)
+    if key in SNAPSHOT_KEYS[4:]:
+        return sort_bank_rows(value)
     return value
 
 

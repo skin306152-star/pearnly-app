@@ -274,6 +274,18 @@ class BookingEditTests(TestCase):
             ],
         )
 
+    def test_editor_sorts_bank_codes_and_hides_dms_zero_placeholders(self):
+        rows = [
+            ["B11", "11", "Bank 11", "00", "00"],
+            ["B02", "02", "Bank 02", "Rayong", "123"],
+            ["B01", "01", "Bank 01", "00", "00"],
+        ]
+        options = booking_edit._payment_bank_options("company_banks", rows)
+        self.assertEqual([item["id"] for item in options], ["B01", "B02", "B11"])
+        self.assertEqual(options[0]["label"], "01 · Bank 01")
+        self.assertEqual(options[0]["account_no"], "")
+        self.assertEqual(options[0]["branch_name"], "")
+
     def test_generic_receiving_bank_requires_account_details_in_editor(self):
         from services.line_dms.booking_payments import (
             normalize_editor_payments,

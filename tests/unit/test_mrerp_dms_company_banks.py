@@ -96,6 +96,27 @@ class CompanyBankTests(unittest.TestCase):
         self.assertEqual(company_bank_label(rows[0]), "SCB")
         self.assertEqual(company_bank_label(rows[1]), "KBANK · บัญชีรับจอง")
 
+    def test_bank_rows_follow_native_numeric_code_order(self):
+        codes = ["11", "03", "02", "09", "01", "08", "00", "10", "07", "13", "06"]
+        rows = normalize_company_bank_rows(
+            [[f"id-{code}", code, f"Bank {code}", "00", "00"] for code in codes]
+        )
+        self.assertEqual(
+            [row[1] for row in rows],
+            ["00", "01", "02", "03", "06", "07", "08", "09", "10", "11", "13"],
+        )
+        self.assertEqual(company_bank_label(rows[0]), "00 · Bank 00")
+
+    def test_dms_zero_placeholders_do_not_replace_real_account_details(self):
+        row = ["2", "11", "ธนาคาร ไอซีบีซี จำกัด", "00", "00"]
+        self.assertEqual(company_bank_label(row), "11 · ธนาคาร ไอซีบีซี จำกัด")
+        extra = company_bank_payment_extra(
+            row,
+            {"dst_account_no": "987654321", "dst_branch_name": "ระยอง"},
+        )
+        self.assertEqual(extra["dst_account_no"], "987654321")
+        self.assertEqual(extra["dst_branch_name"], "ระยอง")
+
     def test_label_and_payment_extra_include_account_and_branch(self):
         row = ["2", "BBL", "BBL", "ระยอง", "Bbl 987654321"]
         self.assertEqual(company_bank_label(row), "BBL · Bbl 987654321 · ระยอง")

@@ -54,8 +54,9 @@ def ask_pay_ref(channel: str, manual_bank: bool = False) -> dict:
 
 def ask_payment_bank(banks: list, page: int = 0, channel: str = "") -> dict:
     from services.line_dms.qa_cards import _msg, _option_text, _pick_rows, ask_pay_ref
-    from services.erp.mrerp_dms_company_banks import company_bank_label
+    from services.erp.mrerp_dms_company_banks import company_bank_label, sort_bank_rows
 
+    banks = sort_bank_rows(banks)
     if not banks:
         return ask_pay_ref(channel, manual_bank=True)
     return _msg(
@@ -81,8 +82,9 @@ def ask_pay_src(banks: list, page: int = 0) -> dict:
         _pick_rows,
         TXT_ASK_PAY_SRC,
     )
-    from services.erp.mrerp_dms_company_banks import company_bank_label
+    from services.erp.mrerp_dms_company_banks import company_bank_label, sort_bank_rows
 
+    banks = sort_bank_rows(banks)
     if not banks:
         return ask_transfer_details(False, manual_source=True)
     return _msg(

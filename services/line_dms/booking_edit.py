@@ -22,6 +22,7 @@ from services.erp.mrerp_dms_company_banks import (
     manual_bank_allowed_for_rows,
     MANUAL_BANK_KEYS,
     PAYMENT_BANK_MASTERS,
+    sort_bank_rows,
 )
 from services.line_dms import binding_guard, booking_payments, qa_cards, store
 from services.line_dms._out import _send, _thr
@@ -107,13 +108,18 @@ def _options(rows: Iterable[list], label=None) -> list[dict]:
 
 
 def _payment_bank_options(key: str, rows: list) -> list[dict]:
+    rows = sort_bank_rows(rows)
     if key != "company_banks":
         return _options(rows, company_bank_label)
     return [
         {
             **_option(row, company_bank_label),
-            "account_no": str(row[4] or "") if len(row) > 4 else "",
-            "branch_name": str(row[3] or "") if len(row) > 3 else "",
+            "account_no": (
+                "" if len(row) <= 4 or str(row[4] or "").strip() == "00" else str(row[4]).strip()
+            ),
+            "branch_name": (
+                "" if len(row) <= 3 or str(row[3] or "").strip() == "00" else str(row[3]).strip()
+            ),
         }
         for row in rows
     ]

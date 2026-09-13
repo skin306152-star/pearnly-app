@@ -32,12 +32,7 @@ async def start(
     snapshot = None
     if endpoint:
         try:
-            live_masters = await _thr(
-                get_masters,
-                endpoint,
-                force_refresh=True,
-                require_complete=True,
-            )
+            live_masters = await _thr(get_masters, endpoint, require_complete=True)
             snapshot = build_snapshot(live_masters)
         except MasterSyncError as exc:
             await _thr(store.clear_session, tenant_id, line_user_id)

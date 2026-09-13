@@ -194,7 +194,7 @@ class _Mem:
         row = self.rows.get(eid)
         return {"masters": row, "age_seconds": 0.0} if row is not None else None
 
-    def write(self, eid, masters):
+    def write(self, eid, masters, *, touch_refreshed_at=True):
         self.rows[eid] = masters
 
 

@@ -26,6 +26,11 @@ TXT_ASK_PAY_DST_DETAIL = (
     "เช่น บริษัท ตัวอย่าง จำกัด | 1234567890 | ระยอง\n"
     "ใช้บัญชีที่ลูกค้าโอนเข้าจริง รายชื่อธนาคารไม่ได้ระบุบัญชีบริษัท\n" + TXT_SEP_HINT
 )
+_DST_FIELD_LABELS = {
+    "dst_business_name": ("ชื่อบัญชีบริษัท", "บริษัท ตัวอย่าง จำกัด"),
+    "dst_account_no": ("เลขบัญชี", "1234567890"),
+    "dst_branch_name": ("สาขา", "ระยอง"),
+}
 # 该渠道银行目录权威为空时的兼容问法:多问一项银行名称(hidden bank id 允许为空)。
 TXT_ASK_CHEQUE_REF_MANUAL = (
     "พิมพ์ เลขที่เช็ค | เล่มที่เช็ค | ชื่อธนาคาร เช่น 123456 | 01 | KBank\n" + TXT_SEP_HINT
@@ -65,10 +70,18 @@ def ask_payment_bank(banks: list, page: int = 0, channel: str = "") -> dict:
     )
 
 
-def ask_transfer_details(destination: bool, manual_source: bool = False) -> dict:
+def ask_transfer_details(destination: bool, manual_source: bool = False, fields=None) -> dict:
     """转账资料问法;来源银行目录为空时先问银行名称(手工兼容流程)。"""
     if destination:
-        return {"type": "text", "text": TXT_ASK_PAY_DST_DETAIL}
+        wanted = tuple(fields or _DST_FIELD_LABELS)
+        labels = [_DST_FIELD_LABELS[key][0] for key in wanted]
+        examples = [_DST_FIELD_LABELS[key][1] for key in wanted]
+        text = "บัญชีบริษัทที่ได้รับเงิน — พิมพ์ " + " | ".join(labels)
+        text += "\nเช่น " + " | ".join(examples)
+        text += "\nใช้ข้อมูลบัญชีที่ลูกค้าโอนเข้าจริง"
+        if len(wanted) > 1:
+            text += "\n" + TXT_SEP_HINT
+        return {"type": "text", "text": text}
     return {
         "type": "text",
         "text": TXT_ASK_PAY_SRC_MANUAL if manual_source else TXT_ASK_PAY_SRC_DETAIL,

@@ -77,6 +77,12 @@ class DispatchTests(unittest.TestCase):
 
 
 class DeliveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_dms_master_scheduler_only_enqueues_sweep(self):
+        with patch.object(dispatch, "enqueue", return_value="task-id") as enqueue:
+            result = await routes.refresh_dms_masters()
+        self.assertEqual(result, {"status": "queued", "task_id": "task-id"})
+        enqueue.assert_called_once_with("dms.masters_sweep")
+
     async def test_completed_duplicate_does_not_execute(self):
         with (
             patch.object(store, "claim", return_value={"status": "succeeded"}),

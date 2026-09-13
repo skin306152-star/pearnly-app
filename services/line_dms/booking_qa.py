@@ -68,7 +68,7 @@ async def start(
         persist=_persist,
         send_step=send_step,
         resolve_endpoint=_id_ocr.resolve_dms_endpoint,
-        get_masters=masters_cache.get_masters,
+        get_masters=masters_cache.get_session_masters,
         resolve_advisor=dms_advisor.resolve_operator_advisor,
         reply_token=reply_token,
         draft=draft,

@@ -18,6 +18,10 @@ from services.erp.dms_masters_cache import (  # noqa: F401  LINE 侧沿用原命
     read_fresh_masters,
     write_authoritative_snapshot,
 )
+from services.erp.dms_master_shared import (  # noqa: F401
+    get_session_masters,
+    get_session_paints,
+)
 from services.line_dms._out import _thr
 from services.line_dms.master_contract import MasterSyncError, build_snapshot
 
@@ -41,7 +45,7 @@ async def qa_masters(
     endpoint_id: Any,
     key: str,
     *,
-    force_refresh: bool = True,
+    force_refresh: bool = False,
     require_complete: bool = False,
 ) -> List[list]:
     """某类主档(cars/place_books/…)。端点解不出就给空表 —— 发问层据此重问,不炸会话。
@@ -52,21 +56,20 @@ async def qa_masters(
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         return []
-    masters = await _thr(
-        get_masters,
-        ep,
-        force_refresh=force_refresh,
-        require_complete=require_complete,
-    )
+    reader = get_masters if force_refresh else get_session_masters
+    kwargs = {"require_complete": require_complete}
+    if force_refresh:
+        kwargs["force_refresh"] = True
+    masters = await _thr(reader, ep, **kwargs)
     return masters.get(key) or []
 
 
 async def qa_snapshot(line_user_id: str, endpoint_id: Any) -> Dict[str, Any]:
-    """新订车会话的权威主档快照；失败时绝不回退旧缓存。"""
+    """新订车会话的有界新鲜共享快照；提交前仍做权威实时复核。"""
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "endpoint")
-    masters = await _thr(get_masters, ep, force_refresh=True, require_complete=True)
+    masters = await _thr(get_session_masters, ep, require_complete=True)
     if not masters:
         raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "snapshot")
     return build_snapshot(masters)
@@ -77,7 +80,7 @@ async def qa_paints(
     endpoint_id: Any,
     car_id: str,
     *,
-    force_refresh: bool = True,
+    force_refresh: bool = False,
     require_complete: bool = False,
 ) -> List[list]:
     """某车型的颜色主档(逐问选完车才有 car_id)。force_refresh 语义同 qa_masters。
@@ -91,27 +94,31 @@ async def qa_paints(
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         return []
-    masters = await _thr(
-        get_masters,
-        ep,
-        force_refresh=force_refresh,
-        require_complete=require_complete,
-    )
-    if not masters:
-        if require_complete:
-            raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "snapshot")
-        return []
     try:
-        return (
-            await _thr(
-                get_paints,
+        if force_refresh:
+            masters = await _thr(
+                get_masters,
                 ep,
-                car_id,
-                masters,
+                force_refresh=True,
                 require_complete=require_complete,
-                force_refresh=force_refresh,
             )
-        ) or []
+            if not masters:
+                if require_complete:
+                    raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "snapshot")
+                return []
+            return (
+                await _thr(
+                    get_paints,
+                    ep,
+                    car_id,
+                    masters,
+                    require_complete=require_complete,
+                    force_refresh=True,
+                )
+            ) or []
+        # booking_qa_sync already materialized the full session snapshot.  Avoid a
+        # second full-master lookup here; the color layer has its own bounded TTL.
+        return (await _thr(get_session_paints, ep, car_id, require_complete=require_complete)) or []
     except Exception as exc:
         if require_complete and getattr(exc, "error_code", "") == "ERR_DMS_MASTER_UNAVAILABLE":
             raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "paints") from exc

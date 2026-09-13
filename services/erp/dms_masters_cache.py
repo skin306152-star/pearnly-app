@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """DMS 下拉主档(顾问/车型/颜色…)缓存(DL-4a)· 通道无关。
 
-每次登录 DMS 抓全量太贵 → 缓存 <12h 直接复用。paints 依赖 car,惰性按 car_id 存进同一
-jsonb 的 paints_by_car 键。写库走 owner 连接(endpoint_id 非租户键,不施 RLS);登录抓取
-复用 erp_dms_intake 的会话范式(_run_logged_in,失败即回退,绝不抛)。表首用 ensure 自愈
-(prod 无 alembic 钩子,照 line_dms/store 范式)。
+兼容调用仍保留 12h 上限；LINE 订车通过 dms_master_shared 使用后台预热和有界新鲜窗口。
+同一租户、DMS 地址和管理员身份共享一行散列键，缺少完整共享范围时退回 endpoint_id，
+避免销售权限裁剪后的目录跨账号复用。paints 依赖 car，按 car_id 独立记录时间并原子合并，
+不把一次颜色读取伪装成整包主档刷新。登录抓取复用 erp_dms_intake 的管理员读取会话。
 
 LINE 逐问的取数薄壳(qa_endpoint / qa_masters / qa_paints)在 services/line_dms/masters_cache.py
 —— 那是通道相关的一层,本模块只管缓存本身。
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ def _read(endpoint_id: str) -> Optional[Dict[str, Any]]:
     return {"masters": masters, "age_seconds": float(row.get("age") or 0)}
 
 
-def _write(endpoint_id: str, masters: Dict[str, Any]) -> None:
+def _write(endpoint_id: str, masters: Dict[str, Any], *, touch_refreshed_at: bool = True) -> None:
     from core import db
 
     if not endpoint_id:
@@ -100,13 +101,33 @@ def _write(endpoint_id: str, masters: Dict[str, Any]) -> None:
 
     def _run():
         with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                "INSERT INTO dms_masters_cache (endpoint_id, masters, refreshed_at) "
-                "VALUES (%s, %s::jsonb, now()) "
-                "ON CONFLICT (endpoint_id) DO UPDATE SET "
-                "  masters = EXCLUDED.masters, refreshed_at = EXCLUDED.refreshed_at",
-                (endpoint_id, json.dumps(masters or {}, ensure_ascii=False)),
-            )
+            if touch_refreshed_at:
+                cur.execute(
+                    "INSERT INTO dms_masters_cache (endpoint_id, masters, refreshed_at) "
+                    "VALUES (%s, %s::jsonb, now()) "
+                    "ON CONFLICT (endpoint_id) DO UPDATE SET "
+                    "  masters = EXCLUDED.masters, refreshed_at = EXCLUDED.refreshed_at",
+                    (endpoint_id, json.dumps(masters or {}, ensure_ascii=False)),
+                )
+            else:
+                # A paint refresh must not make the whole master bundle look new.  The
+                # selected-car timestamp lives inside masters; refreshed_at is reserved
+                # for the complete DMS master read.  Merge just the paint maps in SQL so
+                # a concurrent full-master refresh cannot be replaced by the older blob
+                # that the paint request read before making its DMS call.
+                cur.execute(
+                    "INSERT INTO dms_masters_cache (endpoint_id, masters, refreshed_at) "
+                    "VALUES (%s, %s::jsonb, now()) "
+                    "ON CONFLICT (endpoint_id) DO UPDATE SET masters = "
+                    "dms_masters_cache.masters || jsonb_build_object("
+                    "'paints_by_car', "
+                    "COALESCE(dms_masters_cache.masters->'paints_by_car', '{}'::jsonb) || "
+                    "COALESCE(EXCLUDED.masters->'paints_by_car', '{}'::jsonb), "
+                    "'paints_refreshed_at', "
+                    "COALESCE(dms_masters_cache.masters->'paints_refreshed_at', '{}'::jsonb) || "
+                    "COALESCE(EXCLUDED.masters->'paints_refreshed_at', '{}'::jsonb))",
+                    (endpoint_id, json.dumps(masters or {}, ensure_ascii=False)),
+                )
 
     try:
         _with_heal(_run)
@@ -166,7 +187,7 @@ def get_masters(
     force_refresh 给「刚在 DMS 改了主档、马上要按新数据判」的调用方(如顾问匹配失败重判)——
     必须真抓:成功时按 DMS 现状落库(旧 paints_by_car 不合并回去,否则 DMS 新增/删除的
     颜色被旧色遮住),失败时返回空 dict(fail closed,不拿旧主档冒充刷新过)。"""
-    eid = str(endpoint.get("id") or "")
+    eid = _cache_key(endpoint)
     cached = None if force_refresh else _read(eid)
     cache_usable = cached and all(key in cached["masters"] for key in _COMPLETE_KEYS)
     if require_complete and cache_usable:
@@ -196,7 +217,7 @@ def read_fresh_masters(endpoint: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     submit 校验用:能被提交的选项必来自 data/paints 端点已暖的缓存,请求内再冷抓 = 多余的
     二次登录 → 宁可 None 让调用方重开选车流程。"""
-    cached = _read(str(endpoint.get("id") or ""))
+    cached = _read(_cache_key(endpoint))
     if cached and cached["age_seconds"] < CACHE_TTL_SECONDS:
         return cached["masters"]
     return None
@@ -213,7 +234,7 @@ def get_paints(
     """某车型的颜色主档(惰性)。已缓存直接回;否则登录抓 + 并入 paints_by_car 落缓存。
 
     传入 masters(调用方同请求已读的 blob)则复用之,省一次 _read。"""
-    eid = str(endpoint.get("id") or "")
+    eid = _cache_key(endpoint)
     car_id = str(car_id or "")
     if masters is None:
         cached = _read(eid)
@@ -232,7 +253,13 @@ def get_paints(
             )
         return []
     pbc[car_id] = paints
-    _write(eid, {**masters, "paints_by_car": pbc})
+    paint_times = dict(masters.get("paints_refreshed_at") or {})
+    paint_times[car_id] = time.time()
+    _write(
+        eid,
+        {**masters, "paints_by_car": pbc, "paints_refreshed_at": paint_times},
+        touch_refreshed_at=False,
+    )
     return paints
 
 
@@ -258,24 +285,38 @@ def write_authoritative_snapshot(
       · 银行类目录以本次快照为准(空表 = DMS 已删光,不许被旧值盖回去);只有该 key
         在这次 masters 里根本没有(这次没读这一类目录)才退回旧值。
     """
-    eid = str(endpoint.get("id") or "")
+    eid = _cache_key(endpoint)
     if not eid or not masters:
         return
     cached = _read(eid)
     old = (cached or {}).get("masters") or {}
     merged = dict(masters)
     pbc = dict(old.get("paints_by_car") or {})
+    paint_times = dict(old.get("paints_refreshed_at") or {})
     # None 才是「没读到」;[] 是权威读取成功的空表 = DMS 里颜色被删光,必须落成空表
     # (falsy 判断会把旧颜色留在缓存里,和「增删必须实时映射」冲突)。
     if paints is not None and car_id:
         pbc[str(car_id)] = list(paints)
+        paint_times[str(car_id)] = time.time()
     # 只要这次真读了某车型颜色(含 [])或本来就有其它车型的颜色,就把 paints_by_car 写进去:
     # 用 `if pbc:` 会让「刚清空的最后一条」在下次写入时被旧缓存合并回来。
     if pbc or (paints is not None and car_id):
         merged["paints_by_car"] = pbc
+        merged["paints_refreshed_at"] = paint_times
     for key in _BANK_KEYS:
         # 只认「key 不在这次快照里」;存在且为 [] 是权威删除结果,
         # 用 falsy 判断会把管理员刚删掉的银行从旧缓存恢复回来。
         if key not in merged and old.get(key):
             merged[key] = old[key]
     _write(eid, merged)
+
+
+def _cache_key(endpoint: Dict[str, Any]) -> str:
+    """Use the tenant-safe shared admin scope when available.
+
+    Import lazily: the shared layer calls the low-level read/write helpers in this
+    module, while this compatibility facade also needs its scope calculation.
+    """
+    from services.erp.dms_master_shared import cache_scope_id
+
+    return cache_scope_id(endpoint)

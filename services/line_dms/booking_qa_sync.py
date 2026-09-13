@@ -21,7 +21,7 @@ async def _snapshot(tenant_id, line_user_id, qa, *, persist):
 
 
 async def masters(tenant_id, line_user_id, qa, key, *, persist) -> List[list]:
-    """开局实时抓一次整批主档；本轮按钮与分页复用该快照。"""
+    """开局取一次有界新鲜共享主档；本轮按钮与分页复用该快照。"""
     return snapshot_rows(
         await _snapshot(tenant_id, line_user_id, qa, persist=persist),
         key,
@@ -39,9 +39,8 @@ async def paints(tenant_id, line_user_id, qa, *, persist) -> List[list]:
         line_user_id,
         qa.get("endpoint_id"),
         car_id,
-        # _snapshot() forced a fresh full-master read at session start, which clears stale
-        # paints_by_car. The first color lookup is therefore live; later display/select/page
-        # operations reuse the session paint snapshot. Submit preflight reads DMS again.
+        # First lookup uses the shared bounded-fresh color cache; later display/select/page
+        # operations reuse this session snapshot. Submit preflight still reads DMS again.
         force_refresh=False,
         require_complete=True,
     )

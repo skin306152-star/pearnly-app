@@ -29,8 +29,11 @@ class _Mem:
         r = self.rows.get(eid)
         return {"masters": r["masters"], "age_seconds": r["age"]} if r else None
 
-    def write(self, eid, masters):
-        self.rows[eid] = {"masters": masters, "age": 0.0}
+    def write(self, eid, masters, *, touch_refreshed_at=True):
+        age = 0.0
+        if not touch_refreshed_at and eid in self.rows:
+            age = self.rows[eid]["age"]
+        self.rows[eid] = {"masters": masters, "age": age}
 
 
 class MastersCacheTests(unittest.TestCase):

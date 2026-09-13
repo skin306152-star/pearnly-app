@@ -46,6 +46,7 @@ class CloudImportSchemaTests(unittest.TestCase):
             patch("services.startup._boot_schema_ddl"),
             patch("services.users.columns.ensure_user_profile_columns"),
             patch("services.cloud_tasks.store.ensure_table"),
+            patch("services.erp.dms_master_shared.migrate_lock_table"),
             patch("services.cloud_runtime.schema.migrate_queue_schema"),
             patch("services.stocktake.schema.migrate"),
             patch("builtins.__import__", side_effect=warned_import),
@@ -62,11 +63,13 @@ class CloudImportSchemaTests(unittest.TestCase):
             patch("services.startup._boot_schema_ddl") as boot,
             patch("services.users.columns.ensure_user_profile_columns"),
             patch("services.cloud_tasks.store.ensure_table"),
+            patch("services.erp.dms_master_shared.migrate_lock_table") as lock_table,
             patch("services.cloud_runtime.schema.migrate_queue_schema"),
             patch("services.stocktake.schema.migrate"),
         ):
             schema.migrate()
         boot.assert_called_once_with()
+        lock_table.assert_called_once_with()
         startup_source = (
             Path(__file__).resolve().parents[2] / "services" / "startup.py"
         ).read_text(encoding="utf-8")

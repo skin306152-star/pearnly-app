@@ -64,3 +64,10 @@ async def recover_deliveries():
     for handler in ("queue.ocr", "queue.recon", "queue.steward", "maintenance"):
         await asyncio.to_thread(dispatch.enqueue, handler)
     return {"dispatched": len(task_ids), "queue_wakeups": 4}
+
+
+@router.post("/dms-masters/refresh", dependencies=[Depends(require_task_caller)])
+async def refresh_dms_masters():
+    """Scheduler entrypoint; real DMS reads run in durable worker tasks."""
+    task_id = await asyncio.to_thread(dispatch.enqueue, "dms.masters_sweep")
+    return {"status": "queued", "task_id": task_id}

@@ -34,6 +34,8 @@ HANDLERS = {
     "dms.booking_preview": ("services.line_dms.booking_edit", "_send_review_preview"),
     "dms.records": ("services.line_dms.query_flow", "_run_records"),
     "dms.top": ("services.line_dms.query_flow", "_run_top"),
+    "dms.masters_sweep": ("services.erp.dms_master_refresh", "sweep"),
+    "dms.masters_refresh": ("services.erp.dms_master_refresh", "refresh_endpoint"),
 }
 
 

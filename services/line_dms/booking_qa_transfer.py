@@ -50,13 +50,16 @@ def masters_reader(tenant_id, *, persist):
     return read
 
 
-def parse_details(text, destination=False, manual_source=False):
+def parse_details(text, destination=False, manual_source=False, keys=None):
     """一行资料 → 原生字段。manual_source=来源银行目录权威为空:首段是手工银行名称。
 
     分段用共用分隔符规则(text_fields):| ｜ , ， 、 / ／ · 都行,点号另有保守规则;
     一种规则切出的段数必须精确等于字段数,否则照旧重问。"""
-    keys = _DST_KEYS if destination else (_SRC_MANUAL_KEYS if manual_source else _SRC_KEYS)
-    parts = split_fields(text, len(keys))
+    keys = tuple(
+        keys or (_DST_KEYS if destination else (_SRC_MANUAL_KEYS if manual_source else _SRC_KEYS))
+    )
+    raw = str(text or "").strip()
+    parts = [raw] if len(keys) == 1 and raw else split_fields(text, len(keys))
     # 已经看到旧问法的会话可能仍回「... | 时间」。兼容接收这一轮，但丢弃非 DMS
     # 必填的时间，不再保存/展示/提交；新问法只收上面的三项(手工银行时四项)。
     if parts is None and not destination:
@@ -65,10 +68,18 @@ def parse_details(text, destination=False, manual_source=False):
             parts = legacy[:-1]
     if parts is None or any(not value or value == "-" or len(value) > 160 for value in parts):
         return None
-    account_index = keys.index("dst_account_no" if destination else "src_account_no")
-    if not any(ch.isdigit() for ch in parts[account_index].translate(THAI_DIGITS)):
-        return None
+    account_key = "dst_account_no" if destination else "src_account_no"
+    if account_key in keys:
+        account_index = keys.index(account_key)
+        if not any(ch.isdigit() for ch in parts[account_index].translate(THAI_DIGITS)):
+            return None
     return dict(zip(keys, parts))
+
+
+def destination_missing_keys(qa) -> tuple:
+    """Only ask for company-account fields absent from the selected DMS row/draft."""
+    extra = (qa.get("pending_channel") or {}).get("extra") or {}
+    return tuple(key for key in _DST_KEYS if str(extra.get(key) or "").strip() in {"", "-", "00"})
 
 
 def manual_bank(qa, key) -> bool:
@@ -116,7 +127,8 @@ def transfer_details_question(qa) -> dict:
     """转账资料问法:来源银行目录权威为空时先问银行名称(与 collect_details 同一判据)。"""
     destination = qa.get("step") == "pay_dst_detail"
     manual_source = not destination and manual_bank(qa, "source_banks")
-    return qa_cards.ask_transfer_details(destination, manual_source=manual_source)
+    fields = destination_missing_keys(qa) if destination else None
+    return qa_cards.ask_transfer_details(destination, manual_source=manual_source, fields=fields)
 
 
 def channel_ref_question(qa) -> dict:
@@ -286,6 +298,16 @@ async def pick_bank(
             extra.pop("dst_account_no", None)
             extra.pop("dst_branch_name", None)
         extra.update(company_bank_payment_extra(row, extra))
+    if not other and not source and not destination_missing_keys(qa):
+        await _finish_destination(
+            tenant_id,
+            line_user_id,
+            qa,
+            reply_token,
+            persist=persist,
+            send_step=send_step,
+        )
+        return
     qa["step"] = "pay_ref" if other else ("pay_src_detail" if source else "pay_dst_detail")
     await persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, qa["step"], reply_token)
@@ -294,7 +316,23 @@ async def pick_bank(
 async def collect_details(tenant_id, line_user_id, qa, text, reply_token, *, persist, send_step):
     destination = qa.get("step") == "pay_dst_detail"
     manual_source = not destination and manual_bank(qa, "source_banks")
-    details = parse_details(text, destination=destination, manual_source=manual_source)
+    fields = destination_missing_keys(qa) if destination else None
+    if destination and not fields:
+        await _finish_destination(
+            tenant_id,
+            line_user_id,
+            qa,
+            reply_token,
+            persist=persist,
+            send_step=send_step,
+        )
+        return
+    details = parse_details(
+        text,
+        destination=destination,
+        manual_source=manual_source,
+        keys=fields,
+    )
     if details is None:
         _send(line_user_id, transfer_details_question(qa), reply_token)
         return
@@ -304,6 +342,18 @@ async def collect_details(tenant_id, line_user_id, qa, text, reply_token, *, per
         await persist(tenant_id, line_user_id, qa)
         await send_step(tenant_id, line_user_id, qa, "pay_dst", reply_token)
         return
+    await _finish_destination(
+        tenant_id,
+        line_user_id,
+        qa,
+        reply_token,
+        persist=persist,
+        send_step=send_step,
+    )
+
+
+async def _finish_destination(tenant_id, line_user_id, qa, reply_token, *, persist, send_step):
+    """Finish a transfer once selected DMS data plus entered gaps are complete."""
     complete_channel(qa)
     if not (qa.get("files") or {}).get("slip_mid"):
         await booking_qa_payment.request_slip(

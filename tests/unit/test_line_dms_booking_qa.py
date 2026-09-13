@@ -119,6 +119,7 @@ class Env:
         p(qa.store, "get_binding_by_line_user", side_effect=self.store.get_binding_by_line_user)
         p(qa._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
         p(masters_cache, "get_masters", side_effect=self._get_masters)
+        p(masters_cache, "get_session_masters", side_effect=self._get_masters)
 
         def _paints(ep, cid, masters=None, **kwargs):
             self.paints_calls.append(cid)
@@ -126,6 +127,7 @@ class Env:
             return self.paints
 
         p(masters_cache, "get_paints", side_effect=_paints)
+        p(masters_cache, "get_session_paints", side_effect=_paints)
         p(
             qa.dms_advisor,
             "resolve_operator_advisor",
@@ -164,8 +166,8 @@ class Env:
         return (self.session() or {}).get("payload", {}).get("qa") or {}
 
     def live_master_reads(self):
-        """全量主档实时读取(= 一次 DMS 登录);非 force 读走 12h 缓存,不算登录。"""
-        return [kw for _ep, kw in self.masters_calls if kw.get("force_refresh")]
+        """测试桩收到的有界新鲜主档读取；真实层决定命中共享快照或登录刷新。"""
+        return [kw for _ep, kw in self.masters_calls]
 
 
 def _qa(step="place", **over):
@@ -284,7 +286,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(p["step"], "car_search")
             self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_CAR)
             self.assertTrue(env.masters_calls)
-            self.assertTrue(all(call[1].get("force_refresh") for call in env.masters_calls))
+            self.assertTrue(all(not call[1].get("force_refresh") for call in env.masters_calls))
 
     async def test_stale_master_button_reasks_with_current_dms_options(self):
         with Env(places=[_PLACES[1]]) as env:
@@ -388,7 +390,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.start(_TID, _LUID, "E1", "C1", "สมชาย ใจดี", "mid-card", "rt")
             self.assertEqual(
                 env.live_master_reads(),
-                [{"force_refresh": True, "require_complete": True}],
+                [{"require_complete": True}],
             )
 
             await qa.handle_postback(_TID, _LUID, "qa:place:pl1", {}, "rt")  # → car_search
@@ -411,7 +413,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
             self.assertEqual(
                 env.masters_calls[-1][1],
-                {"force_refresh": True, "require_complete": True},
+                {"require_complete": True},
             )
             snapshot = env.qa_payload()["master_snapshot"]
             self.assertTrue(snapshot["version"])
@@ -435,7 +437,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
             self.assertEqual(
                 env.masters_calls[-1][1],
-                {"force_refresh": True, "require_complete": True},
+                {"require_complete": True},
             )
             self.assertNotIn("master_snapshot", env.qa_payload())
             self.assertEqual(_replied_text(env), qa_cards.TXT_MASTER_EMPTY)
@@ -443,7 +445,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
             self.assertEqual(
                 env.masters_calls[-1][1],
-                {"force_refresh": True, "require_complete": True},
+                {"require_complete": True},
             )
             self.assertEqual(len(env.masters_calls), 2)
 
@@ -454,7 +456,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
             self.assertEqual(
                 env.masters_calls[0][1],
-                {"force_refresh": True, "require_complete": True},
+                {"require_complete": True},
             )
             self.assertEqual(env.paints_calls, ["c1"])
             self.assertEqual(env.qa_payload()["paint_snapshots"]["c1"]["rows"], _PAINTS)
@@ -676,7 +678,9 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
             await qa.handle_postback(_TID, _LUID, "qa:bank:1", {}, "rt")
             self.assertEqual(env.qa_payload()["step"], "pay_dst_detail")
-            await qa.handle_text(_TID, _LUID, "Company | 1234567890123 | ระยอง", "rt")
+            self.assertIn("ชื่อบัญชีบริษัท", _replied_text(env))
+            self.assertNotIn("เลขบัญชี | สาขา", _replied_text(env))
+            await qa.handle_text(_TID, _LUID, "Company", "rt")
             p = env.qa_payload()
             self.assertEqual(p["step"], "slip_after")
             self.assertEqual(p["after_slip"], "pay_more")
@@ -712,6 +716,56 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_MORE)
             await qa.handle_postback(_TID, _LUID, "qa:more:done", {}, "rt")
             self.assertEqual(env.session()["state"], "booking_review")
+
+    async def test_company_bank_complete_draft_skips_redundant_destination_question(self):
+        with Env() as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_dst",
+                    files={"id_card_mid": "mid-card", "slip_mid": "mid-slip"},
+                    pending_channel={
+                        "channel": "transfer",
+                        "amount": "1000.00",
+                        "extra": {
+                            "src_account_name": "Customer",
+                            "src_account_no": "999",
+                            "src_branch_name": "Bangkok",
+                            "dst_business_name": "Company",
+                        },
+                    },
+                ),
+            )
+            await qa.handle_postback(_TID, _LUID, "qa:bank:1", {}, "rt")
+            payload = env.qa_payload()
+            self.assertEqual(payload["step"], "pay_more")
+            self.assertEqual(payload["payments"][0]["extra"]["dst_account_no"], "1234567890123")
+
+    async def test_company_bank_missing_details_only_asks_the_gaps(self):
+        with Env(company_banks=[["1", "SCB", "SCB", "00", "00"]]) as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_dst",
+                    files={"id_card_mid": "mid-card", "slip_mid": "mid-slip"},
+                    pending_channel={
+                        "channel": "transfer",
+                        "amount": "1000.00",
+                        "extra": {
+                            "src_account_name": "Customer",
+                            "src_account_no": "999",
+                            "src_branch_name": "Bangkok",
+                            "dst_business_name": "Company",
+                        },
+                    },
+                ),
+            )
+            await qa.handle_postback(_TID, _LUID, "qa:bank:1", {}, "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_dst_detail")
+            self.assertIn("เลขบัญชี | สาขา", _replied_text(env))
+            self.assertNotIn("ชื่อบัญชีบริษัท |", _replied_text(env))
+            await qa.handle_text(_TID, _LUID, "1234567890 / Rayong", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_more")
 
     async def test_legacy_transfer_without_slip_still_blocks_preview(self):
         with Env() as env:
@@ -820,7 +874,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(p["step"], "pay_dst")
             self.assertEqual(_replied_items(env)[0]["action"]["data"], "qa:bank:1")
             await qa.handle_postback(_TID, _LUID, "qa:bank:2", {}, "rt")
-            await qa.handle_text(_TID, _LUID, "Company | 9876543210 | Rayong", "rt")
+            await qa.handle_text(_TID, _LUID, "Company", "rt")
             payment = env.qa_payload()["payments"][0]
             self.assertEqual(payment["extra"]["dst_id"], "2")
             self.assertEqual(payment["extra"]["src_bank_name"], "KBank")

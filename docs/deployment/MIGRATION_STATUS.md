@@ -28,6 +28,18 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
+- Pearnly 完整 SHA：`64147d04e1426ab329314dae8d74a68e6733dbe5`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:ac596c42da5803818aac6ad3e82794bd28d79a105a0e049ce0593ff6c5e59bc2`。
+- Web revision：`pearnly-web-64147d04e142-s3`；Worker revision：`pearnly-worker-64147d04e142-s3`；两端 Ready、各 100% 流量，同一 digest。
+- [Manual CD 34749383820](https://github.com/skin306152-star/pearnly-app/actions/runs/34749383820) 于 2026-09-13 16:29 Bangkok 完成，conclusion success；schema execution `pearnly-schema-nmn9m` 成功，候选和正式两端的精确 SHA、镜像、健康、就绪及安装包完整下载均通过。
+- 订车确认修复：生产旧会话已保存“来源银行主档权威为空”，但付款记录漏了内部手工来源标记，导致完整卡片在写 DMS 前被隐藏字段校验拦下并反复发卡。新采集会直接保存标记；已发出的旧卡在确认边界依据服务端会话证据自动补齐，随后仍做实时管理员主档核对。不会绕过公司收款账户核对，也不会自动重提真实订单。
+- 颜色性能修复：全量主档刷新改为 PostgreSQL 原子合并，不能再覆盖并发取得的车型颜色；后台每分钟对近期使用且过期的颜色批量保温，一次管理员登录最多刷新 8 个车型。交互请求遇到后台正在刷新时可立即复用上一份完整颜色列表，最终提交前仍实时核对选中车型与颜色。
+- 流程回归：模拟 LINE 从客户资料进入订车，逐一使用实际生成的地点、车型、颜色、日期、销售条件、登记人、支付和公司收款账户按钮，上传身份证与转账凭证并生成最终预览；旧卡确认通过 DMS 协议模拟只建一次单且两份附件均上传。完整单元测试 13,322 项通过、17 项按既有环境条件跳过；全部 PostgreSQL smoke 150 项通过，其中 6 个要求各自 disposable DSN 的模块按既有条件跳过，本次修改的并发原子合并真库测试已实际执行。最终 pre-push 1,183 个模块／6 分片及全部机械闸通过，未跳过 hook。
+- 线上回读：正式域名 `/api/health` 200，`/api/ready` 200 且 ready=true，db、Gemini、SMTP、LINE 全部 ok；新 Web/Worker revision 的 ERROR 级日志为 0。Scheduler 为 ENABLED、每分钟执行，发布后两轮共回读 12 条主档刷新日志，其中活跃范围连续 `paints_warmed=1`，证明颜色保温已由新 Worker 实际执行。
+- 业务边界：发布后尚无新的真实用户 LINE webhook 命中新 Web，因此没有把本地模拟耗时冒充手机实测耗时；没有为验证创建、重提或修改真实 DMS 订车单，也没有替用户点击当前卡片。当前卡片应由用户本人再次确认，真实 DMS 写入、附件和手机端颜色响应仍以该次验收为准。
+
+### 上一次 Pearnly 发布：DMS 共享主档（2026-09-13 14:53）
+
 - Pearnly 完整 SHA：`d15466a5fd69784b785b79877ec8746e11c45e5b`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:01e6777d702465a51d92943bf1c40385fe9061d1dca9c0e66c8e5073f1854f6b`。
 - Web revision：`pearnly-web-d15466a5fd69-s3`；Worker revision：`pearnly-worker-d15466a5fd69-s3`；两端 Ready、各 100% 流量，同一 digest。

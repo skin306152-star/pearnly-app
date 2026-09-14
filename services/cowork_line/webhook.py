@@ -187,6 +187,15 @@ async def handle_event(event: dict) -> None:
         return
     session = await asyncio.to_thread(_session, identity)
     lang = _lang(event, session.get("payload") or {})
+    from services.cowork_line import work_flow
+
+    if await work_flow.handle(event, identity, lang):
+        return
+    # Opening the menu must not discard an ERP draft or block work coordination.
+    message_text = str((event.get("message") or {}).get("text") or "").strip().lower()
+    if event.get("type") == "message" and message_text in _MENU_WORDS:
+        _reply_card(reply_token, menu_cards.menu_card(lang))
+        return
     if event.get("type") == "postback":
         await _handle_postback(event, identity, reply_token, lang)
         return

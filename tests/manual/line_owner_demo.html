@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="zh">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>老板 LINE 工作协调 · 本地验收</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #eef2f7;
+      font: 15px system-ui;
+      color: #172235;
+    }
+    header {
+      padding: 18px 24px;
+      background: #fff;
+      border-bottom: 1px solid #dce3ec;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0 0 5px;
+    }
+    small {
+      color: #586679;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 450px) 1fr;
+      gap: 24px;
+      padding: 24px;
+      max-width: 1350px;
+      margin: auto;
+    }
+    .phone {
+      height: 780px;
+      background: #849dbd;
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 35px #17223522;
+    }
+    .top {
+      background: #fff;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .chat {
+      flex: 1;
+      overflow: auto;
+      padding: 15px;
+    }
+    .bubble {
+      background: #fff;
+      padding: 18px;
+      border-radius: 16px;
+      margin: 10px 0;
+      max-width: 340px;
+      overflow-wrap: anywhere;
+    }
+    .bubble p {
+      margin: 8px 0;
+      white-space: pre-wrap;
+    }
+    .bubble h3 {
+      font-size: 17px;
+      margin: 0 0 14px;
+    }
+    .bubble button,
+    .bubble a {
+      display: block;
+      width: 100%;
+      background: none;
+      color: #2466db;
+      border: 0;
+      border-top: 1px solid #eef0f4;
+      padding: 12px 5px;
+      text-align: center;
+      font: inherit;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .user {
+      background: #9ce781;
+      padding: 10px;
+      border-radius: 14px;
+      margin: 10px 0 10px auto;
+      max-width: 280px;
+      white-space: pre-wrap;
+    }
+    .input {
+      background: #fff;
+      padding: 10px;
+      display: flex;
+      gap: 6px;
+    }
+    .input textarea {
+      flex: 1;
+      min-width: 0;
+      resize: none;
+      font: inherit;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+    }
+    .input button,
+    .menu button {
+      background: #06a84e;
+      color: white;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+    }
+    .menu {
+      background: #fff;
+      padding: 8px;
+      text-align: center;
+    }
+    .panel {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .panel h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    td,
+    th {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #e4e9f0;
+    }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 12px;
+    }
+    .alert {
+      color: #a51d27;
+    }
+    select {
+      padding: 5px;
+    }
+    dialog {
+      border: 0;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    dialog input {
+      font: inherit;
+      padding: 8px;
+    }
+    #busy {
+      padding: 4px;
+      text-align: center;
+      background: #fff;
+      color: #777;
+      font-size: 12px;
+    }
+    @media (max-width: 760px) {
+      .layout {
+        display: block;
+        padding: 12px;
+      }
+      .phone {
+        height: 80vh;
+      }
+      .panels {
+        margin-top: 20px;
+      }
+    }
+    #quick {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 10px;
+      background: #eaf0f7;
+      flex-shrink: 0;
+      min-height: 0;
+    }
+    #quick:empty {
+      padding: 0;
+    }
+    #quick button {
+      white-space: nowrap;
+      border: 1px solid #a6b7ce;
+      background: white;
+      border-radius: 20px;
+      padding: 10px 15px;
+      color: #24354e;
+      font: inherit;
+      cursor: pointer;
+    }
+    .actions {
+      display: flex;
+    }
+    .actions button {
+      flex: 1;
+      width: auto;
+      font-size: 14px;
+      padding: 12px 4px;
+    }
+  </style>
+  <header>
+    <h1>老板 LINE 工作协调</h1>
+    <small
+      >可操作验收模拟器 · 按钮调用真实业务代码和隔离 WeKan；LINE 发送与员工登录为测试替身。</small
+    >
+  </header>
+  <div class="layout">
+    <section class="phone">
+      <div class="top"><b>Pearnly Cowork</b><span>ประสานงาน</span></div>
+      <div class="chat" id="chat"></div>
+      <div id="quick"></div>
+      <div id="busy"></div>
+      <div class="input">
+        <button id="attach" aria-label="上传附件">＋</button
+        ><textarea id="text" rows="2" placeholder="พิมพ์ข้อความ"></textarea
+        ><button id="send">ส่ง</button>
+      </div>
+      <div class="menu">
+        <button id="work">ประสานงาน</button> <button id="menu">เรียกเมนู</button>
+      </div>
+    </section>
+    <aside class="panels">
+      <div class="panel">
+        <h2>WeKan 实际任务</h2>
+        <div id="native">尚未选择看板</div>
+        <p>
+          <a href="http://localhost:18196/_pearnly/start" target="_blank"
+            >打开员工 WeKan（测试登录）</a
+          >
+        </p>
+      </div>
+      <div class="panel">
+        <h2>实际触发的通知</h2>
+        <div id="notices">暂无</div>
+      </div>
+      <details class="panel">
+        <summary>后端状态与任务数据</summary>
+        <pre id="raw"></pre>
+      </details>
+    </aside>
+  </div>
+  <input type="file" id="file" hidden />
+  <dialog id="date">
+    <form method="dialog">
+      <p>截止时间（曼谷 UTC+7）</p>
+      <input type="datetime-local" id="datetime" required />
+      <p><button value="cancel">取消</button><button id="pick" value="ok">确定</button></p>
+    </form>
+  </dialog>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let currentDateAction = null,
+      working = false,
+      noticeCount = 0,
+      refreshing = false;
+    function textEl(tag, text, cls) {
+      const e = document.createElement(tag);
+      e.textContent = text;
+      if (cls) e.className = cls;
+      return e;
+    }
+    function render(message) {
+      if (!message) return;
+      const box = document.createElement('div');
+      box.className = 'bubble';
+      function content(node) {
+        if (node.type === 'text')
+          box.append(textEl(node.weight === 'bold' ? 'h3' : 'p', node.text));
+        else if (node.action) {
+          const label =
+            (node.contents || [])
+              .flatMap((x) => x.contents || [x])
+              .filter((x) => x.type === 'text')
+              .map((x) => x.text)
+              .join(' ') || 'ประสานงาน';
+          const b = textEl('button', label);
+          b.onclick = () => act(node.action);
+          box.append(b);
+        } else (node.contents || []).forEach(content);
+      }
+      if (message.type === 'text') box.append(textEl('p', message.text));
+      else {
+        content(message.contents.body);
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+        for (const item of message.contents.footer?.contents || []) {
+          const action = item.action;
+          const b = textEl('button', action.label);
+          b.onclick = () => act(action);
+          actions.append(b);
+        }
+        box.append(actions);
+      }
+      $('quick').replaceChildren();
+      for (const item of message.quickReply?.items || []) {
+        const b = textEl('button', item.action.label);
+        b.onclick = () => act(item.action);
+        $('quick').append(b);
+      }
+      $('chat').append(box);
+      $('chat').scrollTop = $('chat').scrollHeight;
+    }
+    async function refresh(replay = false) {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const d = await (await fetch('/demo/state')).json();
+        if (replay)
+          for (const entry of d.messages) {
+            const text = entry.event?.message?.text;
+            if (text) $('chat').append(textEl('div', text, 'user'));
+            render(entry.response);
+          }
+        $('raw').textContent = JSON.stringify(d, null, 2);
+        const n = d.native;
+        const host = $('native');
+        host.replaceChildren();
+        if (n.board) {
+          host.append(textEl('p', n.board.title));
+          const table = document.createElement('table');
+          const tr = document.createElement('tr');
+          ['任务', '状态', '负责人'].forEach((v) => tr.append(textEl('th', v)));
+          table.append(tr);
+          for (const c of n.cards) {
+            const row = document.createElement('tr');
+            [
+              c.title,
+              n.lists.find((x) => x._id === c.listId)?.title,
+              (c.assignees || [])
+                .map((id) => n.people.find((p) => p._id === id)?.name || id)
+                .join(', '),
+            ].forEach((v) => row.append(textEl('td', v)));
+            table.append(row);
+          }
+          host.append(table);
+        } else host.textContent = '尚未选择看板';
+        $('notices').replaceChildren();
+        for (const n of d.notices) {
+          const p = document.createElement('pre');
+          p.textContent =
+            n.recipient + '\n' + n.messages.map((m) => m.text || m.altText).join('\n');
+          $('notices').append(p);
+        }
+        for (const n of d.notices.slice(noticeCount)) {
+          if (n.recipient === 'local-owner') n.messages.forEach(render);
+        }
+        noticeCount = d.notices.length;
+      } finally {
+        refreshing = false;
+      }
+    }
+    async function send(body, label) {
+      if (working) return;
+      working = true;
+      $('busy').textContent = 'กำลังดำเนินการ…';
+      if (label) $('chat').append(textEl('div', label, 'user'));
+      try {
+        const r = await fetch('/demo/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...body, lang: 'th' }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw Error(d.error);
+        render(d.response);
+        await refresh();
+      } catch (e) {
+        $('chat').append(textEl('p', e.message, 'alert'));
+      } finally {
+        working = false;
+        $('busy').textContent = '';
+      }
+    }
+    function act(action) {
+      if (action.type === 'uri') {
+        window.open(action.uri, '_blank');
+        return;
+      }
+      if (action.type === 'datetimepicker') {
+        currentDateAction = action;
+        $('date').showModal();
+        return;
+      }
+      send({ event: { type: 'postback', postback: { data: action.data } } }, action.displayText);
+      if (action.inputOption === 'openKeyboard') {
+        $('text').value = action.fillInText || '';
+        $('text').focus();
+      }
+    }
+    $('work').onclick = () =>
+      send({ event: { type: 'postback', postback: { data: 'a=work&c=home' } } }, 'ประสานงาน');
+    $('menu').onclick = () =>
+      send({ event: { type: 'message', message: { type: 'text', text: 'เมนู' } } }, 'เมนู');
+    $('send').onclick = () => {
+      const value = $('text').value;
+      if (value.trim()) {
+        send({ event: { type: 'message', message: { type: 'text', text: value } } }, value);
+        $('text').value = '';
+      }
+    };
+    $('text').onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        $('send').click();
+      }
+    };
+    $('attach').onclick = () => $('file').click();
+    $('file').onchange = async () => {
+      const f = $('file').files[0];
+      if (!f) return;
+      const data = await new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result.split(',')[1]);
+        r.readAsDataURL(f);
+      });
+      send({ file: { name: f.name, data } }, 'ไฟล์แนบ: ' + f.name);
+      $('file').value = '';
+    };
+    $('date').onclose = () => {
+      if ($('date').returnValue === 'ok' && $('datetime').value)
+        send(
+          {
+            event: {
+              type: 'postback',
+              postback: { data: currentDateAction.data, params: { datetime: $('datetime').value } },
+            },
+          },
+          'กำหนดส่ง'
+        );
+    };
+    refresh(true);
+    setInterval(() => {
+      if (!working) refresh().catch(() => {});
+    }, 5000);
+  </script>
+</html>

@@ -114,6 +114,21 @@ def menu_card(lang: str = "th") -> dict[str, Any]:
         if uri
         else None
     )
+    from services.cowork_line.work_cards import t
+
+    work_row = menu_item(
+        "3" if uri else "2",
+        "document-send",
+        THEME_BLUE,
+        t("th", "home"),
+        t("th", "new"),
+        {
+            "type": "postback",
+            "data": urlencode({"a": "work", "c": "home"}),
+            "displayText": t("th", "home"),
+            "inputOption": "closeRichMenu",
+        },
+    )
     return {
         "type": "flex",
         "altText": copy["alt"],
@@ -158,6 +173,7 @@ def menu_card(lang: str = "th") -> dict[str, Any]:
                     {"type": "separator", "color": "#ECEAF0", "margin": "lg"},
                     row,
                     *([stocktake_row] if stocktake_row else []),
+                    work_row,
                     {
                         "type": "text",
                         "text": copy["hint"],

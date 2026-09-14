@@ -174,6 +174,9 @@ Package['core-runtime'].queue('pearnly-bridge', function () {
     };
 
     Meteor.startup(async () => {
+        const { startLineEvents } = Npm.require('/opt/pearnly/line-events.mjs');
+        const eventDriver = MongoInternals.defaultRemoteCollectionDriver();
+        await startLineEvents(await Promise.resolve(eventDriver.mongo.db), service);
         await Meteor.users
             .rawCollection()
             .createIndex({ 'services.pearnly.id': 1 }, { unique: true, sparse: true });
@@ -236,6 +239,39 @@ Package['core-runtime'].queue('pearnly-bridge', function () {
                     res.end();
                     return;
                 }
+                if ((req.url || '').startsWith('/_pearnly/line/')) {
+                    const { lineService } = Npm.require('/opt/pearnly/line-service.mjs');
+                    const driver = MongoInternals.defaultRemoteCollectionDriver();
+                    await lineService(req, res, next, {
+                        secret,
+                        nativeUser,
+                        Accounts,
+                        Meteor,
+                        service,
+                        actor: httpActor,
+                        attachments: globalThis.__pearnlyAttachments,
+                        invite: async (username, boardId, userId) => {
+                            const invocation = new Package['ddp-common'].DDPCommon.MethodInvocation(
+                                {
+                                    isSimulation: false,
+                                    userId,
+                                    unblock() {},
+                                    connection: null,
+                                }
+                            );
+                            return Package['ddp-client'].DDP._CurrentMethodInvocation.withValue(
+                                invocation,
+                                () =>
+                                    Meteor.server.method_handlers.inviteUserToBoard.apply(
+                                        invocation,
+                                        [username, boardId]
+                                    )
+                            );
+                        },
+                        db: await Promise.resolve(driver.mongo.db),
+                    });
+                    return;
+                }
                 if (
                     req.url === '/_pearnly/ready' &&
                     req.headers.authorization === 'Bearer ' + secret
@@ -296,7 +332,9 @@ Package['core-runtime'].queue('pearnly-bridge', function () {
                     ]);
                 }
                 httpActor.withValue(user._id, next);
-            } catch {
+            } catch (error) {
+                if ((req.url || '').startsWith('/_pearnly/line/'))
+                    console.warn('LINE work bridge rejected:', error.message);
                 res.writeHead(401, { 'Cache-Control': 'no-store' });
                 res.end();
             }

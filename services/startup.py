@@ -208,6 +208,7 @@ def _boot_schema_ddl() -> None:
     # 自动做账/报税/一句话记账 schema 双跑(docs accounting·tax-filing·smart-intake)。NEW-DEBT-EXEMPT。
     for _path, _fn, _label in (
         ("services.work_bridge.schema", "migrate_schema", "工作协作登录"),
+        ("services.cowork_line.work_store", "migrate_schema", "LINE 工作协调"),
         ("services.accounting.schema", "ensure_accounting_schema", "accounting"),
         ("services.tax.schema", "ensure_tax_schema", "tax"),
         ("services.expense.schema", "ensure_expense_schema", "expense"),

@@ -120,6 +120,7 @@ class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(webhook.cowork_flow, "_session", return_value={}),
             patch.object(webhook.cowork_flow, "_set"),
+            patch("services.cowork_line.work_flow.handle", return_value=False),
             patch.object(webhook.line_client, "reply_messages", return_value=True) as reply,
         ):
             await webhook._handle_event(text_event("菜单"))

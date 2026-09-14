@@ -40,6 +40,37 @@ function walk(node, visit, parent) {
     }
 }
 
+// Expose only the native attachment writer to the authenticated LINE bridge.
+// No collection or file is written by the installer.
+export function exposeAttachmentWriter(source) {
+    const tree = parse(source, { ecmaVersion: 'latest', sourceType: 'script' });
+    const matches = [];
+    walk(tree, (node) => {
+        if (node.type !== 'NewExpression') return;
+        if (
+            node.arguments.some(
+                (arg) =>
+                    arg.type === 'ObjectExpression' &&
+                    arg.properties.some(
+                        (p) =>
+                            (p.key?.name || p.key?.value) === 'collectionName' &&
+                            p.value?.value === 'attachments'
+                    )
+            )
+        )
+            matches.push(node);
+    });
+    if (matches.length !== 1) throw new Error('Native attachment writer changed');
+    const node = matches[0];
+    return (
+        source.slice(0, node.start) +
+        '(globalThis.__pearnlyAttachments=' +
+        source.slice(node.start, node.end) +
+        ')' +
+        source.slice(node.end)
+    );
+}
+
 export function awaitNativeCreation(source) {
     const tree = parse(source, { ecmaVersion: 'latest', sourceType: 'script' });
     const expected = new Map([
@@ -286,7 +317,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     writeFileSync(
         appPath,
         applyThaiOverrides(
-            allowUsernameInvitation(awaitNativeCreation(readFileSync(appPath, 'utf8'))),
+            exposeAttachmentWriter(
+                allowUsernameInvitation(awaitNativeCreation(readFileSync(appPath, 'utf8')))
+            ),
             overrides
         )
     );

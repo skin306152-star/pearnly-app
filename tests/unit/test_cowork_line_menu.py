@@ -48,7 +48,8 @@ class CoworkLineMenuTests(unittest.TestCase):
             with self.subTest(lang=lang):
                 card = menu_cards.menu_card(lang)
                 menu_cells = cells(card)
-                self.assertEqual(len(menu_cells), 2)
+                self.assertEqual(len(menu_cells), 3)
+                self.assertEqual(menu_cells[2]["action"]["data"], "a=work&c=home")
                 self.assertEqual(menu_cells[1]["action"]["uri"], menu_cards.stocktake_url())
                 self.assertIn(
                     "/stocktake.png?v=1", menu_cells[1]["contents"][0]["contents"][0]["url"]
@@ -69,10 +70,11 @@ class CoworkLineMenuTests(unittest.TestCase):
             menu_cards.menu_card("fr")["altText"], menu_cards.menu_card("th")["altText"]
         )
 
-    def test_rich_menu_has_two_actions_matching_flex_menu(self):
+    def test_rich_menu_has_three_actions_matching_flex_menu(self):
         payload = rich_menu.build_payload()
         self.assertEqual(payload["size"], {"width": 2500, "height": 1686})
-        self.assertEqual(len(payload["areas"]), 2)
+        self.assertEqual(len(payload["areas"]), 3)
+        self.assertEqual(payload["areas"][2]["action"]["data"], "a=work&c=home")
         self.assertEqual(
             payload["areas"][1],
             {

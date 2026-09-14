@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTPUT = ROOT / "static" / "brand" / "line-richmenu-cowork-v1-2500x1686.png"
+OUTPUT = ROOT / "static" / "brand" / "line-richmenu-cowork-v3-2500x1686.png"
 FONT_REGULAR = ROOT / "services" / "export" / "fonts" / "Sarabun-Regular.ttf"
 FONT_BOLD = ROOT / "services" / "export" / "fonts" / "Sarabun-Bold.ttf"
 
@@ -93,8 +93,12 @@ def card(draw, col: int, row: int, *, active: bool) -> None:
     if active:
         glyph = document_icon if col == 0 else stocktake_icon
         glyph(draw, center_x, top + 282)
-        title = "ส่งเอกสารเข้า ERP" if col == 0 else "ตรวจนับสต็อก"
-        desc = "อัปโหลด · ตรวจสอบ · เลือกปลายทาง" if col == 0 else "สแกนบาร์โค้ด · บันทึกจำนวน"
+        title = ("ส่งเอกสารเข้า ERP", "ตรวจนับสต็อก", "ประสานงาน")[col]
+        desc = (
+            "อัปโหลด · ตรวจสอบ · เลือกปลายทาง",
+            "สแกนบาร์โค้ด · บันทึกจำนวน",
+            "มอบหมาย · ติดตาม · ตรวจรับงาน",
+        )[col]
         centered(draw, title, center_x, top + 520, font(62, bold=True), INK)
         centered(draw, desc, center_x, top + 622, font(38), MUTED)
     else:
@@ -108,7 +112,7 @@ def build() -> Image.Image:
     draw = ImageDraw.Draw(image)
     for row in range(2):
         for col in range(3):
-            card(draw, col, row, active=row == 0 and col < 2)
+            card(draw, col, row, active=row == 0)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     image.save(OUTPUT, "PNG", optimize=True)
     icon_dir = ROOT / "static" / "stocktake" / "line-icons"

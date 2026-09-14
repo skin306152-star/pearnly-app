@@ -47,6 +47,36 @@ class EnrollmentRequest(BaseModel):
     user_id: UUID
 
 
+class LineOwnerRequest(BaseModel):
+    membership_id: UUID
+    tenant_id: UUID
+    user_id: UUID
+    line_user_id: str = Field(min_length=1, max_length=100)
+
+
+class LineWorkEvent(BaseModel):
+    board_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
+    card_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
+    event_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
+    list_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
+
+
+@router.post("/api/work/service/line-event", include_in_schema=False)
+def work_line_event(body: LineWorkEvent, request: Request):
+    require_service(request)
+    from services.cowork_line.work_notifications import deliver
+
+    return deliver(body.board_id, body.card_id, body.event_id, body.list_id)
+
+
+@router.post("/api/work/service/line-owner", include_in_schema=False)
+def work_line_owner(body: LineOwnerRequest, request: Request):
+    require_service(request)
+    from services.work_bridge.line_owner import owner
+
+    return owner({key: str(value) for key, value in body.model_dump().items()})
+
+
 def require_service(request: Request) -> None:
     supplied = request.headers.get("Authorization", "")
     if not hmac.compare_digest(supplied.encode(), ("Bearer " + service().secret).encode()):

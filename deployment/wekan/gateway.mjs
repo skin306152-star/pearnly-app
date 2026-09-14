@@ -4,6 +4,7 @@ import https from 'node:https';
 import { readFileSync } from 'node:fs';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { cookieCodec, readCookie, upstreamHeaders } from './cookies.mjs';
+import { verifyLine, lineRoute } from './line-service.mjs';
 
 const origin = new URL(process.env.PEARNLY_ORIGIN);
 const serviceOrigin = new URL(process.env.PEARNLY_SERVICE_ORIGIN || origin);
@@ -107,6 +108,44 @@ const server = http.createServer(async (req, res) => {
     // Never accept a Host chosen to point at another upstream or cookie origin.
     if (req.headers.host !== publicUrl.host) return json(res, 421, { error: 'invalid host' });
     try {
+        if (path.startsWith('/_pearnly/line/')) {
+            if (path.startsWith('/_pearnly/line/file/')) {
+                const query = new URL(req.url, publicUrl).searchParams;
+                req.headers['x-pearnly-line'] = query.get('ticket') || '';
+                req.headers['x-pearnly-line-signature'] = query.get('signature') || '';
+            }
+            verifyLine(req.headers, req.method, path, secret);
+            if (!lineRoute(req.method, path)) return json(res, 404, { error: 'route' });
+            const upstream = transport.request(
+                new URL(path, backend),
+                {
+                    method: req.method,
+                    headers: {
+                        'content-type': 'application/json',
+                        'x-pearnly-line': req.headers['x-pearnly-line'],
+                        'x-pearnly-line-signature': req.headers['x-pearnly-line-signature'],
+                    },
+                },
+                (response) => {
+                    res.writeHead(response.statusCode, {
+                        'Content-Type': response.headers['content-type'] || 'application/json',
+                        'Cache-Control': 'no-store',
+                        'X-Content-Type-Options': 'nosniff',
+                        ...(response.headers['content-disposition']
+                            ? { 'Content-Disposition': response.headers['content-disposition'] }
+                            : {}),
+                    });
+                    response.pipe(res);
+                }
+            );
+            upstream.setTimeout(24000, () => upstream.destroy());
+            upstream.on('error', () => {
+                if (!res.headersSent) json(res, 502, { error: 'upstream' });
+            });
+            req.on('aborted', () => upstream.destroy());
+            req.pipe(upstream);
+            return;
+        }
         if (path === '/_pearnly/health' && req.method === 'GET') {
             try {
                 const ready = await fetch(new URL('/_pearnly/ready', backend), {

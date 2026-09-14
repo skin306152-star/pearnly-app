@@ -12,5 +12,5 @@ COPY branding /opt/pearnly/branding
 COPY i18n /opt/pearnly/i18n
 COPY meteor-bridge.js /build/programs/server/packages/pearnly-bridge.js
 RUN node /opt/pearnly/install.mjs /build/programs/server
-COPY cookies.mjs gateway.mjs client.js /opt/pearnly/
+COPY cookies.mjs gateway.mjs client.js line-service.mjs line-events.mjs /opt/pearnly/
 USER wekan

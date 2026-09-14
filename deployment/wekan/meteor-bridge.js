@@ -1,11 +1,12 @@
 /* Loaded as a server-only Meteor package before the native app package.
  * The integration wraps identity creation; native board roles/methods stay in WeKan.
  */
-/* global Package, process, URL, fetch, AbortSignal */
+/* global Package, process, URL, fetch, AbortSignal, console */
 Package['core-runtime'].queue('pearnly-bridge', function () {
     const { Meteor } = Package.meteor;
     const { Accounts } = Package['accounts-base'];
     const { WebApp, WebAppInternals } = Package.webapp;
+    const { MongoInternals } = Package.mongo;
     const secret = process.env.WORK_BRIDGE_SECRET || '';
     const origin = new URL(process.env.PEARNLY_ORIGIN);
     const serviceOrigin = new URL(process.env.PEARNLY_SERVICE_ORIGIN || origin);
@@ -13,6 +14,34 @@ Package['core-runtime'].queue('pearnly-bridge', function () {
     if (secret.length < 32 || !trusted.filter(Boolean).length)
         throw new Error('Pearnly bridge configuration required');
     const httpActor = new Meteor.EnvironmentVariable();
+
+    // Branding: the product name and the two logo slots are native settings, so
+    // they are written where the app already reads them instead of being painted
+    // over. Only these four keys are ever touched.
+    const BRANDING = {
+        productName: 'Pearnly',
+        hideLogo: false,
+        customTopLeftCornerLogoImageUrl: '/_pearnly/pearnly-header-logo.png',
+        customTopLeftCornerLogoHeight: '27',
+        customLoginLogoImageUrl: '/_pearnly/pearnly-login-logo.png',
+    };
+
+    async function seedBranding() {
+        // The driver, not a second Mongo.Collection: the app already registered
+        // that name and registering it again throws. Only the keys above are
+        // written, so nothing else about the settings document is touched.
+        const driver = MongoInternals.defaultRemoteCollectionDriver();
+        const settings = (await Promise.resolve(driver.mongo.db)).collection('settings');
+        const current = await settings.findOne({});
+        const changes = Object.entries(BRANDING).filter(([key, value]) => current?.[key] !== value);
+        if (!changes.length) return;
+        const fields = Object.fromEntries(changes);
+        if (current) await settings.updateOne({ _id: current._id }, { $set: fields });
+        else {
+            const id = Package.random?.Random?.id?.();
+            await settings.insertOne(id ? { _id: id, ...fields } : fields);
+        }
+    }
     function actorId() {
         try {
             return Meteor.userId() || httpActor.get();
@@ -273,15 +302,40 @@ Package['core-runtime'].queue('pearnly-bridge', function () {
             }
         });
         WebAppInternals.registerBoilerplateDataCallback('pearnly-return', (_req, data) => {
+            // A render-blocking stylesheet, so the cover and the palette are in
+            // force on the first paint: that is what removes the native sign-in
+            // page and the stock logo that used to flash while the Pearnly login
+            // handshake was still in flight.
             data.head =
                 (data.head || '') +
+                '<link rel="stylesheet" href="/_pearnly/branding.css">' +
                 '<script src="/_pearnly/client.js" defer></script>' +
                 '<style>#pearnly-return{position:fixed;bottom:12px;left:12px;z-index:10000;padding:8px 12px;background:#fff;color:#222;border:1px solid #ddd;border-radius:6px;text-decoration:none;font:14px sans-serif}</style>';
             data.body =
                 (data.body || '') +
+                '<div id="pearnly-boot" role="status" aria-live="polite">' +
+                '<img src="/_pearnly/pearnly-login-logo.png" alt="" width="220" height="164">' +
+                '<span class="pearnly-boot-bar" aria-hidden="true"></span>' +
+                '<span class="pearnly-boot-text">กำลังโหลด…</span>' +
+                '</div>' +
                 `<a id="pearnly-return" href="${origin.origin}/cowork">← COWORK</a>`;
             return data;
         });
+
+        // The page loads only after a valid handoff, so the cover is always
+        // removed by the client script. This is the belt-and-braces path for a
+        // script that never ran at all: a cover nobody can lift is worse than
+        // the flash it removes.
+        WebAppInternals.registerBoilerplateDataCallback('pearnly-boot-timeout', (_req, data) => {
+            data.head =
+                (data.head || '') +
+                "<script>setTimeout(function(){document.documentElement.classList.add('pearnly-ready')},12000)</script>";
+            return data;
+        });
+
+        await seedBranding().catch((error) =>
+            console.error('[pearnly-branding] could not seed settings -', error.message)
+        );
     });
     return {};
 });

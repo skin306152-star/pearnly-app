@@ -1,0 +1,128 @@
+/* Pearnly branding for the embedded work-collaboration app.
+ *
+ * Only three things are changed: the logo (replaced by install.mjs from
+ * ./branding), the product name (seeded as the native `productName` setting),
+ * and the palette. Nothing else about the native UI is rewritten.
+ *
+ * This sheet is inlined into the server-rendered <head>, so it is in force on
+ * the FIRST paint: that is what removes the transient native sign-in page and
+ * the stock logo, which used to appear while the Pearnly login handshake was
+ * still in flight.
+ */
+
+:root {
+  /* Pearnly's own accent, from the app's theme tokens (home-01-base.css). */
+  --pearnly-accent: #7c4dff;
+  --pearnly-accent-deep: #6b3ff2;
+  --pearnly-page: #f7f5fc;
+  --pearnly-ink: #231942;
+  /* Native controls read this one variable for "the chosen colour". */
+  --theme-accent: #7c4dff;
+  --theme-accent-fill: #7c4dff;
+}
+
+/* ---- Boot cover ----------------------------------------------------------
+ * Nothing of the native UI is painted until Pearnly has authenticated the
+ * session and applied the branding. `visibility`, not `display`, so the app
+ * behind the cover keeps its layout and the reveal cannot shift the page.
+ */
+#pearnly-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--pearnly-page);
+}
+
+html:not(.pearnly-ready) body > *:not(#pearnly-boot) {
+  visibility: hidden !important;
+}
+
+html.pearnly-ready #pearnly-boot {
+  display: none !important;
+}
+
+#pearnly-boot img {
+  width: 220px;
+  height: auto;
+}
+
+#pearnly-boot .pearnly-boot-bar {
+  position: relative;
+  width: 132px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(124, 77, 255, 0.16);
+  overflow: hidden;
+}
+
+#pearnly-boot .pearnly-boot-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: 999px;
+  background: var(--pearnly-accent);
+  animation: pearnly-boot-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes pearnly-boot-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+#pearnly-boot .pearnly-boot-text {
+  color: #5b5875;
+  font:
+    400 14px system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #pearnly-boot .pearnly-boot-bar::after {
+    animation: none;
+    width: 100%;
+  }
+}
+
+/* ---- Palette -------------------------------------------------------------
+ * WeKan paints its bars from a literal belize blue and its controls from
+ * `--theme-accent`. The literal has to be overridden per surface; the variable
+ * above already carries every control that reads it.
+ */
+#header,
+#header-quick-access {
+  background: var(--pearnly-accent) !important;
+}
+
+.has-custom-theme-color #header,
+.has-custom-theme-color #header-quick-access {
+  background: var(--pearnly-accent) !important;
+}
+
+/* Selected rows, primary buttons and the sidebar's own button, so the chrome
+ * around a board matches the bars rather than staying on the stock blue. */
+.sidebar .sidebar-content .sidebar-btn,
+button[type='submit'].primary,
+input[type='submit'].primary {
+  background-color: var(--pearnly-accent) !important;
+}
+
+/* The stock header logo is replaced by a square Pearnly mark; it carries its
+ * own white tile, so only the box has to stay square and small. */
+#header-quick-access .header-logo img,
+#header-quick-access .header-logo .pearnly-mark {
+  width: auto;
+  height: 28px;
+  border-radius: 7px;
+}

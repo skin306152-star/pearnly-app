@@ -15,6 +15,18 @@ const secure = publicUrl.protocol === 'https:';
 if (!secure && process.env.PEARNLY_ENV !== 'development') throw new Error('HTTPS required');
 const codec = cookieCodec(secret);
 const clientScript = readFileSync(new URL('./client.js', import.meta.url));
+const brandingSheet = readFileSync(new URL('./branding.css', import.meta.url));
+// Served from here rather than from the WeKan bundle: the native asset server
+// only answers paths its build manifest already listed, so files added to that
+// directory afterwards come back as the app page instead of as an image.
+const brandingImages = {
+    '/_pearnly/pearnly-header-logo.png': readFileSync(
+        new URL('./branding/pearnly-header-logo.png', import.meta.url)
+    ),
+    '/_pearnly/pearnly-login-logo.png': readFileSync(
+        new URL('./branding/pearnly-login-logo.png', import.meta.url)
+    ),
+};
 const sessionName = secure ? '__Host-pearnly-work' : 'pearnly-work';
 const stateName = secure ? '__Host-pearnly-work-state' : 'pearnly-work-state';
 const attrs = `; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
@@ -166,6 +178,24 @@ const server = http.createServer(async (req, res) => {
                 'Cache-Control': 'no-store',
             });
             return res.end(clientScript);
+        }
+        // Referenced from the server-rendered <head>, so the palette and the
+        // boot cover apply before the first paint.
+        if (path === '/_pearnly/branding.css' && req.method === 'GET') {
+            res.writeHead(200, {
+                'Content-Type': 'text/css; charset=utf-8',
+                'Cache-Control': 'no-store',
+            });
+            return res.end(brandingSheet);
+        }
+        const image = brandingImages[path];
+        if (image && req.method === 'GET') {
+            res.writeHead(200, {
+                'Content-Type': 'image/png',
+                'Content-Length': image.length,
+                'Cache-Control': 'private, max-age=300',
+            });
+            return res.end(image);
         }
         proxy(req, res, current);
     } catch {

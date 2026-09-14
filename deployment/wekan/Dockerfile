@@ -7,6 +7,8 @@ FROM ${WEKAN_BASE}
 USER root
 COPY --from=dependencies /opt/pearnly /opt/pearnly
 COPY install.mjs /opt/pearnly/
+COPY branding.css /opt/pearnly/
+COPY branding /opt/pearnly/branding
 COPY meteor-bridge.js /build/programs/server/packages/pearnly-bridge.js
 RUN node /opt/pearnly/install.mjs /build/programs/server
 COPY cookies.mjs gateway.mjs client.js /opt/pearnly/

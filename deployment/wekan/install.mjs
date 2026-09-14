@@ -4,7 +4,8 @@
  * AST insertion preserves every native permission check and all surrounding code.
  */
 import { parse } from 'acorn';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 function walk(node, visit, parent) {
@@ -75,6 +76,31 @@ export function includeIdentityHeaders(source) {
         : source;
 }
 
+// The stock icon files are replaced in place, so their names are part of the
+// upstream contract we depend on. The two Pearnly images are served by the
+// gateway instead - they must ship in the image, but must not be copied into the
+// WeKan bundle, whose asset server only answers paths its manifest already lists.
+export const REPLACED_BRAND_FILES = [
+    'favicon.ico',
+    'favicon-16x16.png',
+    'favicon-32x32.png',
+    'apple-touch-icon.png',
+];
+export const SERVED_BRAND_FILES = ['pearnly-header-logo.png', 'pearnly-login-logo.png'];
+
+export function installBrandAssets(appDir, sourceDir) {
+    for (const name of [...REPLACED_BRAND_FILES, ...SERVED_BRAND_FILES]) {
+        const source = path.join(sourceDir, name);
+        if (!existsSync(source)) throw new Error('Missing Pearnly brand asset: ' + name);
+    }
+    for (const name of REPLACED_BRAND_FILES) {
+        if (!existsSync(path.join(appDir, name)))
+            throw new Error('Native brand asset moved upstream: ' + name);
+        copyFileSync(path.join(sourceDir, name), path.join(appDir, name));
+    }
+    return REPLACED_BRAND_FILES;
+}
+
 // Pearnly permits username-only accounts. Native invitation already adds the
 // member, then unconditionally dereferences its email and reports a false failure.
 // Skip only that optional notification when this recipient has no email.
@@ -114,6 +140,8 @@ export function allowUsernameInvitation(source) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const root = process.argv[2] || '/build/programs/server';
+    const brandSource = process.argv[3] || '/opt/pearnly/branding';
+    const webAppDir = process.argv[4] || '/build/programs/web.browser/app';
     const manifestPath = root + '/program.json';
     const manifest = JSON.parse(readFileSync(manifestPath));
     const index = manifest.load.findIndex((entry) => entry.path === 'app/app.js');
@@ -129,4 +157,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     writeFileSync(ddpPath, includeIdentityHeaders(readFileSync(ddpPath, 'utf8')));
     manifest.load.splice(index, 0, { path: 'packages/pearnly-bridge.js' });
     writeFileSync(manifestPath, JSON.stringify(manifest));
+    const installed = installBrandAssets(webAppDir, brandSource);
+    console.log('Pearnly brand assets installed:', installed.join(', '));
 }

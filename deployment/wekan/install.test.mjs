@@ -4,8 +4,42 @@ import {
     awaitNativeCreation,
     includeIdentityHeaders,
     allowUsernameInvitation,
+    installBrandAssets,
+    REPLACED_BRAND_FILES,
+    SERVED_BRAND_FILES,
 } from './install.mjs';
 import vm from 'node:vm';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+test('brand assets replace the stock icons and fail closed when upstream moves one', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pearnly-brand-'));
+    try {
+        const source = path.join(dir, 'branding');
+        const app = path.join(dir, 'app');
+        mkdirSync(source);
+        mkdirSync(app);
+        for (const name of [...REPLACED_BRAND_FILES, ...SERVED_BRAND_FILES]) {
+            writeFileSync(path.join(source, name), `pearnly ${name}`);
+            if (REPLACED_BRAND_FILES.includes(name)) writeFileSync(path.join(app, name), 'stock');
+        }
+        assert.deepEqual(installBrandAssets(app, source), REPLACED_BRAND_FILES);
+        assert.equal(readFileSync(path.join(app, 'favicon.ico'), 'utf8'), 'pearnly favicon.ico');
+        // The gateway-served images stay in the image, out of the WeKan bundle:
+        // its asset server would answer those URLs with the app page instead.
+        assert.equal(existsSync(path.join(app, 'pearnly-header-logo.png')), false);
+        // An upstream release that renames or drops a stock icon must stop the build.
+        rmSync(path.join(app, 'favicon-32x32.png'));
+        assert.throws(() => installBrandAssets(app, source), /moved upstream/);
+        writeFileSync(path.join(app, 'favicon-32x32.png'), 'stock');
+        // ...and so must a brand asset that never made it into the image.
+        rmSync(path.join(source, 'pearnly-login-logo.png'));
+        assert.throws(() => installBrandAssets(app, source), /Missing Pearnly brand asset/);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
 
 test('only missing awaits change; native authorization and awaited calls stay intact', () => {
     const src =

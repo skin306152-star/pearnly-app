@@ -27,6 +27,8 @@ services:
             MONGO_URL: mongodb://mongo:27017/wekan
             WRITABLE_PATH: /data
             DEFAULT_LANGUAGE: th
+            # The names the database-less maintenance and recovery pages print.
+            PRODUCT_NAME: Pearnly
             PASSWORD_LOGIN_ENABLED: 'false'
             WITH_API: 'true'
             MAIL_URL: ${WORK_MAIL_URL:-}

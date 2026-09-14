@@ -69,6 +69,7 @@ async function preminifyDcScript(html) {
 // 不再内联进 .py 常量(2026-07-10 脸0 门户 + reset/pos-login 全部并入本管线)。
 const TARGETS = [
     { src: 'static/cowork-connect/index.html', out: 'static/dist/cowork-connect.html' },
+    { src: 'static/cowork-live/index.html', out: 'static/dist/cowork-live.html' },
     { src: 'work.html', out: 'static/dist/work.html' },
     { src: 'static/stocktake/mobile.html', out: 'static/dist/stocktake-mobile.html' },
     { src: 'home.html', out: 'static/dist/home.html' },

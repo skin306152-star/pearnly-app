@@ -181,18 +181,36 @@ def card(lang, title, lines, buttons):
         "home": "กลับ",
         "detail": "กลับ",
     }
+    decision = any(
+        parse_qs(item["action"].get("data", "")).get("c", [""])[0]
+        in {"save", "apply", "confirm_board", "add_member"}
+        for item in buttons
+    )
     for item in buttons:
         action = dict(item["action"])
         command = parse_qs(action.get("data", "")).get("c", [""])[0]
-        if command in labels and len(primary) < 4:
+        if decision and command in labels and len(primary) < 4:
             action["label"] = labels[command]
             action["displayText"] = labels[command]
-            primary.append({**item, "action": action})
+            primary.append(
+                {
+                    **item,
+                    "action": action,
+                    "style": "primary" if not primary else "secondary",
+                    "color": "#7C3AED" if not primary else "#EDE9F5",
+                    "height": "md",
+                }
+            )
         else:
             action["label"] = action["label"][:20]
             quick.append({"type": "action", "action": action})
     if len(quick) > 13:
         raise ValueError("LINE quick reply exceeds 13 actions")
+    if not decision:
+        result = {"type": "text", "text": "\n".join([title, *map(str, lines)])[:5000]}
+        if quick:
+            result["quickReply"] = {"items": quick}
+        return result
     result = {
         "type": "flex",
         "altText": title[:400],
@@ -201,12 +219,16 @@ def card(lang, title, lines, buttons):
             "body": {
                 "type": "box",
                 "layout": "vertical",
-                "spacing": "sm",
+                "spacing": "md",
+                "paddingAll": "20px",
+                "backgroundColor": "#FAF8FF",
                 "contents": [
                     {
                         "type": "text",
                         "text": title[:1000] or t(lang, "home"),
                         "weight": "bold",
+                        "size": "lg",
+                        "color": "#292039",
                         "wrap": True,
                     },
                     *[
@@ -214,6 +236,7 @@ def card(lang, title, lines, buttons):
                             "type": "text",
                             "text": str(line)[:2000] or "—",
                             "size": "sm",
+                            "color": "#625B70",
                             "wrap": True,
                         }
                         for line in lines
@@ -221,7 +244,15 @@ def card(lang, title, lines, buttons):
                 ],
             },
             **(
-                {"footer": {"type": "box", "layout": "horizontal", "contents": primary}}
+                {
+                    "footer": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "sm",
+                        "paddingAll": "16px",
+                        "contents": primary,
+                    }
+                }
                 if primary
                 else {}
             ),

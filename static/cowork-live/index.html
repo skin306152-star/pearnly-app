@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Pearnly · ภาพรวมงานสด</title>
+    <link rel="stylesheet" href="/static/pearnly-ui.css" />
+    <link rel="stylesheet" href="/static/cowork-live/style.css?v=1" />
+    <script defer src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script defer src="/static/cowork-live/app.js?v=1"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="brand">PEARNLY COWORK</p>
+          <h1 id="title">ภาพรวมงานสด</h1>
+        </div>
+        <button id="close" type="button">กลับ LINE</button>
+      </header>
+      <p id="connection" role="status" aria-live="polite">กำลังเชื่อมต่อ…</p>
+      <section id="workspace" hidden>
+        <label for="board">บอร์ดงาน</label
+        ><select id="board"></select>
+        <section class="summary">
+          <div><span>เสร็จแล้ว</span><strong id="completed">0 / 0</strong></div>
+          <progress
+            id="progress"
+            max="100"
+            value="0"
+            aria-label="สัดส่วนงานที่เสร็จแล้ว"
+          ></progress>
+          <p>คำนวณจากงานที่เสร็จจริง ไม่รวมงานที่ยกเลิก</p>
+        </section>
+        <nav id="filters" aria-label="กรองงาน"></nav>
+        <div class="tools">
+          <label for="search">ค้นหางาน</label
+          ><input id="search" type="search" placeholder="ชื่อเรื่อง หรือผู้รับผิดชอบ" />
+        </div>
+        <p id="empty" hidden>ยังไม่มีงานในรายการนี้ครับ</p>
+        <section id="tasks" aria-label="รายการงาน"></section>
+      </section>
+      <p id="error" role="alert" hidden></p>
+      <button id="retry" type="button" hidden>ลองเชื่อมต่ออีกครั้ง</button>
+    </main>
+  </body>
+</html>

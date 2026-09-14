@@ -147,3 +147,35 @@ async def cowork_work_invite(body: WorkInviteRequest):
         )
     except ValueError as exc:
         raise HTTPException(422, "work.account_invalid") from exc
+
+
+class WorkLiveRead(BaseModel):
+    token: str = Field(min_length=1, max_length=10000)
+    board: str = Field(default="", pattern=r"^[A-Za-z0-9_-]{0,100}$")
+
+
+@router.post("/api/cowork-line/work-live/auth")
+async def cowork_live_auth(body: WorkConnectRequest):
+    from services.cowork_line import work_live
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        await asyncio.to_thread(work_live.authenticate, body.id_token),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.post("/api/cowork-line/work-live/read")
+async def cowork_live_read(body: WorkLiveRead):
+    from services.cowork_line import work_live
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        await asyncio.to_thread(work_live.read, body.token, body.board),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/liff/cowork-live", include_in_schema=False)
+def cowork_live_page():
+    return FileResponse("static/dist/cowork-live.html", headers={"Cache-Control": "no-store"})

@@ -52,7 +52,7 @@ class CoworkLineMenuTests(unittest.TestCase):
                 self.assertEqual(menu_cells[2]["action"]["data"], "a=work&c=home")
                 self.assertEqual(menu_cells[1]["action"]["uri"], menu_cards.stocktake_url())
                 self.assertIn(
-                    "/stocktake.png?v=1", menu_cells[1]["contents"][0]["contents"][0]["url"]
+                    "/stocktake.png?v=2", menu_cells[1]["contents"][0]["contents"][0]["url"]
                 )
                 self.assertEqual(
                     menu_cells[0]["action"]["data"],

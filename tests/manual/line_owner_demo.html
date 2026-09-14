@@ -60,6 +60,21 @@
       max-width: 340px;
       overflow-wrap: anywhere;
     }
+    .plain {
+      padding: 10px 14px;
+      width: fit-content;
+      background: #f2f4f7;
+    }
+    .decision {
+      background: #faf8ff;
+    }
+    .decision h3 {
+      color: #292039;
+      font-size: 20px;
+    }
+    .decision p {
+      color: #625b70;
+    }
     .bubble p {
       margin: 8px 0;
       white-space: pre-wrap;
@@ -278,7 +293,7 @@
     function render(message) {
       if (!message) return;
       const box = document.createElement('div');
-      box.className = 'bubble';
+      box.className = 'bubble ' + (message.type === 'text' ? 'plain' : 'decision');
       function content(node) {
         if (node.type === 'text')
           box.append(textEl(node.weight === 'bold' ? 'h3' : 'p', node.text));
@@ -299,9 +314,13 @@
         content(message.contents.body);
         const actions = document.createElement('div');
         actions.className = 'actions';
+        actions.style.flexDirection = 'column';
         for (const item of message.contents.footer?.contents || []) {
           const action = item.action;
           const b = textEl('button', action.label);
+          b.style.background = item.color || '#EDE9F5';
+          b.style.color = item.style === 'primary' ? '#ffffff' : '#292039';
+          b.style.width = '100%';
           b.onclick = () => act(action);
           actions.append(b);
         }

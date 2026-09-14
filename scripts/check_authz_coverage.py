@@ -23,6 +23,18 @@ from scripts.authz_route_inventory import collect_routes  # noqa: E402
 PUBLIC_ROUTES = {
     (
         "GET",
+        "/liff/cowork-live",
+    ),  # Public shell only; data requires scoped session and native authorization.
+    (
+        "POST",
+        "/api/cowork-line/work-live/auth",
+    ),  # Verified LINE token, active binding and fresh actor.
+    (
+        "POST",
+        "/api/cowork-line/work-live/read",
+    ),  # Audience-scoped signed session, fresh actor and native board/assignment checks.
+    (
+        "GET",
         "/liff/cowork-connect",
     ),  # Public HTML shell; binding requires login and verified LINE token
     # LINE ID token verified against the existing Cowork channel and active membership.

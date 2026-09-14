@@ -27,26 +27,41 @@ def prepare(fixture):
 
 
 def local_url(mode="connect", board=""):
-    return "http://localhost:18099/liff/cowork-connect?" + urlencode(
-        {"flow": "cowork-connect", "draft": mode, "board": board}
+    return (
+        "http://localhost:18099/liff/"
+        + ("cowork-live" if mode == "live" else "cowork-connect")
+        + "?"
+        + urlencode({"flow": "cowork-connect", "draft": mode, "board": board})
     )
 
 
 def asset(route):
     root = Path(__file__).resolve().parents[2]
-    if route == "/liff/cowork-connect":
+    if route in {"/liff/cowork-connect", "/liff/cowork-live"}:
         raw = (
-            (root / "static/cowork-connect/index.html")
+            (
+                root
+                / (
+                    "static/cowork-live/index.html"
+                    if route.endswith("cowork-live")
+                    else "static/cowork-connect/index.html"
+                )
+            )
             .read_text()
             .replace("https://static.line-scdn.net/liff/edge/2/sdk.js", "/demo/liff.js")
         )
         return raw.encode(), "text/html; charset=utf-8"
     if route == "/demo/liff.js":
         return (
-            b"window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>new URLSearchParams(location.search).get('draft')==='invite'?'local-owner':'local-invited',closeWindow:()=>{location.href='/';}};",
+            b"window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>new URLSearchParams(location.search).get('persona')==='owner'||new URLSearchParams(location.search).get('draft')==='invite'?'local-owner':'local-invited',closeWindow:()=>{location.href='/';}};",
             "text/javascript",
         )
-    if route in {"/static/cowork-connect/app.js", "/static/pearnly-ui.css"}:
+    if route in {
+        "/static/cowork-connect/app.js",
+        "/static/pearnly-ui.css",
+        "/static/cowork-live/app.js",
+        "/static/cowork-live/style.css",
+    }:
         return (root / route.lstrip("/")).read_bytes(), (
             "text/javascript" if route.endswith("js") else "text/css"
         )

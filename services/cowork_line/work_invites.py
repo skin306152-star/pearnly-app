@@ -16,10 +16,21 @@ from services.work_bridge import accounts, line_owner
 
 
 def url(mode="connect", board=""):
-    query = urlencode({"flow": "cowork-connect", "draft": mode, "board": board})
+    query = urlencode(
+        {
+            "flow": "cowork-live" if mode == "live" else "cowork-connect",
+            "draft": mode,
+            "board": board,
+        }
+    )
     liff = os.getenv("LINE_COWORK_LIFF_ID") or os.getenv("LINE_LIFF_ID")
     if not liff:
-        return "https://pearnly.com/liff/cowork-connect?" + query
+        return (
+            "https://pearnly.com/liff/"
+            + ("cowork-live" if mode == "live" else "cowork-connect")
+            + "?"
+            + query
+        )
     return f"https://liff.line.me/{liff}/?{query}"
 
 

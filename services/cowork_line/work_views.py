@@ -73,13 +73,16 @@ def paged(lang, state, title, items, command, *, page=0, extras=()):
 
 
 def home(lang, state, data):
+    from services.cowork_line.work_live import entry
+
     nonce = state["nonce"]
     if state.get("work_role") == "employee":
         return card(
             lang,
             "งานของฉัน",
             [data["board"]["title"]],
-            _buttons(lang, state, "pending", "doing", "blocked", "review", "done", "all", "boards"),
+            _buttons(lang, state, "pending", "doing", "blocked", "review", "done", "all", "boards")
+            + [entry(state["board"])],
         )
     counts = {key: sum(state_of(x, mapping(state)) == key for x in data["cards"]) for key in STATES}
     lines = [
@@ -99,7 +102,7 @@ def home(lang, state, data):
             "action": {"type": "uri", "label": "เชิญพนักงาน", "uri": url("invite", state["board"])},
         }
     )
-    return card(lang, t(lang, "home"), lines, buttons)
+    return card(lang, t(lang, "home"), lines, buttons + [entry(state["board"])])
 
 
 def draft(lang, state, data):
@@ -254,3 +257,19 @@ def _choices(lang, state, data, page=0):
             else _buttons(lang, state, "search", "people")
         ),
     )
+
+
+def no_board(lang, state, data):
+    from services.cowork_line.work_live import entry
+
+    keys = ("boards",) if state.get("work_role") == "employee" else ("boards", "create_board")
+    hint = (
+        "เลือกบอร์ดเพื่อดูและจัดการงานครับ"
+        if data.get("boards")
+        else (
+            "ยังไม่มีงานในทีม กรุณารอผู้ดูแลเชิญเข้าบอร์ดครับ"
+            if state.get("work_role") == "employee"
+            else "ยังไม่มีบอร์ดงาน เริ่มสร้างบอร์ดเพื่อมอบหมายงานครับ"
+        )
+    )
+    return card(lang, t(lang, "home"), [hint], _buttons(lang, state, *keys) + [entry()])

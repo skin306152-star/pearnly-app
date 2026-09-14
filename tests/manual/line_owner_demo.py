@@ -22,7 +22,7 @@ from uuid import uuid4
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from services.cowork_line import work_flow, work_store, work_notifications, work_invites
+from services.cowork_line import work_flow, work_store, work_notifications, work_invites, work_live
 from tests.manual import line_demo_accounts
 from services.work_bridge import line_owner
 from tests.unit.test_cowork_line_work_pg_smoke import WorkOwnerPgTests
@@ -157,6 +157,20 @@ def main():
             body = json.loads(
                 self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}"
             )
+            if self.path.startswith("/api/cowork-line/work-live/"):
+                with mutex:
+                    try:
+                        result = (
+                            work_live.authenticate(body["id_token"])
+                            if self.path.endswith("/auth")
+                            else work_live.read(body["token"], body.get("board", ""))
+                        )
+                        return self.send(result)
+                    except Exception as exc:
+                        return self.send(
+                            {"detail": getattr(exc, "detail", "failed")},
+                            getattr(exc, "status_code", 500),
+                        )
             if self.path.startswith("/api/work/service/"):
                 if self.headers.get("Authorization") != "Bearer " + secret:
                     return self.send({}, 401)

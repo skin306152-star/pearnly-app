@@ -69,6 +69,10 @@ class CacheBustDir(NamedTuple):
 # (pearnly-ui.css 被五个入口共用,漏 bump = 五个站一起吃旧样式)。
 _ENTRY_ASSETS = {
     "work.html": ("/static/work/entry.js",),
+    "static/cowork-live/index.html": (
+        "/static/cowork-live/app.js",
+        "/static/cowork-live/style.css",
+    ),
     "static/cowork-connect/index.html": ("/static/cowork-connect/app.js",),
     "home.html": (
         "/static/dist/main.js",

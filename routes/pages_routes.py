@@ -179,6 +179,7 @@ def _line_intake_shell(liff_state: str, flow: str, draft: str) -> FileResponse |
     shells = {
         "cowork-intake": "static/dist/cowork-line-intake.html",
         "cowork-connect": "static/dist/cowork-connect.html",
+        "cowork-live": "static/dist/cowork-live.html",
         "cowork-stocktake": "static/dist/stocktake-mobile.html",
         "erp-intake": "static/dist/erp-line-intake.html",
     }

@@ -8,6 +8,8 @@ from urllib.parse import urlencode
 
 from services.line_dms.menu_cards import (
     THEME_BLUE,
+    THEME_ORANGE,
+    THEME_PURPLE,
     menu_icon_disc,
     menu_item as shared_menu_item,
 )
@@ -71,7 +73,8 @@ def menu_item(num, icon, theme, title, desc, action):
     row = shared_menu_item(num, icon, theme, title, desc, action)
     row["contents"][0]["contents"][0][
         "url"
-    ] = f"https://pearnly.com/static/stocktake/line-icons/{icon}.png?v=1"
+    ] = f"https://pearnly.com/static/stocktake/line-icons/{icon}.png?v=2"
+    row["contents"].pop(1)
     return row
 
 
@@ -98,7 +101,7 @@ def menu_card(lang: str = "th") -> dict[str, Any]:
         menu_item(
             "2",
             "stocktake",
-            THEME_BLUE,
+            THEME_ORANGE,
             stocktake_title,
             {
                 "th": "สแกนบาร์โค้ดและบันทึกจำนวน",
@@ -118,8 +121,8 @@ def menu_card(lang: str = "th") -> dict[str, Any]:
 
     work_row = menu_item(
         "3" if uri else "2",
-        "document-send",
-        THEME_BLUE,
+        "team-work",
+        THEME_PURPLE,
         t("th", "home"),
         t("th", "new"),
         {

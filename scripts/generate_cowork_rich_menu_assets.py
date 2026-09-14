@@ -34,30 +34,64 @@ def centered(draw, text: str, x: float, y: float, face, fill) -> None:
     draw.text((x - (left + right) / 2, y - (top + bottom) / 2), text, font=face, fill=fill)
 
 
-def document_icon(draw, x: float, y: float, color=WHITE) -> None:
-    draw.rounded_rectangle(
-        (x - 84, y - 106, x + 66, y + 106),
-        radius=22,
-        outline=color,
-        width=12,
+def document_icon(draw, x, y, color=WHITE):
+    draw.polygon(
+        [
+            (x - 83, y - 105),
+            (x + 20, y - 105),
+            (x + 62, y - 63),
+            (x + 62, y + 100),
+            (x - 83, y + 100),
+        ],
+        fill=color,
     )
-    draw.line((x - 48, y - 46, x + 30, y - 46), fill=color, width=10)
-    draw.line((x - 48, y - 5, x + 30, y - 5), fill=color, width=10)
-    draw.line((x - 48, y + 36, x + 5, y + 36), fill=color, width=10)
-    draw.line((x + 2, y + 82, x + 102, y + 82), fill=color, width=14)
-    draw.line((x + 70, y + 49, x + 102, y + 82, x + 70, y + 115), fill=color, width=14)
+    cut = WHITE if color != WHITE else ACTIVE
+    draw.line((x - 50, y - 35, x + 14, y - 35), fill=cut, width=12)
+    draw.line((x - 50, y + 4, x + 14, y + 4), fill=cut, width=12)
+    draw.line((x - 50, y + 43, x - 12, y + 43), fill=cut, width=12)
+    draw.line((x + 15, y + 72, x + 100, y + 72), fill=color, width=20)
+    draw.polygon([(x + 70, y + 38), (x + 110, y + 72), (x + 70, y + 106)], fill=color)
 
 
-def stocktake_icon(draw, x: float, y: float, color=WHITE) -> None:
-    draw.rounded_rectangle((x - 78, y - 92, x + 78, y + 104), radius=16, outline=color, width=12)
-    draw.rounded_rectangle((x - 35, y - 112, x + 35, y - 73), radius=10, fill=color)
-    for offset in (-32, 25, 78):
-        draw.line(
-            (x - 49, y + offset - 7, x - 37, y + offset + 6, x - 18, y + offset - 15),
-            fill=color,
-            width=9,
+def stocktake_icon(draw, x, y, color=WHITE):
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            draw.line(
+                [
+                    (x + sx * 68, y + sy * 108),
+                    (x + sx * 108, y + sy * 108),
+                    (x + sx * 108, y + sy * 68),
+                ],
+                fill=color,
+                width=14,
+            )
+    draw.polygon(
+        [
+            (x, y - 58),
+            (x + 69, y - 22),
+            (x + 69, y + 57),
+            (x, y + 93),
+            (x - 69, y + 57),
+            (x - 69, y - 22),
+        ],
+        fill=color,
+    )
+    cut = WHITE if color != WHITE else (217, 119, 6)
+    draw.line([(x - 69, y - 22), (x, y + 12), (x + 69, y - 22)], fill=cut, width=8)
+    draw.line((x, y + 12, x, y + 93), fill=cut, width=8)
+    draw.polygon([(x - 69, y - 22), (x - 90, y - 48), (x - 22, y - 82), (x, y - 58)], fill=color)
+    draw.polygon([(x + 69, y - 22), (x + 90, y - 48), (x + 22, y - 82), (x, y - 58)], fill=color)
+
+
+def team_icon(draw, x, y, color=WHITE):
+    draw.arc((x - 94, y - 85, x + 94, y + 103), 205, 250, fill=color, width=13)
+    draw.arc((x - 94, y - 85, x + 94, y + 103), 290, 335, fill=color, width=13)
+    draw.arc((x - 94, y - 85, x + 94, y + 103), 70, 110, fill=color, width=13)
+    for dx, dy in ((0, -68), (-77, 61), (77, 61)):
+        draw.ellipse((x + dx - 25, y + dy - 38, x + dx + 25, y + dy + 12), fill=color)
+        draw.rounded_rectangle(
+            (x + dx - 39, y + dy + 19, x + dx + 39, y + dy + 61), radius=20, fill=color
         )
-        draw.line((x + 3, y + offset, x + 48, y + offset), fill=color, width=9)
 
 
 def lock_icon(draw, x: float, y: float) -> None:
@@ -76,8 +110,11 @@ def card(draw, col: int, row: int, *, active: bool) -> None:
     left, right = COLUMN_EDGES[col], COLUMN_EDGES[col + 1]
     top, bottom = row * ROW_HEIGHT, (row + 1) * ROW_HEIGHT
     center_x = (left + right) / 2
-    fill = ACTIVE_SOFT if active else MUTED_SOFT
-    outline = (197, 214, 255) if active else (222, 219, 229)
+    accent = ((37, 99, 235), (217, 119, 6), (124, 58, 237))[col]
+    fill = ((235, 242, 255), (255, 244, 229), (243, 235, 255))[col] if active else MUTED_SOFT
+    outline = (
+        ((197, 214, 255), (249, 218, 178), (222, 201, 255))[col] if active else (222, 219, 229)
+    )
     draw.rounded_rectangle(
         (left + 42, top + 42, right - 42, bottom - 42),
         radius=50,
@@ -88,11 +125,11 @@ def card(draw, col: int, row: int, *, active: bool) -> None:
     draw.rounded_rectangle(
         (center_x - 118, top + 164, center_x + 118, top + 400),
         radius=62,
-        fill=ACTIVE if active else (225, 222, 232),
+        fill=fill if active else (225, 222, 232),
     )
     if active:
-        glyph = document_icon if col == 0 else stocktake_icon
-        glyph(draw, center_x, top + 282)
+        glyph = (document_icon, stocktake_icon, team_icon)[col]
+        glyph(draw, center_x, top + 260, accent)
         title = ("ส่งเอกสารเข้า ERP", "ตรวจนับสต็อก", "ประสานงาน")[col]
         desc = (
             "อัปโหลด · ตรวจสอบ · เลือกปลายทาง",
@@ -117,9 +154,13 @@ def build() -> Image.Image:
     image.save(OUTPUT, "PNG", optimize=True)
     icon_dir = ROOT / "static" / "stocktake" / "line-icons"
     icon_dir.mkdir(parents=True, exist_ok=True)
-    for name, glyph in (("document-send", document_icon), ("stocktake", stocktake_icon)):
+    for name, glyph, color in (
+        ("document-send", document_icon, (37, 99, 235)),
+        ("stocktake", stocktake_icon, (217, 119, 6)),
+        ("team-work", team_icon, (124, 58, 237)),
+    ):
         icon = Image.new("RGBA", (320, 320))
-        glyph(ImageDraw.Draw(icon), 160, 160, ACTIVE)
+        glyph(ImageDraw.Draw(icon), 160, 145, color)
         icon.save(icon_dir / f"{name}.png", "PNG", optimize=True)
     return image
 

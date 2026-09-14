@@ -111,8 +111,39 @@ class OwnerFlowTests(unittest.TestCase):
                 result["quickReply"]["items"][0]["action"]["label"], cards.t(lang, "title")
             )
             prompt = self.command("field", f="description")
-            self.assertEqual(prompt["altText"], cards.t("th", "description"))
+            self.assertEqual(prompt["text"].split("\n")[0], cards.t("th", "description"))
             self.text("ตรวจนับสินค้า")
+
+    def test_plain_steps_and_empty_board_back_escape(self):
+        self.state.pop("board")
+        self.data["boards"] = []
+        result = self.command("boards")
+        self.assertEqual(result["type"], "text")
+        result = self.command("home")
+        self.assertNotIn(cards.t("th", "boards") + "\n", result["text"])
+        self.assertIn("สร้างบอร์ด", result["text"])
+        self.assertEqual(self.command("create_board")["type"], "text")
+        confirm = self.text("New board")
+        self.assertEqual(confirm["type"], "flex")
+        footer = confirm["contents"]["footer"]
+        self.assertEqual(footer["layout"], "vertical")
+        self.assertEqual(footer["contents"][0]["style"], "primary")
+        self.assertEqual(footer["contents"][1]["style"], "secondary")
+
+    def test_saved_task_returns_plain_status_after_write(self):
+        self.data["cards"] = [
+            {"_id": "c", "title": "Task", "listId": "pending", "assignees": ["u"]}
+        ]
+        self.command("home")
+        self.state["draft"] = {"title": "Task", "assignees": ["u"]}
+        with (
+            patch.object(flow.actions, "save", return_value="c"),
+            patch.object(flow.actions, "notify", return_value=True),
+        ):
+            result = self.command("save")
+        self.assertEqual(result["type"], "text")
+        self.assertIn(cards.t("th", "saved"), result["text"])
+        self.assertNotIn("draft", self.state)
 
     def test_old_button_cannot_change_task(self):
         self.command("home")

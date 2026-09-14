@@ -37,8 +37,7 @@ def _home(identity, lang, state):
     state["editing_draft"] = False
     data = _data(identity, state)
     if not state.get("board"):
-        state["list_mode"] = "boards"
-        return _choices(lang, state, data)
+        return views.no_board(lang, state, data)
     return views.home(lang, state, data)
 
 
@@ -244,13 +243,8 @@ def _command(identity, lang, state, command, params, event):
         item = actions.task(data, ident)
         notice = actions.notify(identity, item, data, lang)
         result = views.detail(lang, state, data, item)
-        result["contents"]["body"]["contents"].append(
-            {
-                "type": "text",
-                "wrap": True,
-                "text": t(lang, "saved" if notice else "notification_failed"),
-                "size": "sm",
-            }
+        result["text"] = (
+            result["text"][:4800] + "\n" + t(lang, "saved" if notice else "notification_failed")
         )
         return result
     if command == "attachment":
@@ -355,9 +349,7 @@ def _command(identity, lang, state, command, params, event):
         notice = actions.notify(identity, confirmed, fresh, "th")
         result = views.detail("th", state, fresh, confirmed)
         if not notice:
-            result["contents"]["body"]["contents"].append(
-                {"type": "text", "wrap": True, "size": "sm", "text": t("th", "notification_failed")}
-            )
+            result["text"] = result["text"][:4800] + "\n" + t("th", "notification_failed")
         return result
     raise HTTPException(422, "work.invalid")
 

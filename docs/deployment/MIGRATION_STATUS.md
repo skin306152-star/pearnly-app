@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-14 18:05（Asia/Bangkok，UTC+7）。状态：**独立 WeKan 已上线第二版品牌化：顶栏 logo 取消、语言选择只留中英泰、泰语错翻与缺失词条已修（其中 49 条上游泰语实为越南语）；Pearnly Web/Worker 本次未重发。上一轮 DMS 共享主档后台刷新、LINE 订车会话快照与提交前实时核验仍为线上版本，真实 LINE 手机完整新单验收待确认。**
+更新时间：2026-09-14 18:35（Asia/Bangkok，UTC+7）。状态：**已发布登录会话与工作协作入口修复（`9198184c`）：退出登录现在会一并清掉本入口会收养的 legacy token，工作协作票据签发改为要求账号当前登录仍然有效；正式域名 health/ready 200，线上 `main.js?v=12060030` 与本地构建字节一致。独立 WeKan 第二版品牌化（顶栏 logo 取消、语言只留中英泰、泰语错翻与缺失词条修正）仍为线上版本，本次未重发 WeKan。用户真机“退出登录→重新登录→进入工作协作”验收待确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -28,10 +28,23 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- Pearnly 完整 SHA：`0e6cd1b9cbab138d62c50b7e5ec923dcb8308fcb`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:15c93c6216b9b7931afe188a73b1ef62918ca9f44647ab8f0d4ed168d4253a4d`。
-- Web revision：`pearnly-web-0e6cd1b9cbab-s3`；Worker revision：`pearnly-worker-0e6cd1b9cbab-s3`；两端 Ready、各 100% 流量，同一 digest。
-- [Manual CD 34761181296](https://github.com/skin306152-star/pearnly-app/actions/runs/34761181296) 于 2026-09-13 21:02 Bangkok 完成，conclusion success；schema execution `pearnly-schema-l7kbr` 成功，候选和正式两端的精确 SHA、镜像、健康、就绪及安装包完整下载均通过。
+- Pearnly 完整 SHA：`9198184c5b1146f3ee52f023e5c645a3ad225756`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:5be23703d6f4585e370733f8b2c40f5b2768260b78fd0b348e34b308930eeef3`。
+- Web revision：`pearnly-web-9198184c5b11-s3`；Worker revision：`pearnly-worker-9198184c5b11-s3`；两端 Ready、各 100% 流量，同一 digest。
+- [Manual CD 34838010446](https://github.com/skin306152-star/pearnly-app/actions/runs/34838010446) 于 2026-09-14 18:31 Bangkok 完成，conclusion success；schema execution `pearnly-schema-v7pk4` 成功，候选和正式两端的精确 SHA、镜像、健康、就绪及安装包完整下载均通过。
+
+### 登录会话与工作协作入口修复（2026-09-14）
+
+- 现象与根因：账号点“退出登录”后仍处于登录态，此后每次进“工作协作”只看到 `{"error":"work.session_expired"}`。真因是 Google／LINE 回调把 token 写在 legacy 槽 `mrpilot_token`，`/cowork`／`/erp` 会把该 token 收养进自己的槽；退出登录只清当前槽，下一次进页面又把 legacy 那份收养回来——服务端此时已按 `revoke_current_token` 把 `users.active_jti` 清空，于是留下“应用一切照常、只有工作协作进不去”的僵尸会话。实测该账号 `active_jti` 为 NULL、`last_login_at` 停在 16:26，`/api/work/service/consume` 自 18:02 Bangkok 起全部 401（响应体 33 字节 = `{"detail":"work.session_expired"}`）。
+- 修复一（前端）：退出登录时一并清掉“本入口会收养的 legacy token”，判据与 preboot 的 `_migratable` 相同，其他入口的 token 不动；`static/dist/home.html` 的 `main.js?v=` 同步升到 `12060030`。
+- 修复二（后端）：签发工作协作票据时要求 `users.active_jti` 等于该 token 的 `jti`（缓存可能滞后时按鉴权路径的做法强制重取一次）。此前 `validate` 每次都重读 `active_jti`，这类票据永远无法被消费，浏览器只能停在握手地址；现在入口页直接提示重新登录。
+- 本地证据：新增 `test_handoff_is_refused_when_the_account_left_the_login`、`test_stale_auth_cache_does_not_refuse_the_current_login` 及退出登录槽位契约断言；`test_work_bridge_pg_smoke`、`test_work_bridge_routes`、`test_session_contract` 共 14 项通过（一次性 PostgreSQL 16 真库），typecheck、缓存破闸、ruff、black、防屎山闸与完整 pre-push 模块闸通过，未跳闸。
+- 线上回读：正式域名 `/api/health` 200、`/api/ready` 200；`/static/dist/home.html` 引用 `main.js?v=12060030`，线上 `main.js`（1,456,087 字节，sha256 `a534402cd31dc48af5901114…`）与本地构建逐字节一致。
+- 未覆盖边界：没有代替用户用真实账号跑“退出登录→重新登录→进入工作协作”的真机验收；WeKan 网关与其镜像本次未改动，工作协作侧无需重发。
+- 排查副作用（已消失）：排障探测曾用会话级只读设置经过 Supabase 事务池，11:14–11:15 UTC 有 10 次写操作报 `ReadOnlySqlTransaction`，连接回收后恢复；之后的探测改用事务级只读，未再复现。
+
+### 上一版（公司收款账户户名改为可选 · 2026-09-13）
+
 - 公司收款账户户名改为可选：DMS 原生转账并不要求 `txtbusinessnametfmon`，银行主档未返回该字段时，选定银行后应直接用主档带回的银行编码、账号、分行继续，不再追加“公司账户户名”追问。本次把该字段从原生必填集合、LINE 逐问必填字段、编辑器归一化和泰语问法中一并放开：主档提供时照常映射，为空则留空保存，建单照常完成。已看到旧问法的会话按兼容路径接收，不会误把两段旧回包当成单个账号字段。
 - 流程回归：`services/erp/mrerp_dms_payments.py`、`services/line_dms/booking_payments.py`、`services/line_dms/booking_qa_transfer.py`、`services/line_dms/qa_payment_cards.py` 及配套单测、编辑器前端产物与缓存版本同批提交；最终 pre-push 1,183 个模块／6 分片及全部机械闸通过，未跳过 hook。
 - 线上回读：正式域名 `/api/health` 200、`/api/ready` 200；带 nonce `dms_optional_name=0e6cd1b9cbab` 的请求日志命中新 Web revision。

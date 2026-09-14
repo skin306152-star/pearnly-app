@@ -27,3 +27,16 @@
 
 - 浏览器实测：员工原生提交、老板退回、员工补充、老板接受，最终原生状态为完成；36 字节 CSV 下载与上传 SHA256 一致。
 - 快速回退再提交时发现旧活动误触发通知，已增加最新活动与目标列表核验及回归测试。历史/附件已补原生分页。
+# Employee LINE scope added September 14
+
+The user requested implicit Thailand time (no Bangkok label), employee account/password invitations and LINE binding. Owner and employee use the same work entry. Employees see only assigned native tasks and can comment, attach, start, report problems and submit for review. The native service independently checks assignment and allowed source/target lists; employees cannot reassign, accept completion or reopen completed tasks. Status mappings are shared by tenant and board.
+
+Invitations use existing work_bridge.accounts.create_member in the owner's tenant, not the DMS admin invitation that creates a new tenant. The four-language LIFF editor provisions the employee and adds native board membership. The owner forwards the invitation manually. The employee uses existing /api/login and verified LINE ID token binding. Binding refuses silent replacement. Passwords are excluded from chat draft storage; invite retry keys include a secret HMAC fingerprint to reject changed credentials on retry.
+
+Evidence in the disposable environment: 18 focused unit tests, 4 work PG tests, 2 invite PG tests passed. Pinned native WeKan passed owner creation/edit/review/history paging and employee assignment isolation, forbidden operations, submission, return, resubmission, owner completion and refused reopen.
+
+CUA browser completed team creation, Chinese invitation editor, account creation, English employee login/binding, owner assignment, employee progress/comment/CSV attachment, review notification, owner return, employee correction and resubmission, owner completion, employee read-only completed task. Download returned 200 with the exact original 36 bytes (SHA256 5a42412aa4923ebd1740ec38eafcf60e1d612fcf5136e0b2ad787637d0a4d53d).
+
+Artifacts: /tmp/pearnly-line-owner/employee-browser-flow.json and owner-browser-flow-v2.json. Simulator localhost:18099 switches owner/employee, uses real disposable PG/WeKan; LINE SDK/verification and login sessions are explicit local test doubles. Production uses verified LINE ID tokens and existing login JWTs.
+
+NOT DEPLOYED. Full release gates and exact candidate deployment/readback remain. Employee notifications were enhanced after browser acceptance to include status, latest comment and a native open-task action; latest-code regression is pending. Real-device LINE acceptance has not been performed.

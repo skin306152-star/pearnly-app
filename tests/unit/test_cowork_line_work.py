@@ -28,11 +28,14 @@ class OwnerFlowTests(unittest.TestCase):
             "attachments": [],
         }
         self.stack = []
+        p = patch.object(flow.work_store, "board_mapping", return_value={})
+        p.start()
+        self.addCleanup(p.stop)
         for target, replacement in [("conversation", self.conversation)]:
             p = patch.object(flow.work_store, target, replacement)
             p.start()
             self.addCleanup(p.stop)
-        p = patch.object(flow.remote, "owner", return_value={})
+        p = patch.object(flow.remote, "actor", return_value={"work_role": "owner"})
         p.start()
         self.addCleanup(p.stop)
         self.snapshot = patch.object(
@@ -151,7 +154,7 @@ class OwnerFlowTests(unittest.TestCase):
             result = flow.views.home(lang, self.state, self.data)
             for item in result.get("quickReply", {}).get("items", []):
                 self.assertLessEqual(len(item["action"]["label"]), 20)
-                self.assertLessEqual(len(item["action"]["data"]), 300)
+                self.assertLessEqual(len(item["action"].get("data", "")), 300)
 
 
 if __name__ == "__main__":

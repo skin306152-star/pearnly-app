@@ -211,7 +211,11 @@
     }
   </style>
   <header>
-    <h1>老板 LINE 工作协调</h1>
+    <h1>老板与员工 LINE 工作协调</h1>
+    <select id="persona" aria-label="演示身份">
+      <option value="owner">老板 LINE</option>
+      <option value="employee">员工 LINE</option>
+    </select>
     <small
       >可操作验收模拟器 · 按钮调用真实业务代码和隔离 WeKan；LINE 发送与员工登录为测试替身。</small
     >
@@ -254,7 +258,7 @@
   <input type="file" id="file" hidden />
   <dialog id="date">
     <form method="dialog">
-      <p>截止时间（曼谷 UTC+7）</p>
+      <p>กำหนดส่ง</p>
       <input type="datetime-local" id="datetime" required />
       <p><button value="cancel">取消</button><button id="pick" value="ok">确定</button></p>
     </form>
@@ -316,7 +320,7 @@
       if (refreshing) return;
       refreshing = true;
       try {
-        const d = await (await fetch('/demo/state')).json();
+        const d = await (await fetch('/demo/state?persona=' + $('persona').value)).json();
         if (replay)
           for (const entry of d.messages) {
             const text = entry.event?.message?.text;
@@ -354,7 +358,7 @@
           $('notices').append(p);
         }
         for (const n of d.notices.slice(noticeCount)) {
-          if (n.recipient === 'local-owner') n.messages.forEach(render);
+          if (n.recipient === d.line_user_id) n.messages.forEach(render);
         }
         noticeCount = d.notices.length;
       } finally {
@@ -370,7 +374,7 @@
         const r = await fetch('/demo/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...body, lang: 'th' }),
+          body: JSON.stringify({ ...body, lang: 'th', persona: $('persona').value }),
         });
         const d = await r.json();
         if (!r.ok) throw Error(d.error);
@@ -385,7 +389,7 @@
     }
     function act(action) {
       if (action.type === 'uri') {
-        window.open(action.uri, '_blank');
+        window.location.href = action.uri;
         return;
       }
       if (action.type === 'datetimepicker') {
@@ -401,6 +405,12 @@
     }
     $('work').onclick = () =>
       send({ event: { type: 'postback', postback: { data: 'a=work&c=home' } } }, 'ประสานงาน');
+    $('persona').onchange = () => {
+      $('chat').replaceChildren();
+      $('quick').replaceChildren();
+      noticeCount = 0;
+      refresh(true);
+    };
     $('menu').onclick = () =>
       send({ event: { type: 'message', message: { type: 'text', text: 'เมนู' } } }, 'เมนู');
     $('send').onclick = () => {

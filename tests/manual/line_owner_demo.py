@@ -22,7 +22,8 @@ from uuid import uuid4
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from services.cowork_line import work_flow, work_store, work_notifications
+from services.cowork_line import work_flow, work_store, work_notifications, work_invites
+from tests.manual import line_demo_accounts
 from services.work_bridge import line_owner
 from tests.unit.test_cowork_line_work_pg_smoke import WorkOwnerPgTests
 
@@ -49,6 +50,17 @@ def main():
             "INSERT INTO cowork_line_identities VALUES (%s,%s,%s,'local-employee',NULL)",
             (membership, employee_id, identity["tenant_id"]),
         )
+    employee_identity = {
+        "user_id": employee_id,
+        "tenant_id": identity["tenant_id"],
+        "membership_id": membership,
+        "line_user_id": "local-employee",
+    }
+
+    def persona(value):
+        return employee_identity if value == "employee" else identity
+
+    line_demo_accounts.prepare(fixture)
     notices = []
     messages = []
     files = {}
@@ -84,6 +96,15 @@ def main():
 
         def do_GET(self):
             route = urlsplit(self.path)
+            if route.path == "/api/cowork-line/intake/liff/config":
+                return self.send({"ok": True, "data": {"liff_id": "local-demo"}})
+            asset = line_demo_accounts.asset(route.path)
+            if asset:
+                self.send_response(200)
+                self.send_header("Content-Type", asset[1])
+                self.end_headers()
+                self.wfile.write(asset[0])
+                return
             if route.path == "/":
                 raw = Path(__file__).with_suffix(".html").read_bytes()
                 self.send_response(200)
@@ -109,18 +130,25 @@ def main():
                 return
             if route.path == "/demo/state":
                 with mutex:
-                    with work_store.conversation(identity) as state:
+                    selected = persona(parse_qs(route.query).get("persona", ["owner"])[0])
+                    with work_store.conversation(selected) as state:
                         data = json.loads(json.dumps(state))
                     native = (
-                        line_owner.snapshot(identity, data["board"]) if data.get("board") else {}
+                        line_owner.snapshot(selected, data["board"]) if data.get("board") else {}
                     )
                 return self.send(
                     {
                         "state": data,
                         "native": native,
                         "notices": notices,
-                        "messages": messages,
-                        "employee": employee_id,
+                        "messages": [
+                            x
+                            for x in messages
+                            if x["persona"]
+                            == ("employee" if selected is employee_identity else "owner")
+                        ],
+                        "employee": employee_identity["user_id"],
+                        "line_user_id": selected["line_user_id"],
                     }
                 )
             self.send({}, 404)
@@ -140,14 +168,33 @@ def main():
                         )
                     if self.path.endswith("/consume"):
                         return self.send({**native_identity, "session": session})
-                    if self.path.endswith("/line-owner"):
+                    if self.path.endswith(("/line-owner", "/line-actor")):
                         try:
-                            return self.send(line_owner.owner(body))
+                            return self.send(line_owner.actor(body))
                         except Exception:
                             return self.send({}, 403)
                     if self.path.endswith("/line-event"):
                         return self.send(work_notifications.deliver(**body))
                     return self.send({}, 404)
+            if self.path in {
+                "/api/login",
+                "/api/cowork-line/connect",
+                "/api/cowork-line/work-invite",
+            }:
+                with mutex:
+                    try:
+                        if self.path.endswith("/connect"):
+                            auth = self.headers.get("Authorization", "")
+                            if not auth.startswith("Bearer demo-session-"):
+                                return self.send({"detail": "unauthorized"}, 401)
+                            body["_demo_user"] = auth.removeprefix("Bearer demo-session-")
+                        return self.send(
+                            line_demo_accounts.account_request(
+                                self.path, body, fixture, employee_identity
+                            )
+                        )
+                    except Exception as exc:
+                        return self.send({"detail": getattr(exc, "detail", str(exc))}, 400)
             if self.path != "/demo/message":
                 return self.send({}, 404)
             with mutex:
@@ -166,17 +213,40 @@ def main():
                         },
                     }
                 try:
-                    response = work_flow.process(event, identity, body.get("lang", "zh"))
+                    response = work_flow.process(
+                        event, persona(body.get("persona")), body.get("lang", "th")
+                    )
                     if response is None and event.get("message", {}).get("text") == "เมนู":
                         from services.cowork_line.menu_cards import menu_card
 
                         response = menu_card("th")
-                    messages.append({"event": event, "response": response})
+                    messages.append(
+                        {
+                            "event": event,
+                            "response": response,
+                            "persona": body.get("persona", "owner"),
+                        }
+                    )
                     self.send({"response": response})
                 except Exception as exc:
                     self.send({"error": str(exc)}, 500)
 
     with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(work_invites, "url", side_effect=line_demo_accounts.local_url)
+        )
+        stack.enter_context(
+            patch.object(
+                work_invites,
+                "claims",
+                side_effect=lambda token: (
+                    {"sub": token} if token in {"local-owner", "local-invited"} else {}
+                ),
+            )
+        )
+        stack.enter_context(
+            patch("services.cowork_line.push_recovery.reconcile_stale_legacy_reservations")
+        )
         stack.enter_context(
             patch.dict(
                 os.environ,

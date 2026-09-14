@@ -69,6 +69,14 @@ def work_line_event(body: LineWorkEvent, request: Request):
     return deliver(body.board_id, body.card_id, body.event_id, body.list_id)
 
 
+@router.post("/api/work/service/line-actor", include_in_schema=False)
+def work_line_actor(body: LineOwnerRequest, request: Request):
+    require_service(request)
+    from services.work_bridge.line_owner import actor
+
+    return actor({key: str(value) for key, value in body.model_dump().items()})
+
+
 @router.post("/api/work/service/line-owner", include_in_schema=False)
 def work_line_owner(body: LineOwnerRequest, request: Request):
     require_service(request)

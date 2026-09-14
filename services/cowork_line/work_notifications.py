@@ -48,7 +48,9 @@ def deliver(board_id, card_id, event_id, list_id):
             "SELECT s.tenant_id::text, s.membership_id::text, s.payload, "
             "i.user_id::text, i.line_user_id FROM cowork_line_work_sessions s "
             "JOIN cowork_line_identities i ON i.membership_id=s.membership_id "
-            "AND i.tenant_id=s.tenant_id WHERE i.revoked_at IS NULL "
+            "AND i.tenant_id=s.tenant_id JOIN memberships m ON m.id=s.membership_id "
+            "JOIN roles r ON r.id=m.role_id WHERE i.revoked_at IS NULL "
+            "AND m.status='active' AND r.key='owner' "
             "AND s.payload->'mappings' ? %s",
             (board_id,),
         )

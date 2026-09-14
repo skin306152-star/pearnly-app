@@ -78,7 +78,7 @@ export async function lineService(req, res, next, deps) {
     if (createHash('sha256').update(raw).digest('hex') !== envelope.body) throw new Error('body');
     let identity = envelope.identity;
     if (route === 'file') {
-        identity = await service('line-owner', {
+        identity = await service('line-actor', {
             ...identity.line_binding,
             user_id: identity.user_id,
             tenant_id: identity.tenant_id,
@@ -94,12 +94,20 @@ export async function lineService(req, res, next, deps) {
     const boardId = ['context', 'attachment', 'file', 'member', 'records'].includes(route)
         ? req.url.split('/')[4]
         : req.url.split('/')[5];
+    const employee = identity.work_role === 'employee';
+    if (!employee && identity.work_role !== 'owner') throw new Error('role');
+    const membership = {
+        userId: user._id,
+        isActive: true,
+        ...(!employee ? { isAdmin: true } : {}),
+    };
+    const cardScope = employee ? { assignees: user._id } : {};
     let board;
     if (boardId) {
         board = await db.collection('boards').findOne({
             _id: boardId,
             archived: { $ne: true },
-            members: { $elemMatch: { userId: user._id, isActive: true, isAdmin: true } },
+            members: { $elemMatch: membership },
         });
         if (!board) return json(res, 403, { error: 'board' });
     }
@@ -108,7 +116,10 @@ export async function lineService(req, res, next, deps) {
         const file = await db
             .collection('attachments')
             .findOne({ _id: fileId, 'meta.boardId': boardId, 'meta.cardId': cardId });
-        if (!file || !(await db.collection('cards').findOne({ _id: cardId, boardId })))
+        if (
+            !file ||
+            !(await db.collection('cards').findOne({ _id: cardId, boardId, ...cardScope }))
+        )
             return json(res, 404, { error: 'file' });
         const root = await realpath(process.env.WRITABLE_PATH || process.cwd());
         const location = await realpath(file.versions?.original?.path || file.path);
@@ -130,7 +141,7 @@ export async function lineService(req, res, next, deps) {
         if (
             !(await db
                 .collection('cards')
-                .findOne({ _id: cardId, boardId, archived: { $ne: true } }))
+                .findOne({ _id: cardId, boardId, archived: { $ne: true }, ...cardScope }))
         )
             return json(res, 404, { error: 'card' });
         const files = kind === 'files';
@@ -154,7 +165,7 @@ export async function lineService(req, res, next, deps) {
                     {
                         archived: { $ne: true },
                         members: {
-                            $elemMatch: { userId: user._id, isActive: true, isAdmin: true },
+                            $elemMatch: membership,
                         },
                     },
                     { projection: { title: 1 } }
@@ -164,7 +175,9 @@ export async function lineService(req, res, next, deps) {
                 .toArray();
             return json(res, 200, { userId: user._id, boards });
         }
-        const members = (board.members || []).filter((m) => m.isActive).map((m) => m.userId);
+        const members = (board.members || [])
+            .filter((m) => m.isActive && (!employee || m.userId === user._id))
+            .map((m) => m.userId);
         const [lists, cards, people, comments, attachments, lanes] = await Promise.all([
             db
                 .collection('lists')
@@ -174,7 +187,7 @@ export async function lineService(req, res, next, deps) {
             db
                 .collection('cards')
                 .find(
-                    { boardId, archived: { $ne: true } },
+                    { boardId, archived: { $ne: true }, ...cardScope },
                     {
                         projection: {
                             title: 1,
@@ -230,8 +243,8 @@ export async function lineService(req, res, next, deps) {
                 name: p.profile?.fullname || p.username,
                 user_id: p.services?.pearnly?.id,
             })),
-            comments,
-            attachments,
+            comments: comments.filter((x) => cards.some((c) => c._id === x.cardId)),
+            attachments: attachments.filter((x) => cards.some((c) => c._id === x.meta?.cardId)),
             lanes,
         });
     }
@@ -249,9 +262,31 @@ export async function lineService(req, res, next, deps) {
     if (cardId) {
         card = await db
             .collection('cards')
-            .findOne({ _id: cardId, boardId, archived: { $ne: true } });
+            .findOne({ _id: cardId, boardId, archived: { $ne: true }, ...cardScope });
         if (!card || (parts[6] === 'lists' && card.listId !== parts[7]))
             return json(res, 409, { error: 'card_changed' });
+    }
+    if (employee) {
+        const member = board?.members.find((m) => m.userId === user._id && m.isActive);
+        const move =
+            req.method === 'PUT' &&
+            Object.keys(body).length === 1 &&
+            typeof body.listId === 'string' &&
+            envelope.allowed_lists?.includes(body.listId);
+        const comment =
+            req.method === 'POST' &&
+            parts[8] === 'comments' &&
+            Object.keys(body).length === 1 &&
+            typeof body.comment === 'string';
+        if (
+            !card ||
+            !envelope.allowed_sources?.includes(card.listId) ||
+            identity.work_readonly ||
+            member?.isCommentOnly ||
+            member?.isNoComments ||
+            !(move || comment || route === 'attachment')
+        )
+            return json(res, 403, { error: 'employee_action' });
     }
     if (
         board &&

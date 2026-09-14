@@ -1,7 +1,7 @@
 /* Loaded as a server-only Meteor package before the native app package.
  * The integration wraps identity creation; native board roles/methods stay in WeKan.
  */
-/* global Package, process, URL, fetch, AbortSignal, console */
+/* global Package, Npm, process, URL, fetch, AbortSignal, console */
 Package['core-runtime'].queue('pearnly-bridge', function () {
     const { Meteor } = Package.meteor;
     const { Accounts } = Package['accounts-base'];

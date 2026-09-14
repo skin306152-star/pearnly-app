@@ -74,6 +74,13 @@ def paged(lang, state, title, items, command, *, page=0, extras=()):
 
 def home(lang, state, data):
     nonce = state["nonce"]
+    if state.get("work_role") == "employee":
+        return card(
+            lang,
+            "งานของฉัน",
+            [data["board"]["title"]],
+            _buttons(lang, state, "pending", "doing", "blocked", "review", "done", "all", "boards"),
+        )
     counts = {key: sum(state_of(x, mapping(state)) == key for x in data["cards"]) for key in STATES}
     lines = [
         data["board"]["title"],
@@ -84,6 +91,14 @@ def home(lang, state, data):
     if state.get("draft"):
         buttons.append(button(t(lang, "resume"), "resume", nonce))
     buttons.extend(button(t(lang, key), key, nonce) for key in ("boards", "team", "setup"))
+    from services.cowork_line.work_invites import url
+
+    buttons.append(
+        {
+            "type": "button",
+            "action": {"type": "uri", "label": "เชิญพนักงาน", "uri": url("invite", state["board"])},
+        }
+    )
     return card(lang, t(lang, "home"), lines, buttons)
 
 
@@ -124,6 +139,24 @@ def detail(lang, state, data, task):
     state["editing_draft"] = False
     nonce = state["nonce"]
     keys = ["edit", "comment", "history", "attachment", "files"]
+    if state.get("work_role") == "employee":
+        keys = ["history", "files", "back"]
+        extra = []
+        if not state.get("readonly") and state_of(task, mapping(state)) not in {
+            "done",
+            "cancelled",
+        }:
+            keys = ["comment", "attachment"] + keys
+            extra = [
+                button(t(lang, key), "set_status", nonce, s=key)
+                for key in ("doing", "blocked", "review")
+            ]
+        return card(
+            lang,
+            task["title"],
+            task_lines(lang, task, data, state),
+            [button(t(lang, key), "home" if key == "back" else key, nonce) for key in keys] + extra,
+        )
     if state_of(task, mapping(state)) == "review":
         keys += ["accept", "return"]
     keys += ["status", "stop", "back"]
@@ -164,7 +197,11 @@ def _choices(lang, state, data, page=0):
             [(x["_id"], x["title"]) for x in data["boards"]],
             "board",
             page=page,
-            extras=_buttons(lang, state, "create_board", "resume"),
+            extras=(
+                ()
+                if state.get("work_role") == "employee"
+                else _buttons(lang, state, "create_board", "resume")
+            ),
         )
     if mode in {"assignee", "people"}:
         return paged(
@@ -211,5 +248,9 @@ def _choices(lang, state, data, page=0):
         selected,
         "task",
         page=page,
-        extras=_buttons(lang, state, "search", "people"),
+        extras=(
+            _buttons(lang, state, "search")
+            if state.get("work_role") == "employee"
+            else _buttons(lang, state, "search", "people")
+        ),
     )

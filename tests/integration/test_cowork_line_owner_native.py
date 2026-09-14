@@ -153,6 +153,101 @@ class NativeOwnerAcceptance(unittest.TestCase):
 
             Path(output).write_text(json.dumps(self.events, ensure_ascii=False, indent=2))
 
+    def test_employee_native_scope_and_review_cycle(self):
+        from uuid import uuid4
+        from fastapi import HTTPException
+        from services.cowork_line import work_actions
+
+        owner = self.identity
+        employee = {
+            **owner,
+            "user_id": str(uuid4()),
+            "membership_id": str(uuid4()),
+            "line_user_id": "employee-" + uuid4().hex,
+        }
+        role = str(uuid4())
+        with self.pg.cursor(commit=True) as cur:
+            cur.execute(
+                "INSERT INTO users VALUES (%s,'employee','พนักงาน',NULL,true,NULL)",
+                (employee["user_id"],),
+            )
+            cur.execute("INSERT INTO roles VALUES (%s,'accountant')", (role,))
+            cur.execute(
+                "INSERT INTO memberships VALUES (%s,%s,%s,%s,'active')",
+                (employee["membership_id"], employee["user_id"], employee["tenant_id"], role),
+            )
+            cur.execute(
+                "INSERT INTO cowork_line_identities VALUES (%s,%s,%s,%s,NULL)",
+                (
+                    employee["membership_id"],
+                    employee["user_id"],
+                    employee["tenant_id"],
+                    employee["line_user_id"],
+                ),
+            )
+        self.command("home")
+        self.command("create_board")
+        self.text("ทดสอบวงจรพนักงาน")
+        self.command("confirm_board")
+        board = self.state()["board"]
+        self.command("team")
+        self.command("member", id=employee["user_id"])
+        self.command("add_member")
+        data = line_owner.snapshot(owner, board)
+        native_employee = next(
+            x["_id"] for x in data["people"] if x["user_id"] == employee["user_id"]
+        )
+        with patch.object(work_actions.line, "push_messages", return_value=True):
+            for person in (data["userId"], native_employee):
+                self.command("new")
+                self.text("ตรวจนับ " + person)
+                self.command("assignee")
+                self.command("person", id=person)
+                self.command("save")
+            assigned = self.state()["task"]
+            self.identity = employee
+            self.command("open", b=board, id=assigned)
+            snapshot = line_owner.snapshot(employee, board)
+            self.assertEqual([x["_id"] for x in snapshot["cards"]], [assigned])
+            private = next(
+                x for x in line_owner.snapshot(owner, board)["cards"] if x["_id"] != assigned
+            )
+            for method, path, body in (
+                ("PUT", work_actions.path(private), {"listId": private["listId"]}),
+                ("POST", "/api/boards", {"title": "unauthorized"}),
+                ("PUT", work_actions.path(snapshot["cards"][0]), {"title": "unauthorized"}),
+            ):
+                with self.assertRaises(HTTPException):
+                    line_owner.mutate(employee, method, path, body, "denied-" + uuid4().hex)
+            self.command("comment")
+            self.text("ตรวจนับแล้วครับ")
+            self.command("apply")
+            self.command("set_status", s="review")
+            self.command("apply")
+            self.identity = owner
+            self.command("open", b=board, id=assigned)
+            self.command("return")
+            self.text("กรุณาแนบหลักฐานเพิ่มครับ")
+            self.command("apply")
+            self.identity = employee
+            self.command("open", b=board, id=assigned)
+            self.command("set_status", s="review")
+            self.command("apply")
+            self.identity = owner
+            self.command("open", b=board, id=assigned)
+            self.command("accept")
+            self.command("apply")
+            final = line_owner.snapshot(employee, board)["cards"][0]
+            self.assertEqual(final["listId"], work_store.board_mapping(employee, board)["done"])
+            with self.assertRaises(HTTPException):
+                line_owner.mutate(
+                    employee,
+                    "PUT",
+                    work_actions.path(final),
+                    {"listId": work_store.board_mapping(employee, board)["doing"]},
+                    "closed-" + uuid4().hex,
+                )
+
     def test_async_handler_runs_outside_event_loop(self):
         async def check():
             marker = []

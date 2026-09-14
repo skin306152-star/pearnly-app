@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import HTTPException
 
 from core import db
-from services.cowork_line.work_cards import STATES, t
+from services.cowork_line.work_cards import STATES, t, button, card
 from services.line_platform import client as line
 from services.work_bridge import line_owner as remote
 
@@ -134,21 +134,25 @@ def notify(identity, item, data, lang):
             (identity["tenant_id"], users),
         )
         recipients = [r["line_user_id"] for r in cur.fetchall()]
+    from services.cowork_line import work_store, work_views
+
+    mapping = work_store.board_mapping(identity, item["boardId"])
+    status = work_views.state_of(item, mapping)
+    latest = next(
+        (x.get("text", "") for x in data.get("comments", []) if x.get("cardId") == item["_id"]), ""
+    )
+    message = card(
+        "th",
+        t("th", "notification"),
+        [
+            data["board"]["title"],
+            item["title"],
+            t("th", status) if status else "",
+            latest or item.get("description") or "—",
+        ],
+        [button("เปิดงาน", "open", b=item["boardId"], id=item["_id"])],
+    )
     ok = len(recipients) == len(users)
     for recipient in recipients:
-        ok = (
-            line.push_messages(
-                recipient,
-                [
-                    {
-                        "type": "text",
-                        "text": f'{t(lang, "notification")}\n{data["board"]["title"]}\n{item["title"]}\n{item.get("description") or ""}'[
-                            :4900
-                        ],
-                    }
-                ],
-                channel="cowork",
-            )
-            and ok
-        )
+        ok = line.push_messages(recipient, [message], channel="cowork") and ok
     return ok

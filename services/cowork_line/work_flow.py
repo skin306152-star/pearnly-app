@@ -23,6 +23,10 @@ from services.cowork_line.work_views import _buttons, _prompt, _choices
 
 def _data(identity, state):
     data = remote.snapshot(identity, state.get("board", ""))
+    if state.get("board"):
+        shared = work_store.board_mapping(identity, state["board"])
+        if shared:
+            state.setdefault("mappings", {})[state["board"]] = shared
     if len(data.get("cards", [])) > 2000 or len(data.get("boards", [])) > 200:
         raise HTTPException(422, "work.limit")
     return data
@@ -68,7 +72,7 @@ def _command(identity, lang, state, command, params, event):
         item = actions.task(data, params["id"])
         state.update(board=params["b"], task=params["id"])
         state.pop("input", None)
-        return views.detail(lang, state, data, item)
+        return views.detail(lang, state, _data(identity, state), item)
     if command == "boards":
         state["list_mode"] = "boards"
         return _choices(lang, state, remote.snapshot(identity))
@@ -86,6 +90,7 @@ def _command(identity, lang, state, command, params, event):
         )
         state["board"] = board
         state.setdefault("mappings", {})[board] = mapped
+        work_store.publish_mapping(identity, board, mapped)
         state.pop("board_draft", None)
         return _home(identity, lang, state)
     if command == "page":
@@ -150,6 +155,7 @@ def _command(identity, lang, state, command, params, event):
         state["setup"][STATES[len(state["setup"])]] = params["id"]
         if len(state["setup"]) == len(STATES):
             state.setdefault("mappings", {})[state["board"]] = state.pop("setup")
+            work_store.publish_mapping(identity, state["board"], views.mapping(state))
             return _home(identity, lang, state)
         return _choices(lang, state, data)
     if command in {"new", "resume"}:
@@ -180,7 +186,7 @@ def _command(identity, lang, state, command, params, event):
                     "blocked",
                     "review",
                     "done",
-                    "cancelled",
+                    *(("cancelled",) if state.get("work_role") != "employee" else ()),
                     "overdue",
                 )
                 + [button(t(lang, "all"), "list", state["nonce"])]
@@ -434,16 +440,23 @@ def process(event, identity, lang):
         if not work and (not state.get("active") or event.get("type") != "message"):
             return None
         try:
-            remote.owner(identity)
+            current = remote.actor(identity)
             if (
                 work
                 and params.get("c") not in {"home", "open"}
                 and params.get("n") != state.get("nonce")
             ):
                 return {"type": "text", "text": t(lang, "expired")}
+            state["work_role"] = current["work_role"]
             state["active"] = True
             state["lang"] = lang
             state["nonce"] = secrets.token_urlsafe(12)
+            if current["work_role"] == "employee":
+                from services.cowork_line import work_employee
+
+                return work_employee.process(
+                    identity, state, params if work else None, event, current
+                )
             if work:
                 return _command(identity, lang, state, params.get("c", "home"), params, event)
             return _input(identity, lang, state, event)
@@ -460,7 +473,14 @@ def process(event, identity, lang):
                 )
             )
             return card(
-                lang, t(lang, "home"), [t(lang, key)], _buttons(lang, state, "back", "resume")
+                lang,
+                t(lang, "home"),
+                [t(lang, key)],
+                (
+                    _buttons(lang, state, "back")
+                    if state.get("work_role") == "employee"
+                    else _buttons(lang, state, "back", "resume")
+                ),
             )
 
 

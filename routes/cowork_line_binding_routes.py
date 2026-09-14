@@ -93,3 +93,57 @@ async def cowork_line_unbind(request: Request):
             {},
         )
     return {"connected": False}
+
+
+from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse
+
+
+class WorkConnectRequest(BaseModel):
+    id_token: str = Field(min_length=1, max_length=10000)
+
+
+class WorkInviteRequest(WorkConnectRequest):
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{16,64}$")
+    account: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=8, max_length=200)
+    display_name: str = Field(min_length=1, max_length=100)
+    board: str = Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
+
+
+@router.get("/liff/cowork-connect", include_in_schema=False)
+def cowork_connect_page():
+    return FileResponse("static/dist/cowork-connect.html", headers={"Cache-Control": "no-store"})
+
+
+@router.post("/api/cowork-line/connect")
+async def cowork_connect(body: WorkConnectRequest, request: Request):
+    from services.cowork_line.work_invites import connect
+
+    user = get_current_user_from_request(request)
+    try:
+        result = await asyncio.to_thread(connect, **_identity_args(user), token=body.id_token)
+    except CoworkLineIdentityError as exc:
+        raise _http_error(exc) from exc
+    await asyncio.to_thread(
+        _log_op, request, user, "cowork.line.connect", "user", str(user["id"]), None, {}
+    )
+    return result
+
+
+@router.post("/api/cowork-line/work-invite")
+async def cowork_work_invite(body: WorkInviteRequest):
+    from services.cowork_line.work_invites import invite
+
+    try:
+        return await asyncio.to_thread(
+            invite,
+            body.id_token,
+            body.request_id,
+            body.account,
+            body.password,
+            body.display_name,
+            body.board,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, "work.account_invalid") from exc

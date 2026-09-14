@@ -90,6 +90,32 @@ ok(!globalThis.localStorage.has('mrpilot_token_erp'), 'erp clear removes erp slo
 ok(globalThis.localStorage.has('mrpilot_token_cowork'), 'erp clear leaves cowork slot alone');
 ok(globalThis.window.token === '', 'window.token cleared on erp clear');
 
+// 2b) 退出登录必须真的退出:本入口会收养的 legacy token 一起清(否则下次进页面被
+// 原样收养回来 = 退不掉),别的入口的 legacy token 仍不动。
+setGlobal(mkStore({ mrpilot_token_cowork: mkTok('cowork'), mrpilot_token: mkTok('cowork') }), '/cowork', '');
+S.clearToken();
+ok(!globalThis.localStorage.has('mrpilot_token_cowork'), 'cowork clear removes cowork slot');
+ok(
+    !globalThis.localStorage.has('mrpilot_token'),
+    'cowork clear also removes the legacy token it would adopt back'
+);
+setGlobal(
+    mkStore({ mrpilot_token_cowork: mkTok('cowork'), mrpilot_token: mkTok('pos') }),
+    '/cowork',
+    ''
+);
+S.clearToken();
+ok(globalThis.localStorage.has('mrpilot_token'), 'cowork clear keeps a non-adoptable pos legacy');
+setGlobal(mkStore({ mrpilot_token: mkTok('main') }), '/cowork', '');
+S.clearToken();
+ok(!globalThis.localStorage.has('mrpilot_token'), 'cowork clear removes an adoptable main legacy');
+setGlobal(mkStore({ mrpilot_token_erp: mkTok('erp'), mrpilot_token: mkTok('main') }), '/erp', '');
+S.clearToken();
+ok(globalThis.localStorage.has('mrpilot_token'), 'erp clear keeps a main legacy it cannot adopt');
+setGlobal(mkStore({ mrpilot_token_erp: mkTok('erp'), mrpilot_token: mkTok('erp') }), '/erp', '');
+S.clearToken();
+ok(!globalThis.localStorage.has('mrpilot_token'), 'erp clear removes the erp legacy token');
+
 // 3) 迁移收养:JWT entry 精确匹配才收养;POS/main 不得被收养。
 setGlobal(mkStore({ mrpilot_token: mkTok('main') }), '/cowork', '');
 ok(S.migrateLegacyToken() === true, 'cowork adopts main legacy');

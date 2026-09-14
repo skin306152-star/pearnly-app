@@ -118,11 +118,9 @@ input[type='submit'].primary {
   background-color: var(--pearnly-accent) !important;
 }
 
-/* The stock header logo is replaced by a square Pearnly mark; it carries its
- * own white tile, so only the box has to stay square and small. */
-#header-quick-access .header-logo img,
-#header-quick-access .header-logo .pearnly-mark {
-  width: auto;
-  height: 28px;
-  border-radius: 7px;
+/* The top bar carries the page title only. A logo there sat next to the board
+ * name and added nothing, so the slot is left empty; `customTopLeftCornerLogo`
+ * is still seeded so that no upstream logo is ever the thing being hidden. */
+#header-quick-access .header-logo {
+  display: none !important;
 }

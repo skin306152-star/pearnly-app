@@ -119,6 +119,31 @@ this directory, so a fresh host is branded by the image alone.
 - The tab title and the two `application-name` metas are hardcoded in the native
   layout, so `client.js` rewrites them, following the head rather than assuming
   an order.
+- The top bar carries the page title only: `branding.css` hides the logo slot,
+  which sat beside the board name and added nothing.
+
+## Thai text and the language picker
+
+Pearnly's market is Thai first, so the Thai text is treated as product content
+rather than an upstream detail. `install.mjs` patches two places in the pinned
+bundle:
+
+- **The language picker** lists three languages (ไทย, English, 简体中文).
+  `getSupportedLanguages()` is filtered, not the language table: a profile that
+  already selected another language keeps loading it.
+- **The Thai text** is corrected from `i18n/th-overrides.json`. A block of
+  upstream's Thai file was Vietnamese (the create-board dialog offered "Mẫu" for
+  Template), and 26 keys the UI asks for are missing from every language file, so
+  the raw key was shown as a tooltip (for example `collapse-card`). Corrections
+  must exist in the bundle and additions must not, so an upstream fix or a stale
+  entry stops the build instead of silently doing nothing.
+
+The audit behind that list: all 2417 keys are present in Thai; 49 values were
+another language; 47 matched English, and all but one were product names or
+abbreviations; one placeholder mismatch is an example JSON whose Thai version
+translates the example itself. Two templates with hardcoded English
+(`originalPositionsView`, `originalPosition`) are unreachable in this build - no
+template includes them.
 
 To update the running image: build the pinned-architecture image, push it, put
 its immutable digest in a new `pearnly-work-env` secret version, then on the host

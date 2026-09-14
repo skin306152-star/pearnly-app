@@ -145,6 +145,14 @@ class OwnerFlowTests(unittest.TestCase):
             self.command("apply")
             mutate.assert_not_called()
 
+    def test_blank_editor_omits_invalid_empty_line_fill_text(self):
+        for lang in ("th", "en", "zh", "ja"):
+            blank = cards.edit_button(lang, "description", "nonce", "")["action"]
+            self.assertEqual(blank["inputOption"], "openKeyboard")
+            self.assertNotIn("fillInText", blank)
+            filled = cards.edit_button(lang, "description", "nonce", "existing")["action"]
+            self.assertEqual(filled["fillInText"], "existing")
+
     def test_language_rows_and_native_limits(self):
         for key, translations in cards.COPY.items():
             self.assertEqual(len(translations), 4, key)

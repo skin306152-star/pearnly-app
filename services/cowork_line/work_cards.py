@@ -158,7 +158,9 @@ def edit_button(lang, field, nonce, current=""):
         item["action"].pop("displayText", None)
         item["action"].update(type="datetimepicker", mode="datetime")
     else:
-        item["action"].update(inputOption="openKeyboard", fillInText=str(current)[:300])
+        item["action"]["inputOption"] = "openKeyboard"
+        if str(current).strip():
+            item["action"]["fillInText"] = str(current)[:300]
     return item
 
 

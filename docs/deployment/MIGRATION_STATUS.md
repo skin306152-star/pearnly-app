@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-14 17:20（Asia/Bangkok，UTC+7）。状态：**独立 WeKan 已完成 Pearnly 品牌化并上线（名称、logo、配色），进入“工作协作”时不再闪现原生登录页或官方 logo；Pearnly Web/Worker 本次未重发。上一轮 DMS 共享主档后台刷新、LINE 订车会话快照与提交前实时核验仍为线上版本，真实 LINE 手机完整新单验收待确认。**
+更新时间：2026-09-14 18:05（Asia/Bangkok，UTC+7）。状态：**独立 WeKan 已上线第二版品牌化：顶栏 logo 取消、语言选择只留中英泰、泰语错翻与缺失词条已修（其中 49 条上游泰语实为越南语）；Pearnly Web/Worker 本次未重发。上一轮 DMS 共享主档后台刷新、LINE 订车会话快照与提交前实时核验仍为线上版本，真实 LINE 手机完整新单验收待确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -101,7 +101,19 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 - 该次 Cloudflare Worker 源码提交 `05f52eb96df4a2f783e0200dc092f3e73bb01f89`，2026-09-12 20:14 发布；控制台显示 `b24c28cb (Active) Latest`。`/dms`、`/dms/`、`/api/dms`、`/api/dms/`、订车及 portal API 禁止缓存，并保留原凭据入口规则。替代此前仅凭据/订车入口 no-store 的范围；版本化静态资源策略保留。本次未改动该策略。
 - 正式域名 GET `/dms/` 与 `/home/dms-booking` 200，geo 缺认证 400、paints 无效 nonce 422、portal 根路径 404，以上均 `Cache-Control: no-store` / `CF-Cache-Status: DYNAMIC`。错误响应只验证边缘策略，不作为带身份业务数据验收。ready 200；不自动重试真实订单，不宣称历史聊天卡片会自动刷新。
 
-### 独立 WeKan 品牌化（2026-09-14）
+### 独立 WeKan 品牌化 · 第二轮（泰语与语言选择，2026-09-14）
+
+- 顶栏 logo 取消：`branding.css` 隐藏 `#header-quick-access .header-logo`，顶栏只保留首页图标与页面标题。原生 `customTopLeftCornerLogoImageUrl` 仍指向 Pearnly 素材，因此任何情况下都不会加载 WeKan 官方 logo。
+- 语言选择只保留 ไทย / English / 简体中文：`install.mjs` 在客户端包内过滤 `getSupportedLanguages()` 的返回值，不删语言表，已选其他语言的存量账号仍可继续加载。
+- 泰语修正（泰国市场为主，故按产品内容对待）：49 条上游“泰语”实为越南语（新建看板对话框的 Template 显示为 `Mẫu`、看板视图 Calendar 显示为 `Lịch`，以及 card/yes/天时分秒与规则编辑器 `r-*`、operator、predicate 等）；另有 26 条界面引用但所有语言文件都缺失的键，导致提示直接显示英文 key（如卡片折叠提示 `collapse-card`、排序菜单 `date-created-newest-first`）。修正与新增分别取自 `deployment/wekan/i18n/th-overrides.json`，修正项必须在包内存在、新增项必须不存在，否则构建立即失败。
+- 审计口径：泰语 2417 键与英文完全对齐，无缺键；49 条为其他语言；47 条与英文一致（除 1 条 `Bytes`→ไบต์ 外均为专有名词/缩写）；1 处占位符不一致是帮助文本中的示例 JSON。两处写死英文模板（`originalPositionsView`、`originalPosition`）在本版本无任何引用，用户不可见。
+- 源码：`c401672f035fe2f6404fb44765ef4ea8456a0b0e`；镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/wekan@sha256:fe78f03cea422e3ae7f3754fa09a789eb3d1875327a28c8917828dd03d2f1e50`（linux/amd64，revision label 与归档 manifest 平台回读一致，重启次数 0）。`pearnly-work-env` 升为 v4，仅替换 `WORK_IMAGE`；`compose.yml` 未变，本轮未改动主机上的任何配置文件。**本次不重发 Pearnly Cloud Run。**
+- 14 项 Node 测试通过，含泰语替换的转义往返与语言过滤的失败闭合；本仓 pre-push 机械闸通过。
+- 生产回读：运行容器内泰语包为 `"template":"เทมเพลต"`、`"calendar":"ปฏิทิน"`、`"yes":"ใช่"`，新增键为 `"collapse-card":"ย่อการ์ด"`、`"date-created-newest-first":"วันที่สร้าง (ใหม่สุดก่อน)"`；语言函数为 `.filter((language)=>["th","en","zh-CN"].includes(language.tag))`。
+- 真实浏览器（正式域名、已登录）：顶栏 logo 计算样式 `display: none`、顶栏 `rgb(124, 77, 255)`、标签页标题 `Pearnly - …`、页面无 WeKan 文案；语言选择实测三项。泰语渲染与 26 条新增词条在本地同一镜像上逐屏验证（含卡片折叠提示 `ย่อการ์ด` 与排序菜单）。
+- 限制：本机浏览器仍可能缓存旧 favicon；繁体中文（zh-TW）已一并从列表移除，如需台湾档位需再加回；26 条新增词条只补了泰语，英文/中文界面在上游仍显示英文 key。
+
+### 独立 WeKan 品牌化 · 第一轮（名称、logo、配色，2026-09-14）
 
 - 进入“工作协作”时短暂闪现的 WeKan 原生登录页与官方 logo 已消除：`branding.css` 由服务端 `<head>` 以阻塞渲染方式引入，配合 Pearnly 首屏遮罩，Pearnly 会话验证完成后、登录失败时（显示重试提示）以及 12 秒兜底超时三种情况都会解除遮罩。
 - 名称与两个 logo 槽位使用 WeKan 原生 `productName` / `customTopLeftCornerLogoImageUrl`(+Height) / `customLoginLogoImageUrl`，由桥接包在启动时通过 Mongo driver 幂等写入（应用已注册 `settings` 集合，重复注册会抛错）。实测生产 settings 文档为 `productName: Pearnly` 与两条 `/_pearnly/...` logo 路径。

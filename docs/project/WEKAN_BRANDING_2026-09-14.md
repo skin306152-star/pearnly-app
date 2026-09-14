@@ -51,10 +51,50 @@ permission or workflow was rewritten, and no data was migrated.
   `rgb(124, 77, 255)`, `--theme-accent: #7c4dff`, the Pearnly mark in the header,
   and no `WeKan`/`Wekan` text anywhere in the page.
 
+## Second round: Thai text, language picker, header logo (2026-09-14, later)
+
+Three follow-ups on the same service. Source `c401672f`, image
+`…/wekan@sha256:fe78f03cea422e3ae7f3754fa09a789eb3d1875327a28c8917828dd03d2f1e50`,
+`pearnly-work-env` version 4. Pearnly Cloud Run was not redeployed and no host
+configuration file changed.
+
+- **The header logo is gone.** `branding.css` hides the slot; it sat beside the
+  board name and added nothing. The native custom-logo setting still points at
+  the Pearnly mark, so the upstream logo can never appear.
+- **The language picker offers ไทย / English / 简体中文.** The client bundle's
+  `getSupportedLanguages()` result is filtered, not the language table, so a
+  profile that already chose another language keeps loading it.
+- **Thai is treated as product content.** 49 upstream "Thai" values are
+  Vietnamese - the create-board dialog offered "Mẫu" for Template, the board-view
+  menu offered "Lịch" for Calendar, plus card/yes/day/hour/minute/second and the
+  rule editor's `r-*`/operator/predicate set. 26 keys the UI asks for are missing
+  from every language file, so a raw key was shown as the text (the card fold
+  control read `collapse-card`, the sort menu `date-created-newest-first`).
+  Corrections must exist in the bundle and additions must not, so an upstream fix
+  or a stale entry stops the build.
+
+The audit behind that list: all 2417 keys are present in Thai; 49 values were
+another language; 47 matched English and all but one (`Bytes` → ไบต์) were
+product names or abbreviations; the single placeholder mismatch is an example
+JSON whose Thai version translates the example itself. The two templates with
+hardcoded English (`originalPositionsView`, `originalPosition`) are unreachable -
+no template includes them.
+
+Evidence: 14 Node tests pass; the running production containers carry the patched
+values (`"template":"เทมเพลต"`, `"collapse-card":"ย่อการ์ด"`,
+`"date-created-newest-first":"วันที่สร้าง (ใหม่สุดก่อน)"`) and the filtered
+language function; on the formal domain, signed in, the header logo computes to
+`display: none`, the bar is `rgb(124, 77, 255)`, the tab title is `Pearnly - …`,
+no `WeKan`/`Wekan` text is present, and the picker shows exactly three languages.
+The Thai rendering and the added keys were walked screen by screen on a local
+stack running the identical image.
+
 ## Limits
 
 - The favicon may stay cached in a browser that already loaded the old one;
-  nothing else about the icons is versioned.
+  nothing else about the icons is versioned. Traditional Chinese was removed from
+  the picker along with the rest of the list, and the 26 added keys exist in Thai
+  only - the English and Chinese interfaces still show those raw keys upstream.
 - Only the app's own surfaces were branded. WeKan's maintenance pages take the
   bundled `PRODUCT_NAME`, which the deployed compose now sets; that path was not
   exercised by a real maintenance page.
@@ -68,7 +108,7 @@ permission or workflow was rewritten, and no data was migrated.
 ## Workspace
 
 - Worktree `/Users/skin/Developer/Pearnly/pearnly-wekan-branding`, branch
-  `codex/wekan-branding`; the code was pushed to `master` as `c6c11684`. Other
-  windows' changes in the shared checkout were left alone.
-- Local verification containers, the network and the local test image were
-  removed after the checks.
+  `codex/wekan-branding`; the code was pushed to `master` as `c6c11684` and then
+  `c401672f`. Other windows' changes in the shared checkout were left alone.
+- Local verification containers, networks and images were removed after the
+  checks, including the throwaway Pearnly stand-in used to render the app locally.

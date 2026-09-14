@@ -2,6 +2,8 @@
 
 from urllib.parse import parse_qs, urlencode
 
+from services.line_dms.cards import _btn as native_button
+
 # Each row follows the existing Cowork LINE language contract.
 COPY = {
     "language": ("编辑语言", "Editor language", "ภาษาแก้ไข", "編集言語"),
@@ -192,15 +194,11 @@ def card(lang, title, lines, buttons):
         if decision and command in labels and len(primary) < 4:
             action["label"] = labels[command]
             action["displayText"] = labels[command]
-            primary.append(
-                {
-                    **item,
-                    "action": action,
-                    "style": "primary" if not primary else "secondary",
-                    "color": "#06C755" if not primary else "#D9DDE5",
-                    "height": "md",
-                }
+            native = native_button(
+                action["label"], action["data"], "primary" if not primary else "secondary"
             )
+            native["action"] = action
+            primary.append(native)
         else:
             action["label"] = action["label"][:20]
             quick.append({"type": "action", "action": action})
@@ -249,7 +247,6 @@ def card(lang, title, lines, buttons):
                         "type": "box",
                         "layout": "vertical",
                         "spacing": "sm",
-                        "paddingAll": "16px",
                         "contents": primary,
                     }
                 }

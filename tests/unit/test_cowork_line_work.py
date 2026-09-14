@@ -128,8 +128,11 @@ class OwnerFlowTests(unittest.TestCase):
         footer = confirm["contents"]["footer"]
         self.assertEqual(footer["layout"], "vertical")
         self.assertEqual(footer["contents"][0]["style"], "primary")
-        self.assertEqual(footer["contents"][0]["color"], "#06C755")
-        self.assertEqual(footer["contents"][1]["color"], "#D9DDE5")
+        from services.line_dms.cards import _btn
+
+        for item in footer["contents"]:
+            expected = _btn(item["action"]["label"], item["action"]["data"], item["style"])
+            self.assertEqual(item, expected)
         self.assertEqual(footer["contents"][1]["style"], "secondary")
 
     def test_saved_task_returns_plain_status_after_write(self):

@@ -21,6 +21,7 @@ def issue(user: dict, claims: dict, browser_state: str) -> dict:
     tenant_id = str(user.get("tenant_id") or "") or None
     if not claims.get("jti") or claims.get("sub") != str(user["id"]):
         raise HTTPException(401, "auth.invalid_token")
+    require_active_session(user, str(claims["jti"]))
     session = secrets.token_urlsafe(32)
     ticket = secrets.token_urlsafe(32)
     expiry = datetime.fromtimestamp(int(claims["exp"]), tz=timezone.utc)
@@ -48,6 +49,28 @@ def issue(user: dict, claims: dict, browser_state: str) -> dict:
         )
     # Only the trusted service receives the opaque handle after a successful consume.
     return {"ticket": ticket, "consume_url": target.url + "/_pearnly/consume"}
+
+
+def require_active_session(user: dict, token_jti: str) -> None:
+    """Only the account's live login may start a handoff.
+
+    `validate` re-reads `users.active_jti` on every service call, so a ticket
+    issued for a login the account has already left can never be consumed: the
+    browser posts the handoff form, gets an opaque expired-session answer, and
+    retrying changes nothing. Refuse at the entry page instead, where the client
+    already asks for a fresh sign-in. An empty `active_jti` counts as a login
+    that is no longer current, not as a match.
+    """
+    if user.get("active_jti") == token_jti:
+        return
+    # The auth cache can lag a token rotation, so re-read before rejecting a
+    # session that is in fact current.
+    from core.db import find_user_by_id
+
+    fresh = find_user_by_id(str(user["id"]))
+    if fresh is not None and fresh.get("active_jti") == token_jti:
+        return
+    raise HTTPException(401, "auth.session_revoked")
 
 
 def consume(ticket: str, browser_state: str) -> dict:

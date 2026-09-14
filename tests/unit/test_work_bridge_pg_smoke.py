@@ -145,6 +145,33 @@ class WorkBridgePgTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 sessions.validate(result["session"])
 
+    def test_handoff_is_refused_when_the_account_left_the_login(self):
+        # A ticket for a login the account has already left can never be
+        # consumed, so the entry page must ask for a fresh sign-in instead of
+        # sending the browser onto a handoff URL that only reports an opaque
+        # expired session.
+        for mutation in (
+            "UPDATE users SET active_jti = NULL WHERE id = %s",
+            "UPDATE users SET active_jti = %s WHERE id = %s",
+        ):
+            user, claims = self.user()
+            result = self.handoff(user, claims)
+            parameters = (user["id"],) if mutation.count("%s") == 1 else (str(uuid4()), user["id"])
+            with self.cursor(commit=True) as cur:
+                cur.execute(mutation, parameters)
+            with self.assertRaises(HTTPException) as refused:
+                sessions.issue(user, claims, "s" * 43)
+            self.assertEqual(refused.exception.status_code, 401)
+            self.assertEqual(refused.exception.detail, "auth.session_revoked")
+            with self.assertRaises(HTTPException):
+                sessions.validate(result["session"])
+
+    def test_stale_auth_cache_does_not_refuse_the_current_login(self):
+        # get_current_user hands over a cached row; a rotation that has not
+        # reached the cache yet must not lock the account out of its own login.
+        user, claims = self.user()
+        sessions.issue({**user, "active_jti": str(uuid4())}, claims, "s" * 43)
+
     def test_wekan_member_has_native_employee_password_and_role_without_admin_grants(self):
         actor, _ = self.user()
         kwargs = {

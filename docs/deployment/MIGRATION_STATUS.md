@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-14 18:35（Asia/Bangkok，UTC+7）。状态：**已发布登录会话与工作协作入口修复（`9198184c`）：退出登录现在会一并清掉本入口会收养的 legacy token，工作协作票据签发改为要求账号当前登录仍然有效；正式域名 health/ready 200，线上 `main.js?v=12060030` 与本地构建字节一致。独立 WeKan 第二版品牌化（顶栏 logo 取消、语言只留中英泰、泰语错翻与缺失词条修正）仍为线上版本，本次未重发 WeKan。用户真机“退出登录→重新登录→进入工作协作”验收待确认。**
+更新时间：2026-09-14 19:05（Asia/Bangkok，UTC+7）。状态：**已发布 Google/LINE 登录握手修复（`173687806fea`）：一次性握手不再被 4 小时浏览器缓存重放——每次点击带唯一参数、握手响应 no-store；这是"一直登不进去"的真因，正式域名 health/ready 200，`landing.js?v=27` 已生效。Cloudflare Worker 侧的 no-store 名单已写好但未部署（需要 CF 凭据），当前可用性不依赖它。同一会话早些时候已发布退出登录与工作协作入口修复（`9198184c`）。独立 WeKan 第二版品牌化仍为线上版本。真实 Google 登录与"退出→重登→进工作协作"的真机验收待用户确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -28,10 +28,20 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- Pearnly 完整 SHA：`9198184c5b1146f3ee52f023e5c645a3ad225756`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:5be23703d6f4585e370733f8b2c40f5b2768260b78fd0b348e34b308930eeef3`。
-- Web revision：`pearnly-web-9198184c5b11-s3`；Worker revision：`pearnly-worker-9198184c5b11-s3`；两端 Ready、各 100% 流量，同一 digest。
-- [Manual CD 34838010446](https://github.com/skin306152-star/pearnly-app/actions/runs/34838010446) 于 2026-09-14 18:31 Bangkok 完成，conclusion success；schema execution `pearnly-schema-v7pk4` 成功，候选和正式两端的精确 SHA、镜像、健康、就绪及安装包完整下载均通过。
+- Pearnly 完整 SHA：`173687806feaeb5118ff363d2f7261c1b7775832`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:953c865460b69a3dcefe39a391be6530584a56c959f8eb315d92c946db8756d8`。
+- Web revision：`pearnly-web-173687806fea-s3`；Worker revision：`pearnly-worker-173687806fea-s3`；两端 Ready、各 100% 流量，同一 digest。
+- [Manual CD 34840631564](https://github.com/skin306152-star/pearnly-app/actions/runs/34840631564) 于 2026-09-14 19:02 Bangkok 完成，conclusion success；候选和正式两端的精确 SHA、镜像、健康、就绪及安装包完整下载均通过。第一次 dispatch 误用短 SHA 导致 checkout 失败（run 34840534522），未产生任何线上变更。
+
+### Google 登录一直失败：一次性握手被 4 小时浏览器缓存（2026-09-14）
+
+- 现象：点 Google 登录后只回到登录页，什么都不显示，反复失败；过去 7 天该回调只有 1 次成功。用户表现为"退不出去、也登不进来"。
+- 根因：`/api/auth/google/start` 的 302 里带 10 分钟有效的签名 `state`，而 Cloudflare 的 zone Browser Cache TTL 把该 302 改写成 `cache-control: max-age=14400`（实测：边缘每次回源给的是**新** state，`cf-cache-status: EXPIRED`；被缓存的是**浏览器**那一份）。于是每次点击都在重放旧 state，回调判 `invalid_state`，登录连坏 4 小时。这也解释了日志里多次点击却没有新的 `/start` 请求。仓库 2026-09-07 已记录过同一机制，当时只修了 DMS 入口。
+- 修复（已上线）：SSO 按钮每次点击带唯一参数（`&n=…`），旧缓存条目再也不会被请求；同时源站在握手相关的 302/HTML 上加 `no-store`，被拒绝的回调改为记日志（此前静默，页面又丢掉 `oauth_error`，故障完全不可见）。
+- 未上线的一层：`deployment/cloudflare/worker.js` 已把 `/api/auth/*` 与 `/login`、`/cowork` 加入 no-store 名单并配套测试，但**尚未部署**——部署 Worker 需要 Cloudflare 凭据（本机无 wrangler 登录、密钥库无 CF token）。它用于阻止此类响应再被缓存；当前用户可用性不依赖它。
+- 本地证据：worker 用例 2 项、Python 定向用例 82 项通过；真 Playwright 重跑 `_erp_cowork_split_verify.cjs` 的登录门 15 项全过（`/login` 302→`/cowork`、cowork 旧登录 UI 且输入框获焦可键入、erp 独立门、两侧 390×844），刷新了 cowork-login 两张截图；该脚本之后的超管/ERP 菜单矩阵因本机无本地数据库未跑，已记 2026-09-16 到期的欠条。完整 pre-push 闸通过，未跳闸。
+- 线上回读：正式域名 `/api/health` 200、`/api/ready` 200；`/cowork` 引用 `landing.js?v=27`，线上该文件含唯一握手参数；带不同 `n` 的 start 请求各拿到不同 state。
+- 未覆盖边界：未代替用户完成一次真实 Google 登录；用户侧浏览器里那份旧的 4 小时缓存条目仍在，但新代码不会再请求它。
 
 ### 登录会话与工作协作入口修复（2026-09-14）
 

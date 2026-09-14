@@ -128,6 +128,8 @@ class OwnerFlowTests(unittest.TestCase):
         footer = confirm["contents"]["footer"]
         self.assertEqual(footer["layout"], "vertical")
         self.assertEqual(footer["contents"][0]["style"], "primary")
+        self.assertEqual(footer["contents"][0]["color"], "#06C755")
+        self.assertEqual(footer["contents"][1]["color"], "#D9DDE5")
         self.assertEqual(footer["contents"][1]["style"], "secondary")
 
     def test_saved_task_returns_plain_status_after_write(self):

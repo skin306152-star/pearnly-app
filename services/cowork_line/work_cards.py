@@ -197,7 +197,7 @@ def card(lang, title, lines, buttons):
                     **item,
                     "action": action,
                     "style": "primary" if not primary else "secondary",
-                    "color": "#7C3AED" if not primary else "#EDE9F5",
+                    "color": "#06C755" if not primary else "#D9DDE5",
                     "height": "md",
                 }
             )
@@ -221,14 +221,14 @@ def card(lang, title, lines, buttons):
                 "layout": "vertical",
                 "spacing": "md",
                 "paddingAll": "20px",
-                "backgroundColor": "#FAF8FF",
+                "backgroundColor": "#F8F9FA",
                 "contents": [
                     {
                         "type": "text",
                         "text": title[:1000] or t(lang, "home"),
                         "weight": "bold",
                         "size": "lg",
-                        "color": "#292039",
+                        "color": "#20242B",
                         "wrap": True,
                     },
                     *[
@@ -236,7 +236,7 @@ def card(lang, title, lines, buttons):
                             "type": "text",
                             "text": str(line)[:2000] or "—",
                             "size": "sm",
-                            "color": "#625B70",
+                            "color": "#626A76",
                             "wrap": True,
                         }
                         for line in lines

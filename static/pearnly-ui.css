@@ -84,6 +84,8 @@
 
 /* ── Layer 2: Semantic tokens — light (Purple v2 = home's exact values) ── */
 :root {
+  --line-action: #06c755;
+  --line-action-ink: #ffffff;
   --accent: #7c4dff;
   --accent-deep: #6b3ff2;
   --accent-weak: #eee5ff;

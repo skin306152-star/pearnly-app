@@ -83,7 +83,7 @@ progress {
   width: 100%;
   height: 12px;
   margin-top: 14px;
-  accent-color: var(--accent);
+  accent-color: var(--line-action);
 }
 .summary p {
   margin-bottom: 0;
@@ -99,9 +99,9 @@ nav button {
   font-size: 13px;
 }
 nav button[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: var(--accent);
+  background: var(--line-action);
+  color: var(--line-action-ink);
+  border-color: var(--line-action);
 }
 #tasks {
   display: grid;

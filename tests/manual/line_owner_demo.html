@@ -408,7 +408,10 @@
     }
     function act(action) {
       if (action.type === 'uri') {
-        window.location.href = action.uri;
+        const target = new URL(action.uri);
+        if (target.origin === location.origin && target.pathname === '/liff/cowork-live')
+          target.searchParams.set('persona', $('persona').value);
+        window.location.href = target.href;
         return;
       }
       if (action.type === 'datetimepicker') {

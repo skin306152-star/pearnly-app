@@ -29,6 +29,16 @@ export default {
                 '/api/line/dms-booking/config',
                 '/api/line/dms-credentials',
             ].includes(original.pathname);
+        // Sign-in handshakes are one-time: the redirect carries a 10-minute signed
+        // state, so a stored copy replays a stale state and every attempt is
+        // rejected with `invalid_state` until the cache expires. Cloudflare's zone
+        // Browser Cache TTL rewrote the origin's 302 into `max-age=14400`
+        // (measured 2026-09-14), which kept Google sign-in broken for four hours
+        // at a time. Never store these.
+        const authNoStore =
+            original.pathname.startsWith('/api/auth/') ||
+            ['/api/login', '/api/logout', '/login', '/cowork'].includes(original.pathname);
+        const noStore = dmsNoStore || authNoStore;
         const target = new URL(original.pathname + original.search, ORIGIN);
         const headers = new Headers(request.headers);
         headers.delete('host');
@@ -49,7 +59,7 @@ export default {
         });
         const response = await fetch(
             upstream,
-            dmsNoStore
+            noStore
                 ? { cache: 'no-store' }
                 : {
                       cf: cacheable
@@ -61,7 +71,7 @@ export default {
                   }
         );
         const result = new Response(response.body, response);
-        if (dmsNoStore || original.pathname.endsWith('/latest.json')) {
+        if (noStore || original.pathname.endsWith('/latest.json')) {
             result.headers.set('cache-control', 'no-store');
         }
         const location = result.headers.get('location');

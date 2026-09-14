@@ -12,7 +12,7 @@ globalThis.Request = class extends NativeRequest {
     }
 };
 
-test('DMS portal, credentials and LIFF auth bypass cache', async () => {
+test('sign-in handshakes, DMS portal, credentials and LIFF auth bypass cache', async () => {
     let options;
     const previous = globalThis.fetch;
     globalThis.fetch = async (_request, value) => {
@@ -37,6 +37,15 @@ test('DMS portal, credentials and LIFF auth bypass cache', async () => {
             '/api/line/dms-booking/config',
             '/api/line/dms-booking/auth',
             '/api/line/dms-credentials',
+            '/api/auth/google/start',
+            '/api/auth/google/callback',
+            '/api/auth/line/start',
+            '/api/auth/line/callback',
+            '/api/auth/google/connect/launch',
+            '/api/login',
+            '/api/logout',
+            '/login',
+            '/cowork',
         ]) {
             const response = await worker.fetch(new Request('https://pearnly.com' + path));
             assert.equal(options.cache, 'no-store', path);
@@ -64,9 +73,7 @@ test('other products retain original fetch options and response headers', async 
             for (const path of [
                 '/',
                 '/home',
-                '/login',
                 '/erp',
-                '/cowork',
                 '/ai',
                 '/daily',
                 '/pos',

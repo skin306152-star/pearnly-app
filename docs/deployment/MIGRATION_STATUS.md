@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-14 22:50（UTC+7）。状态：**已发布老板及员工 LINE 工作闭环（`98bb3ce6c6d5`），Web/Worker Ready、各 100% 流量；原生 WeKan 同步更新，Cowork Rich Menu v3 已设为默认并回读校验。邀请、绑定、派工、员工回报/附件、退回重提和老板验收已通过隔离真实存储模拟与 LINE 官方格式验证；手机 LINE 真机验收尚未完成。此前 Google/LINE 登录缓存修复仍包含在当前版本中。**
+更新时间：2026-09-14 23:42（UTC+7）。状态：**已发布 LINE 原生 DMS 按钮、三色菜单及 LIFF 实时工作台（`bf19d3c0df2b`），Web/Worker Ready、各 100% 流量；网页保留紫色、任务卡无左侧色条，Cowork Rich Menu v3 已同步更新并回读校验。邀请、绑定、派工、员工回报/附件、退回重提和老板验收已通过隔离真实存储模拟与 LINE 官方格式验证；手机 LINE 真机验收尚未完成。此前 Google/LINE 登录缓存修复仍包含在当前版本中。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -28,10 +28,18 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- Pearnly 完整 SHA：`98bb3ce6c6d5facc6aa33e1cf114052f66781362`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:0ef79395d27e35b42f46fc55ffdb3da93dd895fac7f3929aa40cc071439c699e`。
-- Web revision：`pearnly-web-98bb3ce6c6d5-s3`；Worker revision：`pearnly-worker-98bb3ce6c6d5-s3`；两端 Ready、各 100% 流量，同一 digest，运行密钥均为 v3。
-- [Manual CD 34863164831](https://github.com/skin306152-star/pearnly-app/actions/runs/34863164831) 于 2026-09-14 15:42:20 UTC 完成，conclusion success；schema、候选及正式两端精确 SHA/镜像、health/ready 和安装包下载闸通过。正式域名连接页、LIFF 配置均 200，连接页 JS 与本地逐字节一致；未登录绑定请求 401。
+- Pearnly 完整 SHA：`bf19d3c0df2bcecce082d4e69214e4dab8f2e046`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:406731f005a269d85b16b889fc80ca2205fc3d8b6615630e59586f69cc74e24a`。
+- Web revision：`pearnly-web-bf19d3c0df2b-s3`；Worker revision：`pearnly-worker-bf19d3c0df2b-s3`；两端 Ready、各 100% 流量，同一 digest，运行密钥均为 v3。
+- [Manual CD 34869359546](https://github.com/skin306152-star/pearnly-app/actions/runs/34869359546) 于 2026-09-14 16:40:30 UTC 完成，conclusion success；schema、候选及正式两端精确 SHA/镜像、health/ready 和安装包下载闸通过。正式实时页及 LIFF 配置 200，实时 JS/CSS 与三个图标逐字节一致；伪造实时会话 401，原生 health ok。
+
+### LINE 视觉分层与实时工作台（2026-09-14）
+
+- 普通对话使用泰语文字与原生 Quick Reply；仅写入确认使用 Flex，直接复用 DMS `_btn`，绿色主按钮、浅灰次按钮、纵向排列。修正模拟器圆角和间距。网页/LIFF 保留既有紫色 CSS，移除任务卡左色条。
+- 同一个工作入口增加“ภาพรวมงานสด”，前台约 5 秒自动读取真实状态；后台暂停、断网标记旧数据。老板/员工沿用原生权限，员工仅自己的任务；不伪造进度。
+- 完整 pre-push 1,188 模块/6 分片及机械闸通过。最终隔离 PG/WeKan 双身份完整闭环、自动状态变化、390px、断网恢复与权限隔离通过；50 个消息及菜单获 LINE 官方格式校验通过，没有发送真实测试消息。真机登录、送达及显示尚未验收。
+- Cowork OA `@pearnly` 默认菜单更新为 `richmenu-4e8d59ee7758f88e1e25c764eb2a0c19`；三色图片 90,920 字节，SHA256 `0688a8eb8e6639c2a4c491027d41b1d3974277f894c4306d283570f7bada7cb1`。默认 ID、全部 actions 和图片回读一致，呼出菜单同步三个图标。
+- 前一候选 run 34868908980 在切流前取消，最终仅发布 bf19d3c0df2b。原生 WeKan 保持下节 bc1ed19b 版本；本轮未重发原生容器。
 
 ### 老板与员工 LINE 工作闭环（2026-09-14）
 
@@ -39,7 +47,7 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 - 老板在所属账套创建员工账号并加入原生看板，手动转发邀请；员工使用现有登录和 LINE ID token 绑定。员工只能处理自己的指派任务，完成后只读；原生服务独立检查权限。
 - WeKan 源码 `bc1ed19b98ae8326f6a2e2afe99b7280edad0ec3`，镜像 `asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/wekan@sha256:47999fbf4b2668f24b10b3d5f36cd3e075aecae6b2e3d8320454537305040be6`；`pearnly-work-env` v5 仅更新 WORK_IMAGE。VM 运行镜像/revision label 已回读，health ok，重启次数 0，原文件卷保留。
 - 发布前数据盘快照 `pearnly-work-line-bc1ed19b` READY，guest flush 完成且 Mongo 解锁已确认；v4 secret 保留作镜像回退依据。
-- Cowork OA `@pearnly` 默认菜单 `richmenu-7ee0e0bb6400cd8446d9f517e1b205a9`（`pearnly-cowork-work-v3`）。默认 ID、全部 action 与 74,917 字节图片回读一致，图片 SHA256 `e86aa9d4b1373b2a7d1d84663674b25075487337e8898acecf01c560a94c1c63`。
+- 首轮发布时 Cowork OA `@pearnly` 默认菜单 `richmenu-7ee0e0bb6400cd8446d9f517e1b205a9`（已由上节新版替换）（`pearnly-cowork-work-v3`）。默认 ID、全部 action 与 74,917 字节图片回读一致，图片 SHA256 `e86aa9d4b1373b2a7d1d84663674b25075487337e8898acecf01c560a94c1c63`。
 - 正式发布前官方 LINE 校验发现空 fillInText 不被接受，已改为省略空值，并取消旧候选 run 34862407835（旧服务未切流；兼容性 schema 已完成）。修复后最终实际 50 个消息 payload 与 Rich Menu 官方验证全部通过，没有发送真实测试消息。
 - 完整 pre-push 1,187 模块/6 分片及机械闸通过；隔离 PG、原生 WeKan 与双身份浏览器完整闭环通过。真机 LINE 登录、送达及显示验收待用户完成，不把模拟或 HTTP 200 当作外部验收。详见[本任务记录](../project/LINE_OWNER_COORDINATION_20260914.md)。
 

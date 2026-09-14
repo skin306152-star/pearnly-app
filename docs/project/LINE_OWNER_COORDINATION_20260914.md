@@ -11,9 +11,9 @@
 ## 发布身份
 
 - 分支 `codex/line-owner-coordination`；隔离目录 `/Users/skin/Developer/Pearnly/pearnly-line-owner-coordination`，基于 `02b01718`。共享主目录的其他任务改动保留。
-- 应用 `98bb3ce6c6d5facc6aa33e1cf114052f66781362`；Web/Worker 对应 revision 均 Ready、100% 流量。
+- 应用 `bf19d3c0df2bcecce082d4e69214e4dab8f2e046`；Web/Worker 对应 revision 均 Ready、100% 流量。
 - 原生服务源码 `bc1ed19b98ae8326f6a2e2afe99b7280edad0ec3`，运行密钥 v5，health ok。后续应用修复未改原生源码。
-- LINE 默认 Rich Menu `richmenu-7ee0e0bb6400cd8446d9f517e1b205a9` 已发布，actions 与图片逐字节回读一致。
+- LINE 默认 Rich Menu `richmenu-4e8d59ee7758f88e1e25c764eb2a0c19` 已发布，actions 与图片逐字节回读一致。
 - 完整镜像 digest、快照及工作流证据见[部署账本](../deployment/MIGRATION_STATUS.md)。后续纯文档提交不重发容器。
 
 ## 验证与发现的修复
@@ -39,4 +39,6 @@ Docker 项目 `pearnly-line-owner`、文件卷 `pearnly-line-owner-files`、运�
 
 实时工作台通过现有工作入口的“ภาพรวมงานสด”打开，LINE 内 LIFF 展示每个可访问看板的真实任务状态、负责人、截止时间和最新回报。前台每次请求完成后约 5 秒自动同步，后台暂停，重新显示立即同步，网络失败逐步退避到 30 秒并明确标记旧数据。展示真实完成任务数；未配置状态映射时不猜完成比例。短期会话限定 audience，每轮重新核对绑定、成员、角色及原生看板/员工指派权限，页面不写任务。
 
-本地双身份完整闭环通过；老板面板无刷新/查询点击地从待验收 0/1 更新为完成 1/1，保持已展开详情；390px 无横向溢出，断网提示和恢复自动同步已浏览器验证。LINE 官方最终消息 payload 和菜单验证通过。发布身份待本轮精确候选切流回读后补记。
+本地双身份完整闭环通过；老板面板无刷新/查询点击地从待验收 0/1 更新为完成 1/1，保持已展开详情；390px 无横向溢出，断网提示和恢复自动同步已浏览器验证。LINE 官方最终消息 payload 和菜单验证通过。发布 bf19d3c0df2b 已完成，工作流 34869359546 success，两端 Ready/100% 且同一镜像 digest；完整身份见部署账本。正式 JS/CSS、三个图标逐字节一致，无效会话 401，原生 health ok。
+
+最终按用户参考复用 DMS 原生 `_btn`，修正模拟器圆角和纵向间距；网页按钮恢复 CSS 紫色，实时卡片左色条移除。最终 pre-push 1,188 模块通过，证据 `/tmp/pearnly-line-owner/live-native-push.log`；完整流程 `native-buttons-cycle.log`，官方验证 `native-buttons-line-validation.log`。新版默认菜单 actions/图片回读一致，证据 `menu-published.json`。前一候选 34868908980 已在切流前取消。历史 LINE 消息不会随版本更新重绘，应重新触发查看新卡片。

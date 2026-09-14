@@ -3,7 +3,7 @@
 Production entry: **https://pearnly.com/cowork** → การทำงานร่วมกัน →
 **https://work.pearnly.com**. Exact release identities and acceptance limits are in
 [the deployment ledger](../../docs/deployment/MIGRATION_STATUS.md) and
-[the task record](../../docs/project/WEKAN_SSO_20260912.md).
+[the task records](../../docs/project/WEKAN_SSO_20260912.md).
 
 All COWORK accounts use one service. There is no firm allowlist, first-owner
 configuration or per-firm activation. Pearnly's ordinary employee permissions
@@ -89,6 +89,44 @@ a cloned disk and an isolated MongoDB container, never over the live database. B
 WeKan versions, take a version-labelled database/file backup and validate the
 upgrade against its copy. Initial single-instance hosting has no automatic
 failover; its capacity and monthly infrastructure cost require live readback.
+
+## Branding
+
+Only the logo, the product name and the palette differ from upstream; no native
+screen, permission or workflow is rewritten. Everything is reproducible from
+this directory, so a fresh host is branded by the image alone.
+
+- The name and the two logo slots are the **native** `productName`,
+  `customTopLeftCornerLogoImageUrl`/`Height` and `customLoginLogoImageUrl`
+  settings. `meteor-bridge.js` seeds them at startup through the Mongo driver
+  (the app already owns the `settings` collection, so a second `Mongo.Collection`
+  handle would throw). Only those five keys are ever written. Because the name is
+  the real setting, `<title>`, the header alt text, the page-title template and
+  the sign-in heading all follow natively.
+- Logos live in `branding/`. `install.mjs` copies the four stock icon files over
+  their upstream names and **fails the build** if one is renamed upstream; the two
+  Pearnly lockups are served by the gateway from `/_pearnly/`, because WeKan's own
+  asset server answers unknown paths with the app page rather than the file.
+  `branding/README.md` records how each image was derived from
+  `static/brand/logo-square.png`.
+- `branding.css` carries the palette (`--theme-accent`, the two header bars, the
+  primary/sidebar fills) and the boot cover. The boilerplate links it in `<head>`
+  so it is render-blocking, and the cover hides the native UI until the client
+  script has authenticated the Pearnly session: that is what removes the
+  transient native sign-in page and stock logo. The cover lifts on success, on a
+  failed login (with the retry message) and on a 12-second safety timeout, so it
+  can never strand a user.
+- The tab title and the two `application-name` metas are hardcoded in the native
+  layout, so `client.js` rewrites them, following the head rather than assuming
+  an order.
+
+To update the running image: build the pinned-architecture image, push it, put
+its immutable digest in a new `pearnly-work-env` secret version, then on the host
+refresh `runtime.env` from that version and run
+`docker compose --env-file runtime.env -p pearnly-work -f compose.yml -f compose.production.yml up -d`.
+Changing a compose file on the host means copying the updated file into
+`/srv/pearnly-work/app` first; the rest of this directory is a source reference
+and is not read at runtime.
 
 ## Application-consistent snapshots
 

@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-13 15:02（Asia/Bangkok，UTC+7）。状态：**DMS 共享主档后台刷新、LINE 订车会话快照、公司收款银行自动带入及提交前实时核验已上线，Web/Worker 各 100%；同一租户和管理员身份下的多个 OA／操作员共享主档，操作员无需感知刷新。没有创建、重提或修改真实 DMS 订单；真实 LINE 手机完整新单验收仍待确认。独立 WeKan 保持原发布。**
+更新时间：2026-09-14 17:20（Asia/Bangkok，UTC+7）。状态：**独立 WeKan 已完成 Pearnly 品牌化并上线（名称、logo、配色），进入“工作协作”时不再闪现原生登录页或官方 logo；Pearnly Web/Worker 本次未重发。上一轮 DMS 共享主档后台刷新、LINE 订车会话快照与提交前实时核验仍为线上版本，真实 LINE 手机完整新单验收待确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -101,7 +101,17 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 - 该次 Cloudflare Worker 源码提交 `05f52eb96df4a2f783e0200dc092f3e73bb01f89`，2026-09-12 20:14 发布；控制台显示 `b24c28cb (Active) Latest`。`/dms`、`/dms/`、`/api/dms`、`/api/dms/`、订车及 portal API 禁止缓存，并保留原凭据入口规则。替代此前仅凭据/订车入口 no-store 的范围；版本化静态资源策略保留。本次未改动该策略。
 - 正式域名 GET `/dms/` 与 `/home/dms-booking` 200，geo 缺认证 400、paints 无效 nonce 422、portal 根路径 404，以上均 `Cache-Control: no-store` / `CF-Cache-Status: DYNAMIC`。错误响应只验证边缘策略，不作为带身份业务数据验收。ready 200；不自动重试真实订单，不宣称历史聊天卡片会自动刷新。
 
-### 上一次 Pearnly 发布与独立 WeKan 当前状态（2026-09-12）
+### 独立 WeKan 品牌化（2026-09-14）
+
+- 进入“工作协作”时短暂闪现的 WeKan 原生登录页与官方 logo 已消除：`branding.css` 由服务端 `<head>` 以阻塞渲染方式引入，配合 Pearnly 首屏遮罩，Pearnly 会话验证完成后、登录失败时（显示重试提示）以及 12 秒兜底超时三种情况都会解除遮罩。
+- 名称与两个 logo 槽位使用 WeKan 原生 `productName` / `customTopLeftCornerLogoImageUrl`(+Height) / `customLoginLogoImageUrl`，由桥接包在启动时通过 Mongo driver 幂等写入（应用已注册 `settings` 集合，重复注册会抛错）。实测生产 settings 文档为 `productName: Pearnly` 与两条 `/_pearnly/...` logo 路径。
+- 顶部 logo、登录页 logo、favicon 与 iOS 图标均为 Pearnly 素材；配色改用应用自身强调色 `#7C4DFF`（两条顶栏、主按钮/侧栏填充及读取 `--theme-accent` 的控件）。除 logo、名称与配色外未改动原生界面、权限或业务。
+- WeKan 最终源码：`c6c116846ceb47f32796e28c4b147c5cbd5eedc9`；镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/wekan@sha256:0827370c3508aa7984bfd84df3e45493d9de69e57b56143ccb43cdca4b004042`（linux/amd64，revision label 与运行状态回读一致）。`pearnly-work-env` 升为 v3，仅替换 `WORK_IMAGE`；`compose.yml` 增加 `PRODUCT_NAME: Pearnly` 供维护页使用。**本次不重发 Pearnly Cloud Run。**
+- 12 项 Node 测试与本仓 pre-push 机械闸通过；本地一次性栈（镜像＋网关＋桩身份服务＋MongoDB）在部署前验证了页面、样式表、两条 logo URL 与设置写入。生产回读：容器内两条 logo 与 `branding.css` 的 sha256 与仓库一致，运行容器 `favicon.ico` 同样一致。
+- 真实浏览器（已登录身份）在重载后约 260 ms 的截图显示 Pearnly 遮罩而非原生登录页；稳定后 `<html class="pearnly-ready">`、标题 `Pearnly - 全部看板 / 已星标`、顶栏 `rgb(124, 77, 255)`、`--theme-accent: #7c4dff`、页面内无 `WeKan`/`Wekan` 文案。
+- 限制：浏览器可能仍缓存旧 favicon；维护页 `PRODUCT_NAME` 路径未用真实维护页验收；看板自身自定义背景色仍按看板数据保留，仅顶栏/按钮统一为 Pearnly 配色。详见 [品牌化任务记录](../project/WEKAN_BRANDING_2026-09-14.md)。
+
+### 上一次 Pearnly 发布与独立 WeKan 当时状态（2026-09-12）
 
 - Pearnly 完整 SHA：`6ae1a234fa19c38d8292c2b67e1ed6aee130eaef`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:d9820d8a4c51990e086d4f182e42155e4e3edb09b219e80ce7921cf190908cd3`。

@@ -1,42 +1,34 @@
-# 老板 LINE 工作协调集成
+# 老板与员工 LINE 工作协调
 
-目标：一个新增工作入口，在 LINE 内完成老板派发、查看、编辑、评论、状态调整和验收。底部 Rich Menu 与呼出菜单同步；功能选择使用 LINE 原生 Quick Reply，预览只保留确认、编辑、取消、返回。系统对话固定泰语，编辑选项支持 th/zh/en/ja。
+## 已实现并发布
 
-## 实现
+老板邀请员工 → 同账套员工账号与原生看板成员 → 员工在 LINE 内使用账号密码登录并绑定 → 老板派工 → 员工开始、评论、附件、提交验收 → 老板退回 → 员工修正重提 → 老板确认完成。
 
-- 分支 `codex/line-owner-coordination`，基于 `02b01718`。隔离目录 `/Users/skin/Developer/Pearnly/pearnly-line-owner-coordination`。
-- 复用原生 WeKan 看板、列表、任务、成员、评论、附件及审计。Pearnly PostgreSQL 仅保存独立 LINE 草稿和通知回执。
-- 每次操作核对当前 Pearnly owner、有效 LINE 绑定和原生看板管理员权限；签名限定方法、路径、正文、有效期。
-- 明确确认后才写入；原生操作回执防止重复创建，不确定结果保留草稿。
-- 日期按曼谷输入、UTC 保存。原生附件接口保留上传校验和 afterUpload 审计；下载重新核对当前绑定和看板权限，链接五分钟有效。
-- 原生状态活动触发老板待验收/阻塞通知；通知使用稳定回执和 LINE retry key。没有在真实 LINE 发送验收消息。
+工作入口只新增一个，底部 Rich Menu 与呼出菜单同步。功能选择使用 LINE 原生 Quick Reply；预览仅确认、编辑、取消、返回。对话泰语，编辑器支持泰/中/英/日，时间默认泰国且不显示城市，内部 UTC 保存。
 
-## 验收环境
+复用原生 WeKan 任务、成员、评论、附件与审计；PG 保存 LINE 会话、共享状态映射、幂等回执。每次操作重新验证绑定、账套成员有效性及原生权限；员工仅访问自己的任务，不能派工、验收或重开完成任务。附件下载重新检查身份，有效期五分钟。邀请密码不进入聊天草稿；重试参数不一致拒绝，绑定不静默覆盖其他有效身份。老板手动转发邀请，系统不擅自发送账号密码。
 
-`tests/manual/line_owner_demo.py` + `.html` 为交互模拟器，默认端口 18099。真实业务处理器连接任务专用 PostgreSQL（15439）与正式 Dockerfile 构建的 WeKan（18196）。LINE 发送与测试员工 SSO 是替身，所有业务存储是真实隔离实例。
+## 发布身份
 
-任务临时目录 `/tmp/pearnly-line-owner`。Docker compose 项目 `pearnly-line-owner`；文件卷 `pearnly-line-owner-files`。勿动其他任务资源。
+- 分支 `codex/line-owner-coordination`；隔离目录 `/Users/skin/Developer/Pearnly/pearnly-line-owner-coordination`，基于 `02b01718`。共享主目录的其他任务改动保留。
+- 应用 `98bb3ce6c6d5facc6aa33e1cf114052f66781362`；Web/Worker 对应 revision 均 Ready、100% 流量。
+- 原生服务源码 `bc1ed19b98ae8326f6a2e2afe99b7280edad0ec3`，运行密钥 v5，health ok。后续应用修复未改原生源码。
+- LINE 默认 Rich Menu `richmenu-7ee0e0bb6400cd8446d9f517e1b205a9` 已发布，actions 与图片逐字节回读一致。
+- 完整镜像 digest、快照及工作流证据见[部署账本](../deployment/MIGRATION_STATUS.md)。后续纯文档提交不重发容器。
 
-## 当前验证与剩余工作
+## 验证与发现的修复
 
-- Cowork LINE 单测 132 项通过，4 个 PG 测试在未提供数据库时跳过；随后专用 PG 4 项单独实际运行通过。
-- 真实 native 集成覆盖创建、编辑、附件、评论、提交验收、确认完成和重复确认。附件实测发现的 write/writeAsync 版本差异已经修正。
-- 四语言预览保持泰语、原生快捷按钮和旧按钮失效已有回归测试。
-- 本机正式 Dockerfile 镜像已构建，继续核对下载字节、员工回报和老板通知，再完成机械闸及发布。
-- 准备候选提交，尚未推送或部署。不得把模拟验收当作手机 LINE 真机验收。
+- 完整 pre-push 1,187 个模块/6 分片和机械闸通过。
+- 真实隔离 PG 验证会话、回执、过期员工通知过滤、邀请同账套、密码哈希、重试冲突、绑定幂等与拒绝覆盖。原生集成验证老板全流程、员工隔离及禁止操作、分页、附件和重复确认。
+- CUA 浏览器完成中英文邀请/绑定表单及老板、员工全闭环。最终原生状态为完成，员工只能看历史与附件。36 字节 CSV 下载与上传 SHA256 一致：`5a42412aa4923ebd1740ec38eafcf60e1d612fcf5136e0b2ad787637d0a4d53d`。
+- 实测修复原生附件 writeAsync 接口兼容、快速退回重提的过期活动通知、LIFF 配置嵌套读取，以及 LINE 不接受空 fillInText。旧发布在切流前取消；修复后的最终 50 个真实消息 payload 及 Rich Menu 通过官方验证接口，没有发送真实测试消息。
+- 最终源码再次跑邀请、绑定、派工、员工附件/回报、等待真实原生活动通知、退回重提和完成；证据 `owner-flow-final.json`、`employee-flow-final.json`、`seed-final-demo.log`、`official-line-validation-final.log` 位于 `/tmp/pearnly-line-owner`。
+- 正式域名 health/ready、连接页、LIFF 配置 200；线上连接页 JS 与本地一致；未登录绑定 401。发布工作流成功不等同手机验收。
 
-- 浏览器实测：员工原生提交、老板退回、员工补充、老板接受，最终原生状态为完成；36 字节 CSV 下载与上传 SHA256 一致。
-- 快速回退再提交时发现旧活动误触发通知，已增加最新活动与目标列表核验及回归测试。历史/附件已补原生分页。
-# Employee LINE scope added September 14
+## 演示与未覆盖边界
 
-The user requested implicit Thailand time (no Bangkok label), employee account/password invitations and LINE binding. Owner and employee use the same work entry. Employees see only assigned native tasks and can comment, attach, start, report problems and submit for review. The native service independently checks assignment and allowed source/target lists; employees cannot reassign, accept completion or reopen completed tasks. Status mappings are shared by tenant and board.
+演示地址 http://localhost:18099/，可切换老板/员工。`tests/manual/line_owner_demo.py` 使用任务专用 PG 15439、原生 WeKan 18196；仅 LINE SDK/验证/运输与演示登录会话为替身，业务存储为真实隔离实例。没有在生产创建测试员工或任务。
 
-Invitations use existing work_bridge.accounts.create_member in the owner's tenant, not the DMS admin invitation that creates a new tenant. The four-language LIFF editor provisions the employee and adds native board membership. The owner forwards the invitation manually. The employee uses existing /api/login and verified LINE ID token binding. Binding refuses silent replacement. Passwords are excluded from chat draft storage; invite retry keys include a secret HMAC fingerprint to reject changed credentials on retry.
+Docker 项目 `pearnly-line-owner`、文件卷 `pearnly-line-owner-files`、运行目录 `/tmp/pearnly-line-owner` 和当前演示服务保留供用户查看。勿清理其他任务资源；PG/Mongo 使用临时存储，重建容器会丢失演示数据。
 
-Evidence in the disposable environment: 18 focused unit tests, 4 work PG tests, 2 invite PG tests passed. Pinned native WeKan passed owner creation/edit/review/history paging and employee assignment isolation, forbidden operations, submission, return, resubmission, owner completion and refused reopen.
-
-CUA browser completed team creation, Chinese invitation editor, account creation, English employee login/binding, owner assignment, employee progress/comment/CSV attachment, review notification, owner return, employee correction and resubmission, owner completion, employee read-only completed task. Download returned 200 with the exact original 36 bytes (SHA256 5a42412aa4923ebd1740ec38eafcf60e1d612fcf5136e0b2ad787637d0a4d53d).
-
-Artifacts: /tmp/pearnly-line-owner/employee-browser-flow.json and owner-browser-flow-v2.json. Simulator localhost:18099 switches owner/employee, uses real disposable PG/WeKan; LINE SDK/verification and login sessions are explicit local test doubles. Production uses verified LINE ID tokens and existing login JWTs.
-
-NOT DEPLOYED. Full release gates and exact candidate deployment/readback remain. Employee notifications were enhanced after browser acceptance to include status, latest comment and a native open-task action; latest-code regression is pending. Real-device LINE acceptance has not been performed.
+手机 LINE 真实登录、消息送达、原生按钮与菜单显示尚未验收。不能宣称所有场景绝无错误；已通过上述覆盖范围内的验证。

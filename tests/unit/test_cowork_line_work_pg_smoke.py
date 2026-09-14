@@ -91,6 +91,38 @@ class WorkOwnerPgTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             line_owner.owner(self.identity)
 
+    def test_expired_assignee_does_not_receive_task_content(self):
+        from services.cowork_line import work_actions
+
+        user_id, membership = str(uuid4()), str(uuid4())
+        with self.cursor(commit=True) as cur:
+            cur.execute(
+                "INSERT INTO users VALUES (%s,'expired','Employee',NULL,true,now()-interval '1 day')",
+                (user_id,),
+            )
+            cur.execute(
+                "INSERT INTO memberships VALUES (%s,%s,%s,%s,'active')",
+                (membership, user_id, self.ids["tenant_id"], self.ids["role"]),
+            )
+            cur.execute(
+                "INSERT INTO cowork_line_identities VALUES (%s,%s,%s,'expired-line',NULL)",
+                (membership, user_id, self.ids["tenant_id"]),
+            )
+        data = {
+            "userId": "owner-native",
+            "board": {"title": "Board"},
+            "people": [{"_id": "employee-native", "user_id": user_id}],
+        }
+        item = {
+            "_id": "card",
+            "boardId": "board",
+            "title": "Task",
+            "assignees": ["employee-native"],
+        }
+        with patch.object(work_actions.line, "push_messages") as push:
+            self.assertFalse(work_actions.notify(self.identity, item, data, "th"))
+            push.assert_not_called()
+
     def test_draft_persists_and_transaction_rolls_back(self):
         with work_store.conversation(self.identity) as state:
             state["draft"] = {"title": "盘点"}

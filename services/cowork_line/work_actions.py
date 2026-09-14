@@ -130,7 +130,8 @@ def notify(identity, item, data, lang):
             "SELECT i.line_user_id FROM cowork_line_identities i "
             "JOIN memberships m ON m.id=i.membership_id JOIN users u ON u.id=m.user_id "
             "WHERE i.tenant_id=%s AND i.user_id::text=ANY(%s) AND i.revoked_at IS NULL "
-            "AND m.status='active' AND u.is_active=TRUE",
+            "AND m.status='active' AND u.is_active=TRUE "
+            "AND (u.expires_at IS NULL OR u.expires_at>now())",
             (identity["tenant_id"], users),
         )
         recipients = [r["line_user_id"] for r in cur.fetchall()]

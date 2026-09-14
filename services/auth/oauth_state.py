@@ -14,6 +14,13 @@ import time as _time
 
 _OAUTH_STATE_TTL = 600
 
+# Auth redirects carry a one-time signed state, so any stored copy replays a stale
+# handshake and the sign-in is rejected as `invalid_state`. Cloudflare's zone
+# Browser Cache TTL turned these 302s into `max-age=14400` (measured 2026-09-14),
+# which broke Google sign-in for four hours at a time. The edge worker now forces
+# no-store for these paths; this keeps the origin's intent correct behind any proxy.
+NO_STORE_HEADERS = {"Cache-Control": "no-store", "Pragma": "no-cache"}
+
 # 共享 OAuth 登录只服务会计主站与 Cowork。ERP 是邀请制独立登录门，不能由查询参数签发。
 _OAUTH_ENTRANCES = frozenset({"main", "cowork"})
 

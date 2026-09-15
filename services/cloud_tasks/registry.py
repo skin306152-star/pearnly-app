@@ -24,14 +24,18 @@ HANDLERS = {
     "workorder.bank_sales": ("services.cloud_tasks.workorders", "bank_sales"),
     "cowork.document": ("services.cowork_line.webhook_documents", "process_document"),
     "line_erp.document": ("services.line_erp.webhook", "_process_document"),
+    "dms.menu_sync": ("services.line_dms.menu_sync", "sync"),
     "dms.image": ("services.line_dms.flow", "_dispatch_image"),
     "dms.create": ("services.line_dms.flow", "_write_create"),
     "dms.update": ("services.line_dms.flow", "_write_update"),
     "dms.dedup": ("services.line_dms.flow", "_run_dedup"),
     "dms.approve": ("services.line_dms.approval_flow", "_execute_approved"),
     "dms.booking": ("services.line_dms.booking_flow", "_execute_booking"),
+    "dms.booking_preview": ("services.line_dms.booking_edit", "_send_review_preview"),
     "dms.records": ("services.line_dms.query_flow", "_run_records"),
     "dms.top": ("services.line_dms.query_flow", "_run_top"),
+    "dms.masters_sweep": ("services.erp.dms_master_refresh", "sweep"),
+    "dms.masters_refresh": ("services.erp.dms_master_refresh", "refresh_endpoint"),
 }
 
 

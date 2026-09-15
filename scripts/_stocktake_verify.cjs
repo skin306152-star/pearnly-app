@@ -108,6 +108,12 @@ async function stub(context, state, mobile = false) {
             return route.fulfill(
                 json({ entries: state.task.entries, total: state.task.entry_total })
             );
+        if (p.endsWith('/photos') && req.method() === 'GET') {
+            const entry = state.task.entries.find((e) => p.includes('/entries/' + e.id + '/'));
+            return route.fulfill(
+                json({ photos: (entry.photos || []).map((data, i) => ({ data, slot: i + 1 })) })
+            );
+        }
         if (
             (p.includes('/items/') && p.endsWith('/entries')) ||
             (p.includes('/entries/') && req.method() === 'PATCH')
@@ -132,6 +138,7 @@ async function stub(context, state, mobile = false) {
                         counted_by_name: 'Counter',
                         counted_at: new Date().toISOString(),
                         version: 0,
+                        photo_count: (body.photos || []).length,
                     });
                 }
                 state.task.entry_total = state.task.entries.length;
@@ -366,6 +373,22 @@ async function main() {
         });
         await expect(body.locator('[data-scan-camera] video')).toHaveCount(0);
         await body.locator('[data-entry-quantity]').fill('34649487');
+        const imageFile = {
+            name: 'shelf.png',
+            mimeType: 'image/png',
+            buffer: fs.readFileSync(path.resolve('static/stocktake/line-icons/stocktake.png')),
+        };
+        await body.locator('[data-photo-files]').setInputFiles([imageFile, imageFile]);
+        await expect(body.locator('[data-photo-preview] img')).toHaveCount(2);
+        await body.locator('[data-photo-remove="1"]').click();
+        await expect(body.locator('[data-photo-preview] img')).toHaveCount(1);
+        await body
+            .locator('[data-photo-files]')
+            .setInputFiles([imageFile, imageFile, imageFile, imageFile, imageFile]);
+        await expect(body.locator('[data-photo-message]')).toHaveText(
+            await text(phone, 'st-error-photo_limit', 'th')
+        );
+        await expect(body.locator('[data-photo-preview] img')).toHaveCount(1);
         await phone.screenshot({ path: path.join(ART, '03-mobile-count-th.png'), fullPage: true });
         assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         await body.locator('[data-entry-quantity]').fill('12.5');
@@ -374,10 +397,23 @@ async function main() {
         await expect(body.locator('[data-entry-quantity]')).toHaveValue('', { timeout: 30000 });
         assert.equal(mobileState.task.items[0].actual_qty, '12.5');
         assert.equal(mobileState.task.entry_total, 1);
+        assert.equal(mobileState.task.entries[0].photo_count, 1);
+        assert.ok(mobileState.task.entries[0].photos[0].startsWith('/9j/'));
+        await body.locator('[data-history] summary').click();
+        await body.locator('[data-view-photos]').click();
+        await expect(body.locator('[data-photo-dialog] img')).toBeVisible();
+        await phone.screenshot({
+            path: path.join(ART, '08-mobile-photo-view.png'),
+            fullPage: true,
+        });
+        await body.locator('[data-photo-dialog] button').click();
         await body.locator('[data-entry-quantity]').fill('3');
+        await body.locator('[data-photo-capture]').setInputFiles(imageFile);
+        await expect(body.locator('[data-photo-preview] img')).toHaveCount(1);
         await phone.locator('#st-lang').selectOption('zh');
         await expect(body.locator('h1')).toHaveText(await text(phone, 'st-title'));
         await expect(body.locator('[data-entry-quantity]')).toHaveValue('3');
+        await expect(body.locator('[data-photo-preview] img')).toHaveCount(1);
         // Camera denial must leave the manual entry available.
         await phone.evaluate(() => {
             navigator.mediaDevices.getUserMedia = async () => {

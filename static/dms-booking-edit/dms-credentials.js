@@ -30,25 +30,26 @@
 
     function errorKey(error) {
         var code = error && error.code;
-        if (code === 'dms_credentials.operator_inactive') return 'operatorInactive';
+        if (code === 'dms_booking.not_bound') return 'bindingChanged';
+        if (code === 'dms_credentials.operator_inactive' || code === 'auth.account_disabled')
+            return 'operatorInactive';
+        if (code === 'dms_booking.line_auth_required' || (error && error.status === 401))
+            return 'lineAuthRequired';
         if (code === 'dms_credentials.endpoint_missing') return 'endpointMissing';
-        if (code === 'dms_credentials.unavailable') return 'unavailable';
+        if (code === 'dms_credentials.unavailable' || code === 'dms_booking.liff_unavailable')
+            return 'unavailable';
         return 'failed';
     }
 
     async function request(path, options) {
-        try {
-            return await gateway.api(path, options);
-        } catch (error) {
-            if (error.status !== 401) throw error;
-            await gateway.authenticate();
-            return gateway.api(path, options);
-        }
+        // Never switch identity and replay a form submitted by the old identity.
+        return gateway.api(path, options);
     }
 
     function render(username) {
         document.getElementById('loading').hidden = true;
         result.hidden = true;
+        result.innerHTML = '';
         form.hidden = false;
         form.className = 'editor credentials-editor';
         form.innerHTML =
@@ -80,11 +81,31 @@
         document.getElementById('credentials-username').focus();
     }
 
+    function retryButton(key) {
+        var button = document.createElement('button');
+        button.id = 'credentials-retry';
+        button.type = 'button';
+        button.className = 'pu-btn primary credentials-done';
+        button.dataset.credentialsText =
+            key === 'lineAuthRequired' || key === 'bindingChanged' ? 'reconnect' : 'retry';
+        button.onclick = function () {
+            form.reset();
+            form.innerHTML = '';
+            mount(
+                { gateway: gateway, locale: locale, close: closePage },
+                key === 'lineAuthRequired' || key === 'bindingChanged'
+            );
+        };
+        return button;
+    }
+
     function showLoadError(key) {
         document.getElementById('loading').hidden = true;
         form.hidden = true;
         result.hidden = false;
-        result.innerHTML = '<h1 data-credentials-text="' + key + '"></h1>';
+        result.innerHTML =
+            '<h1 data-credentials-text="' + (key === 'failed' ? 'loadFailed' : key) + '"></h1>';
+        result.appendChild(retryButton(key));
         translate();
     }
 
@@ -121,17 +142,27 @@
             translate();
         } catch (error) {
             button.disabled = false;
-            errorNode.textContent = t(errorKey(error));
+            var key = errorKey(error);
+            errorNode.textContent = t(key);
+            if (key === 'bindingChanged' || key === 'lineAuthRequired') {
+                button.disabled = true;
+                var retry = document.getElementById('credentials-retry');
+                if (!retry) errorNode.parentNode.appendChild(retryButton(key));
+                translate();
+            }
         }
     }
 
-    async function mount(options) {
+    async function mount(options, forceLogin) {
         gateway = options.gateway;
         locale = options.locale || 'th';
         closePage = options.close;
+        form.hidden = true;
+        result.hidden = true;
+        document.getElementById('loading').hidden = false;
         document.getElementById('loading').querySelector('p').textContent = t('loading');
         try {
-            if (!gateway.hasDmsToken()) await gateway.authenticate();
+            await gateway.authenticate(forceLogin);
             var data = await request('/api/line/dms-credentials');
             render(data.username || '');
         } catch (error) {

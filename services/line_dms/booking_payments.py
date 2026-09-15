@@ -4,15 +4,23 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
-from services.erp.mrerp_dms_company_banks import company_bank_payment_extra
+from services.erp.mrerp_dms_company_banks import (
+    company_bank_payment_extra,
+    PAYMENT_CHANNEL_BANKS,
+    resolve_bank_identity,
+)
+from services.erp.mrerp_dms_payments import (
+    MANUAL_BANK_FLAG,
+    missing_transfer_fields,
+)
 from services.line_dms.qa_util import (
     CHANNEL_EXTRA_SHAPE,
-    THAI_DIGITS,
     find_row,
     parse_amount,
 )
+from services.line_dms.text_fields import split_fields
 
 
 class PaymentValidationError(ValueError):
@@ -21,35 +29,55 @@ class PaymentValidationError(ValueError):
         self.code = code
 
 
-def parse_payment_detail(channel: str, text: Optional[str]) -> Optional[Dict[str, str]]:
-    """把 LINE 的一行付款补充资料拆成 DMS 的独立字段。"""
+_DETAIL_KEYS = {
+    "cheque": ("cheque_no", "cheque_book_no"),
+    "cashier_cheque": ("cashier_no", "cashier_book_no"),
+    "card": ("bank_name", "card_type"),
+}
+
+
+def _two_parts(value: str) -> Optional[Tuple[str, str]]:
+    """支票/本票编号与簿号：先用明确分隔符，再按首个空格拆分。"""
+    parts = split_fields(value, 2)
+    if parts is not None:
+        return parts[0], parts[1]
+    normalized = value.replace("｜", "|")
+    if "|" in normalized:
+        left, right = (part.strip() for part in normalized.split("|", 1))
+        return (left, right) if left and right else None
+    words = normalized.split()
+    if len(words) < 2:
+        return None
+    return words[0], " ".join(words[1:])
+
+
+def parse_payment_detail(
+    channel: str, text: Optional[str], *, manual_bank: bool = False
+) -> Optional[Dict[str, str]]:
+    """把 LINE 的一行付款补充资料拆成 DMS 的独立字段。
+
+    分段用共用分隔符规则(text_fields):| ｜ , ， 、 / ／ · 都行,点号另有保守规则。
+    manual_bank=该渠道银行目录权威为空:多出一段手工银行名称(支票/本票在末段,卡在首段)。"""
     value = str(text or "").strip()
-    if channel == "transfer" and value == "-":
-        return {}
     if not value:
         return None
-    value = value.replace("｜", "|")
-    if "|" in value:
-        left, right = (part.strip() for part in value.split("|", 1))
-    else:
-        parts = value.split()
-        if len(parts) < 2:
-            return None
-        if channel == "transfer":
-            left, right = " ".join(parts[:-1]), parts[-1]
-        else:
-            left, right = parts[0], " ".join(parts[1:])
-    if not left or not right:
+    if channel == "card" and manual_bank:
+        parts = split_fields(value, 2)
+        if parts is not None and all(part != "-" for part in parts):
+            return {"bank_name": parts[0], "card_type": parts[1]}
         return None
-    if channel == "transfer":
-        if not any(ch.isdigit() for ch in right.translate(THAI_DIGITS)):
+    if channel in {"card", "other"}:
+        return {"card_type" if channel == "card" else "detail": value} if value != "-" else None
+    keys = _DETAIL_KEYS.get(channel)
+    if keys and manual_bank and channel != "card":
+        parts = split_fields(value, 3)
+        if parts is None or any(part == "-" for part in parts):
             return None
-        return {"src_bank_name": left, "src_account_no": right}
-    keys = {
-        "cheque": ("cheque_no", "bank_name"),
-        "cashier_cheque": ("cashier_no", "bank_name"),
-        "card": ("bank_name", "card_type"),
-    }.get(channel)
+        return {keys[0]: parts[0], keys[1]: parts[1], "bank_name": parts[2]}
+    parts = _two_parts(value)
+    if parts is None:
+        return None
+    left, right = parts
     if keys:
         return {keys[0]: left, keys[1]: right}
     if channel == "other":
@@ -59,13 +87,13 @@ def parse_payment_detail(channel: str, text: Optional[str]) -> Optional[Dict[str
 
 def _required(value: Any) -> str:
     text = str(value or "").strip()
-    if not text or len(text) > 160:
+    if not text or text == "-" or len(text) > 160:
         raise PaymentValidationError("dms_booking.payment_detail_required")
     return text
 
 
 def normalize_editor_payments(rows: list, masters: dict) -> list[dict]:
-    """校验编辑器载荷并补全公司收款账户的 DMS 主档字段。"""
+    """转账只接受收款银行选择，账户资料来自主档；其他渠道校验各自字段。"""
     if not rows:
         raise PaymentValidationError("dms_booking.payment_required")
     banks = masters.get("company_banks") or []
@@ -86,34 +114,26 @@ def normalize_editor_payments(rows: list, masters: dict) -> list[dict]:
             bank = find_row(banks, str(extra.get("dst_id") or ""))
             if bank is None:
                 raise PaymentValidationError("dms_booking.invalid_bank")
-            source_bank = str(extra.get("src_bank_name") or "").strip()
-            source_account = str(extra.get("src_account_no") or "").strip()
-            if bool(source_bank) != bool(source_account):
+            extra = company_bank_payment_extra(bank)
+            if missing_transfer_fields(extra):
                 raise PaymentValidationError("dms_booking.payment_detail_required")
+        elif channel in PAYMENT_CHANNEL_BANKS:
+            key = PAYMENT_CHANNEL_BANKS[channel]
+            identity = resolve_bank_identity(
+                masters.get(key), key, extra.get("bank_id"), extra.get("bank_name")
+            )
+            if identity is None:
+                raise PaymentValidationError("dms_booking.invalid_bank")
+            keys = {
+                "cheque": ("cheque_no", "cheque_book_no"),
+                "cashier_cheque": ("cashier_no", "cashier_book_no"),
+                "card": ("card_type",),
+            }[channel]
             extra = {
-                "src_bank_name": source_bank,
-                "src_account_no": source_account,
-                "src_account_name": str(extra.get("src_account_name") or "").strip(),
-                "src_branch_name": str(extra.get("src_branch_name") or "").strip(),
-                "src_time": str(extra.get("src_time") or "").strip(),
-                **company_bank_payment_extra(bank),
-            }
-        elif channel == "cheque":
-            extra = {
-                "cheque_no": _required(extra.get("cheque_no")),
-                "bank_name": _required(extra.get("bank_name")),
-                "cheque_book_no": str(extra.get("cheque_book_no") or "").strip(),
-            }
-        elif channel == "cashier_cheque":
-            extra = {
-                "cashier_no": _required(extra.get("cashier_no")),
-                "bank_name": _required(extra.get("bank_name")),
-                "cashier_book_no": str(extra.get("cashier_book_no") or "").strip(),
-            }
-        elif channel == "card":
-            extra = {
-                "bank_name": _required(extra.get("bank_name")),
-                "card_type": _required(extra.get("card_type")),
+                "bank_id": identity["id"],
+                "bank_name": identity["name"],
+                **{key: _required(extra.get(key)) for key in keys},
+                **({MANUAL_BANK_FLAG: "1"} if identity["manual"] else {}),
             }
         elif channel == "other":
             extra = {"detail": _required(extra.get("detail"))}
@@ -132,18 +152,42 @@ def payment_preview_detail(payment: dict) -> str:
         source = " ".join(
             part
             for part in (
+                str(extra.get("src_account_name") or ""),
                 str(extra.get("src_bank_name") or ""),
                 str(extra.get("src_account_no") or ""),
+                str(extra.get("src_branch_name") or ""),
             )
             if part
         )
-        route = " → ".join(part for part in (source, str(extra.get("dst") or "")) if part)
+        route = " → ".join(
+            part
+            for part in (
+                source,
+                " ".join(
+                    str(extra.get(key) or "")
+                    for key in (
+                        "dst_business_name",
+                        "dst_bank_name",
+                        "dst_account_no",
+                        "dst_branch_name",
+                    )
+                ).strip()
+                or str(extra.get("dst") or ""),
+            )
+            if part
+        )
         return " · ".join(part for part in (value, route) if part)
     if channel in {"cheque", "cashier_cheque"}:
         ref_key = "cheque_no" if channel == "cheque" else "cashier_no"
         ref = " · ".join(
             part
-            for part in (str(extra.get(ref_key) or ""), str(extra.get("bank_name") or ""))
+            for part in (
+                str(extra.get(ref_key) or ""),
+                str(
+                    extra.get("cheque_book_no" if channel == "cheque" else "cashier_book_no") or ""
+                ),
+                str(extra.get("bank_name") or ""),
+            )
             if part
         )
         return " · ".join(part for part in (value, ref) if part)
@@ -154,4 +198,4 @@ def payment_preview_detail(payment: dict) -> str:
             if part
         )
         return " · ".join(part for part in (value, ref) if part)
-    return value
+    return " · ".join(part for part in (value, str(extra.get("detail") or "")) if part)

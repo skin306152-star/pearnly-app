@@ -78,58 +78,53 @@ class DMSClientFormsMixin:
         target = self._norm_geo(name)
         if not target:
             return ""
-        for value, label in options:
-            if self._norm_geo(label) == target:
-                return value
-        return ""
+        matches = [value for value, label in options if self._norm_geo(label) == target]
+        return matches[0] if len(set(matches)) == 1 else ""
 
     def _resolve_address_geo(self, address, form_html: str):
-        """Resolve province/district/subdistrict/zipcode TEXT → DMS master ids
-        via the customer form's cascade endpoints (listdistricts → … → zipcodes).
+        """Prefill only exact, unambiguous matches from the current native cascade.
 
-        cus/new.php rejects an empty geo select with a misleading "already used"
-        error, so every level falls back to the list's first option (and the
-        form's pre-selected province) when the OCR'd name finds no match — the
-        customer is always created with a valid chain while the address TEXT
-        fields still carry the real registered address."""
+        Unmatched OCR text leaves that level and its descendants unselected so
+        the user can correct them. It must never choose the form default or an
+        unrelated first option just to make the native save accept the record.
+        """
         prov = re.search(
             r'<select[^>]+name="selprovinces"[^>]*>(.*?)</select>', form_html, re.S | re.I
         )
         if not prov:
-            return address
-        provinces = self._parse_options(prov.group(1))
-        default_province = self._selected_value(prov.group(1)) or (
-            provinces[0][0] if provinces else ""
+            raise DMSClientError("DMS province options unavailable", "ERR_DMS_MASTER_UNAVAILABLE")
+        resolved = replace(
+            address, province_id="", district_id="", subdistrict_id="", zipcode_id=""
         )
-        province_id = self._match_geo(provinces, address.province_name) or default_province
+        provinces = self._parse_options(prov.group(1))
+        province_id = self._match_geo(provinces, address.province_name)
         if not province_id:
-            return address
-
+            return resolved
+        resolved = replace(resolved, province_id=province_id)
         districts = self._fetch_options(
             "cus/component/listdistricts.php", {"selprovinces": province_id}
         )
-        district_id = self._match_geo(districts, address.district_name) or (
-            districts[0][0] if districts else ""
-        )
+        district_id = self._match_geo(districts, address.district_name)
+        if not district_id:
+            return resolved
+        resolved = replace(resolved, district_id=district_id)
         subdistricts = self._fetch_options(
             "cus/component/listsubdistricts.php", {"seldistricts": district_id}
         )
-        subdistrict_id = self._match_geo(subdistricts, address.subdistrict_name) or (
-            subdistricts[0][0] if subdistricts else ""
-        )
+        subdistrict_id = self._match_geo(subdistricts, address.subdistrict_name)
+        if not subdistrict_id:
+            return resolved
+        resolved = replace(resolved, subdistrict_id=subdistrict_id)
         zipcodes = self._fetch_options(
             "cus/component/listzipcodes.php", {"selsubdistricts": subdistrict_id}
         )
-        zipcode_id = self._match_geo(zipcodes, address.zipcode) or (
-            zipcodes[0][0] if zipcodes else ""
-        )
-        return replace(
-            address,
-            province_id=province_id,
-            district_id=district_id,
-            subdistrict_id=subdistrict_id,
-            zipcode_id=zipcode_id,
-        )
+        zipcode_id = self._match_geo(zipcodes, address.zipcode)
+        # 泰国身份证正面常不印邮编。当前街道若在 DMS 只对应一个邮编，可确定性补齐；
+        # 多个候选仍保持空白，留给用户选择，绝不猜第一项。
+        if not zipcode_id:
+            unique_ids = {str(row[0]) for row in zipcodes if row and row[0] is not None}
+            zipcode_id = next(iter(unique_ids)) if len(unique_ids) == 1 else ""
+        return replace(resolved, zipcode_id=zipcode_id)
 
     def _fetch_options(self, path: str, body: Dict[str, str]) -> List[List[str]]:
         return self._parse_options(self._post_text(path, body))

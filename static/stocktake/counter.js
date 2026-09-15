@@ -12,6 +12,7 @@
             pending = null,
             busy = false,
             draft = null;
+        let photoDraft = { values: [], loading: false };
         let reportPage = 0,
             reportQuery = '',
             reportFilter = 'all';
@@ -122,6 +123,7 @@
             selected = item;
             editing = null;
             pending = null;
+            photoDraft = { values: [], loading: false };
             draft = {
                 warehouse: item.warehouse || '',
                 location: item.location || '',
@@ -144,8 +146,15 @@
                     .join('')}</datalist>
                 <label>${esc(t('location-optional'))}<input data-entry-location list="st-locations" maxlength="300" placeholder="${esc(t('choose-or-type'))}" value="${esc(values.location)}"></label><datalist id="st-locations" data-location-options></datalist>
                 <label>${esc(t('quantity-this-entry'))}<input data-entry-quantity type="number" min="0" step="0.000001" inputmode="decimal" required value="${esc(values.quantity)}"></label>
+                <section data-entry-photos></section>
                 <p>${esc(t(editing ? 'edit-entry-help' : 'add-entry-help'))}</p><div class="st-toolbar"><button class="pu-btn pu-btn--primary" data-entry-submit>${esc(t(editing ? 'save-correction' : 'save-next'))}</button>${action('cancel', 'cancel')}</div></form>`;
             updateLocations();
+            window.PearnlyStocktakePhotos.editor($('[data-entry-photos]'), {
+                draft: photoDraft,
+                existing: editing?.photo_count || 0,
+                t,
+                esc,
+            });
             $('[data-entry-warehouse]').oninput = updateLocations;
             $('[data-entry-form]').onsubmit = (event) => {
                 event.preventDefault();
@@ -153,7 +162,7 @@
             };
             if (pending && !pending.confirmed)
                 $('[data-entry-form]')
-                    .querySelectorAll('input')
+                    .querySelectorAll('input,[data-entry-photos] button')
                     .forEach((node) => {
                         node.disabled = true;
                     });
@@ -172,6 +181,10 @@
         }
         async function save(voided = false) {
             if (busy || disposed) return;
+            if (photoDraft.loading) {
+                message(t('photos-processing'));
+                return;
+            }
             keepDraft();
             if (!pending) {
                 const body = {
@@ -181,6 +194,7 @@
                     location: draft.location.trim(),
                 };
                 if (editing) Object.assign(body, { version: editing.version, voided });
+                if (photoDraft.values.length) body.photos = [...photoDraft.values];
                 pending = {
                     body,
                     path:
@@ -209,6 +223,7 @@
                 editing = null;
                 draft = null;
                 pending = null;
+                photoDraft = { values: [], loading: false };
                 render();
                 message(t('entry-saved'));
                 if (cameraMode) void scan();
@@ -223,7 +238,7 @@
                 });
                 if (pending)
                     $('[data-entry-form]')
-                        ?.querySelectorAll('input')
+                        ?.querySelectorAll('input,[data-entry-photos] button')
                         .forEach((node) => {
                             node.disabled = true;
                         });
@@ -276,7 +291,7 @@
         }
         function history() {
             $('[data-entries]').innerHTML =
-                `<div class="st-list">${displayedEntries.map((e) => `<article class="st-card"><strong>${esc(e.product_name)}</strong><span>${esc(e.product_code)} · ${esc(e.warehouse)} / ${esc(e.location || '—')}</span><span>${esc(quantity(e.quantity))} ${esc(e.unit)} · ${esc(e.voided ? t('entry-voided') : t('entry-included'))}</span><small>${esc(e.counted_by_name)} · ${esc(new Date(e.counted_at).toLocaleString())}</small>${task.status === 'active' && !e.voided ? `<div class="st-toolbar"><button type="button" class="pu-btn pu-btn--secondary" data-edit-entry="${esc(e.id)}">${esc(t('edit-entry'))}</button><button type="button" class="pu-btn pu-btn--secondary" data-void-entry="${esc(e.id)}">${esc(t('void-entry'))}</button></div>` : ''}</article>`).join('') || `<p>${esc(t('no-entries'))}</p>`}</div><div class="st-toolbar">${entryPage ? action('entries-prev', 'prev') : ''}<span>${entryTotal ? entryPage * 50 + 1 : 0}–${entryPage * 50 + displayedEntries.length} / ${entryTotal}</span>${(entryPage + 1) * 50 < entryTotal ? action('entries-next', 'next') : ''}</div>`;
+                `<div class="st-list">${displayedEntries.map((e) => `<article class="st-card"><strong>${esc(e.product_name)}</strong><span>${esc(e.product_code)} · ${esc(e.warehouse)} / ${esc(e.location || '—')}</span><span>${esc(quantity(e.quantity))} ${esc(e.unit)} · ${esc(e.voided ? t('entry-voided') : t('entry-included'))}</span><small>${esc(e.counted_by_name)} · ${esc(new Date(e.counted_at).toLocaleString())}</small>${e.photo_count ? `<button type="button" class="pu-btn pu-btn--secondary" data-view-photos="${esc(e.id)}">${esc(t('view-photos'))} (${e.photo_count})</button>` : ''}${task.status === 'active' && !e.voided ? `<div class="st-toolbar"><button type="button" class="pu-btn pu-btn--secondary" data-edit-entry="${esc(e.id)}">${esc(t('edit-entry'))}</button><button type="button" class="pu-btn pu-btn--secondary" data-void-entry="${esc(e.id)}">${esc(t('void-entry'))}</button></div>` : ''}</article>`).join('') || `<p>${esc(t('no-entries'))}</p>`}</div><div class="st-toolbar">${entryPage ? action('entries-prev', 'prev') : ''}<span>${entryTotal ? entryPage * 50 + 1 : 0}–${entryPage * 50 + displayedEntries.length} / ${entryTotal}</span>${(entryPage + 1) * 50 < entryTotal ? action('entries-next', 'next') : ''}</div>`;
         }
         async function pageEntries(delta) {
             const target = entryPage + delta;
@@ -292,12 +307,22 @@
             if (!target || busy) return;
             event.stopPropagation();
             try {
+                if (target.dataset.viewPhotos) {
+                    await window.PearnlyStocktakePhotos.view(host, {
+                        api,
+                        path: '/' + task.id + '/entries/' + target.dataset.viewPhotos + '/photos',
+                        t,
+                        esc,
+                    });
+                    return;
+                }
                 if (target.dataset.editEntry || target.dataset.voidEntry) {
                     if (pending) {
                         message(t('retry-same-entry'));
                         return;
                     }
                     stop();
+                    photoDraft = { values: [], loading: false };
                     editing = displayedEntries.find(
                         (e) => e.id === (target.dataset.editEntry || target.dataset.voidEntry)
                     );
@@ -329,6 +354,7 @@
                     selected = null;
                     editing = null;
                     draft = null;
+                    photoDraft = { values: [], loading: false };
                     render();
                     if (cameraMode) void scan();
                 }

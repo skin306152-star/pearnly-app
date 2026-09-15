@@ -59,6 +59,9 @@ async def maintenance():
     if not owner:
         return
     try:
+        from services.line_dms import menu_sync
+
+        await asyncio.to_thread(menu_sync.reconcile)
         await background_loops.run_erp_retry_tick()
         await background_loops.run_email_ingest_tick()
     finally:

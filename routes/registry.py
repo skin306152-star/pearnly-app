@@ -64,6 +64,7 @@ from routes.line_dms_credentials_routes import router as line_dms_credentials_ro
 from routes.line_dms_portal_routes import router as line_dms_portal_router
 from routes.line_erp_routes import router as line_erp_router
 from routes.login_routes import router as login_router
+from routes.work_bridge_routes import router as work_bridge_router
 from routes.me_routes import router as me_router
 from routes.meta_aliases_routes import router as meta_aliases_router
 from routes.modules_routes import router as modules_router
@@ -225,6 +226,7 @@ ROUTERS = (
     oauth_router,
     oauth_line_router,
     login_router,
+    work_bridge_router,
     meta_aliases_router,  # /api/version + v1 OCR 别名
     ocr_export_router,
 )

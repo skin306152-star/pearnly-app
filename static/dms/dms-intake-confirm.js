@@ -326,6 +326,12 @@
         var fields = payload.fields,
             addresses = payload.addresses;
         if (!fields.people_id || !fields.name) return root.showToast(t('dic-need-fields'), 'error');
+        if (root.DXGEO.missingSelection()) {
+            closeModal();
+            S.tab = 'allfields';
+            renderConfirm();
+            return root.showToast(t('dx-select-required'), 'error');
+        }
         var mode = !existing() ? 'create' : S.decision;
         if (mode === 'create' && !String(fields.phone || '').trim()) {
             S.tab = 'allfields';
@@ -404,45 +410,7 @@
 
     // 地址级联(府→县→区→邮编)· ID 块/联系/寄送各自联动。
     function onGeoChange(selEl) {
-        var fk = selEl.dataset.fk;
-        S.form[fk] = selEl.value;
-        var chain = {
-            province_id: ['districts', 'district_id'],
-            district_id: ['subdistricts', 'subdistrict_id'],
-            subdistrict_id: ['zipcodes', 'zipcode_id'],
-        };
-        var base = fk.replace(/_ct$|_sd$/, '');
-        var sfx = fk.slice(base.length);
-        var next = chain[base];
-        if (!next) return C.syncMirror();
-        return fetch(
-            '/api/dms/geo?level=' + next[0] + '&parent_id=' + encodeURIComponent(selEl.value),
-            { headers: C.authHeaders() }
-        )
-            .then(function (r) {
-                return r.json().catch(function () {
-                    return {};
-                });
-            })
-            .then(function (d) {
-                var opts = (d && d.options) || [];
-                var tgt = $('dx-f-' + next[1] + sfx);
-                if (tgt && opts.length) {
-                    tgt.innerHTML = opts
-                        .map(function (o) {
-                            return '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>';
-                        })
-                        .join('');
-                    S.form[next[1] + sfx] = tgt.value;
-                    tgt.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            })
-            .catch(function () {
-                /* 忽略级联失败 */
-            })
-            .then(function () {
-                C.syncMirror();
-            });
+        return root.DXGEO.onChange(selEl);
     }
 
     root.DXCONFIRM = {

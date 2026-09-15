@@ -15,7 +15,7 @@ from psycopg2.extras import RealDictCursor
 from core import db
 from core.workspace_context import WorkspaceScope
 from routes.stocktake_routes import router
-from services.stocktake import store, schema, access, entry_schema
+from services.stocktake import store, schema, access, entry_schema, photo_schema
 from tests.unit._pg_smoke import connect_or_skip, connect, require_disposable_db
 from tests.unit.test_stocktake import ROW, xlsx
 
@@ -35,6 +35,7 @@ class StocktakePgSmoke(TestCase):
             )
             cur.execute(schema.DDL)
             entry_schema.apply(cur)
+            photo_schema.apply(cur)
             from core.rls import apply_tenant_workspace_rls
 
             apply_tenant_workspace_rls(

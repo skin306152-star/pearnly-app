@@ -3,6 +3,10 @@
 
     window.DMS_CREDENTIALS_TEXT = {
         th: {
+            lineAuthRequired: 'ยืนยันบัญชี LINE อีกครั้งเพื่อเปิดหน้ารหัสผ่าน DMS',
+            reconnect: 'ยืนยัน LINE อีกครั้ง',
+            retry: 'ลองโหลดอีกครั้ง',
+            loadFailed: 'เปิดข้อมูลบัญชีไม่สำเร็จ กรุณาลองโหลดอีกครั้ง',
             title: 'เปลี่ยนบัญชีและรหัสผ่าน DMS',
             subtitle:
                 'กรอกชื่อผู้ใช้และรหัสผ่านที่ใช้งานอยู่ใน MR.ERP DMS เพื่ออัปเดตข้อมูลเชื่อมต่อของ Pearnly',
@@ -23,10 +27,16 @@
             operatorInactive: 'บัญชีผู้ปฏิบัติงานนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแล',
             endpointMissing: 'ไม่พบการเชื่อมต่อ DMS ของคุณ กรุณาติดต่อผู้ดูแล',
             unavailable: 'ไม่สามารถอ่านข้อมูลเชื่อมต่อ DMS ได้ กรุณาติดต่อผู้ดูแล',
+            bindingChanged:
+                'การเชื่อมต่อ LINE เปลี่ยนแปลงหรือหมดอายุ กรุณาปิดหน้านี้แล้วเปิดเมนู 4 จาก LINE อีกครั้ง',
             failed: 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
             loading: 'กำลังโหลดข้อมูลบัญชี…',
         },
         en: {
+            lineAuthRequired: 'Verify your LINE account again to open DMS credential settings.',
+            reconnect: 'Verify LINE again',
+            retry: 'Try loading again',
+            loadFailed: 'Could not load account details. Please try again.',
             title: 'Update DMS credentials',
             subtitle:
                 'Enter the username and password currently used in MR.ERP DMS to update Pearnly’s connection.',
@@ -47,10 +57,16 @@
             operatorInactive: 'This operator is inactive. Contact your administrator.',
             endpointMissing: 'Your DMS connection was not found. Contact your administrator.',
             unavailable: 'The DMS connection could not be read. Contact your administrator.',
+            bindingChanged:
+                'Your LINE binding changed or expired. Close this page and reopen menu 4 from LINE.',
             failed: 'Could not save. Please try again.',
             loading: 'Loading account details…',
         },
         zh: {
+            lineAuthRequired: '请重新验证 LINE 身份，再打开 DMS 密码设置。',
+            reconnect: '重新验证 LINE',
+            retry: '重新加载',
+            loadFailed: '账号信息加载失败，请重新加载。',
             title: '更改 DMS 账号密码',
             subtitle: '填写目前在 MR.ERP DMS 使用的用户名和密码，更新 Pearnly 的连接凭证。',
             username: 'DMS 用户名',
@@ -70,10 +86,15 @@
             operatorInactive: '该操作员已被停用，请联系管理员。',
             endpointMissing: '找不到你的 DMS 连接，请联系管理员。',
             unavailable: '无法读取 DMS 连接信息，请联系管理员。',
+            bindingChanged: 'LINE 绑定已变更或登录已过期。请关闭此页面，从 LINE 重新打开菜单 4。',
             failed: '保存失败，请稍后重试。',
             loading: '正在加载账号信息…',
         },
         ja: {
+            lineAuthRequired: 'DMSの接続情報を開くには、LINEアカウントを再認証してください。',
+            reconnect: 'LINEを再認証',
+            retry: '再読み込み',
+            loadFailed: 'アカウント情報を読み込めませんでした。再読み込みしてください。',
             title: 'DMSのアカウント情報を変更',
             subtitle:
                 'MR.ERP DMSで現在使用しているユーザー名とパスワードを入力し、Pearnlyの接続情報を更新します。',
@@ -94,6 +115,8 @@
             operatorInactive: 'この担当者は無効です。管理者に連絡してください。',
             endpointMissing: 'DMS接続が見つかりません。管理者に連絡してください。',
             unavailable: 'DMS接続情報を読み取れません。管理者に連絡してください。',
+            bindingChanged:
+                'LINE の連携が変更されたか、有効期限が切れました。このページを閉じ、LINE のメニュー 4 から開き直してください。',
             failed: '保存できませんでした。もう一度お試しください。',
             loading: 'アカウント情報を読み込み中…',
         },

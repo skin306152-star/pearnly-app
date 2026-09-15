@@ -21,6 +21,22 @@ from scripts.authz_route_inventory import collect_routes  # noqa: E402
 
 # 真公开面:每条必须带"为何公开"注释。新增公开路由必须在这里登记。
 PUBLIC_ROUTES = {
+    (
+        "GET",
+        "/liff/cowork-live",
+    ),  # Public shell only; data requires scoped session and native authorization.
+    (
+        "POST",
+        "/api/cowork-line/work-live/auth",
+    ),  # Verified LINE token, active binding and fresh actor.
+    (
+        "POST",
+        "/api/cowork-line/work-live/read",
+    ),  # Audience-scoped signed session, fresh actor and native board/assignment checks.
+    (
+        "GET",
+        "/liff/cowork-connect",
+    ),  # Public HTML shell; binding requires login and verified LINE token
     # LINE ID token verified against the existing Cowork channel and active membership.
     ("POST", "/api/cowork/stocktakes/line/auth"),
     # 页面服务(SPA 外壳,鉴权在前端 boot + 后端 API)
@@ -47,6 +63,7 @@ PUBLIC_ROUTES = {
     # 登录准入与数据权限仍由 /api/login entry 和后端 API 守门。
     # 绝不登记任何 /api/erp/* 业务路由。
     ("GET", "/cowork"),
+    ("GET", "/work"),  # Public redirect shell; no business data or credentials.
     ("GET", "/erp"),
     ("GET", "/cashier-sw.js"),  # PWA Service Worker 脚本(公开静态 · 同 /pos-sw.js)
     ("GET", "/reset"),
@@ -79,9 +96,16 @@ PUBLIC_ROUTES = {
     # webhook(签名校验在实现内:LINE signature / GitHub secret)
     ("POST", "/api/line/webhook"),  # Cowork 默认 channel · LINE signature 验签即凭证
     ("POST", "/api/line/dms/webhook"),  # DMS channel · line_client.verify_signature 验签即凭证
+    # DMS 多 OA:A/B 各自入口用本 OA 的 LINE channel secret 验签,错 secret 400,验签即凭证
+    ("POST", "/api/line/dms/webhook/a"),
+    ("POST", "/api/line/dms/webhook/b"),
     ("POST", "/api/line/erp/webhook"),  # ERP 独立 channel · ERP secret 验 LINE signature
     ("POST", "/api/line/erp/liff/auth"),  # ERP LIFF id_token + binding + draft session 即凭证
     ("GET", "/api/line/erp/liff/config"),  # 仅返回 ERP OA 的公开 LIFF ID
+    (
+        "POST",
+        "/api/cowork-line/work-invite",
+    ),  # Verified LIFF token plus fresh owner binding and native board admin
     ("POST", "/api/cowork-line/intake/liff/auth"),  # Cowork LIFF id_token + 绑定身份 + 草稿即凭证
     ("GET", "/api/cowork-line/intake/liff/config"),  # 仅返回 Cowork OA 的公开 LIFF ID
     # Cowork LIFF 草稿接口以 20 分钟 scoped JWT + session nonce 作为凭证；

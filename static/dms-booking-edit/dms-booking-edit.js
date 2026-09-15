@@ -14,9 +14,13 @@
     var gateway = window.DmsBookingApi;
     var model = null;
     var masters = null;
+    // 目录权威为空、银行名称要手工填的银行目录(后端与 LINE 对话同一判据)。
+    var manualBanks = [];
     var form = document.getElementById('editor');
     var result = document.getElementById('result');
     var nonce = query('draft');
+    var customerMode = query('editor') === 'customer';
+    var editorQuery = customerMode ? 'editor=customer&' : '';
     var ERROR_KEYS = window.DMS_BOOKING_ERROR_KEYS;
     var portalMode = query('portal') === 'dms';
     var credentialsMode = query('credentials') === 'dms';
@@ -88,6 +92,12 @@
             })
             .join('');
     }
+    function bankOptions(rows, selected) {
+        return '<option value="">' + t('chooseBank') + '</option>' + options(rows, selected);
+    }
+    function masterOptions(rows, selected) {
+        return '<option value="">' + t('chooseOption') + '</option>' + options(rows, selected);
+    }
     function select(name, label, rows, selected, cls) {
         return (
             '<div class="field ' +
@@ -100,8 +110,8 @@
             name +
             '" name="' +
             name +
-            '">' +
-            options(rows, selected) +
+            '" required>' +
+            masterOptions(rows, selected) +
             '</select></div>'
         );
     }
@@ -123,7 +133,7 @@
             })
             .join('');
     }
-    function paymentField(cls, label, value, wide) {
+    function paymentField(cls, label, value, wide, required) {
         return (
             '<div class="field ' +
             (wide ? 'wide' : '') +
@@ -133,59 +143,74 @@
             cls +
             '" value="' +
             esc(value || '') +
-            '"></div>'
+            '"' +
+            (required ? ' required' : '') +
+            '></div>'
         );
     }
-    function legacySource(x) {
-        if (x.src_bank_name || x.src_account_no) return x;
-        var parts = String(x.src || '')
-            .trim()
-            .split(/\s+/);
-        if (parts.length > 1) {
-            x.src_account_no = parts.pop();
-            x.src_bank_name = parts.join(' ');
-        } else if (/\d/.test(parts[0] || '')) {
-            x.src_account_no = parts[0];
-        } else {
-            x.src_bank_name = parts[0] || '';
-        }
-        return x;
+    function paymentBank(key, value) {
+        // 手工目录没有目录 id 可选:调用方传的是整笔 extra,回显的是 bank_name,不拿 bank_id 顶替。
+        if (manualBank(key))
+            return paymentField('bank-name', 'bankName', value.bank_name, false, true);
+        return (
+            '<div class="field"><label>' +
+            t('bankName') +
+            '</label><select class="bank-id" required>' +
+            bankOptions(masters[key], value.bank_id) +
+            '</select></div>'
+        );
+    }
+    function manualBank(key) {
+        return manualBanks.indexOf(key) >= 0;
     }
     function paymentRow(p) {
         p = p || { channel: 'cash', amount: '', extra: {} };
         var x = p.extra || {};
-        if (p.channel === 'transfer') x = legacySource(x);
         var extra =
             p.channel === 'transfer'
                 ? '<div class="extra grid">' +
-                  paymentField('src-bank', 'sourceBank', x.src_bank_name) +
-                  paymentField('src-account', 'sourceAccount', x.src_account_no) +
-                  paymentField('src-name', 'sourceAccountName', x.src_account_name) +
-                  paymentField('src-branch', 'sourceBranch', x.src_branch_name) +
-                  paymentField('src-time', 'transferTime', x.src_time) +
                   '<div class="field wide"><label>' +
                   t('destination') +
-                  '</label><select class="dst">' +
-                  options(masters.company_banks, x.dst_id) +
-                  '</select></div></div>'
+                  '</label><select class="dst" required>' +
+                  bankOptions(masters.company_banks, x.dst_id) +
+                  '</select></div>' +
+                  '</div>'
                 : p.channel === 'cash'
                   ? '<div class="extra"></div>'
                   : p.channel === 'cheque'
                     ? '<div class="extra grid">' +
-                      paymentField('cheque-no', 'chequeNo', x.cheque_no || x.ref) +
-                      paymentField('bank-name', 'bankName', x.bank_name) +
-                      paymentField('cheque-book-no', 'chequeBookNo', x.cheque_book_no) +
+                      paymentField('cheque-no', 'chequeNo', x.cheque_no || x.ref, false, true) +
+                      paymentBank('cheque_banks', x) +
+                      paymentField(
+                          'cheque-book-no',
+                          'chequeBookNo',
+                          x.cheque_book_no,
+                          false,
+                          true
+                      ) +
                       '</div>'
                     : p.channel === 'cashier_cheque'
                       ? '<div class="extra grid">' +
-                        paymentField('cashier-no', 'cashierNo', x.cashier_no || x.ref) +
-                        paymentField('bank-name', 'bankName', x.bank_name) +
-                        paymentField('cashier-book-no', 'cashierBookNo', x.cashier_book_no) +
+                        paymentField(
+                            'cashier-no',
+                            'cashierNo',
+                            x.cashier_no || x.ref,
+                            false,
+                            true
+                        ) +
+                        paymentBank('cashier_banks', x) +
+                        paymentField(
+                            'cashier-book-no',
+                            'cashierBookNo',
+                            x.cashier_book_no,
+                            false,
+                            true
+                        ) +
                         '</div>'
                       : p.channel === 'card'
                         ? '<div class="extra grid">' +
-                          paymentField('bank-name', 'bankName', x.bank_name) +
-                          paymentField('card-type', 'cardType', x.card_type || x.ref) +
+                          paymentBank('card_banks', x) +
+                          paymentField('card-type', 'cardType', x.card_type || x.ref, false, true) +
                           '</div>'
                         : '<div class="field extra"><label>' +
                           t('detail') +
@@ -284,7 +309,7 @@
         }
         if (portalMode) {
             try {
-                if (!gateway.hasDmsToken()) await gateway.authenticate();
+                await gateway.authenticate();
                 var portal = await gateway.api('/api/line/dms-portal/ticket', {
                     method: 'POST',
                     body: '{}',
@@ -305,31 +330,35 @@
                     location.replace(portalUrl);
                 }
             } catch (e) {
-                return showError('failed');
+                return showError(errorKey(e, 'failed'));
             }
             return;
         }
         if (!nonce) return showError('expired');
         try {
-            if (!gateway.hasDmsToken()) await gateway.authenticate();
+            await gateway.authenticate();
             model = await gateway.api(
-                '/api/line/dms-booking/draft?nonce=' + encodeURIComponent(nonce)
+                '/api/line/dms-booking/draft?' + editorQuery + 'nonce=' + encodeURIComponent(nonce)
             );
         } catch (e) {
             if (e.status === 401) {
                 try {
                     await gateway.authenticate();
                     model = await gateway.api(
-                        '/api/line/dms-booking/draft?nonce=' + encodeURIComponent(nonce)
+                        '/api/line/dms-booking/draft?' +
+                            editorQuery +
+                            'nonce=' +
+                            encodeURIComponent(nonce)
                     );
                 } catch (x) {
-                    return showError(x.status === 409 ? 'expired' : 'failed');
+                    return showError(errorKey(x, 'failed'));
                 }
             } else {
-                return showError(e.status === 409 ? 'expired' : 'failed');
+                return showError(errorKey(e, 'failed'));
             }
         }
         masters = model.masters;
+        manualBanks = model.manual_banks || [];
         render();
         await hydrateGeo();
     }
@@ -340,9 +369,9 @@
             adv = model.form.advisor || {};
         form.innerHTML =
             '<div class="intro"><h1>' +
-            t('title') +
+            t(customerMode ? 'customerTitle' : 'title') +
             '</h1><p>' +
-            t('sub') +
+            t(customerMode ? 'customerSub' : 'sub') +
             '</p></div>' +
             section(
                 'customer',
@@ -368,48 +397,50 @@
                     t('idWarn') +
                     '</p>'
             ) +
-            section(
-                'booking',
-                '<div class="grid"><div class="field wide"><label>' +
-                    t('advisor') +
-                    '</label><input readonly value="' +
-                    esc(adv.name || '') +
-                    '"></div>' +
-                    select('place_id', 'place', masters.places, (a.place || {}).id) +
-                    select('car_id', 'car', masters.cars, (a.car || {}).id) +
-                    select('paint_id', 'paint', masters.paints, (a.paint || {}).id) +
-                    field('delivery_date_be', 'delivery', a.delivery_date_be) +
-                    select('term_id', 'term', masters.terms, (a.term || {}).id) +
-                    select('regis_id', 'regis', masters.regis, (a.regis || {}).id) +
-                    field('regis_name', 'regisName', a.regis_name, 'wide') +
-                    '</div>'
-            ) +
-            section(
-                'payment',
-                '<div id="payment-list"></div><button id="add-payment" class="pu-btn add" type="button">' +
-                    t('addPayment') +
-                    '</button><div class="field wide"><label>' +
-                    t('total') +
-                    '</label><input id="total" readonly></div>'
-            ) +
-            section(
-                'files',
-                '<p class="hint">' +
-                    t('fileHint') +
-                    '</p><div class="file-row"><span>' +
-                    t('idCard') +
-                    '</span><label><input id="keep-id" class="switch" type="checkbox" ' +
-                    (f.id_card ? 'checked' : 'disabled') +
-                    '> ' +
-                    t('attached') +
-                    '</label></div><div class="file-row"><span>' +
-                    t('slip') +
-                    '</span><label><input id="keep-slip" class="switch" type="checkbox" ' +
-                    (f.slip ? 'checked' : 'disabled') +
-                    '> ' +
-                    t('attached') +
-                    '</label></div>'
-            ) +
+            (customerMode
+                ? ''
+                : section(
+                      'booking',
+                      '<div class="grid"><div class="field wide"><label>' +
+                          t('advisor') +
+                          '</label><input readonly value="' +
+                          esc(adv.name || '') +
+                          '"></div>' +
+                          select('place_id', 'place', masters.places, (a.place || {}).id) +
+                          select('car_id', 'car', masters.cars, (a.car || {}).id) +
+                          select('paint_id', 'paint', masters.paints, (a.paint || {}).id) +
+                          field('delivery_date_be', 'delivery', a.delivery_date_be) +
+                          select('term_id', 'term', masters.terms, (a.term || {}).id) +
+                          select('regis_id', 'regis', masters.regis, (a.regis || {}).id) +
+                          field('regis_name', 'regisName', a.regis_name, 'wide') +
+                          '</div>'
+                  ) +
+                  section(
+                      'payment',
+                      '<div id="payment-list"></div><button id="add-payment" class="pu-btn add" type="button">' +
+                          t('addPayment') +
+                          '</button><div class="field wide"><label>' +
+                          t('total') +
+                          '</label><input id="total" readonly></div>'
+                  ) +
+                  section(
+                      'files',
+                      '<p class="hint">' +
+                          t('fileHint') +
+                          '</p><div class="file-row"><span>' +
+                          t('idCard') +
+                          '</span><label><input id="keep-id" class="switch" type="checkbox" ' +
+                          (f.id_card ? 'checked' : 'disabled') +
+                          '> ' +
+                          t('attached') +
+                          '</label></div><div class="file-row"><span>' +
+                          t('slip') +
+                          '</span><label><input id="keep-slip" class="switch" type="checkbox" ' +
+                          (f.slip ? 'checked' : 'disabled') +
+                          '> ' +
+                          t('attached') +
+                          '</label></div>'
+                  )) +
             '<p id="form-error" class="error" role="alert"></p><div class="sticky-actions"><button id="cancel" class="pu-btn secondary" type="button">' +
             t('cancel') +
             '</button><button id="save" class="pu-btn primary" type="submit" disabled>' +
@@ -417,20 +448,22 @@
             '</button></div>';
         document.getElementById('loading').hidden = true;
         form.hidden = false;
-        renderPayments(model.form.payments);
-        document.getElementById('add-payment').onclick = function () {
-            var channel = nextChannel();
-            if (!channel) return;
-            var list = document.getElementById('payment-list');
-            list.insertAdjacentHTML(
-                'beforeend',
-                paymentRow({ channel: channel, amount: '', extra: {} })
-            );
-            wirePayments();
-            syncChannelOptions();
-            total();
-        };
-        document.getElementById('car_id').onchange = loadPaints;
+        if (!customerMode) {
+            renderPayments(model.form.payments);
+            document.getElementById('add-payment').onclick = function () {
+                var channel = nextChannel();
+                if (!channel) return;
+                var list = document.getElementById('payment-list');
+                list.insertAdjacentHTML(
+                    'beforeend',
+                    paymentRow({ channel: channel, amount: '', extra: {} })
+                );
+                wirePayments();
+                syncChannelOptions();
+                total();
+            };
+            document.getElementById('car_id').onchange = loadPaints;
+        }
         document.getElementById('province_id').onchange = function () {
             cascade('districts', this.value, 'district_id', true);
         };
@@ -445,7 +478,9 @@
     }
     async function geo(level, parent) {
         return gateway.api(
-            '/api/line/dms-booking/geo?nonce=' +
+            '/api/line/dms-booking/geo?' +
+                editorQuery +
+                'nonce=' +
                 encodeURIComponent(nonce) +
                 '&level=' +
                 level +
@@ -455,49 +490,78 @@
     }
     function setOptions(id, rows, selected) {
         var el = document.getElementById(id);
-        el.innerHTML = options(rows, selected);
-        if (selected) el.value = selected;
+        el.innerHTML = masterOptions(rows, selected);
+        el.value = (rows || []).some(function (row) {
+            return String(row.id) === String(selected);
+        })
+            ? String(selected)
+            : '';
     }
     async function hydrateGeo() {
-        var c = model.form.customer;
+        var c = model.form.customer,
+            bundled = model.geo || {};
         try {
-            setOptions('province_id', await geo('provinces', ''), c.province_id);
-            setOptions('district_id', await geo('districts', c.province_id), c.district_id);
             setOptions(
-                'subdistrict_id',
-                await geo('subdistricts', c.district_id),
-                c.subdistrict_id
+                'province_id',
+                bundled.provinces || (await geo('provinces', '')),
+                c.province_id
             );
-            setOptions('zipcode_id', await geo('zipcodes', c.subdistrict_id), c.zipcode_id);
+            var levels = [
+                ['districts', 'province_id', 'district_id'],
+                ['subdistricts', 'district_id', 'subdistrict_id'],
+                ['zipcodes', 'subdistrict_id', 'zipcode_id'],
+            ];
+            for (var item of levels) {
+                var parent = document.getElementById(item[1]).value;
+                setOptions(
+                    item[2],
+                    bundled[item[0]] || (parent ? await geo(item[0], parent) : []),
+                    c[item[2]]
+                );
+            }
             document.getElementById('save').disabled = false;
         } catch (e) {
             showFormError();
         }
     }
     async function cascade(level, parent, target, downstream) {
+        setOptions(target, [], '');
+        if (downstream) {
+            if (target === 'district_id') {
+                setOptions('subdistrict_id', [], '');
+                setOptions('zipcode_id', [], '');
+            }
+            if (target === 'subdistrict_id') setOptions('zipcode_id', [], '');
+        }
+        if (!parent) return;
         try {
             var rows = await geo(level, parent);
+            var parentId = {
+                districts: 'province_id',
+                subdistricts: 'district_id',
+                zipcodes: 'subdistrict_id',
+            }[level];
+            if (document.getElementById(parentId).value !== parent) return;
             setOptions(target, rows, '');
-            if (downstream) {
-                if (target === 'district_id') {
-                    setOptions('subdistrict_id', [], '');
-                    setOptions('zipcode_id', [], '');
-                }
-                if (target === 'subdistrict_id') setOptions('zipcode_id', [], '');
-            }
         } catch (e) {
             showFormError();
         }
     }
     async function loadPaints() {
+        var selectedCar = this.value;
+        masters.paints = [];
+        setOptions('paint_id', [], '');
+        if (!selectedCar) return;
         try {
-            masters.paints = await gateway.api(
+            var rows = await gateway.api(
                 '/api/line/dms-booking/paints?nonce=' +
                     encodeURIComponent(nonce) +
                     '&car_id=' +
-                    encodeURIComponent(this.value)
+                    encodeURIComponent(selectedCar)
             );
-            setOptions('paint_id', masters.paints, '');
+            if (document.getElementById('car_id').value !== selectedCar) return;
+            masters.paints = rows;
+            setOptions('paint_id', rows, '');
         } catch (e) {
             showFormError();
         }
@@ -505,29 +569,30 @@
     var val = (id, fallback) => document.getElementById(id).value.trim() || fallback || '';
     function selectedLabel(id) {
         var el = document.getElementById(id);
-        return el.selectedOptions[0] ? el.selectedOptions[0].textContent : '';
+        return el.value && el.selectedOptions[0] ? el.selectedOptions[0].textContent : '';
     }
     function collectPayments() {
         return Array.from(document.querySelectorAll('.payment')).map(function (row) {
             var ch = row.querySelector('.pay-channel').value,
                 x = {};
             if (ch === 'transfer') {
-                x.src_bank_name = row.querySelector('.src-bank').value.trim();
-                x.src_account_no = row.querySelector('.src-account').value.trim();
-                x.src_account_name = row.querySelector('.src-name').value.trim();
-                x.src_branch_name = row.querySelector('.src-branch').value.trim();
-                x.src_time = row.querySelector('.src-time').value.trim();
                 x.dst_id = row.querySelector('.dst').value;
             } else if (ch === 'cheque') {
                 x.cheque_no = row.querySelector('.cheque-no').value.trim();
-                x.bank_name = row.querySelector('.bank-name').value.trim();
+                if (manualBank('cheque_banks'))
+                    x.bank_name = row.querySelector('.bank-name').value.trim();
+                else x.bank_id = row.querySelector('.bank-id').value;
                 x.cheque_book_no = row.querySelector('.cheque-book-no').value.trim();
             } else if (ch === 'cashier_cheque') {
                 x.cashier_no = row.querySelector('.cashier-no').value.trim();
-                x.bank_name = row.querySelector('.bank-name').value.trim();
+                if (manualBank('cashier_banks'))
+                    x.bank_name = row.querySelector('.bank-name').value.trim();
+                else x.bank_id = row.querySelector('.bank-id').value;
                 x.cashier_book_no = row.querySelector('.cashier-book-no').value.trim();
             } else if (ch === 'card') {
-                x.bank_name = row.querySelector('.bank-name').value.trim();
+                if (manualBank('card_banks'))
+                    x.bank_name = row.querySelector('.bank-name').value.trim();
+                else x.bank_id = row.querySelector('.bank-id').value;
                 x.card_type = row.querySelector('.card-type').value.trim();
             } else if (ch === 'other') {
                 x.detail = row.querySelector('.detail').value.trim();
@@ -557,12 +622,13 @@
             ],
             customer = {};
         names.forEach(function (n) {
-            customer[n] = val(n, window.DMS_BOOKING_GEO.includes(n) ? model.form.customer[n] : '');
+            customer[n] = val(n);
         });
         customer.province_name = selectedLabel('province_id');
         customer.district_name = selectedLabel('district_id');
         customer.subdistrict_name = selectedLabel('subdistrict_id');
         customer.zipcode = selectedLabel('zipcode_id');
+        if (customerMode) return { customer: customer };
         return {
             customer: customer,
             answers: {
@@ -583,11 +649,12 @@
     }
     async function save(ev) {
         ev.preventDefault();
+        if (!form.reportValidity()) return;
         var btn = document.getElementById('save');
         btn.disabled = true;
         document.getElementById('form-error').textContent = '';
         try {
-            await gateway.api('/api/line/dms-booking/draft', {
+            await gateway.api('/api/line/dms-booking/draft?' + editorQuery, {
                 method: 'POST',
                 body: JSON.stringify({ nonce: nonce, form: payload() }),
             });
@@ -621,6 +688,10 @@
         document.getElementById('loading').hidden = true;
         result.hidden = false;
         result.innerHTML = '<h1>' + t(key) + '</h1>';
+    }
+    function errorKey(e, fallback) {
+        if (e && e.code && ERROR_KEYS[e.code]) return ERROR_KEYS[e.code];
+        return e && e.status === 409 ? 'expired' : fallback;
     }
     function applyLanguage() {
         document.documentElement.lang = locale;

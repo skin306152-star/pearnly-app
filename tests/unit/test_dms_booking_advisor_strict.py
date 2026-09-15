@@ -2,9 +2,8 @@
 """订车单顾问栏(销售提成归属)严格解析。
 
 2026-08-11:顾问栏此前恒填名册首行(_ref_from_default 的首行兜底),而 payload 从没人写
-advisor_id → 全公司的单都算到同一个人头上。改成只认调用方钉死的 id,认不出就报错;
-只有名册取数失败(_bshsd 回 None)才按钉死标量降级,不因一次抖动拦生意 —— 名册真空
-(回 [])一律拦,那种单 DMS 必拒,降级只会把失败拖到更晚。
+advisor_id → 全公司的单都算到同一个人头上。只认实时主档中选定的 id;
+名册不可用不能回退到旧名字/旧 ID,主档已删或缺少选择也必须阻止提交。
 """
 
 import json
@@ -24,6 +23,16 @@ _EMPLOYEE_LISTING = (
     'dt::<div data-val="297"><div><div><p>SALE01</p><p>sale01</p></div>'
     "<div><p>สมชาย</p></div></div></div>"
 )
+_ORG_BODY = json.dumps(
+    ["1", "Rayong", "30", "Sales team", "289", "Manager", None, None, None, None, None, None]
+)
+_BOOKING_MASTERS = {
+    "txtcar": [["c1", "DMX", "D-Max"]],
+    "txtcarpaint": [["p1", "WHITE", "White"]],
+    "txtplacebook": [["pl1", "OUTSIDE", "Outside showroom"]],
+    "txttermsale": [["ts1", "FINANCE", "Finance"]],
+    "txtregisbehalf": [["r1", "PERSON", "Individual"]],
+}
 
 
 class _FakeClient(DMSClientOpsMixin):
@@ -33,7 +42,7 @@ class _FakeClient(DMSClientOpsMixin):
     """
 
     def __init__(self, rows_by_elem, employees_body=_EMPLOYEE_LISTING):
-        self.rows_by_elem = rows_by_elem
+        self.rows_by_elem = {**_BOOKING_MASTERS, **rows_by_elem}
         self.employees_body = employees_body
         self.calls = []
         self.posts = []
@@ -47,6 +56,8 @@ class _FakeClient(DMSClientOpsMixin):
 
     def _post_text(self, path, data):
         self.posts.append(path)
+        if path == "drfcbc/component/detailbooksell.php":
+            return _ORG_BODY
         return self.employees_body
 
 
@@ -70,11 +81,23 @@ class _PagedMasters(DMSClientOpsMixin):
         return None if rows is None else list(rows)
 
     def _post_text(self, path, data):
+        if path == "drfcbc/component/detailbooksell.php":
+            return _ORG_BODY
         return self.employees_body
 
 
 def _defaults(**over) -> BookingDefaults:
-    return BookingDefaults(**{"advisor_id": "335", **over})
+    return BookingDefaults(
+        **{
+            "advisor_id": "335",
+            "car_id": "c1",
+            "paint_id": "p1",
+            "place_book_id": "pl1",
+            "term_sale_id": "ts1",
+            "regis_behalf_id": "r1",
+            **over,
+        }
+    )
 
 
 _CARD = ThaiIdCardPayload(people_id="1101700998118", first_name="ก", last_name="ข", birthday_be="")
@@ -105,18 +128,19 @@ class AdvisorStrictTests(unittest.TestCase):
             cl._advisor_ref_strict(_defaults(advisor_id="999", advisor_name="ผีน้อย"))
         self.assertEqual(ctx.exception.error_code, "ERR_DMS_ADVISOR_UNMATCHED")
 
-    def test_fetch_failure_falls_back_to_pinned_scalars(self):
+    def test_fetch_failure_cannot_fall_back_to_pinned_scalars(self):
         cl = _FakeClient({"txtusers": None})
-        ref = cl._advisor_ref_strict(
-            _defaults(advisor_id="335", advisor_code="sale02", advisor_name="sale02")
-        )
-        self.assertEqual((ref.id, ref.code, ref.name, ref.extra), ("335", "sale02", "sale02", ()))
+        with self.assertRaises(DMSClientError) as ctx:
+            cl._advisor_ref_strict(
+                _defaults(advisor_id="335", advisor_code="sale02", advisor_name="sale02")
+            )
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
 
-    def test_fetch_failure_without_name_raises_unmatched(self):
+    def test_fetch_failure_without_name_raises_unavailable(self):
         cl = _FakeClient({"txtusers": None})
         with self.assertRaises(DMSClientError) as ctx:
             cl._advisor_ref_strict(_defaults(advisor_id="335"))
-        self.assertEqual(ctx.exception.error_code, "ERR_DMS_ADVISOR_UNMATCHED")
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
 
     def test_empty_master_raises_even_with_pinned_name(self):
         # 名册真空 ≠ 取数失败:真空时 DMS 必拒这张单,降级放行只会把失败拖到更晚。
@@ -156,6 +180,19 @@ class RefFromDefaultStrictTests(unittest.TestCase):
             cl._ref_from_default("txtcar", "c1", "", "")
         self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNMATCHED")
 
+    def test_no_selection_cannot_choose_even_a_single_master_row(self):
+        cl = _FakeClient({"txtcar": [["c1", "DMX", "D-Max"]]})
+        with self.assertRaises(DMSClientError) as ctx:
+            cl._ref_from_default("txtcar", "", "", "")
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNMATCHED")
+
+    def test_explicit_code_resolves_only_unique_live_match(self):
+        cl = _FakeClient({"txtcar": [["c1", "DMX", "D-Max"], ["c2", "MX5", "MX-5"]]})
+        self.assertEqual(cl._ref_from_default("txtcar", "", "MX5", "").id, "c2")
+        cl = _FakeClient({"txtcar": [["c1", "DMX", "D-Max"], ["c2", "DMX", "D-Max variant"]]})
+        with self.assertRaises(DMSClientError):
+            cl._ref_from_default("txtcar", "", "DMX", "")
+
 
 class ResolveBookingPayloadTests(unittest.TestCase):
     def test_booking_payload_carries_matched_advisor(self):
@@ -164,8 +201,20 @@ class ResolveBookingPayloadTests(unittest.TestCase):
         self.assertEqual(booking.advisor.id, "335")
         self.assertEqual(booking.advisor.name, "sale02")
 
-    def test_other_masters_keep_first_row_fallback(self):
-        # 顾问改严了,其余主档(车/场所/条件…)的首行兜底行为原样保留。
+    def test_booking_organization_comes_from_advisor_not_first_branch_and_team(self):
+        cl = _FakeClient(
+            {
+                "txtusers": _ADVISORS,
+                "txtbranch_book": [["2", "Other branch", "Other branch"]],
+                "txtteam_book": [["37", "Other team", "Other team"]],
+            }
+        )
+        booking = cl.resolve_booking_payload(_defaults(), _CARD)
+        self.assertEqual((booking.branch.id, booking.team.id), ("1", "30"))
+        self.assertEqual(dict(booking.organization_fields)["usersposival2_book"], "289")
+        self.assertFalse(any(elem in {"txtbranch_book", "txtteam_book"} for elem, _ in cl.calls))
+
+    def test_explicit_place_default_resolves_live(self):
         cl = _FakeClient({"txtusers": _ADVISORS, "txtplacebook": [["pl1", "", "สาขาบางนา"]]})
         booking = cl.resolve_booking_payload(_defaults(), _CARD)
         self.assertEqual(booking.place_book.id, "pl1")
@@ -256,7 +305,7 @@ class FetchMastersTests(unittest.TestCase):
 
 
 class BshsdPagingTests(unittest.TestCase):
-    """_bshsd_all:翻页取全 + 失败传播 + 截断留痕(顾问名册靠它才拿得到第 11 个人)。"""
+    """_bshsd_all:翻页取全 + 失败传播 + 超出上限不返回半份主档。"""
 
     class _Paged(DMSClientOpsMixin):
         def __init__(self, pages):
@@ -286,12 +335,13 @@ class BshsdPagingTests(unittest.TestCase):
         cl = self._Paged([[["0"], ["1"]], None])
         self.assertIsNone(cl._bshsd_all("txtusers", page_size=2))
 
-    def test_truncation_is_logged_not_silent(self):
+    def test_truncation_blocks_instead_of_returning_or_caching_partial_rows(self):
         cl = self._Paged([[["a"], ["b"]]] * 4)
-        with self.assertLogs("services.erp.mrerp_dms_client_ops", "WARNING") as logs:
-            rows = cl._bshsd_all("txtusers", page_size=2, max_pages=3)
-        self.assertEqual(len(rows), 6)
-        self.assertIn("truncated", logs.output[0])
+        with self.assertRaises(DMSClientError) as ctx:
+            cl._bshsd_all("txtusers", page_size=2, max_pages=3)
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
+        cl.pages = [[["c"]]]
+        self.assertEqual(cl._bshsd_all("txtusers", page_size=2, max_pages=3), [["c"]])
 
 
 class SessionMemoTests(unittest.TestCase):
@@ -299,11 +349,13 @@ class SessionMemoTests(unittest.TestCase):
 
     class _Counting(DMSClientOpsMixin):
         def __init__(self, rows_by_elem, body_by_elem=None):
-            self.rows_by_elem = rows_by_elem
+            self.rows_by_elem = {**_BOOKING_MASTERS, **rows_by_elem}
             self.body_by_elem = body_by_elem or {}
             self.posts = []
 
         def _post_text(self, path, data):
+            if path == "drfcbc/component/detailbooksell.php":
+                return _ORG_BODY
             if "elemname" not in data:  # 员工表(users/…/showdata.php),不走 bshsd 备忘
                 return _EMPLOYEE_LISTING
             self.posts.append((data["elemname"], data.get("bshsdcurrpage")))
@@ -328,6 +380,15 @@ class SessionMemoTests(unittest.TestCase):
         with self.assertLogs("services.erp.mrerp_dms_client_ops", "WARNING"):
             self.assertIsNone(cl._bshsd("txtusers"))
         self.assertEqual(len(cl.posts), 2)
+
+    def test_admin_principal_does_not_reuse_sales_master_memo(self):
+        cl = self._Counting({"txtusers": _ADVISORS[:1]})
+        cl.transport = object()
+        self.assertEqual(len(cl._bshsd_all("txtusers")), 1)
+        cl.transport = object()
+        cl.rows_by_elem["txtusers"] = _ADVISORS
+        self.assertEqual(len(cl._bshsd_all("txtusers")), 2)
+        self.assertEqual(cl.posts.count(("txtusers", "1")), 2)
 
     def test_empty_master_is_memoized(self):
         cl = self._Counting({"txtusers": []})

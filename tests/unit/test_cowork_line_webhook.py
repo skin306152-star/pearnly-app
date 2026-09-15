@@ -47,7 +47,7 @@ class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         revoke.assert_called_once_with("U-line")
         clear.assert_called_once_with(tenant_id="tenant-1", line_user_id="U-line")
 
-    async def test_unblocked_follow_prompts_for_new_binding_code(self):
+    async def test_unblocked_follow_offers_native_account_connection(self):
         event = {
             "type": "follow",
             "replyToken": "reply-1",
@@ -57,11 +57,14 @@ class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         }
         with (
             patch.object(webhook.identity_store, "resolve_active_identity", return_value=None),
-            patch.object(webhook.line_client, "reply_text", return_value=True) as reply,
+            patch.object(webhook.line_client, "reply_messages", return_value=True) as reply,
         ):
             await webhook._handle_event(event)
 
-        self.assertIn("6 位绑定码", reply.call_args.args[1])
+        message = reply.call_args.args[1][0]
+        self.assertIn("บัญชี", message["text"])
+        self.assertEqual(message["quickReply"]["items"][0]["action"]["type"], "uri")
+        self.assertIn("cowork-connect", message["quickReply"]["items"][0]["action"]["uri"])
         self.assertEqual(reply.call_args.kwargs["channel"], "cowork")
 
     async def test_menu_shows_unavailable_erp_status_without_selecting_it(self):
@@ -120,6 +123,7 @@ class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(webhook.cowork_flow, "_session", return_value={}),
             patch.object(webhook.cowork_flow, "_set"),
+            patch("services.cowork_line.work_flow.handle", return_value=False),
             patch.object(webhook.line_client, "reply_messages", return_value=True) as reply,
         ):
             await webhook._handle_event(text_event("菜单"))

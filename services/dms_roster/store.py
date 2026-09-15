@@ -183,6 +183,7 @@ def list_profiles(tenant_id: str) -> List[dict]:
                        p.created_at,
                        u.username,
                        b.display_name AS line_name, b.bound_at, b.line_user_id,
+                       b.channel_key AS line_channel_key,
                        e.enabled AS ep_enabled, e.advisor_id, e.advisor_name
                 FROM dms_operator_profiles p
                 JOIN users u ON u.id = p.user_id

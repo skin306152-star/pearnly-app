@@ -13,12 +13,12 @@ from services.line_platform import client as line_client
 
 logger = logging.getLogger(__name__)
 
-MENU_NAME = "pearnly-cowork-stocktake-v2"
+MENU_NAME = "pearnly-cowork-work-v3"
 IMAGE_PATH = (
     Path(__file__).resolve().parents[2]
     / "static"
     / "brand"
-    / "line-richmenu-cowork-v1-2500x1686.png"
+    / "line-richmenu-cowork-v3-2500x1686.png"
 )
 WIDTH, HEIGHT = 2500, 1686
 ROW_HEIGHT = 843
@@ -52,6 +52,15 @@ def build_payload() -> dict[str, Any]:
             {
                 "bounds": {"x": 833, "y": 0, "width": 833, "height": ROW_HEIGHT},
                 "action": {"type": "uri", "uri": uri},
+            },
+            {
+                "bounds": {"x": 1666, "y": 0, "width": 834, "height": ROW_HEIGHT},
+                "action": {
+                    "type": "postback",
+                    "data": "a=work&c=home",
+                    "displayText": "ประสานงาน",
+                    "inputOption": "closeRichMenu",
+                },
             },
         ],
     }

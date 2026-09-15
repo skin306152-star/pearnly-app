@@ -1,4 +1,4 @@
-/* global URL, Response, Headers, Request, fetch */
+/* global URL, URLSearchParams, Response, Headers, Request, fetch */
 const ORIGIN = 'https://pearnly-web-112074003592.asia-southeast1.run.app';
 
 export default {
@@ -10,6 +10,35 @@ export default {
         if (original.pathname.startsWith('/internal/')) {
             return new Response('Not found', { status: 404 });
         }
+        const state = original.searchParams.get('liff.state') || '';
+        const stateQuery = new URLSearchParams(state.slice(state.indexOf('?') + 1));
+        const dmsNoStore =
+            original.pathname === '/dms' ||
+            original.pathname.startsWith('/dms/') ||
+            original.pathname === '/api/dms' ||
+            original.pathname.startsWith('/api/dms/') ||
+            original.pathname.startsWith('/api/line/dms-booking/') ||
+            original.pathname.startsWith('/api/line/dms-portal/') ||
+            ['/home/dms-booking', '/login/dms-booking', '/liff/dms-booking'].includes(
+                original.pathname
+            ) ||
+            (['/home', '/login'].includes(original.pathname) &&
+                stateQuery.get('credentials') === 'dms') ||
+            [
+                '/api/line/dms-booking/auth',
+                '/api/line/dms-booking/config',
+                '/api/line/dms-credentials',
+            ].includes(original.pathname);
+        // Sign-in handshakes are one-time: the redirect carries a 10-minute signed
+        // state, so a stored copy replays a stale state and every attempt is
+        // rejected with `invalid_state` until the cache expires. Cloudflare's zone
+        // Browser Cache TTL rewrote the origin's 302 into `max-age=14400`
+        // (measured 2026-09-14), which kept Google sign-in broken for four hours
+        // at a time. Never store these.
+        const authNoStore =
+            original.pathname.startsWith('/api/auth/') ||
+            ['/api/login', '/api/logout', '/login', '/cowork'].includes(original.pathname);
+        const noStore = dmsNoStore || authNoStore;
         const target = new URL(original.pathname + original.search, ORIGIN);
         const headers = new Headers(request.headers);
         headers.delete('host');
@@ -28,13 +57,21 @@ export default {
             body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
             redirect: 'manual',
         });
-        const response = await fetch(upstream, {
-            cf: cacheable
-                ? { cacheEverything: true, cacheTtlByStatus: { '200-299': 86400, '400-599': -1 } }
-                : { cacheTtl: 0 },
-        });
+        const response = await fetch(
+            upstream,
+            noStore
+                ? { cache: 'no-store' }
+                : {
+                      cf: cacheable
+                          ? {
+                                cacheEverything: true,
+                                cacheTtlByStatus: { '200-299': 86400, '400-599': -1 },
+                            }
+                          : { cacheTtl: 0 },
+                  }
+        );
         const result = new Response(response.body, response);
-        if (original.pathname.endsWith('/latest.json')) {
+        if (noStore || original.pathname.endsWith('/latest.json')) {
             result.headers.set('cache-control', 'no-store');
         }
         const location = result.headers.get('location');

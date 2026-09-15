@@ -61,7 +61,11 @@ def _lookup(scenario, *, customer_id=None):
     return {
         "ok": True,
         "scenario": scenario,
-        "match": {"found": scenario == "exact", "customer_id": customer_id, "current_fields": {}},
+        "match": {
+            "found": scenario == "exact",
+            "customer_id": customer_id,
+            "current_fields": {"prefix_id": "17", "birthday_be": _RAW_ID["birthday_be"]},
+        },
         "field_diffs": [],
         "candidates": [],
         "geo": _GEO,
@@ -90,6 +94,14 @@ class FakeStore:
     def set_session(self, tenant, luid, state, payload=None, ttl_minutes=30):
         self.data[(str(tenant), str(luid))] = {"state": state, "payload": payload or {}}
 
+    def consume_nonce(self, tenant, luid, state, nonce):
+        sess = self.get_session(tenant, luid)
+        payload = (sess or {}).get("payload") or {}
+        if not sess or sess["state"] != state or not nonce or payload.get("nonce") != nonce:
+            return None
+        self.set_session(tenant, luid, state, {**payload, "nonce": None})
+        return payload
+
     def clear_session(self, tenant, luid):
         self.data.pop((str(tenant), str(luid)), None)
 
@@ -114,18 +126,20 @@ class _Env:
     def __enter__(self):
         es = self._es
         p = lambda *a, **k: es.enter_context(mock.patch.object(*a, **k))  # noqa: E731
+        p(flow.binding_guard, "current", return_value=True)
+        p(flow.store, "consume_nonce", side_effect=self.store.consume_nonce)
         p(flow.store, "get_session", side_effect=self.store.get_session)
         p(flow.store, "set_session", side_effect=self.store.set_session)
         p(flow.store, "clear_session", side_effect=self.store.clear_session)
         p(menu_flow.query_access, "can_query", return_value=False)
         p(flow, "_spawn", side_effect=self.spawned.append)
         self.qa_start = p(menu_flow.booking_qa, "start", new_callable=mock.AsyncMock)
-        self.reply = p(flow.line_client, "reply_text")
-        self.reply_msgs = p(flow.line_client, "reply_messages")
-        self.push_text = p(flow.line_client, "push_text")
-        self.push_msgs = p(flow.line_client, "push_messages")
-        p(flow.line_client, "start_loading")
-        p(flow.line_client, "download_message_content", return_value=b"imgbytes")
+        self.reply = p(flow._out.line_client, "reply_text")
+        self.reply_msgs = p(flow._out.line_client, "reply_messages")
+        self.push_text = p(flow._out.line_client, "push_text")
+        self.push_msgs = p(flow._out.line_client, "push_messages")
+        p(flow._out.line_client, "start_loading")
+        p(flow._out.line_client, "download_message_content", return_value=b"imgbytes")
         p(flow.db, "find_user_by_id", return_value={"id": "U1", "tenant_id": "T1"})
         self.insert_log = p(flow.db, "insert_push_log", return_value="LOG1")
         p(flow._id_ocr, "recognize_id_card", return_value=(self._ep, self._ocr, 10))
@@ -293,6 +307,30 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(env.session())  # 收尾清会话
             texts = [c.args[1] for c in env.push_text.call_args_list]
             self.assertIn(cards.TXT_DONE_SAVED, texts)
+
+    async def test_menu_one_customer_mode_writes_the_customer_master_only(self):
+        """菜单一(customer 模式)只走客户档写入(原生客户表 cus/new.php|cus/edit.php 那条
+        intake 路),不自动开订车;客户档落定后清会话。"""
+        with _Env(lookup=_lookup("none")) as env:
+            nonce = await self._seed_reviewing(env, mode="customer")
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_CREATE, nonce))
+            await env.drain()
+            self.assertTrue(env.push_idcard.called)
+            self.assertEqual(env.push_idcard.call_args.kwargs["mode"], "create")
+            self.assertIsNone(env.push_idcard.call_args.kwargs["customer_id"])
+            self.assertFalse(env.qa_start.called)  # 菜单一不自动订车
+            self.assertIsNone(env.session())
+            self.assertIn(cards.TXT_DONE_SAVED, [c.args[1] for c in env.push_text.call_args_list])
+
+    async def test_id_card_mid_survives_the_customer_write_into_booking_qa(self):
+        """默认(订车)模式:客户档写入后开逐问,身份证消息 id 一路带到 booking_qa.start。"""
+        with _Env(lookup=_lookup("none")) as env:
+            nonce = await self._seed_reviewing(env)  # mode 缺省 = 老直拍行为
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_CREATE, nonce))
+            await env.drain()
+            self.assertTrue(env.qa_start.called)
+            self.assertEqual(env.qa_start.call_args.kwargs["customer_id"], "C99")
+            self.assertEqual(env.qa_start.call_args.kwargs["id_card_mid"], "mid1")
 
     async def test_a3_continue_triggers_booking_qa(self):
         """A3:continue 卡点「ทำใบจองต่อ」(cid 对齐)→ 开订车逐问。"""

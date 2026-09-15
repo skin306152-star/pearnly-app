@@ -267,6 +267,14 @@
         button.textContent = busy ? label : button.dataset.label;
     }
 
+    // 一次性握手:start 的 302 里带着 10 分钟有效的签名 state。若这次跳转被缓存
+    // (Cloudflare 把源站的 302 改写成 4 小时浏览器缓存 · 2026-09-14 实测),再点一次
+    // 就是重放旧 state → 回调判 invalid_state,登录一直失败到缓存过期。每次点击带一个
+    // 唯一参数,保证每次都是全新的握手;边缘侧另有 no-store 兜底。
+    function handshakeNonce() {
+        return '&n=' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
     function switchMode(mode) {
         const isSignup = mode === 'signup';
         document.querySelector('.auth-card').classList.toggle('signup-mode', isSignup);
@@ -295,10 +303,12 @@
         }
         const sso = event.target.closest('[data-sso]');
         if (sso && sso.dataset.sso === 'google') {
-            window.location.href = '/api/auth/google/start?entry=' + encodeURIComponent(_entry);
+            window.location.href =
+                '/api/auth/google/start?entry=' + encodeURIComponent(_entry) + handshakeNonce();
         }
         if (sso && sso.dataset.sso === 'line') {
-            window.location.href = '/api/auth/line/start?entry=' + encodeURIComponent(_entry);
+            window.location.href =
+                '/api/auth/line/start?entry=' + encodeURIComponent(_entry) + handshakeNonce();
         }
     });
 

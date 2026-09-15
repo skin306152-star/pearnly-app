@@ -10,6 +10,7 @@ import contextlib
 import unittest
 from unittest import mock
 
+from services.dms_roster import store as roster_store
 from services.line_dms import cards, draft, flow, master_contract, ocr_review, qa_cards, text_router
 
 # 网页确认页 fields 键形状(static/dms/dms-intake-core.js)· LINE 侧必须同形。
@@ -74,6 +75,10 @@ _MASTER_SNAPSHOT = master_contract.build_snapshot(
         "term_sales": [["t1", "", "เงินสด"]],
         "regis_behalfs": [["r1", "", "บุคคลธรรมดา"]],
         "company_banks": [],
+        "source_banks": [],
+        "cheque_banks": [],
+        "cashier_banks": [],
+        "card_banks": [],
     },
     captured_at="2026-09-01T00:00:00+00:00",
 )
@@ -85,12 +90,26 @@ class DraftPrefixTests(unittest.TestCase):
             {"prefix_name": "นางสาว", "address": {}}, {}, [["17", "นาย"], ["18", "นางสาว"]], ""
         )
         self.assertEqual(out["prefix_id"], "18")
+        self.assertEqual(out["prefix_name"], "นางสาว")
 
-    def test_unmapped_ocr_prefix_falls_back_to_first_dms_option(self):
+    def test_common_identity_title_alias_maps_to_the_unique_dms_option(self):
+        out = draft.build_draft(
+            {"prefix_name": "Mr.", "address": {}}, {}, [["17", "นาย"], ["18", "นางสาว"]], ""
+        )
+        self.assertEqual(out["prefix_id"], "17")
+        self.assertEqual(out["prefix_name"], "Mr.")
+
+    def test_unmapped_ocr_prefix_stays_unselected(self):
         out = draft.build_draft(
             {"prefix_name": "เด็กหญิง", "address": {}}, {}, [["17", "นาย"], ["18", "นางสาว"]], ""
         )
-        self.assertEqual(out["prefix_id"], "17")
+        self.assertEqual(out["prefix_id"], "")
+
+    def test_ambiguous_ocr_prefix_stays_unselected(self):
+        out = draft.build_draft(
+            {"prefix_name": "นาย", "address": {}}, {}, [["17", "นาย"], ["19", "นาย"]], ""
+        )
+        self.assertEqual(out["prefix_id"], "")
 
     def test_empty_dms_prefix_master_stays_empty(self):
         out = draft.build_draft({"prefix_name": "นาย", "address": {}}, {}, [], "")
@@ -113,7 +132,11 @@ def _lookup(scenario, *, field_diffs=None, customer_id=None, candidates=None, cu
         "match": {
             "found": scenario == "exact",
             "customer_id": customer_id,
-            "current_fields": current_fields or {},
+            "current_fields": {
+                "prefix_id": "17",
+                "birthday_be": _RAW_ID["birthday_be"],
+                **(current_fields or {}),
+            },
         },
         "field_diffs": field_diffs or [],
         "candidates": candidates or [],
@@ -133,6 +156,14 @@ class FakeStore:
 
     def set_session(self, tenant, luid, state, payload=None, ttl_minutes=30):
         self.data[(str(tenant), str(luid))] = {"state": state, "payload": payload or {}}
+
+    def consume_nonce(self, tenant, luid, state, nonce):
+        sess = self.get_session(tenant, luid)
+        payload = (sess or {}).get("payload") or {}
+        if not sess or sess["state"] != state or not nonce or payload.get("nonce") != nonce:
+            return None
+        self.set_session(tenant, luid, state, {**payload, "nonce": None})
+        return payload
 
     def clear_session(self, tenant, luid):
         self.data.pop((str(tenant), str(luid)), None)
@@ -159,10 +190,19 @@ class _Env:
     def __enter__(self):
         es = self._es
         p = lambda *a, **k: es.enter_context(mock.patch.object(*a, **k))  # noqa: E731
+        # These are domain-flow fixtures; real epoch/rebind and SQL concurrency have separate tests.
+        p(
+            __import__("services.line_dms.binding_guard", fromlist=["current"]),
+            "current",
+            return_value=True,
+        )
+        p(flow.store, "consume_nonce", side_effect=self.store.consume_nonce)
         p(flow.store, "get_session", side_effect=self.store.get_session)
         p(flow.store, "set_session", side_effect=self.store.set_session)
         p(flow.store, "clear_session", side_effect=self.store.clear_session)
         p(flow, "_spawn", side_effect=self.spawned.append)
+        p(roster_store, "get_profile", return_value=None)
+        p(flow.menu_flow.booking_qa.masters_cache, "qa_snapshot", return_value=_MASTER_SNAPSHOT)
 
         # 客户档落定后 flow 委托 menu_flow.after_customer_saved → booking_qa.start(DL-7 逐问);
         # 此处存 DL-3 客户写档语义,start 桩成「消费 reviewing 会话」——订车执行在 test_line_dms_booking。
@@ -170,12 +210,12 @@ class _Env:
             self.store.clear_session(str(tenant_id), luid)
 
         self.qa_start = p(flow.menu_flow.booking_qa, "start", side_effect=_qa_start)
-        self.reply = p(flow.line_client, "reply_text")
-        self.reply_msgs = p(flow.line_client, "reply_messages")
-        self.push_text = p(flow.line_client, "push_text")
-        self.push_msgs = p(flow.line_client, "push_messages")
-        p(flow.line_client, "start_loading")
-        p(flow.line_client, "download_message_content", return_value=b"imgbytes")
+        self.reply = p(flow._out.line_client, "reply_text")
+        self.reply_msgs = p(flow._out.line_client, "reply_messages")
+        self.push_text = p(flow._out.line_client, "push_text")
+        self.push_msgs = p(flow._out.line_client, "push_messages")
+        p(flow._out.line_client, "start_loading")
+        p(flow._out.line_client, "download_message_content", return_value=b"imgbytes")
         p(flow.db, "find_user_by_id", return_value={"id": "U1", "tenant_id": "T1"})
         self.insert_log = p(flow.db, "insert_push_log", return_value="LOG1")
         if self._ocr_error is not None:
@@ -450,34 +490,23 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(_card_has_text(card, cards.TXT_ADMIN_NEEDED))
 
     # ── DL-6 逐字段修正 ────────────────────────────────────────────────────
-    async def test_e0_cancel_keeps_card_valid_and_spawns_nothing(self):
-        """菜单阶段取消修改 = 原卡仍有效 + 零后台任务(慢重跑劫持后续流程 · J4 实锤)。"""
-        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
-            nonce = await self._seed_reviewing(env)
-            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_EDIT, nonce))
-            spawned_before = len(env.spawned)
-            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_EDIT_CANCEL, nonce))
-            self.assertEqual(len(env.spawned), spawned_before)  # 不再重跑查重
-            self.assertEqual(env.session()["state"], "reviewing")
-            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_CREATE, nonce))
-            await env.drain()
-            self.assertEqual(env.push_idcard.call_count, 1)  # 原卡同 nonce 仍可确认
 
-    async def test_e0b_editing_text_cancel_restores_reviewing(self):
-        """editing 态文本 ยกเลิก = 原地恢复 reviewing(同 nonce 去 editing_field),不重跑。"""
-        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
-            nonce = await self._seed_reviewing(env)
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "name")
+    async def test_female_ocr_title_is_reviewed_and_written_only_after_confirm(self):
+        lookup = _lookup("exact", customer_id="C7")
+        lookup["prefixes"] = [["17", "นาย"], ["18", "น.ส."]]
+        ocr = _ocr_ok()
+        ocr["id_card"] = dict(ocr["id_card"], prefix_name="นางสาว")
+        with _Env(ocr=ocr, lookup=lookup, admin=True) as env:
+            nonce = await self._seed_reviewing(env, mode="customer")
+            self.assertEqual(env.session()["payload"]["draft"]["prefix_id"], "18")
+            self.assertEqual(
+                env.session()["payload"]["field_diffs"],
+                [{"field": "prefix_id", "old": "17", "new": "18"}],
             )
-            self.assertEqual(env.session()["state"], "editing")
-            spawned_before = len(env.spawned)
-            await flow.handle_text(_BINDING, _LUID, "rt", cards.BTN_EDIT_CANCEL)
-            self.assertEqual(len(env.spawned), spawned_before)
-            sess = env.session()
-            self.assertEqual(sess["state"], "reviewing")
-            self.assertNotIn("editing_field", sess["payload"])
-            self.assertEqual(sess["payload"]["nonce"], nonce)
+            env.push_idcard.assert_not_called()
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_UPDATE, nonce))
+            await env.drain()
+            self.assertEqual(env.push_idcard.call_args.kwargs["fields"]["prefix_id"], "18")
 
     async def test_e1_edit_button_and_menu(self):
         """E1:新建卡有 [แก้ไข];对 nonce → quick reply 字段列表;错 nonce → 过期不进编辑。"""
@@ -487,166 +516,56 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
 
             await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_EDIT, nonce))
             msg = env.reply_msgs.call_args.args[1][0]
-            self.assertIn("quickReply", msg)
-            datas = [it["action"]["data"] for it in msg["quickReply"]["items"]]
-            self.assertTrue(any("field=name" in d for d in datas))
-            self.assertTrue(any("field=people_id" in d for d in datas))
+            action = msg["contents"]["footer"]["contents"][0]["action"]
+            self.assertEqual(action["type"], "uri")
+            self.assertIn("editor=customer", action["uri"])
+            self.assertIn(nonce, action["uri"])
 
             env.reply_msgs.reset_mock()
             await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_EDIT, "BADNONCE"))
             env.reply_msgs.assert_not_called()
             self.assertEqual(env.reply.call_args.args[1], cards.TXT_EXPIRED)
 
-    async def test_e2_edit_name_reruns_dedup_new_value_new_nonce(self):
-        """E2:选 name → editing;输新值 → 重跑 dedup·draft.name=新值·新卡含新值+新 nonce·旧 nonce 拒。"""
+    async def test_retired_field_buttons_only_open_browser_without_mutation(self):
+        for action in ("edit_field", "edit_cancel"):
+            with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+                nonce = await self._seed_reviewing(env)
+                before = dict(env.session()["payload"])
+                lookups = env.lookup.call_count
+                await flow.handle_postback(_BINDING, _LUID, "rt", _pb_field(action, nonce, "name"))
+                await env.drain()
+                self.assertEqual(env.session()["state"], "reviewing")
+                self.assertEqual(env.session()["payload"], before)
+                self.assertEqual(env.lookup.call_count, lookups)
+                env.push_idcard.assert_not_called()
+                link = env.reply_msgs.call_args.args[1][0]["contents"]["footer"]["contents"][0][
+                    "action"
+                ]
+                self.assertEqual(link["type"], "uri")
+                self.assertIn("editor=customer", link["uri"])
+
+    async def test_retired_editing_text_cannot_change_fields_or_restart_lookup(self):
         with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
             nonce = await self._seed_reviewing(env)
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "name")
-            )
-            self.assertEqual(env.session()["state"], "editing")
-            self.assertEqual(env.session()["payload"]["editing_field"], "name")
-
-            new_name = "ภัทรกร อักษรวรนารถ"
-            await flow.handle_text(_BINDING, _LUID, "rt", new_name)
-            await env.drain()
-
-            sess = env.session()
-            self.assertEqual(sess["state"], "reviewing")
-            self.assertEqual(sess["payload"]["draft"]["name"], new_name)
-            self.assertNotEqual(sess["payload"]["nonce"], nonce)
-            self.assertTrue(_card_has_text(env.pushed_card(), new_name))
-
-            # 旧 nonce 确认必拒(不写)
-            await flow.handle_postback(_BINDING, _LUID, "rt2", _pb(cards.ACT_CREATE, nonce))
-            await env.drain()
-            env.push_idcard.assert_not_called()
-            self.assertEqual(env.reply.call_args.args[1], cards.TXT_EXPIRED)
-
-    async def test_e3_edit_people_id_checksum_validation(self):
-        """E3:选 people_id·校验位错号打回停 editing 不重查重;合法号 → draft 更新且重查重。"""
-        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
-            nonce = await self._seed_reviewing(env)
-            base = env.lookup.call_count
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "people_id")
-            )
-            await flow.handle_text(_BINDING, _LUID, "rt", "1234567890122")  # 校验位错
-            await env.drain()
-            self.assertEqual(env.session()["state"], "editing")
-            self.assertEqual(env.reply.call_args.args[1], cards.TXT_EDIT_BAD_ID)
-            self.assertEqual(env.lookup.call_count, base)
-
-            await flow.handle_text(_BINDING, _LUID, "rt", "2345678901234")  # 合法号
-            await env.drain()
-            self.assertEqual(env.session()["state"], "reviewing")
-            self.assertEqual(env.session()["payload"]["draft"]["people_id"], "2345678901234")
-            self.assertEqual(env.lookup.call_count, base + 1)
-
-    async def test_e4_birthday_and_phone_validation(self):
-        """E4:生日格式错打回·电话格式错打回(均停 editing)。"""
-        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
-            nonce = await self._seed_reviewing(env)
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "birthday_be")
-            )
-            await flow.handle_text(_BINDING, _LUID, "rt", "2530-01-01")  # 非 dd/mm/yyyy
-            self.assertEqual(env.reply.call_args.args[1], cards.TXT_EDIT_BAD_BIRTHDAY)
-            self.assertEqual(env.session()["state"], "editing")
-
-            await flow.handle_text(_BINDING, _LUID, "rt", "01/01/2530")  # 合法佛历
-            await env.drain()
-            self.assertEqual(env.session()["state"], "reviewing")
-
-            nonce2 = env.session()["payload"]["nonce"]
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce2, "phone")
-            )
-            await flow.handle_text(_BINDING, _LUID, "rt", "ไม่มีเบอร์")  # 零数字才打回(透传语义)
-            self.assertEqual(env.reply.call_args.args[1], cards.TXT_EDIT_BAD_PHONE)
-            self.assertEqual(env.session()["state"], "editing")
-
-    async def test_e5_diff_card_edit_soi_reruns_dedup(self):
-        """E5:diff 卡(分支C)有 [แก้ไข] 且走同一编辑路;改 soi → 重跑 dedup 按新值重算。"""
-        diffs = [{"field": "road", "old": "x", "new": "สุขุมวิท"}]
-        with _Env(
-            ocr=_ocr_ok(), lookup=_lookup("exact", field_diffs=diffs, customer_id="C7"), admin=True
-        ) as env:
-            nonce = await self._seed_reviewing(env)
-            self.assertIn(cards.BTN_EDIT, _all_button_labels(env.pushed_card()))
-            base = env.lookup.call_count
-
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "soi")
-            )
-            self.assertEqual(env.session()["state"], "editing")
-            await flow.handle_text(_BINDING, _LUID, "rt", "5")
-            await env.drain()
-
-            self.assertEqual(env.lookup.call_count, base + 1)
-            self.assertEqual(env.session()["payload"]["draft"]["soi"], "5")
-            self.assertEqual(env.session()["payload"]["scenario"], "exact_diff")
-
-    async def test_e6_cancel_and_reset_during_edit(self):
-        """E6:编辑中 ยกเลิก → 回 reviewing 重发卡;เริ่มใหม่ → clear_session。"""
-        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
-            nonce = await self._seed_reviewing(env)
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "name")
-            )
-            self.assertEqual(env.session()["state"], "editing")
-
-            await flow.handle_text(_BINDING, _LUID, "rt", cards.BTN_EDIT_CANCEL)  # ยกเลิก
-            await env.drain()
-            self.assertEqual(env.reply.call_args.args[1], cards.TXT_EDIT_CANCELLED)
-            self.assertEqual(env.session()["state"], "reviewing")
-
-            nonce2 = env.session()["payload"]["nonce"]
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce2, "name")
-            )
-            self.assertEqual(env.session()["state"], "editing")
-            await flow.handle_text(_BINDING, _LUID, "rt", cards.BTN_RESTART)  # เริ่มใหม่
-            self.assertIsNone(env.session())
-
-    async def test_e7_menu_word_during_editing_is_not_eaten_as_new_value(self):
-        """P1-10:编辑姓名时打 เมนู → 弹菜单、结束编辑;不许被当成新姓名写进 id_card。
-
-        产品文案明写「随时可打 เมนู 叫菜单」,旧分发顺序让 editing 态独占文本,菜单词
-        变成新姓名并重跑查重(白烧一次 DMS 登录)。"""
-        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
-            nonce = await self._seed_reviewing(env)
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "name")
-            )
-            self.assertEqual(env.session()["state"], "editing")
+            before = dict(env.session()["payload"])
+            env.store.set_session("T1", "L1", "editing", {**before, "editing_field": "name"})
             lookups = env.lookup.call_count
-
-            await flow.handle_text(_BINDING, _LUID, "rt", "เมนู")
+            await flow.handle_text(_BINDING, _LUID, "rt", "MUST NOT BECOME CUSTOMER NAME 999")
             await env.drain()
-
-            sess = env.session()
-            self.assertEqual(sess["state"], "menu")
-            self.assertNotIn("editing_field", sess["payload"])
-            self.assertEqual(sess["payload"]["id_card"]["name"], "สมชาย ใจดี")  # 原值没被覆盖
-            self.assertEqual(env.lookup.call_count, lookups)  # 不重跑查重
-            self.assertEqual(env.reply_msgs.call_args.args[1][0]["altText"], cards.TXT_MENU_TITLE)
-
-    async def test_e8_reset_word_during_editing_still_clears(self):
-        """editing 态的 เริ่มใหม่ 仍是全局重置(命令先于状态,顺序调整后不许回退)。"""
-        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
-            nonce = await self._seed_reviewing(env)
-            await flow.handle_postback(
-                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "name")
-            )
-            await flow.handle_text(_BINDING, _LUID, "rt", cards.BTN_RESTART)
-            self.assertIsNone(env.session())
+            after = env.session()["payload"]
+            self.assertEqual(env.session()["state"], "reviewing")
+            self.assertEqual(after["draft"], before["draft"])
+            self.assertEqual(after["id_card"], before["id_card"])
+            self.assertNotIn("editing_field", after)
+            self.assertNotEqual(after["nonce"], nonce)
+            self.assertEqual(env.lookup.call_count, lookups)
+            env.push_idcard.assert_not_called()
 
     async def test_e9_edit_cancel_word_stays_editing_scoped(self):
         """ยกเลิก 只在 editing 态生效:非编辑态原样落到闲聊路,不当全局命令。"""
         with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
             env.store.set_session("T1", "L1", "collecting", {"phone": _PHONE})
-            await flow.handle_text(_BINDING, _LUID, "rt", cards.BTN_EDIT_CANCEL)
+            await flow.handle_text(_BINDING, _LUID, "rt", "ยกเลิก")
             self.assertEqual(env.session()["state"], "collecting")
             self.assertEqual(env.reply.call_args.args[1], cards.TXT_ASK_CARD)
 
@@ -827,7 +746,7 @@ class PhonePassthroughTests(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch.object(flow.store, "get_session", return_value=sess),
             mock.patch.object(flow, "_merge_session", new_callable=mock.AsyncMock) as merge,
-            mock.patch.object(flow, "_spawn"),
+            mock.patch.object(text_router.cloud_dispatch, "spawn"),
             mock.patch.object(text_router, "_reply"),
         ):
             merge.return_value = {"id_card": {"people_id": "x"}, "phone": "12345678"}

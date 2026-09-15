@@ -30,6 +30,8 @@ def upgrade() -> None:
             ticket_hash text PRIMARY KEY,
             tenant_id uuid NOT NULL,
             user_id uuid NOT NULL,
+            channel_key text NOT NULL DEFAULT 'dms',
+            binding_id uuid,
             expires_at timestamptz NOT NULL,
             created_at timestamptz NOT NULL DEFAULT now()
         )
@@ -37,6 +39,10 @@ def upgrade() -> None:
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_line_dms_login_tickets_expires_at "
         "ON line_dms_login_tickets (expires_at)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_line_dms_login_tickets_scope "
+        "ON line_dms_login_tickets (tenant_id, channel_key, user_id)"
     )
 
 

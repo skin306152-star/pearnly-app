@@ -59,6 +59,12 @@ class _TaggedTransport:
             return _Resp(_EDIT_FORM)
         if url.endswith("cus/component/showdata.php"):
             return _Resp('<a data-val="95">row</a>')
+        if url.endswith("listdistricts.php"):
+            return _Resp('<option value="804">คลองท่อม</option>')
+        if url.endswith("listsubdistricts.php"):
+            return _Resp('<option value="6472">x</option>')
+        if url.endswith("listzipcodes.php"):
+            return _Resp('<option value="6477">81120</option>')
         return _Resp("")  # new.php / edit.php 无 err:: = 成功
 
     def wrote_edit(self):

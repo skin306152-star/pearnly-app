@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LINE 逐问的 DMS 主档取数薄壳:按 LINE 用户解端点 → 读缓存。
+"""LINE 逐问的 DMS 主档取数薄壳:按 LINE 用户解端点 → 实时读取。
 
 缓存本体是通道无关的基建,住在 services/erp/dms_masters_cache.py;本文件只做 LINE 侧那层
 「会话只存 endpoint_id,取数前现解端点」的异步包装。缓存函数在这里逐名 re-export,既有
@@ -16,7 +16,11 @@ from services.erp.dms_masters_cache import (  # noqa: F401  LINE 侧沿用原命
     get_masters,
     get_paints,
     read_fresh_masters,
-    refresh_from_client,
+    write_authoritative_snapshot,
+)
+from services.erp.dms_master_shared import (  # noqa: F401
+    get_session_masters,
+    get_session_paints,
 )
 from services.line_dms._out import _thr
 from services.line_dms.master_contract import MasterSyncError, build_snapshot
@@ -25,9 +29,11 @@ from services.line_dms.master_contract import MasterSyncError, build_snapshot
 async def qa_endpoint(line_user_id: str, endpoint_id: Any) -> Optional[Dict[str, Any]]:
     """按 LINE 绑定的 user 解 DMS 端点。未绑定 / 端点被停用 → None。"""
     from services.erp import dms_id_ocr
-    from services.line_dms import store
+    from services.line_dms import binding_guard, store
 
-    binding = await _thr(store.get_binding_by_line_user, line_user_id)
+    binding = await _thr(
+        store.get_binding_by_line_user, line_user_id, binding_guard.current_channel()
+    )
     uid = (binding or {}).get("user_id") or ""
     if not uid:
         return None
@@ -44,27 +50,26 @@ async def qa_masters(
 ) -> List[list]:
     """某类主档(cars/place_books/…)。端点解不出就给空表 —— 发问层据此重问,不炸会话。
 
-    force_refresh 只在本轮订车第一次进主档时开(当天改的主档当天可见);
-    同轮后续按钮复用 12h 缓存快照,不再每步登录一遍 DMS。
+    建档/订车开局强制读取一次完整主档，本轮步骤复用会话快照；提交前再做实时复核。
+    不以跨会话旧缓存作为可提交主档。
     """
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         return []
-    masters = await _thr(
-        get_masters,
-        ep,
-        force_refresh=force_refresh,
-        require_complete=require_complete,
-    )
+    reader = get_masters if force_refresh else get_session_masters
+    kwargs = {"require_complete": require_complete}
+    if force_refresh:
+        kwargs["force_refresh"] = True
+    masters = await _thr(reader, ep, **kwargs)
     return masters.get(key) or []
 
 
 async def qa_snapshot(line_user_id: str, endpoint_id: Any) -> Dict[str, Any]:
-    """新订车会话的权威主档快照；失败时绝不回退旧缓存。"""
+    """新订车会话的有界新鲜共享快照；提交前仍做权威实时复核。"""
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "endpoint")
-    masters = await _thr(get_masters, ep, force_refresh=True, require_complete=True)
+    masters = await _thr(get_session_masters, ep, require_complete=True)
     if not masters:
         raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "snapshot")
     return build_snapshot(masters)
@@ -89,20 +94,31 @@ async def qa_paints(
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         return []
-    masters = await _thr(
-        get_masters,
-        ep,
-        force_refresh=force_refresh,
-        require_complete=require_complete,
-    )
-    if not masters:
-        if require_complete:
-            raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "snapshot")
-        return []
     try:
-        return (
-            await _thr(get_paints, ep, car_id, masters, require_complete=require_complete)
-        ) or []
+        if force_refresh:
+            masters = await _thr(
+                get_masters,
+                ep,
+                force_refresh=True,
+                require_complete=require_complete,
+            )
+            if not masters:
+                if require_complete:
+                    raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "snapshot")
+                return []
+            return (
+                await _thr(
+                    get_paints,
+                    ep,
+                    car_id,
+                    masters,
+                    require_complete=require_complete,
+                    force_refresh=True,
+                )
+            ) or []
+        # booking_qa_sync already materialized the full session snapshot.  Avoid a
+        # second full-master lookup here; the color layer has its own bounded TTL.
+        return (await _thr(get_session_paints, ep, car_id, require_complete=require_complete)) or []
     except Exception as exc:
         if require_complete and getattr(exc, "error_code", "") == "ERR_DMS_MASTER_UNAVAILABLE":
             raise MasterSyncError("ERR_DMS_MASTER_UNAVAILABLE", "paints") from exc

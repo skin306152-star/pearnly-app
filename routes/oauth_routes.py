@@ -27,6 +27,7 @@ from core.auth import create_access_token
 from services.auth.entrance import login_entrance_allowed as _login_entrance_allowed
 from services.auth.oauth_state import gen_oauth_state as _gen_oauth_state
 from services.auth.oauth_state import login_redirect_path as _login_redirect_path
+from services.auth.oauth_state import NO_STORE_HEADERS as _NO_STORE
 from services.auth.oauth_state import oauth_entry_context as _oauth_entry_context
 from services.auth.oauth_state import oauth_state_entry as _oauth_state_entry
 from services.auth.oauth_state import oauth_state_secret as _oauth_state_secret  # noqa: F401
@@ -64,7 +65,8 @@ def _is_line_inapp(ua: str) -> bool:
 
 
 def _external_browser_breakout(entry: str = "") -> HTMLResponse:
-    params = {"ext": 1, "openExternalBrowser": 1}
+    # 唯一参数:这次跳转是一次性握手,不能被缓存重放(见 _NO_STORE 的注释)。
+    params = {"ext": 1, "openExternalBrowser": 1, "n": os.urandom(6).hex()}
     safe_entry = _oauth_entry_context(entry)
     if safe_entry:
         params["entry"] = safe_entry
@@ -81,7 +83,7 @@ def _external_browser_breakout(entry: str = "") -> HTMLResponse:
 </div>
 <script>location.replace({target});</script>
 </body></html>"""
-    return HTMLResponse(html)
+    return HTMLResponse(html, headers=_NO_STORE)
 
 
 @router.get("/api/auth/google/start")
@@ -103,20 +105,31 @@ async def google_oauth_start(request: Request, ext: int = 0, entry: str = ""):
         "prompt": "select_account",
     }
     url = "https://accounts.google.com/o/oauth2/v2/auth?" + _urlencode(params)
-    return _RedirectResp(url, status_code=302)
+    return _RedirectResp(url, status_code=302, headers=_NO_STORE)
+
+
+def _oauth_reject(reason: str, detail: str = ""):
+    """Rejected callbacks are logged, not just redirected.
+
+    The browser only ever sees the login page again, so a rejected sign-in used
+    to be indistinguishable from a user who never tried: the reason in the
+    query string is ignored by the page and was never written to the log.
+    """
+    logger.error("[OAuth] sign-in rejected · %s%s", reason, (" · " + detail) if detail else "")
+    return _RedirectResp(f"/login?oauth_error={reason}", status_code=302, headers=_NO_STORE)
 
 
 @router.get("/api/auth/google/callback")
 async def google_oauth_callback(code: str = "", state: str = "", error: str = ""):
     if error:
-        return _RedirectResp(f"/login?oauth_error={error}", status_code=302)
+        return _oauth_reject(error, "provider returned an error")
     if not _verify_oauth_state(state):
-        return _RedirectResp("/login?oauth_error=invalid_state", status_code=302)
+        return _oauth_reject("invalid_state")
     _entry_ctx = _oauth_state_entry(state)
     if not code:
-        return _RedirectResp("/login?oauth_error=no_code", status_code=302)
+        return _oauth_reject("no_code")
     if not _GOOGLE_CLIENT_ID or not _GOOGLE_CLIENT_SECRET:
-        return _RedirectResp("/login?oauth_error=not_configured", status_code=302)
+        return _oauth_reject("not_configured")
 
     # code → access_token → userinfo
     try:
@@ -139,13 +152,13 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
             tok_data = tr.json()
             access_token = tok_data.get("access_token")
             if not access_token:
-                return _RedirectResp("/login?oauth_error=no_access_token", status_code=302)
+                return _oauth_reject("no_access_token")
             ur = await client.get(
                 "https://openidconnect.googleapis.com/v1/userinfo",
                 headers={"Authorization": f"Bearer {access_token}"},
             )
             if ur.status_code != 200:
-                return _RedirectResp("/login?oauth_error=userinfo_fail", status_code=302)
+                return _oauth_reject("userinfo_fail", f"status={ur.status_code}")
             uinfo = ur.json()
     except Exception as e:
         logger.error(f"[OAuth] callback fetch failed: {e}")
@@ -155,7 +168,7 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
     email = (uinfo.get("email") or "").lower().strip()
     picture = (uinfo.get("picture") or "").strip()  # v118.27.5.3 · Google 头像 URL
     if not sub or not email:
-        return _RedirectResp("/login?oauth_error=invalid_userinfo", status_code=302)
+        return _oauth_reject("invalid_userinfo")
 
     # 1) 用 google_sub 找
     user = db.find_user_by_google_sub(sub)
@@ -214,7 +227,8 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
     # POS PO-B1 · role=cashier → /pos(收银员只进收银前台)
     safe_token = json.dumps(token)
     _redirect_path = _login_redirect_path(user, entry=_entry_ctx)
-    return HTMLResponse(f"""<!doctype html>
+    return HTMLResponse(
+        f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Pearnly · Signing in...</title></head>
 <body style="font-family:-apple-system,sans-serif;background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
 <div>Signing you in...</div>
@@ -222,4 +236,6 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
 try {{ localStorage.setItem("mrpilot_token", {safe_token}); }} catch(e) {{}}
 window.location.replace("{_redirect_path}");
 </script>
-</body></html>""")
+</body></html>""",
+        headers=_NO_STORE,
+    )

@@ -169,8 +169,14 @@
     }
     function lineBadge(item) {
         if (item.line_bound) {
+            // 绑定所属 OA 名(来自后端),一眼看出这条 LINE 落在哪个 OA。
+            var oa = item.line_channel_name
+                ? '<span class="dms-op-line-oa">' + esc(item.line_channel_name) + '</span>'
+                : '';
             var who = item.line_display_name ? ' · ' + esc(item.line_display_name) : '';
-            return '<span class="dms-badge ok">' + esc(t('dms-op-line-bound')) + '</span>' + who;
+            return (
+                '<span class="dms-badge ok">' + esc(t('dms-op-line-bound')) + '</span>' + oa + who
+            );
         }
         return '<span class="dms-badge pending">' + esc(t('dms-op-line-unbound')) + '</span>';
     }
@@ -287,14 +293,8 @@
     }
 
     // 绑定码大字弹层(照 dms-line 样式:大字码 + 倒计时);逻辑层填 code/countdown 并驱动过期。
-    // DMS 独立 OA;QR 走 api.qrserver.com。
-    // (CSP img-src 已放行·主站 LINE 绑定卡同款渠道),扫出来即加好友页。
-    var FRIEND_URL = 'https://line.me/R/ti/p/@264tuqln';
-    var LINE_ID = '@264tuqln';
-    var QR_URL =
-        'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=1&data=' +
-        encodeURIComponent(FRIEND_URL);
-
+    // LINE ID / 二维码 / 加好友链接全部来自后端 /operator/bind-code 响应的 line 对象(该账号
+    // 被分配的 OA),本文件不写死任何 OA 常量 —— 三者必然同源,换 OA 无需改前端。
     function codeOverlay(name) {
         return (
             '<div class="dms-op-modal" role="dialog" aria-modal="true"><div class="dms-op-modal-card">' +
@@ -307,18 +307,7 @@
             '</li><li>' +
             esc(t('dms-op-code-step2')) +
             '</li></ol>' +
-            '<div class="dms-op-qr"><img class="dms-op-qr-img" src="' +
-            QR_URL +
-            '" alt="' +
-            esc(t('dms-line-addfriend')) +
-            '" width="120" height="120" loading="lazy">' +
-            '<div class="dms-op-qr-info"><div class="dms-op-qr-id">LINE ID<br>' +
-            esc(LINE_ID) +
-            '</div><a class="dms-op-qr-link" href="' +
-            FRIEND_URL +
-            '" target="_blank" rel="noopener">' +
-            esc(t('dms-line-addfriend')) +
-            '</a></div></div>' +
+            '<div class="dms-op-qr" id="dms-op-code-line"></div>' +
             '<div class="dms-line-code" id="dms-op-code-val">······</div>' +
             '<div class="dms-line-countdown" id="dms-op-code-cd"></div>' +
             '<div class="dms-op-modal-actions"><button type="button" class="btn" id="dms-op-code-close">' +
@@ -326,6 +315,32 @@
             '</button><button type="button" class="btn primary" id="dms-op-code-regen">' +
             esc(t('dms-op-code-regen')) +
             '</button></div></div></div>'
+        );
+    }
+    // 单源渲染:只吃后端 line 公开字段;缺字段就退化为空(绝不回落到写死的旧 OA)。
+    function lineBlock(line) {
+        var info = line || {};
+        var url = info.add_friend_url || '';
+        var qr = info.qr_image_url || '';
+        var basicId = info.basic_id || '';
+        var name = info.channel_name || '';
+        return (
+            '<img class="dms-op-qr-img" src="' +
+            esc(qr) +
+            '" alt="' +
+            esc(t('dms-line-addfriend')) +
+            '" width="120" height="120" loading="lazy">' +
+            '<div class="dms-op-qr-info"><div class="dms-op-qr-id">' +
+            esc(name) +
+            '<br>' +
+            esc(t('dms-op-code-line-id')) +
+            ' ' +
+            esc(basicId) +
+            '</div><a class="dms-op-qr-link" href="' +
+            esc(url) +
+            '" target="_blank" rel="noopener">' +
+            esc(t('dms-line-addfriend')) +
+            '</a></div>'
         );
     }
     // 编辑操作员模态(体系内 · 非原生弹窗):DMS 用户名/密码各改各 · 留空=不改;
@@ -385,6 +400,7 @@
         listCard: listCard,
         listEmpty: listEmpty,
         codeOverlay: codeOverlay,
+        lineBlock: lineBlock,
         accModal: accModal,
         deleteModal: deleteModal,
         advisorOptions: advisorOptions,

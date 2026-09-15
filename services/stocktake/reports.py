@@ -6,7 +6,7 @@ from decimal import Decimal
 from io import BytesIO
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 SUMMARY = [
     "รหัสสินค้า",
@@ -23,6 +23,7 @@ SUMMARY = [
     "ตำแหน่งตามบัญชี",
     "ตำแหน่งที่ตรวจนับ",
     "ผลเทียบตำแหน่ง",
+    "ดูรูปภาพ",
 ]
 DETAIL = [
     "รหัสสินค้า",
@@ -41,6 +42,7 @@ DETAIL = [
     "ผลเทียบคลังสินค้า",
     "ตำแหน่งตามบัญชี",
     "ผลเทียบตำแหน่ง",
+    "ดูรูปภาพ",
 ]
 
 
@@ -59,6 +61,11 @@ def _append(sheet, values):
             cell.value = str(cell.value)
         if isinstance(cell.value, str):
             cell.data_type = "s"
+
+
+def _highlight(sheet, columns):
+    for col in columns:
+        sheet.cell(sheet.max_row, col).fill = PatternFill("solid", fgColor="FFF2CC")
 
 
 def workbook(task):
@@ -98,8 +105,15 @@ def workbook(task):
                 row["location"],
                 "\n".join(value or "(ไม่ระบุ)" for value in locations),
                 _comparison(row["location"], locations),
+                "",
             ],
         )
+        if difference is not None and difference != 0:
+            _highlight(summary, (5, 6, 7, 8))
+        if _comparison(row["warehouse"], warehouses) == "ไม่ตรงกัน":
+            _highlight(summary, (9, 10, 11))
+        if _comparison(row["location"], locations) == "ไม่ตรงกัน":
+            _highlight(summary, (12, 13, 14))
     detail = wb.create_sheet("รายละเอียดการนับ")
     _append(detail, DETAIL)
     for entry in task["entries"]:
@@ -123,8 +137,19 @@ def workbook(task):
                 _comparison(book["warehouse"], [entry["warehouse"]]),
                 book["location"],
                 _comparison(book["location"], [entry["location"]]),
+                "",
             ],
         )
+        if not entry["voided"]:
+            if _comparison(book["warehouse"], [entry["warehouse"]]) == "ไม่ตรงกัน":
+                _highlight(detail, (4, 13, 14))
+            if _comparison(book["location"], [entry["location"]]) == "ไม่ตรงกัน":
+                _highlight(detail, (5, 15, 16))
+    from services.stocktake.photo_report import attach
+
+    attach(wb, task, summary, detail)
+    edge = Side(style="thin", color="A6ACB3")
+    border = Border(left=edge, right=edge, top=edge, bottom=edge)
     for sheet in wb:
         sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = sheet.dimensions
@@ -135,8 +160,11 @@ def workbook(task):
         sheet.column_dimensions["B"].width = 36
         sheet.row_dimensions[1].height = 26
         for cells in sheet:
+            bordered = sheet in (summary, detail) or any(cell.value is not None for cell in cells)
             for cell in cells:
                 cell.alignment = Alignment(vertical="top", wrap_text=True)
+                if bordered:
+                    cell.border = border
     out = BytesIO()
     wb.save(out)
     return out.getvalue()

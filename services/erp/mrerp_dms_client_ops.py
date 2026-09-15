@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, timedelta
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from services.erp import dms_employees, mrerp_dms_docno
@@ -18,10 +18,18 @@ from services.erp.mrerp_dms_models import (
     DMSMasterRef,
     ThaiIdCardPayload,
 )
-from services.erp.mrerp_dms_client_base import DMSClientError, to_be_date
+from services.erp.mrerp_dms_booking_payload import (
+    advisor_ref_strict,
+    payload_from_refs,
+    ref_from_rows,
+)
+from services.erp.mrerp_dms_client_base import DMSClientError
 from services.erp.mrerp_dms_master_rows import memo as _memo
+from services.erp.mrerp_dms_master_rows import row_by_id  # noqa: F401  既有对外名(dms_advisor)
 from services.erp.mrerp_dms_master_rows import parse_rows as _parse_bshsd_rows
 from services.erp.mrerp_dms_payments import payment_form_fields
+from services.erp.mrerp_dms_booking_submit import submit_booking
+from services.erp.mrerp_dms_booking_org import resolve_booking_org
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +57,6 @@ def _bump_docno(docno: str) -> str:
     return mrerp_dms_docno.bump_docno(docno)
 
 
-def row_by_id(rows: Optional[List[list]], rid: str) -> Optional[list]:
-    """bshsd 主档行按 id 命中(首列即 id),取首个;没有 → None。"""
-    for row in rows or []:
-        if row and str(row[0]) == str(rid):
-            return row
-    return None
-
-
 class DMSClientOpsMixin:
     def _apply_booking_form_fields(
         self,
@@ -68,11 +68,14 @@ class DMSClientOpsMixin:
     ) -> None:
         """填订车单业务字段(顾问/车/颜色/客户/身份/地址…)· 建(new)与改(edit)共用。
         不含 stsel/idsel/txtdocno —— 由调用方按建/改设置。"""
+        advisor_phone = str((booking.advisor.extra or ("",))[0] or "").strip()
+        if not advisor_phone:
+            raise DMSClientError("DMS advisor phone is missing", "ERR_DMS_ADVISOR_UNMATCHED")
         data.update(
             {
                 "usersval": booking.advisor.id,
                 "txtusers": booking.advisor.name,
-                "txtuserstel": booking.advisor.extra[0] if booking.advisor.extra else ".",
+                "txtuserstel": advisor_phone,
                 "placebookval": booking.place_book.id,
                 "txtplacebook": booking.place_book.name,
                 "cusval": customer_id,
@@ -118,18 +121,26 @@ class DMSClientOpsMixin:
                 "txtregisname": booking.regis_name or card.full_name,
             }
         )
+        data.update(dict(booking.organization_fields))
         # 有订金渠道时覆盖上面的 0.00 默认与新增渠道字段;空 payments 则保持现状。
         data.update(payment_form_fields(booking.payments))
         self._apply_address_to_booking_form(data, card.address)
 
     def create_booking_via_form(
-        self, *, customer_id: str, booking: DMSBookingPayload, card: ThaiIdCardPayload
+        self,
+        *,
+        customer_id: str,
+        booking: DMSBookingPayload,
+        card: ThaiIdCardPayload,
+        on_attempt=None,
     ) -> tuple:
         """A1:走 DMS 原生订车单表单建单 · DMS autonum 出 BK 号(符合公司规则·零手填)。
         取代 Excel 导入 + patch 两步。返回 (booking_id, booking_no)。
 
         autonum 计数器与全局唯一约束失步时会回已占用号 → 提交即「单号重复」。
-        撞重复就往后顺号重试(_bump_docno),跳过被占用的号。"""
+        建单前先只读扫列表,从实际最大流水之后选号,并把 ``natn`` 同量前移;撞重复
+        仍往后顺号重试(数字主体与 natn 同步 +1),跳过被占用的号。
+        ``booking_no``/回读/台账一律用完整号(DMS 返回的前缀 + 数字主体)。"""
         form_html = self._post_text("drfcbc/form.php", {"status": "n"})
         base = self._parse_form_defaults(form_html)
         base["stsel"] = "n"
@@ -138,60 +149,78 @@ class DMSClientOpsMixin:
         base["menulv"] = _DRFCBC_MENULV
         self._apply_booking_form_fields(base, customer_id=customer_id, booking=booking, card=card)
 
-        docno = self._next_booking_docno(booking.branch.id)
-        if not docno:
-            raise DMSClientError("booking auto number unavailable", "ERR_DMS_IMPORT")
-        digits = getattr(self, "_booking_docno_digits", 6)
-        docno = mrerp_dms_docno.next_unoccupied_docno(docno, digits, self._post_text)
-        last_body = ""
-        for _ in range(_BOOKING_DOCNO_MAX_TRIES):
-            data = dict(base)
-            data["txtdocno"] = docno
-            resp = self.transport.post(self._url("drfcbc/new.php"), data=data, timeout_ms=120000)
-            last_body = (resp.text or "").strip()
-            if resp.status_code == 200 and not last_body.startswith("err::"):
-                booking_id = self.search_booking(docno)
-                if not booking_id:
-                    raise DMSClientError(
-                        "booking create returned ok but search failed", "ERR_DMS_IMPORT"
-                    )
-                return booking_id, docno
-            if resp.status_code == 200 and _is_duplicate_docno_error(last_body):
-                docno = _bump_docno(docno)
-                continue
-            break
-        raise DMSClientError(f"booking create failed: {last_body[:300]!r}", "ERR_DMS_IMPORT")
+        state = self._next_booking_docno(booking.branch.id)
+        scan = mrerp_dms_docno.scan_unoccupied_docno(state.docno, state.digits, self._post_text)
+        if scan.docno != state.docno:
+            # 换号的唯一入口:with_docno 只把 natn 前移「所选尾号 - 原候选尾号」的 delta。
+            # 计数器基数(natn)可能不等于候选尾号,绝不能被新尾号绝对值覆盖,也不能
+            # 在调用前先手动 align 一次 —— 那会把同一个 delta 推两次。
+            state = state.with_docno(scan.docno)
+        return submit_booking(
+            self,
+            base,
+            state,
+            on_attempt=on_attempt,
+            write_payload=self._booking_write_payload,
+            readback_payload=self._booking_readback_payload,
+        )
 
-    def _next_booking_docno(self, branch_id: str) -> str:
-        """取 DMS 订车单下一个自动编号(BK+期间+流水)。autonum 关/异常时返回空。"""
+    def _next_booking_docno(self, branch_id: str) -> mrerp_dms_docno.DMSBookingAutonumState:
+        """取 DMS 原生订车单取号状态(前缀 + 完整号 + 隐藏字段)。
+
+        ``autonum.php``/``autonumdetail.php`` 缺字段或形状不符原生协议时 fail closed
+        (``ERR_DMS_IMPORT``),绝不回退成空串或自造单号 —— 旧版丢掉 ``idatndt``/``natn``
+        导致计数器永不推进,是本次修复的根因。
+        """
         try:
-            cfg = json.loads(
-                self._post_text(
-                    "component/php/autonum.php",
-                    {"menulv": _DRFCBC_MENULV, "idmenu": _DRFCBC_IDMENU},
-                )
+            cfg_body = self._post_text(
+                "component/php/autonum.php",
+                {"menulv": _DRFCBC_MENULV, "idmenu": _DRFCBC_IDMENU},
             )
-            if not cfg or cfg[0] is None or str(cfg[1]) != "1":
-                return ""
-            digits = int(cfg[3])
-            if digits <= 0:
-                return ""
-            self._booking_docno_digits = digits
-            det = json.loads(
-                self._post_text(
-                    "component/php/autonumdetail.php",
-                    {
-                        "idautonum": cfg[0],
-                        "prefixautonum": cfg[2],
-                        "digitautonum": cfg[3],
-                        "idautonumformat": cfg[4],
-                        "idbranch": branch_id or "",
-                    },
-                )
+            cfg = json.loads(cfg_body)
+            detail_body = self._post_text(
+                "component/php/autonumdetail.php",
+                {
+                    "idautonum": cfg[0],
+                    "prefixautonum": cfg[2],
+                    "digitautonum": cfg[3],
+                    "idautonumformat": cfg[4],
+                    "idbranch": branch_id or "",
+                },
             )
-            return str(det[2]) if len(det) > 2 and det[2] else ""
-        except Exception:
-            return ""
+            return mrerp_dms_docno.autonum_state(cfg_body, detail_body)
+        except Exception as exc:
+            raise DMSClientError(
+                f"booking auto number protocol unavailable: {type(exc).__name__}",
+                "ERR_DMS_IMPORT",
+            ) from exc
+
+    def _booking_write_payload(self, base: Dict[str, str], state) -> Dict[str, str]:
+        """``drfcbc/new.php`` 的提交体 —— 完全模拟原生表单:
+
+        ``txtprefixautonum`` = 配置前缀,``txtdocno`` = 完整号去掉精确前缀后的数字主体,
+        外加保存用隐藏字段 ``idatndt``(detail[0])与 ``natn``(与实际选号对齐的下一个流水)。
+        单号整串**不**塞进 ``txtdocno``,否则前缀栏为空、计数器也不推进。
+        """
+        return {
+            **base,
+            "txtprefixautonum": state.prefix,
+            "txtdocno": state.body,
+            mrerp_dms_docno.HIDDEN_IDAUTNUMDETAIL: state.idautonumdetail,
+            mrerp_dms_docno.HIDDEN_NEXTAUTONUM: str(state.nextautonum),
+        }
+
+    def _booking_readback_payload(self, base: Dict[str, str], state) -> Dict[str, str]:
+        """回读比对用的 submitted 视图 —— 必须带**完整号**,不能退化成纯数字主体。
+
+        真实 POST 的 ``txtdocno`` 是纯数字,直接拿它比对会把正确的单判成不一致;
+        这里构造一份只用于比对的副本(不参与任何写入)。
+        """
+        return {
+            **base,
+            "txtprefixautonum": state.prefix,
+            "txtdocno": state.docno,
+        }
 
     def attach_booking_files(self, *, booking_id: str, files: list) -> dict:
         """给已存在订车单挂附件 —— 逐文件独立一轮 edit.php POST,失败不中断。
@@ -317,10 +346,11 @@ class DMSClientOpsMixin:
         self, defaults: BookingDefaults, card: ThaiIdCardPayload, *, today: Optional[date] = None
     ) -> DMSBookingPayload:
         """Build a DMSBookingPayload from endpoint defaults, resolving any
-        master ref the user did not pin from live DMS master data."""
-        today = today or date.today()
-        delivery = today + timedelta(days=defaults.delivery_days)
+        master ref the user did not pin from live DMS master data.
 
+        按需实时取数版(单凭据兼容路径):每个主档一次 bshsd。订车提交路径不走这里 ——
+        那里吃 readonly_preflight 已取到的权威快照(build_booking_payload),不重复取数。
+        """
         advisor = self._advisor_ref_strict(defaults)
         car = self._ref_from_default("txtcar", defaults.car_id, defaults.car_code, "")
         paint = self._ref_from_default(
@@ -328,23 +358,19 @@ class DMSClientOpsMixin:
         )
         place = self._ref_from_default("txtplacebook", defaults.place_book_id, "", "")
         term = self._ref_from_default("txttermsale", defaults.term_sale_id, "", "")
-        branch = self._ref_from_default("txtbranch_book", defaults.branch_id, "", "")
-        team = self._ref_from_default(
-            "txtteam_book", defaults.team_id, "", "", branch_book=branch.id
-        )
+        org = resolve_booking_org(self, advisor.id, defaults)
         regis = self._ref_from_default("txtregisbehalf", defaults.regis_behalf_id, "", "")
 
-        return DMSBookingPayload(
-            doc_date_be=to_be_date(today),
-            delivery_date_be=to_be_date(delivery),
+        return payload_from_refs(
+            defaults,
             advisor=advisor,
             car=car,
             paint=paint,
-            place_book=place,
-            term_sale=term,
-            branch=branch,
-            team=team,
-            regis_behalf=regis,
+            place=place,
+            term=term,
+            org=org,
+            regis=regis,
+            today=today,
         )
 
     def search_customer(self, text: str) -> Optional[str]:
@@ -384,69 +410,18 @@ class DMSClientOpsMixin:
         逐问开局已按操作员的 DMS 账号匹配好归属(services/erp/dms_advisor.py),到这里必有
         id;落错人只有月底对账才看得出来,所以宁可当场报错也不猜。
         """
-        if not defaults.advisor_id:
-            raise DMSClientError(
-                "booking advisor not pinned for operator", "ERR_DMS_ADVISOR_REQUIRED"
-            )
-        rows = self._advisor_rows()
-        row = row_by_id(rows, defaults.advisor_id)
-        if row is not None:
-            return self._ref_from_row(row)
-        if rows is None and defaults.advisor_name:
-            # 名册取数失败(接口抖 / 200 里塞了不可解析的 body):有名字才敢放行,按钉死标量
-            # 提交,DMS 侧仍按 id 认人。名册真空(rows == [])不走这条 —— 那种单 DMS 必拒,
-            # 降级只会把「建不了单」拖到更晚才暴露。
-            return DMSMasterRef(
-                id=defaults.advisor_id, code=defaults.advisor_code, name=defaults.advisor_name
-            )
-        raise DMSClientError(
-            f"booking advisor id {defaults.advisor_id!r} not in DMS advisor master",
-            "ERR_DMS_ADVISOR_UNMATCHED",
-        )
+        return advisor_ref_strict(self._advisor_rows, defaults)
 
     def _ref_from_default(
         self, elemname: str, pinned_id: str, pinned_code: str, pinned_name: str, **extra
     ) -> DMSMasterRef:
-        """Resolve a master ref: if the user pinned an id, fetch that exact
-        row from the full (paged) live master; else take the first available row.
+        """Resolve a user's explicit selection against the complete live master.
 
         只在第 1 页里找 pinned id,id 在第 2 页会被误判成「不存在」然后悄悄回落首行,
         建单就填错车/店。故最终解析与 fetch_masters 一样走 _bshsd_all 全量翻页。
-
-        pinned id 一旦存在就不许回落首行或钉死标量:主档读不到/已变更时提交旧值,
-        月底对账才会暴露填错。取数失败(rows None)→ ERR_DMS_MASTER_UNAVAILABLE
-        (可重试);主档真空或找不到 pinned → ERR_DMS_MASTER_UNMATCHED(重试无意义,
-        必须让操作员重新选择)。
         """
-        rows = self._bshsd_all(elemname, **extra)
-        if pinned_id:
-            if rows is None:
-                raise DMSClientError(
-                    f"DMS master {elemname} unavailable while resolving pinned id {pinned_id!r}",
-                    "ERR_DMS_MASTER_UNAVAILABLE",
-                )
-            chosen = row_by_id(rows, pinned_id)
-            if chosen is None:
-                raise DMSClientError(
-                    f"pinned id {pinned_id!r} not in DMS master {elemname}",
-                    "ERR_DMS_MASTER_UNMATCHED",
-                )
-            return self._ref_from_row(chosen)
-        chosen = rows[0] if rows else None
-        if chosen is None:
-            # No live rows and no pin — fall back to the pinned scalars so the
-            # caller still gets a usable (if unverified) ref.
-            return DMSMasterRef(id=pinned_id, code=pinned_code, name=pinned_name)
-        return self._ref_from_row(chosen)
-
-    @staticmethod
-    def _ref_from_row(row: list) -> DMSMasterRef:
-        """bshsd 行 [id, code, name, ...] → DMSMasterRef(尾列进 extra 供表单原样回显)。"""
-        return DMSMasterRef(
-            id=str(row[0]),
-            code=str(row[1]) if len(row) > 1 else str(row[0]),
-            name=str(row[2]) if len(row) > 2 else (str(row[1]) if len(row) > 1 else ""),
-            extra=tuple(row[3:]),
+        return ref_from_rows(
+            elemname, self._bshsd_all(elemname, **extra), pinned_id, pinned_code, pinned_name
         )
 
     def _bshsd(self, elemname: str, **extra) -> Optional[List[List[Any]]]:
@@ -455,7 +430,7 @@ class DMSClientOpsMixin:
         同一会话内同参只打一次:一次建单要解六七个主档、还会在成功后就地刷缓存,
         而主档在这一次登录期间不会变。失败不进备忘,允许下次重试。
         """
-        key = (elemname, tuple(sorted(extra.items())))
+        key = (id(getattr(self, "transport", None)), elemname, tuple(sorted(extra.items())))
         memo = _memo(self)
         if key not in memo:
             data = {"bshsdamt": "10", "bshsdcurrpage": "1", "elemname": elemname, "sdt": ""}
@@ -472,9 +447,9 @@ class DMSClientOpsMixin:
         """翻页拉全某主档:不满一页即最后一页。任一页取数失败 → 整体 None。
 
         半份名册比取不到更危险 ——「这个人不在名册」的判断会变成瞎话。撞 max_pages 说明
-        主档比预期大一个量级,截断必须点名留痕(静默截断 = 又一个分页黑洞)。
+        主档比预期大一个量级，必须失败，不能将不完整主档当成可选择的全量结果。
         """
-        key = (elemname, tuple(sorted(extra.items())), "all")
+        key = (id(getattr(self, "transport", None)), elemname, tuple(sorted(extra.items())), "all")
         memo = _memo(self)
         if key in memo:
             return memo[key]
@@ -487,8 +462,9 @@ class DMSClientOpsMixin:
             if len(got) < page_size:
                 break
         else:
-            logger.warning(
-                "[dms] master %s truncated at %d pages / %d rows", elemname, max_pages, len(rows)
+            raise DMSClientError(
+                f"DMS master {elemname} exceeds {max_pages} pages; complete mapping unavailable",
+                "ERR_DMS_MASTER_UNAVAILABLE",
             )
         memo[key] = rows
         return rows

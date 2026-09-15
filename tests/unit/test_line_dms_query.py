@@ -29,6 +29,10 @@ class QueryAccessTests(unittest.TestCase):
 
 
 class QueryFlowTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Domain behavior after authentication; rejection cases live in binding_guard regressions.
+        self.enterContext(mock.patch("services.line_dms.binding_guard.current", return_value=True))
+
     async def test_forged_query_postback_is_denied_server_side(self):
         with (
             mock.patch.object(query_flow, "_can_query", new=mock.AsyncMock(return_value=False)),
@@ -141,7 +145,9 @@ class QueryFlowTests(unittest.IsolatedAsyncioTestCase):
                 "fetch_sales_records",
                 return_value={"ok": True, "rows": []},
             ),
-            mock.patch.object(query_flow, "_can_query", new=mock.AsyncMock(return_value=False)),
+            mock.patch.object(
+                query_flow, "_can_query", new=mock.AsyncMock(side_effect=[True, False])
+            ),
             mock.patch.object(query_flow, "_push") as push,
             mock.patch.object(query_flow, "_send") as send,
         ):

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Shared LINE Messaging API transport for Cowork, DMS, and ERP."""
 
-import os
 import hmac
 import hashlib
 import base64
@@ -11,6 +10,8 @@ import time
 import urllib.request
 import urllib.error
 from typing import Optional, List, Dict, Any
+
+from services.line_platform import channels as line_channels
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +39,12 @@ def pick_lang_from_line_event(ev: dict) -> str:
     return "th"
 
 
-# 三个产品共用 LINE 传输，凭据按产品隔离。
+# 三个产品共用 LINE 传输，凭据按产品隔离。DMS 多 OA：每个 stable channel key 一套 env，
+# 名字只在 channels registry 声明一次 —— 新增 OA 改 registry 即可,不会漏改这张表。
 _CHANNEL_ENV = {
     "cowork": ("LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN"),
-    "dms": ("LINE_DMS_CHANNEL_SECRET", "LINE_DMS_CHANNEL_ACCESS_TOKEN"),
     "erp": ("LINE_ERP_CHANNEL_SECRET", "LINE_ERP_CHANNEL_ACCESS_TOKEN"),
+    **{key: (cfg.secret_env, cfg.token_env) for key, cfg in line_channels.DMS_CHANNELS.items()},
 }
 
 
@@ -54,20 +56,34 @@ def _channel_env_names(channel: str) -> tuple[str, str]:
     return "", ""
 
 
+def _credentials_blob_env(channel: str) -> str:
+    """DMS 多 OA 允许把每个 OA 的凭据作为一个 Secret 挂到单个 env(JSON/dotenv 皆可)。"""
+    if not channel.startswith("dms"):
+        return ""
+    channel_cfg = line_channels.get(channel)
+    return channel_cfg.credentials_env if channel_cfg else ""
+
+
+def _resolve_channel_credentials(secret_env: str, token_env: str, blob_env: str) -> tuple[str, str]:
+    from services.line_platform import channels as line_channels
+
+    return line_channels.resolve_credentials(secret_env, token_env, blob_env)
+
+
 def _get_channel_secret(channel: str = "cowork") -> str:
-    name = _channel_env_names(channel)[0]
-    s = os.environ.get(name, "").strip()
-    if not s:
+    name, token_name = _channel_env_names(channel)
+    secret, _token = _resolve_channel_credentials(name, token_name, _credentials_blob_env(channel))
+    if not secret:
         logger.warning(f"{name} 未设置")
-    return s
+    return secret
 
 
 def _get_channel_token(channel: str = "cowork") -> str:
-    name = _channel_env_names(channel)[1]
-    s = os.environ.get(name, "").strip()
-    if not s:
-        logger.warning(f"{name} 未设置")
-    return s
+    name, token_name = _channel_env_names(channel)
+    _secret, token = _resolve_channel_credentials(name, token_name, _credentials_blob_env(channel))
+    if not token:
+        logger.warning(f"{token_name} 未设置")
+    return token
 
 
 # ============================================================

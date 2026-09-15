@@ -24,6 +24,14 @@
     "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
   ],
   "stale_ack": {
+    "_stocktake_verify.cjs": {
+      "why": "本次只因共享 i18n-data.js 新增 WeKan 导航词条，同步把手机盘点页的词典缓存指纹 stocktake-5 升到 stocktake-6；该页其余字节、mobile.js、盘点接口和摄像头逻辑均未改。缓存资源登记与容器页面测试已通过，盘点全量实机 E2E 未重跑，本条明确保留这一证据限制。",
+      "until": "2026-09-13"
+    },
+    "_erp_cowork_split_verify.cjs": {
+      "why": "Google/LINE 登录握手改为每次点击带唯一参数并加 no-store,只动 landing.js 里两个 SSO 按钮拼 URL 的方式与响应缓存头,未改登录门 DOM、/login 302 或跨壳路由。本次已真跑该脚本:登录门全部 15 项通过(/login 302→/cowork、cowork=旧登录 UI+获焦键入、erp=独立门、两侧手机 390×844),刷新了 cowork-login-desktop/mobile 两张截图;脚本之后的超管 Cowork 与 ERP 菜单矩阵因本机无本地数据库、真 app 起不来而未跑完,该段仍欠验收。",
+      "until": "2026-09-16"
+    },
     "_erp_admin_invite_verify.cjs": {
       "why": "OCR 重构只改共享后台缓存键与 OCR 文案，未改 ERP 邀请行为；OCR 页中泰语真实浏览器已验证，按用户要求不扩大到邀请测试；2026-09-05 开发工具清理仅替换脚本第3行的文档链接；对比 ab6bec3e 与候选，除整行注释外逐字一致，未重跑真实 ERP 邀请。若脚本行为变化须重验。",
       "until": "2026-09-05"
@@ -69,6 +77,7 @@
         "static/stocktake/ui.js",
         "static/stocktake/camera.js",
         "static/stocktake/counter.js",
+        "static/stocktake/photos.js",
         "static/stocktake/mobile.js",
         "static/stocktake/mobile.html",
         "static/stocktake/stocktake.css"
@@ -1105,6 +1114,9 @@
     },
     "28-dms-intake-write-honesty.spec.js": {
       "covers": [
+        "static/dms/**",
+        "static/dist/dms.*",
+        "scripts/build-home-js.mjs",
         "src/home/**",
         "static/home-*.css",
         "home.html",
@@ -1612,6 +1624,19 @@
         "tests/e2e/_helpers/**"
       ],
       "only_e2e": ["销项每屏+向导走查截图,无 console error"]
+    },
+    "55-dms-binding-integrity.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/dms-binding-integrity/*.png",
+      "covers": [
+        "static/dms-booking-edit/dms-booking-api.js",
+        "static/dms-booking-edit/dms-credentials.js",
+        "static/dms-booking-edit/dms-credentials-i18n.js"
+      ],
+      "only_e2e": [
+        "真实浏览器保留旧共享 JWT 时仍交换当前 LINE 身份，密码 PUT 使用本页令牌且不污染网页登录态",
+        "打开表单后重新绑定，四语页面显示失效提示且不自动重试保存；菜单 3 也重新交换 LINE 身份",
+        "A/B(无自身 LIFF env)入口在真浏览器里 config 要按 URL 的 channel 取共享 Provider LIFF、auth body 原样带该 channel key，菜单 3/4 的票据与凭据读写仍落在本 OA 绑定上；单测只证明函数入参，证明不了页面真按入口 OA 发这些请求"
+      ]
     }
   },
   "_stale_ack_rule": [

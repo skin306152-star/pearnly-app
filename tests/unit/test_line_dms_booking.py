@@ -8,7 +8,6 @@ qa.files 下载并同会话挂载(attach 结果进 result 与台账 response_bod
 """
 
 import contextlib
-import dataclasses
 import json
 import os
 import unittest
@@ -39,33 +38,55 @@ class FakeStore:
             "ttl_minutes": ttl_minutes,
         }
 
+    def consume_nonce(self, tenant, luid, state, nonce):
+        sess = self.get_session(tenant, luid)
+        payload = (sess or {}).get("payload") or {}
+        if not sess or sess["state"] != state or not nonce or payload.get("nonce") != nonce:
+            return None
+        self.set_session(tenant, luid, state, {**payload, "nonce": None, "_booking_claim": nonce})
+        return payload
+
     def clear_session(self, tenant, luid):
         self.data.pop((str(tenant), str(luid)), None)
 
+    def replace_claimed_booking_payload(
+        self, tenant, luid, nonce, state, payload, ttl_minutes=None
+    ):
+        current = self.get_session(tenant, luid)
+        old = (current or {}).get("payload") or {}
+        if old.get("_booking_claim") != nonce or old.get("nonce") or old.get("booking_attempt"):
+            return False
+        if state is None:
+            self.clear_session(tenant, luid)
+        else:
+            self.set_session(tenant, luid, state, payload, ttl_minutes or 120)
+        return True
 
-@dataclasses.dataclass(frozen=True)
-class _FakeBooking:
-    delivery_date_be: str = "old"
-    regis_name: str = ""
-    payments: tuple = ()
+    def clear_booking_attempt(self, tenant, luid, nonce):
+        current = self.get_session(tenant, luid)
+        if current and current["payload"].get("_booking_claim") == nonce:
+            self.clear_session(tenant, luid)
+            return True
+        return False
 
 
 class _FakeClient:
-    """记录建单/附件入参,供断言逐问选择与附件透传。"""
+    """记录建单/附件入参,供断言逐问选择与附件透传。
+
+    载荷解析(resolve_booking_payload/组织级联)不再被打桩:订车提交路径吃 readonly_preflight
+    已取到的权威快照,所以这里只要给得出主档行与顾问组织,解析走真代码。
+    """
 
     def __init__(self, rec):
         self.rec = rec
-
-    def resolve_booking_payload(self, defaults, card, today=None):
-        self.rec["defaults"] = defaults
-        self.rec["card"] = card
-        return _FakeBooking()
 
     def save_customer(self, **kwargs):
         self.rec["customer_save"] = kwargs
         return kwargs.get("customer_id"), False
 
-    def create_booking_via_form(self, *, customer_id, booking, card):
+    def create_booking_via_form(self, *, customer_id, booking, card, on_attempt=None):
+        if on_attempt:
+            on_attempt("BK123")
         self.rec["customer_id"] = customer_id
         self.rec["booking"] = booking
         return ("BID1", "BK123")
@@ -91,7 +112,34 @@ class _FakeClient:
     def _bshsd_all(self, elemname, **kwargs):
         if elemname == "txtcarpaint":
             return [["p1", "WHITE", "ขาว"]]
+        if elemname.startswith("txtbankname"):
+            return [["1", "SCB", "SCB", "ระยอง", "1234567890123"]]
         return []
+
+    def _post_text(self, path, data):
+        """顾问组织级联(detailbooksell)是提交前唯一一次单独实时读;其余读取本文不关心。"""
+        if path == "drfcbc/component/detailbooksell.php":
+            return _ORG_BODY
+        return ""
+
+
+_ORG_BODY = json.dumps(
+    ["1", "Rayong", "30", "Sales team", "289", "Manager", None, None, None, None, None, None]
+)
+
+
+class _FakeAdapter:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def login(self):
+        return None
+
+    def _client(self):
+        return _FakeClient({})
 
 
 def _qa_payload(**over):
@@ -118,6 +166,17 @@ def _qa_payload(**over):
                 "amount": "5000.00",
                 "extra": {
                     "src": "SCB",
+                    "src_bank_id": "1",
+                    "src_bank_name": "SCB",
+                    "src_account_name": "Customer",
+                    "src_account_no": "1111111111",
+                    "src_branch_name": "Rayong",
+                    "src_time": "14:00",
+                    "dst_bank_id": "1",
+                    "dst_bank_name": "SCB",
+                    "dst_business_name": "Company",
+                    "dst_account_no": "1234567890123",
+                    "dst_branch_name": "ระยอง",
                     "dst_id": "1",
                     "dst": "SCB · 1234567890123 · ระยอง",
                 },
@@ -126,6 +185,21 @@ def _qa_payload(**over):
         "pending_channel": {},
         "audit": [{"step": "slip", "input": "image:mid-slip"}],
     }
+    qa["master_snapshot"] = bf.master_contract.build_snapshot(
+        {
+            **_FakeClient({}).fetch_masters(),
+            **{
+                key: [["1", "SCB", "SCB", "ระยอง", "1234567890123"]]
+                for key in (
+                    "company_banks",
+                    "source_banks",
+                    "cheque_banks",
+                    "cashier_banks",
+                    "card_banks",
+                )
+            },
+        }
+    )
     qa.update(over)
     return qa
 
@@ -146,17 +220,37 @@ class _Env:
     def __enter__(self):
         es = self.es
         p = lambda *a, **k: es.enter_context(mock.patch.object(*a, **k))  # noqa: E731
+        # These are domain-flow fixtures; real epoch/rebind and SQL concurrency have separate tests.
+        p(
+            __import__("services.line_dms.binding_guard", fromlist=["current"]),
+            "current",
+            return_value=True,
+        )
+        p(bf.store, "consume_nonce", side_effect=self.store.consume_nonce)
         p(bf.store, "get_session", side_effect=self.store.get_session)
         p(bf.store, "set_session", side_effect=self.store.set_session)
         p(bf.store, "clear_session", side_effect=self.store.clear_session)
+        p(
+            bf.booking_attempt.session_store,
+            "clear_booking_attempt",
+            side_effect=self.store.clear_booking_attempt,
+        )
+        p(
+            bf.booking_attempt.session_store,
+            "replace_claimed_booking_payload",
+            side_effect=self.store.replace_claimed_booking_payload,
+        )
         p(bf, "_spawn", side_effect=self.spawned.append)
-        self.reply = p(bf.line_client, "reply_text")
-        self.push_text = p(bf.line_client, "push_text")
-        self.push_msgs = p(bf.line_client, "push_messages")
-        p(bf.line_client, "start_loading")
-        self.download = p(bf.line_client, "download_message_content", return_value=self._download)
+        self.reply = p(bf._out.line_client, "reply_text")
+        self.push_text = p(bf._out.line_client, "push_text")
+        self.push_msgs = p(bf._out.line_client, "push_messages")
+        p(bf._out.line_client, "start_loading")
+        self.download = p(
+            bf._out.line_client, "download_message_content", return_value=self._download
+        )
         p(bf._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
-        self.insert_log = p(bf.db, "insert_push_log", return_value="LOG1")
+        # 台账写入已拆到 booking_ledger(booking_flow 过 500 行硬闸),打桩点跟着搬。
+        self.insert_log = p(bf.booking_ledger.db, "insert_push_log", return_value="LOG1")
         if self._book_result is not None:
             p(bf, "_book_in_session", return_value=self._book_result)
         return self
@@ -184,16 +278,10 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 return masters
 
         def fake_run(ep, do):
-            return do(ChangedClient(rec), object())
+            return do(ChangedClient(rec), _FakeAdapter())
 
         payload = _review()
-        with (
-            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
-        ):
+        with (mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),):
             result = bf._book_in_session({"id": "E1", "config": {}}, payload)
 
         self.assertEqual(result["preflight"], "changed")
@@ -212,15 +300,9 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 return masters
 
         def fake_run(ep, do):
-            return do(DeletedClient(rec), object())
+            return do(DeletedClient(rec), _FakeAdapter())
 
-        with (
-            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
-        ):
+        with (mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),):
             result = bf._book_in_session({"id": "E1", "config": {}}, _review())
 
         self.assertEqual(result["preflight"], "unmatched")
@@ -253,11 +335,37 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             env.push_msgs.call_args_list[0].args[1][0]["text"], qa_cards.TXT_MASTER_CHANGED
         )
 
+    async def test_live_customer_identity_failure_stops_before_booking_write(self):
+        from services.erp.mrerp_dms_client_base import DMSClientError
+
+        rec = {}
+
+        class WrongCustomer(_FakeClient):
+            def read_customer(self, customer_id):
+                rec["read_customer"] = customer_id
+                return {"people_id": "different-identity"}
+
+            def lookup_customer(self, people_id):
+                raise AssertionError("must read the selected customer directly")
+
+        with (
+            mock.patch(
+                "services.erp.erp_dms_intake._run_logged_in",
+                side_effect=lambda ep, do: do(WrongCustomer(rec), _FakeAdapter()),
+            ),
+        ):
+            with self.assertRaises(DMSClientError) as ctx:
+                bf._book_in_session({"id": "E1", "config": {}}, _review())
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_CUSTOMER_LOOKUP")
+        self.assertEqual(rec["read_customer"], "C1")
+        self.assertNotIn("booking", rec)
+        self.assertNotIn("customer_save", rec)
+
     async def test_browser_customer_edits_are_written_before_booking(self):
         rec = {}
 
         def fake_run(ep, do):
-            return do(_FakeClient(rec), object())
+            return do(_FakeClient(rec), _FakeAdapter())
 
         qa = _qa_payload(
             customer_dirty=True,
@@ -270,11 +378,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 "services.erp.mrerp_dms_booking_customer.card_from_customer",
                 side_effect=lambda client, customer_id, people_id: bf._card_payload({"qa": qa}),
             ),
-            mock.patch.object(bf.masters_cache, "refresh_from_client"),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
         ):
             result = bf._book_in_session({"id": "E1", "config": {}}, {"qa": qa})
 
@@ -325,7 +429,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         rec = {}
 
         def fake_run(ep, do):
-            return do(_FakeClient(rec), object())
+            return do(_FakeClient(rec), _FakeAdapter())
 
         with (
             mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
@@ -336,14 +440,23 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                     or bf._card_payload(_review())
                 ),
             ),
-            mock.patch.object(bf.masters_cache, "refresh_from_client"),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
         ):
             res = bf._book_in_session(
-                {"id": "E1", "config": {}},
+                # 端点默认全钉成别的 id:逐问选择必须覆盖它们(否则建单填错车/店/归属)。
+                {
+                    "id": "E1",
+                    "config": {
+                        "booking_defaults": {
+                            "advisor_id": "zz9",
+                            "car_id": "zz9",
+                            "paint_id": "zz9",
+                            "place_book_id": "zz9",
+                            "term_sale_id": "zz9",
+                            "regis_behalf_id": "zz9",
+                        }
+                    },
+                },
                 _review(),
                 attach_files=[
                     {
@@ -366,18 +479,15 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(res["attach_ok"])  # 下载失败件仍在 → 附件不谎报全挂
         self.assertEqual(res["attached"], 2)
         self.assertEqual([f["display_name"] for f in res["attach_failed"]], ["y"])
-        d = rec["defaults"]
-        # 顾问归属:开局匹配好的 id/name 一路传到建单层(建单层按 id 严格解析)
-        self.assertEqual(d.advisor_id, "335")
-        self.assertEqual(d.advisor_name, "sale02")
-        self.assertEqual(d.car_id, "c1")
-        self.assertEqual(d.paint_id, "p1")
-        self.assertEqual(d.place_book_id, "pl1")
-        self.assertEqual(d.term_sale_id, "t1")
-        self.assertEqual(d.regis_behalf_id, "r1")
         self.assertEqual(rec["customer_id"], "C1")
         self.assertEqual(rec["customer_lookup"], ("C1", "1234567890121"))
         b = rec["booking"]
+        # 逐问选择覆盖端点默认,且按权威主档行解析(建单层只认实时主档里的 id)
+        self.assertEqual((b.advisor.id, b.advisor.name), ("335", "sale02"))
+        self.assertEqual(b.car.id, "c1")
+        self.assertEqual(b.paint.id, "p1")
+        self.assertEqual((b.place_book.id, b.term_sale.id, b.regis_behalf.id), ("pl1", "t1", "r1"))
+        self.assertEqual((b.branch.id, b.team.id), ("1", "30"))  # 组织来自顾问级联
         self.assertEqual(b.delivery_date_be, "01/01/2570")  # 逐问交车日覆盖
         self.assertEqual(b.regis_name, "บริษัท สมชาย จำกัด")
         self.assertEqual(
@@ -388,12 +498,19 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                     "amount": "5000.00",
                     "extra": {
                         "src": "SCB",
-                        "dst_id": "1",
-                        "dst": "SCB · 1234567890123 · ระยอง",
+                        "src_bank_id": "1",
+                        "src_bank_name": "SCB",
+                        "src_account_name": "Customer",
+                        "src_account_no": "1111111111",
+                        "src_branch_name": "Rayong",
+                        "src_time": "14:00",
                         "dst_bank_id": "1",
                         "dst_bank_name": "SCB",
-                        "dst_branch_name": "ระยอง",
+                        "dst_business_name": "Company",
                         "dst_account_no": "1234567890123",
+                        "dst_branch_name": "ระยอง",
+                        "dst_id": "1",
+                        "dst": "SCB · 1234567890123 · ระยอง",
                     },
                 },
             ),
@@ -401,6 +518,111 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rec["attach_booking_id"], "BID1")
         self.assertEqual([f["filename"] for f in rec["attach_files"]], ["idcard.jpg", "slip.jpg"])
         self.assertEqual(rec["attach_files"][0]["content_type"], "image/jpeg")
+
+    async def test_submit_preflight_reads_live_masters_and_selected_paints_once(self):
+        """提交前实时复核:新 DMS 会话里完整主档 1 次 + 选中车型颜色 1 次,插在建单前。"""
+        rec = {}
+
+        class RecordingClient(_FakeClient):
+            def fetch_masters(self, *, strict=False):
+                self.rec["masters_reads"] = self.rec.get("masters_reads", 0) + 1
+                return super().fetch_masters(strict=strict)
+
+            def _bshsd_all(self, elemname, **kwargs):
+                if elemname == "txtcarpaint":
+                    self.rec.setdefault("paint_reads", []).append(kwargs.get("idcar"))
+                return super()._bshsd_all(elemname, **kwargs)
+
+        def fake_run(ep, do):
+            return do(RecordingClient(rec), _FakeAdapter())
+
+        with (
+            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
+            ),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
+        ):
+            res = bf._book_in_session(
+                {"id": "E1", "config": {}},
+                _review(),
+                on_attempt=lambda no: rec.setdefault("attempts", []).append(no),
+            )
+        self.assertTrue(res["ok"])
+        self.assertEqual(rec["masters_reads"], 1)  # 逐问的会话快照不算数,提交前实时抓一次
+        self.assertTrue(rec["strict_masters"])  # 且必须严格完整
+        self.assertEqual(rec["paint_reads"], ["c1"])  # 只抓选中车型的颜色
+        self.assertEqual(rec["attempts"], ["BK123"])  # 越过写边界前先记本次尝试
+
+    async def test_existing_manual_source_review_submits_once_with_both_attachments(self):
+        """A production card issued before the marker fix remains confirmable.
+
+        The live DMS source-bank directory is empty, the selected destination is
+        still current, and every visible source field is complete. Confirmation
+        repairs provenance, performs one write, then attaches the ID card and slip.
+        """
+        rec = {}
+
+        class EmptySourceBankClient(_FakeClient):
+            def _bshsd_all(self, elemname, **kwargs):
+                if elemname == "txtbanknametffrom":
+                    return []
+                return super()._bshsd_all(elemname, **kwargs)
+
+        review = _review()
+        qa_payload = review["qa"]
+        qa_payload["manual_banks"] = ["source_banks"]
+        qa_payload["master_snapshot"]["rows"]["source_banks"] = []
+        qa_payload["payments"][0]["extra"].update(
+            {
+                "src_bank_id": "",
+                "src_bank_name": "KBank",
+                "src_account_name": "Somchai Jaidee",
+                "src_account_no": "1234567890",
+                "src_branch_name": "Rayong",
+            }
+        )
+        qa_payload["payments"][0]["extra"].pop("bank_manual", None)
+
+        def fake_run(ep, do):
+            return do(EmptySourceBankClient(rec), _FakeAdapter())
+
+        attachments = [
+            {
+                "display_name": "สำเนาบัตรประชาชน",
+                "filename": "idcard.jpg",
+                "content_type": "image/jpeg",
+                "content": _JPEG,
+            },
+            {
+                "display_name": "ใบโอนเงินจอง",
+                "filename": "slip.jpg",
+                "content_type": "image/jpeg",
+                "content": _JPEG,
+            },
+        ]
+        with (
+            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: bf._card_payload(review),
+            ),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
+        ):
+            result = bf._book_in_session(
+                {"id": "E1", "config": {}}, review, attach_files=attachments
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["booking_no"], "BK123")
+        self.assertTrue(result["attach_ok"])
+        self.assertEqual(result["attached"], 2)
+        self.assertEqual(rec["customer_id"], "C1")
+        self.assertEqual(
+            [item["filename"] for item in rec["attach_files"]], ["idcard.jpg", "slip.jpg"]
+        )
+        self.assertNotIn("bank_manual", rec["booking"].payments[0]["extra"])
 
     async def test_d4_attach_failure_appends_attach_note(self):
         """建单成功但附件没挂全 → 回执如实追加 TXT_ATTACH_FAIL,不谎报附件成功。"""
@@ -433,7 +655,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         rec = {}
 
         def fake_run(ep, do):
-            return do(_FakeClient(rec), object())
+            return do(_FakeClient(rec), _FakeAdapter())
 
         with (
             mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
@@ -441,11 +663,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 "services.erp.mrerp_dms_booking_customer.card_from_customer",
                 side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
             ),
-            mock.patch.object(bf.masters_cache, "refresh_from_client"),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
         ):
             qa = _qa_payload()
             files = qa["files"]
@@ -464,6 +682,48 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(res["attach_ok"])
         self.assertEqual([f["filename"] for f in rec["attach_files"]], ["idcard.jpg"])
 
+    async def test_d4_attach_runs_only_after_the_write_was_verified(self):
+        """回读没确认写入(UNKNOWN)→ 一张附件都不挂:附件只挂在已核实的单据上。"""
+        from services.erp.mrerp_dms_booking_submit import DMSBookingOutcomeUnknown
+
+        rec = {}
+
+        class UnverifiedClient(_FakeClient):
+            def create_booking_via_form(self, *, customer_id, booking, card, on_attempt=None):
+                if on_attempt:
+                    on_attempt("BK000002609000007")
+                raise DMSBookingOutcomeUnknown("BK000002609000007", http_status=200, body="ok")
+
+        adapter = _FakeAdapter()
+        adapter._client = lambda: UnverifiedClient(rec)
+        with (
+            mock.patch(
+                "services.erp.erp_dms_intake._build_mrerp_dms_adapter",
+                return_value=(adapter, None),
+            ),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
+            ),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
+        ):
+            result = bf._book_in_session(
+                {"id": "E1", "config": {}},
+                _review(),
+                attach_files=[
+                    {
+                        "display_name": "สำเนาบัตรประชาชน",
+                        "filename": "idcard.jpg",
+                        "content_type": "image/jpeg",
+                        "content": _JPEG,
+                    }
+                ],
+            )
+        self.assertFalse(result.get("ok"))
+        self.assertEqual(result.get("error_code"), "ERR_DMS_BOOKING_OUTCOME_UNKNOWN")
+        self.assertTrue((result.get("response_body") or {}).get("submitted"))  # 不许重试
+        self.assertNotIn("attach_booking_id", rec)  # 未核实 → 附件一步都没走
+
     async def test_d4_create_booking_runs_inside_shared_account_lock(self):
         """create_booking_via_form 在账套级 mrerp_booking_lock 内执行;附件在锁释放后挂载。"""
         rec = {}
@@ -477,7 +737,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             lock_events.append("exit")
 
         class _ProbeClient(_FakeClient):
-            def create_booking_via_form(self, *, customer_id, booking, card):
+            def create_booking_via_form(self, *, customer_id, booking, card, on_attempt=None):
                 rec["create_in_lock"] = lock_events == ["enter"]
                 return super().create_booking_via_form(
                     customer_id=customer_id, booking=booking, card=card
@@ -488,7 +748,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 return super().attach_booking_files(booking_id=booking_id, files=files)
 
         def fake_run(ep, do):
-            return do(_ProbeClient(rec), object())
+            return do(_ProbeClient(rec), _FakeAdapter())
 
         ep = {"id": "E1", "config": {"system_url": "https://dms.example.com/dms/index.php"}}
         with (
@@ -497,11 +757,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 "services.erp.mrerp_dms_booking_customer.card_from_customer",
                 side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
             ),
-            mock.patch.object(bf.masters_cache, "refresh_from_client"),
-            mock.patch(
-                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
-            ),
+            mock.patch.object(bf.masters_cache, "write_authoritative_snapshot"),
             mock.patch.object(bf, "mrerp_booking_lock", fake_lock),
         ):
             res = bf._book_in_session(
@@ -551,6 +807,28 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(env.session()["state"], "booking_review")
         self.assertEqual(env.session()["ttl_minutes"], 30)
         self.assertNotEqual(env.session()["payload"]["nonce"], "N1")
+
+    async def test_customer_lookup_failure_preserves_draft_with_fresh_retry_nonce(self):
+        from services.erp.erp_dms_push import _dms_friendly
+
+        result = {
+            "ok": False,
+            "error_code": "ERR_DMS_CUSTOMER_LOOKUP",
+            "error_friendly": _dms_friendly("ERR_DMS_CUSTOMER_LOOKUP"),
+        }
+        with _Env(book_result=result) as env:
+            original = _review()
+            env.store.set_session("T1", "L1", "booking_review", original)
+            await bf.handle_postback(
+                _BINDING, _LUID, "rt", cards.ACT_CONFIRM_BOOKING, {"nonce": "N1"}
+            )
+            await env.drain()
+        self.assertEqual(env.session()["payload"]["qa"], original["qa"])
+        self.assertNotEqual(env.session()["payload"]["nonce"], "N1")
+        card = env.push_msgs.call_args.args[1][0]
+        self.assertIn(result["error_friendly"]["th"], json.dumps(card, ensure_ascii=False))
+        self.assertFalse(bf._retryable_result({**result, "booking_id": "already-written"}))
+        self.assertFalse(bf._retryable_result({"error_code": "ERR_DMS_IMPORT"}))
 
     async def test_retry_postback_resumes_draft_and_finishes_booking(self):
         failure = {

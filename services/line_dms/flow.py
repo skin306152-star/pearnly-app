@@ -13,6 +13,8 @@ _IDENTITY_MAP、地址键取自 _ADDR_MAP,绝不自造键名。
 
 from __future__ import annotations
 
+from services.line_dms import binding_guard
+
 import json
 import logging
 import secrets
@@ -23,15 +25,15 @@ from core import db
 from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
-from services.line_platform import client as line_client
 from services.line_dms import (
     _out,
     approval_flow,
+    booking_attempt,
     booking_flow,
     booking_qa,
     cards,
     draft,
-    edit_flow,
+    customer_edit_entry as customer_editor,
     menu_flow,
     ocr_review,
     qa_cards,
@@ -39,7 +41,7 @@ from services.line_dms import (
     store,
     text_router,
 )
-from services.line_dms._out import _CHANNEL, _push, _reply, _thr
+from services.line_dms._out import _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +63,6 @@ _ADDR_BLOCK_KEYS = (
 # 新建客户的身份字段键(与网页 create 分支 fields 同形)。
 _CREATE_ID_KEYS = ("prefix_id", "name", "people_id", "tax_id", "birthday_be", "phone")
 
-# 后台调度 + LINE 出口(_CHANNEL/_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
 _spawn = _out.make_spawn("line_dms.flow")
 
 
@@ -74,6 +75,7 @@ def handle_image(binding: dict, line_user_id: str, message_id: str) -> None:
         )
 
 
+@binding_guard.bound_task
 async def _dispatch_image(binding: dict, line_user_id: str, message_id: str) -> None:
     """图片事件分发:逐问/确认态先于 OCR。
 
@@ -90,7 +92,7 @@ async def _dispatch_image(binding: dict, line_user_id: str, message_id: str) -> 
             _push(line_user_id, qa_cards.TXT_NO_IMAGE_NEEDED)
         return
     if state == "booking_review":
-        _push(line_user_id, qa_cards.TXT_CONFIRM_ABOVE)
+        _push(line_user_id, booking_attempt.review_message(sess, qa_cards.TXT_CONFIRM_ABOVE))
         return
     await process_image(binding, line_user_id, message_id)
 
@@ -142,9 +144,9 @@ async def handle_postback(
         await approval_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
         return
 
-    # 逐字段修正(DL-6):开菜单/选字段/取消。nonce 只校验不消费,写档仍由下方 consume_nonce 守卫。
-    if action in edit_flow.EDIT_ACTIONS:
-        await edit_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
+    # 历史编辑按钮只跳转网页编辑器。
+    if action in customer_editor.EDIT_ACTIONS:
+        await customer_editor.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
         return
 
     if action == cards.ACT_KEEP:
@@ -208,13 +210,13 @@ async def handle_postback(
 async def process_image(binding: dict, line_user_id: str, message_id: str) -> None:
     """下载 + 身份证 OCR(计费走真实用户行)。成功存 id_card;齐料自动查重。"""
     tenant, user_id = binding["tenant_id"], binding["user_id"]
-    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, line_user_id)
 
     user = await _thr(db.find_user_by_id, user_id)
     if not user:
         _push(line_user_id, cards.TXT_NO_ENDPOINT)
         return
-    content = await _thr(line_client.download_message_content, message_id, channel=_CHANNEL)
+    content = await _thr(_out.download_content, message_id)
     if not content:
         _push(line_user_id, cards.TXT_BLURRY)
         return
@@ -248,6 +250,7 @@ async def process_image(binding: dict, line_user_id: str, message_id: str) -> No
 
 
 # ── collecting → reviewing:查重四分支 ──────────────────────────────────────
+@binding_guard.bound_task
 async def _run_dedup(
     binding: dict,
     line_user_id: str,
@@ -257,15 +260,15 @@ async def _run_dedup(
     endpoint_id: Optional[str],
 ) -> None:
     tenant, user_id = binding["tenant_id"], binding["user_id"]
-    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, line_user_id)
     # 菜单层(波2)的 mode 决定写档后是否自动串联订车;缺省=老直拍行为不变。会话是权威源
     # (采集路径都先写会话再进这里),避免多签名穿参。id_card_mid 同样从会话回读:它是
     # 订车逐问的身份证附件源,必须活到客户档落定(见 _run_dedup base)。
     _sess = await _thr(store.get_session, tenant, line_user_id)
     mode = str(((_sess or {}).get("payload") or {}).get("mode") or "")
     id_card_mid = ((_sess or {}).get("payload") or {}).get("id_card_mid")
-    if ep is None:
-        ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
+    # Queued work must not reuse a credential/config snapshot from before menu 4.
+    ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id or (ep or {}).get("id"))
     if not ep:
         _push(line_user_id, cards.TXT_NO_ENDPOINT)
         return
@@ -291,6 +294,8 @@ async def _run_dedup(
     field_diffs = res.get("field_diffs") or []
     geo = res.get("geo") or {}
     draft_vals = draft.build_draft(id_card, geo, res.get("prefixes") or [], phone)
+    field_diffs += draft.identity_diffs(res, draft_vals)
+    geo["prefixes"] = res.get("prefixes") or []
     summary = draft.build_summary(draft_vals, geo)
 
     nonce = secrets.token_hex(8)
@@ -300,7 +305,6 @@ async def _run_dedup(
         "endpoint_id": str(ep.get("id") or ""),
         "nonce": nonce,
         "field_diffs": [],  # 默认无差异;exact_diff 分支覆写为真实 diffs。
-        # 逐字段修正(DL-6)按此重跑查重:留原始 id_card/phone 作重放源,改值后回灌此路。
         "id_card": id_card,
         "phone": phone,
         "mode": mode,  # 写档后分叉(菜单层波2)靠它;编辑重跑经会话回读得以保留。
@@ -352,6 +356,7 @@ async def _run_dedup(
 
 
 # ── reviewing → 执行写档 ────────────────────────────────────────────────────
+@binding_guard.bound_task
 async def _write_create(binding: dict, line_user_id: str, payload: dict) -> None:
     d = payload.get("draft") or {}
     fields = {k: d.get(k, "") for k in _CREATE_ID_KEYS}
@@ -369,6 +374,7 @@ async def _write_create(binding: dict, line_user_id: str, payload: dict) -> None
     )
 
 
+@binding_guard.bound_task
 async def _write_update(binding: dict, line_user_id: str, payload: dict) -> None:
     d = payload.get("draft") or {}
     field_diffs = payload.get("field_diffs") or []
@@ -403,7 +409,7 @@ async def _execute(
     tenant, user_id = binding["tenant_id"], binding["user_id"]
     name = str(fields.get("name") or "")
     people_id = str(fields.get("people_id") or "")
-    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    await _thr(_out.start_loading, line_user_id)
 
     ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, payload.get("endpoint_id"))
     if not ep:

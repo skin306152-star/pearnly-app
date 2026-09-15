@@ -23,11 +23,13 @@ def migrate() -> None:
         from services.startup import _boot_schema_ddl
         from services.users.columns import ensure_user_profile_columns
         from services.cloud_tasks.store import ensure_table
+        from services.erp.dms_master_shared import migrate_lock_table
 
         _ensure_schema()
         _boot_schema_ddl()
         ensure_user_profile_columns()
         ensure_table()
+        migrate_lock_table()
         migrate_queue_schema()
         from services.stocktake.schema import migrate as migrate_stocktake
 

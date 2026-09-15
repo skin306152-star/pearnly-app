@@ -10,6 +10,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Dict
 
+from services.erp.mrerp_dms_client_base import DMSClientError
+
 # 订金支付渠道闭集 —— 未知渠道必须报错,不许静默丢。
 _PAYMENT_CHANNELS = ("cash", "transfer", "cheque", "cashier_cheque", "card", "other")
 
@@ -31,7 +33,6 @@ _PAYMENT_TEXT_FIELD = {
         "src_bank_name": "txtbanknametffrom",
         "src_bank_id": "banktffromval",
         "src_branch_name": "txtbranchnametffrom",
-        "src_time": "txttimetffrom",
         "dst_business_name": "txtbusinessnametfmon",
         "dst_account_no": "txtaccountnumtfmon",
         "dst_bank_name": "txtbanknametfmon",
@@ -58,11 +59,66 @@ _PAYMENT_TEXT_FIELD = {
     "other": {"detail": "txtdetailother"},
 }
 
-_LEGACY_EXTRA = {
-    "cheque": {"cheque_no": "ref"},
-    "cashier_cheque": {"cashier_no": "ref"},
-    "card": {"card_type": "ref"},
+# 该渠道原生银行目录「权威为空」、银行名称由用户手工填写时挂在 extra 上的标记。
+# 它只说明「名称来自手工输入」,自身不构成提交依据:目录非空时 validate_company_bank_payments
+# 与 normalize_editor_payments 都按实时目录判,命中目录后会把标记就地清掉。
+MANUAL_BANK_FLAG = "bank_manual"
+
+# 目录权威为空时可省的原生字段:银行 id 由目录行产生,手工填名称时留空(名称字段照旧必填)。
+# company_banks(公司收款账户)不在此列 —— 收款账户永不手工,必须实时目录选择。
+_MANUAL_OPTIONAL_FIELDS = {
+    "transfer": frozenset({"src_bank_id"}),
+    "cheque": frozenset({"bank_id"}),
+    "cashier_cheque": frozenset({"bank_id"}),
+    "card": frozenset({"bank_id"}),
 }
+
+# Transfer selection requires the receiving bank identity. Other bank fields are mapped
+# when present, but do not create extra questions or block a bank-only transfer.
+TRANSFER_SOURCE_FIELDS = frozenset(
+    {"src_bank_id", "src_bank_name", "src_account_name", "src_account_no", "src_branch_name"}
+)
+_OPTIONAL_FIELDS = {
+    "transfer": frozenset({"dst_business_name", "dst_account_no", "dst_branch_name"})
+    | TRANSFER_SOURCE_FIELDS
+}
+
+
+def manual_bank_entry(extra: dict) -> bool:
+    """这笔付款的银行名称是否来自「目录权威为空时的手工填写」。"""
+    return str((extra or {}).get(MANUAL_BANK_FLAG) or "").strip() == "1"
+
+
+def missing_transfer_fields(extra: dict) -> list[str]:
+    """Return missing native transfer fields that DMS actually requires."""
+    return _missing_fields("transfer", extra)
+
+
+def _missing_fields(channel: str, extra: dict) -> list[str]:
+    optional = _OPTIONAL_FIELDS.get(channel, frozenset()) | (
+        _MANUAL_OPTIONAL_FIELDS.get(channel, frozenset())
+        if manual_bank_entry(extra)
+        else frozenset()
+    )
+    return [
+        key
+        for key in _PAYMENT_TEXT_FIELD.get(channel, {})
+        if key not in optional
+        if not str(extra.get(key) or "").strip() or str(extra.get(key)).strip() == "-"
+    ]
+
+
+def validate_payment_completeness(payments) -> None:
+    """Stop incomplete native payment data before any DMS write, including non-LINE callers."""
+    for payment in payments or ():
+        channel = payment.get("channel")
+        extra = payment.get("extra") or {}
+        missing = _missing_fields(channel, extra)
+        if missing:
+            raise DMSClientError(
+                str(channel) + " payment is incomplete; missing=" + ",".join(missing),
+                "ERR_DMS_PAYMENT_INCOMPLETE",
+            )
 
 
 def payment_form_fields(payments: tuple) -> Dict[str, str]:
@@ -71,6 +127,7 @@ def payment_form_fields(payments: tuple) -> Dict[str, str]:
     DMS 每个渠道只有一组固定字段，因此同渠道重复必须拦截，不能拼接后伪装成一笔。
     空 payments 返回空 dict —— 调用方保留表单默认 txtearnestmoney="0.00"。
     """
+    validate_payment_completeness(payments)
     totals: Dict[str, Decimal] = {}
     extras: Dict[str, dict] = {}
     for pay in payments:
@@ -82,20 +139,6 @@ def payment_form_fields(payments: tuple) -> Dict[str, str]:
         amount = str(pay.get("amount") or "0").replace(",", "")
         totals[channel] = Decimal(amount)
         extra = dict(pay.get("extra") or {})
-        if (
-            channel == "transfer"
-            and extra.get("src")
-            and not (extra.get("src_account_no") or extra.get("src_bank_name"))
-        ):
-            source = str(extra["src"]).strip()
-            parts = source.split()
-            if source != "-" and len(parts) > 1 and any(ch.isdigit() for ch in parts[-1]):
-                extra["src_bank_name"] = " ".join(parts[:-1])
-                extra["src_account_no"] = parts[-1]
-            elif source != "-" and any(ch.isdigit() for ch in source):
-                extra["src_account_no"] = source
-            elif source != "-":
-                extra["src_bank_name"] = source
         extras[channel] = extra
 
     fields: Dict[str, str] = {}
@@ -108,8 +151,6 @@ def payment_form_fields(payments: tuple) -> Dict[str, str]:
         for slot, form_field in _PAYMENT_TEXT_FIELD.get(channel, {}).items():
             extra = extras.get(channel, {})
             value = extra.get(slot)
-            if not value:
-                value = extra.get((_LEGACY_EXTRA.get(channel) or {}).get(slot, ""))
             if value and value != "-":
                 fields[form_field] = str(value)
     if fields:

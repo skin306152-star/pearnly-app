@@ -22,6 +22,7 @@ from core import db
 from core.auth import create_access_token
 from services.auth.entrance import login_entrance_allowed as _login_entrance_allowed
 from services.auth.oauth_state import gen_oauth_state as _gen_oauth_state
+from services.auth.oauth_state import NO_STORE_HEADERS as _NO_STORE
 from services.auth.oauth_state import login_redirect_path as _login_redirect_path
 from services.auth.oauth_state import oauth_entry_context as _oauth_entry_context
 from services.auth.oauth_state import oauth_state_entry as _oauth_state_entry
@@ -59,20 +60,22 @@ async def line_oauth_start(entry: str = ""):
         "nonce": _secrets.token_urlsafe(16),
     }
     url = "https://access.line.me/oauth2/v2.1/authorize?" + _urlencode(params)
-    return _RedirectResp(url, status_code=302)
+    return _RedirectResp(url, status_code=302, headers=_NO_STORE)
 
 
 @router.get("/api/auth/line/callback")
 async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
     if error:
-        return _RedirectResp(f"/login?oauth_error={error}", status_code=302)
+        return _RedirectResp(f"/login?oauth_error={error}", status_code=302, headers=_NO_STORE)
     if not _verify_oauth_state(state):
-        return _RedirectResp("/login?oauth_error=invalid_state", status_code=302)
+        return _RedirectResp("/login?oauth_error=invalid_state", status_code=302, headers=_NO_STORE)
     _entry_ctx = _oauth_state_entry(state)
     if not code:
-        return _RedirectResp("/login?oauth_error=no_code", status_code=302)
+        return _RedirectResp("/login?oauth_error=no_code", status_code=302, headers=_NO_STORE)
     if not _LINE_LOGIN_CHANNEL_ID or not _LINE_LOGIN_CHANNEL_SECRET:
-        return _RedirectResp("/login?oauth_error=line_not_configured", status_code=302)
+        return _RedirectResp(
+            "/login?oauth_error=line_not_configured", status_code=302, headers=_NO_STORE
+        )
 
     # code → access_token + id_token
     try:
@@ -94,11 +97,15 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                 logger.error(
                     f"[LINE OAuth] token exchange failed {tr.status_code}: {tr.text[:300]}"
                 )
-                return _RedirectResp("/login?oauth_error=line_token_fail", status_code=302)
+                return _RedirectResp(
+                    "/login?oauth_error=line_token_fail", status_code=302, headers=_NO_STORE
+                )
             tok_data = tr.json()
             id_token = tok_data.get("id_token")
             if not id_token:
-                return _RedirectResp("/login?oauth_error=line_no_id_token", status_code=302)
+                return _RedirectResp(
+                    "/login?oauth_error=line_no_id_token", status_code=302, headers=_NO_STORE
+                )
 
             # 用 LINE 的 verify 端点 · 服务端验证 id_token + 拿 payload
             vr = await client.post(
@@ -113,18 +120,22 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                 logger.error(
                     f"[LINE OAuth] id_token verify failed {vr.status_code}: {vr.text[:300]}"
                 )
-                return _RedirectResp("/login?oauth_error=line_verify_fail", status_code=302)
+                return _RedirectResp(
+                    "/login?oauth_error=line_verify_fail", status_code=302, headers=_NO_STORE
+                )
             payload = vr.json()
     except Exception as e:
         logger.error(f"[LINE OAuth] callback fetch failed: {e}")
-        return _RedirectResp("/login?oauth_error=line_fetch_fail", status_code=302)
+        return _RedirectResp(
+            "/login?oauth_error=line_fetch_fail", status_code=302, headers=_NO_STORE
+        )
 
     line_uid = payload.get("sub")
     line_name = (payload.get("name") or "").strip()
     line_picture = (payload.get("picture") or "").strip()
     line_email = (payload.get("email") or "").strip().lower()  # email scope 没批通常没这个
     if not line_uid:
-        return _RedirectResp("/login?oauth_error=line_no_sub", status_code=302)
+        return _RedirectResp("/login?oauth_error=line_no_sub", status_code=302, headers=_NO_STORE)
 
     # 1) 用 line_uid 找
     user = db.find_user_by_line_uid(line_uid)
@@ -153,11 +164,15 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                 logger.error(f"[LINE OAuth] one-click signup failed: {e}")
                 user = None
             if not user:
-                return _RedirectResp("/login?oauth_error=line_signup_failed", status_code=302)
+                return _RedirectResp(
+                    "/login?oauth_error=line_signup_failed", status_code=302, headers=_NO_STORE
+                )
 
     if not _login_entrance_allowed(_entry_ctx or "main", user):
         error_path = "/cowork" if _entry_ctx == "cowork" else "/login"
-        return _RedirectResp(f"{error_path}?oauth_error=invalid_credentials", status_code=302)
+        return _RedirectResp(
+            f"{error_path}?oauth_error=invalid_credentials", status_code=302, headers=_NO_STORE
+        )
 
     # 颁 JWT
     db.update_last_login(str(user["id"]))
@@ -181,7 +196,8 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
     safe_token = json.dumps(token)
     # v118.28.2 · 超管 → /admin · 普通用户 → /home · POS PO-B1 · cashier → /pos
     _redirect_path = _login_redirect_path(user, entry=_entry_ctx)
-    return HTMLResponse(f"""<!doctype html>
+    return HTMLResponse(
+        f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Pearnly · Signing in...</title></head>
 <body style="font-family:-apple-system,sans-serif;background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
 <div>Signing you in...</div>
@@ -189,4 +205,6 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
 try {{ localStorage.setItem("mrpilot_token", {safe_token}); }} catch(e) {{}}
 window.location.replace("{_redirect_path}");
 </script>
-</body></html>""")
+</body></html>""",
+        headers=_NO_STORE,
+    )

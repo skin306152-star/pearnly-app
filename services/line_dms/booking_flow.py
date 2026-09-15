@@ -11,20 +11,27 @@ A4 定义形状),顶层 payload 只有 nonce 与 collecting 残留键。
 
 from __future__ import annotations
 
+from services.line_dms import binding_guard
+
 import dataclasses
-import json
 import logging
 import secrets
 from typing import Any, Dict, List, Optional, Tuple
 
-from core import db
 from services.cloud_tasks import dispatch as cloud_dispatch
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.session_lock import mrerp_booking_lock
-from services.line_platform import client as line_client
-from services.line_dms import _out, cards, master_contract, masters_cache, qa_cards, store
-from services.line_dms._out import _CHANNEL, _push, _reply, _send, _thr
-from services.line_dms.qa_util import find_row
+from services.line_dms import (
+    _out,
+    booking_attempt,
+    booking_ledger,
+    cards,
+    master_contract,  # noqa: F401  模块对外名保留(会话快照/测试夹具用它构造 qa)
+    masters_cache,
+    qa_cards,
+    store,
+)
+from services.line_dms._out import _push, _reply, _send, _thr
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +40,7 @@ BOOKING_ACTIONS = frozenset(
 )
 _RETRY_TTL_MINUTES = 30
 
-# 后台调度 + LINE 出口(_CHANNEL/_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
+# 后台调度 + LINE 出口(_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
 _spawn = _out.make_spawn("line_dms.booking")
 
 # 附件种类表:(qa.files 键尾, DMS 显示名, 落盘文件名)。
@@ -50,6 +57,11 @@ async def handle_postback(
     """预览卡按钮:核对 booking_review 态 + nonce → 建单 / 取消。"""
     tenant = binding["tenant_id"]
     if action == cards.ACT_CANCEL_BOOKING:
+        session = await _thr(store.get_session, tenant, line_user_id)
+        marker = ((session or {}).get("payload") or {}).get("booking_attempt")
+        if marker:
+            _reply(reply_token, booking_attempt.message(marker))
+            return
         await _thr(store.clear_session, tenant, line_user_id)
         _reply(reply_token, cards.TXT_BOOKING_CANCELLED)
         return
@@ -80,20 +92,32 @@ async def handle_postback(
 
 
 # ── 建订车单 ─────────────────────────────────────────────────────────────
+@binding_guard.bound_task
 async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> None:
     tenant, user_id = binding["tenant_id"], binding["user_id"]
     qa = payload.get("qa") or {}
-    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    pending = await _thr(booking_attempt.pending, tenant, line_user_id, payload)
+    if pending:
+        _push(line_user_id, booking_attempt.message(pending))
+        return
+    await _thr(_out.start_loading, line_user_id)
     ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, qa.get("endpoint_id"))
     if not ep:
         _push(line_user_id, cards.TXT_NO_ENDPOINT)
         return
     attach_files, attach_failed = await _download_attach_files(qa)
-    result = await _thr(_book_in_session, ep, payload, attach_files, attach_failed)
+    result = await _thr(
+        _book_in_session,
+        ep,
+        payload,
+        attach_files,
+        attach_failed,
+        on_attempt=booking_attempt.recorder(tenant, line_user_id, payload),
+    )
     if result.get("preflight"):
         await _resume_after_master_change(binding, line_user_id, payload, result)
         return
-    await _thr(_log_booking, user_id, ep, payload, result)
+    await _thr(booking_ledger.log_booking, user_id, ep, payload, result)
     if result.get("ok"):
         answers = qa.get("answers") or {}
         text = cards.booking_receipt_text(
@@ -106,9 +130,19 @@ async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> N
         if not result.get("attach_ok"):
             text = f"{text}\n{qa_cards.TXT_ATTACH_FAIL}"
         _push(line_user_id, text)
-        await _thr(store.clear_session, tenant, line_user_id)
+        await _thr(booking_attempt.clear_completed, tenant, line_user_id, payload)
     else:
         fr = result.get("error_friendly") or {}
+        if result.get("error_code") == booking_attempt.UNKNOWN:
+            _push(line_user_id, booking_attempt.message(result))
+            return
+        if result.get("error_code") == "ERR_DMS_PAYMENT_INCOMPLETE":
+            nonce = secrets.token_hex(8)
+            if not await _thr(_arm_retry, tenant, line_user_id, payload, nonce):
+                return
+            _push(line_user_id, fr.get("th") or cards.TXT_BOOKING_FAIL)
+            _send(line_user_id, qa_cards.preview_card(qa, nonce))
+            return
         if _retryable_result(result):
             retry_nonce = secrets.token_hex(8)
             armed = await _thr(
@@ -134,19 +168,28 @@ async def _resume_after_master_change(
     binding: dict, line_user_id: str, payload: dict, result: dict
 ) -> None:
     """确认瞬间主档有变化：改名重发摘要，删除则退回对应步骤重选。"""
-    from services.line_dms import booking_qa
+    from services.line_dms import booking_qa, session_store
 
     tenant = binding["tenant_id"]
     qa = result.get("qa") or payload.get("qa") or {}
-    if result.get("preflight") == "changed":
-        nonce = secrets.token_hex(8)
-        await _thr(
-            store.set_session,
-            tenant,
-            line_user_id,
-            "booking_review",
-            {**payload, "qa": qa, "nonce": nonce},
-        )
+    changed = result.get("preflight") == "changed"
+    nonce = secrets.token_hex(8) if changed else None
+    state = (
+        "booking_review"
+        if changed
+        else (None if result.get("field") == "advisor" else "booking_qa")
+    )
+    updated = {**payload, "qa": qa, "nonce": nonce} if changed else {"qa": qa}
+    if not await _thr(
+        session_store.replace_claimed_booking_payload,
+        tenant,
+        line_user_id,
+        payload.get("nonce"),
+        state,
+        updated,
+    ):
+        return
+    if changed:
         _send(line_user_id, qa_cards.master_changed())
         _send(line_user_id, qa_cards.preview_card(qa, nonce))
         return
@@ -154,9 +197,7 @@ async def _resume_after_master_change(
     code = str(result.get("error_code") or "ERR_DMS_MASTER_UNMATCHED")
     _send(line_user_id, qa_cards.master_problem(code))
     if result.get("field") == "advisor":
-        await _thr(store.clear_session, tenant, line_user_id)
         return
-    await _thr(store.set_session, tenant, line_user_id, "booking_qa", {"qa": qa})
     await booking_qa.send_step(tenant, line_user_id, qa, qa.get("step") or "place")
 
 
@@ -166,11 +207,15 @@ def _retryable_result(result: Dict[str, Any]) -> bool:
     主档暂时读不到(ERR_DMS_MASTER_UNAVAILABLE)可等主档恢复后重试;主档已变更
     (ERR_DMS_MASTER_UNMATCHED)重试只会拿到同一份主档,必须让操作员重新选择。
     """
-    if result.get("booking_id"):
+    if result.get("booking_id") or (result.get("response_body") or {}).get("submitted"):
         return False
     if result.get("error_code") == "ERR_DMS_MASTER_UNMATCHED":
         return False
-    if result.get("error_code") in ("ERR_DMS_CONCURRENT_LOGIN", "ERR_DMS_MASTER_UNAVAILABLE"):
+    if result.get("error_code") in (
+        "ERR_DMS_CONCURRENT_LOGIN",
+        "ERR_DMS_MASTER_UNAVAILABLE",
+        "ERR_DMS_CUSTOMER_LOOKUP",
+    ):
         return True
     raw = str(result.get("raw_error") or "")
     response = result.get("response_body") or {}
@@ -179,15 +224,17 @@ def _retryable_result(result: Dict[str, Any]) -> bool:
 
 
 def _arm_retry(tenant: str, line_user_id: str, payload: dict, nonce: str) -> bool:
-    """把失败后的完整订车草稿重新挂回 booking_review,只保留 30 分钟。"""
-    store.set_session(
+    """只重挂本次尚未提交的草稿；不得覆盖用户后续新建或取消的会话。"""
+    from services.line_dms.session_store import replace_claimed_booking_payload
+
+    return replace_claimed_booking_payload(
         tenant,
         line_user_id,
+        payload.get("nonce"),
         "booking_review",
         {**payload, "nonce": nonce},
         ttl_minutes=_RETRY_TTL_MINUTES,
     )
-    return store.verify_nonce(store.get_session(tenant, line_user_id), nonce, "booking_review")
 
 
 async def _download_attach_files(qa: dict) -> Tuple[List[dict], List[dict]]:
@@ -202,7 +249,7 @@ async def _download_attach_files(qa: dict) -> Tuple[List[dict], List[dict]]:
         mid = files.get(f"{key}_mid")
         if not mid:
             continue
-        content = await _thr(line_client.download_message_content, mid, channel=_CHANNEL)
+        content = await _thr(_out.download_content, mid)
         if not content:
             failed.append({"display_name": display, "error": "line content download failed"})
             continue
@@ -231,15 +278,18 @@ def _book_in_session(
     payload: dict,
     attach_files: Optional[List[dict]] = None,
     attach_failed: Optional[List[dict]] = None,
+    *,
+    on_attempt=None,
 ) -> Dict[str, Any]:
-    """一个 DMS 会话内:解析订车载荷 → 建单 → 挂附件 → 顺手全量刷主档缓存(零额外登录)。
+    """一个 DMS 会话内:权威复核 + 解析订车载荷 → 建单 → 挂附件 → 用同一份快照刷主档缓存。
 
     逐问选的 place/term/regis/car/paint id 覆盖端点默认;advisor 在逐问开局就按操作员的
-    DMS 账号匹配好(或端点上钉死)存进 qa["advisor"] —— 建单层(_advisor_ref_strict)按该
-    id 严格校验,匹配不上宁可报错也不落到别人头上;交车日用逐问值覆盖(端点默认只给推算基线)。
-    附件在同一会话挂载:create 成功后、主档刷新前调 cl.attach_booking_files。返回 {ok,
-    booking_no, booking_id, attach_ok, attached, attach_failed} 或 _run_logged_in 的
-    _err dict(ok=False)。
+    DMS 账号匹配好(或端点上钉死)存进 qa["advisor"] —— 载荷层按该 id 在权威名册里严格
+    校验,匹配不上宁可报错也不落到别人头上;交车日用逐问值覆盖(端点默认只给推算基线)。
+    附件在同一会话挂载:create 成功后调 cl.attach_booking_files。
+
+    返回 {ok, booking_no, booking_id, attach_ok, attached, attach_failed} 或
+    _run_logged_in 的 _err dict(ok=False)。
     """
     from services.erp.erp_dms_intake import _run_logged_in
     from services.erp.mrerp_dms_models import BookingDefaults
@@ -263,50 +313,76 @@ def _book_in_session(
     customer_id = str((qa.get("customer") or {}).get("id") or "")
 
     def _do(cl, adapter):
+        nonlocal qa
         from services.erp.mrerp_dms_booking_customer import card_from_customer
-        from services.erp.mrerp_dms_client_base import DMSClientError
+        from services.erp.dms_admin_read import authoritative_read_session
+        from services.erp.mrerp_dms_booking_org import resolve_booking_org
+        from services.erp.mrerp_dms_booking_payload import build_booking_payload
         from services.erp.mrerp_dms_company_banks import (
-            fetch_company_banks,
+            fetch_payment_bank_masters,
             validate_company_bank_payments,
         )
+        from services.erp.mrerp_dms_payments import validate_payment_completeness
+        from services.line_dms import booking_preflight
 
-        live_masters = {
-            **cl.fetch_masters(strict=True),
-            "company_banks": fetch_company_banks(adapter),
-        }
-        selected_car_id = str((answers.get("car") or {}).get("id") or "")
-        selected_car = find_row(live_masters.get("cars"), selected_car_id)
-        live_paints = []
-        if selected_car is not None:
-            live_paints = cl._bshsd_all("txtcarpaint", idcar=selected_car_id)
-            if live_paints is None:
-                raise DMSClientError(
-                    f"DMS paint master unavailable for car {selected_car_id!r}",
-                    "ERR_DMS_MASTER_UNAVAILABLE",
+        # Cards already issued by the previous collector retained the evidence
+        # that the source directory was empty but missed the payment-level flag.
+        validate_payment_completeness(qa.get("payments") or [])
+
+        # 只读阶段:配了独立管理员凭据组时,这一块里的**一切读**都走管理员权威会话(销售常
+        # 看不到车型/颜色/收款银行/客户档,销售视图会把 DMS 里还在的选择误判成不存在)。
+        # 整块只解析一次管理员 transport;未配管理员即销售会话。
+        # 提交前的权威取数在这里一次性做完:一份全量主档 + 选中车型颜色 + 顾问组织 + 客户档;
+        # 载荷(build_booking_payload)吃这份快照**纯解析**,不再按 car/paint/place/term/
+        # regis/advisor 逐字段回 DMS 取数(resolve_booking_payload 会重新取数,且在退出本块
+        # 后就是销售视图 —— 核心契约会在解析层被绕过,这里必须不用它)。
+        with authoritative_read_session(cl):
+            # cl 此刻的 transport 就是权威只读闸(只许 GET/POST 到只读路径);退出即换回销售,
+            # 下面的建单/附件/回读永不落管理员态。
+            preflight = booking_preflight.readonly_preflight(
+                cl,
+                adapter,
+                qa,
+                fetch_masters=lambda client: client.fetch_masters(strict=True),
+                fetch_payment_banks=lambda _adapter: fetch_payment_bank_masters(
+                    _adapter, client=cl
+                ),
+            )
+            if preflight["status"] != "ok":
+                return {
+                    "ok": False,
+                    "preflight": preflight["status"],
+                    "field": preflight.get("field", ""),
+                    "error_code": preflight.get("code", "ERR_DMS_MASTER_CHANGED"),
+                    "qa": preflight["qa"],
+                }
+            qa = payload["qa"] = preflight["qa"]
+            masters, paints = preflight["masters"], preflight["paints"]
+
+            if qa.get("customer_dirty"):
+                draft = dict(qa.get("draft") or {})
+                draft["name"] = str((qa.get("customer") or {}).get("name") or "")
+                # 客户建档/改档已有 admin writer 语义(save_customer 自带 _writer_session)。
+                # 嵌套在本块内:写切 raw admin writer,退出 writer 会话仍落回本块的只读闸。
+                cl.save_customer(fields=draft, mode="overwrite", customer_id=customer_id)
+            master_card = card_from_customer(
+                cl,
+                customer_id=customer_id,
+                people_id=card.people_id,
+            )
+            # 顾问组织(detailbooksell)只有这一次单独实时读:它不在全量主档里。
+            org = resolve_booking_org(cl, defaults.advisor_id, defaults)
+            # 载荷吃已取得的权威快照:零额外取数,不做逐字段重复解析。
+            booking = build_booking_payload(defaults, masters=masters, paints=paints, org=org)
+            if delivery_be:
+                # 银行身份核对也在权威只读块内完成并产出最终 payments —— 退出本块后银行目录
+                # 只剩销售视图,核对必须在这里做完。
+                payments = validate_company_bank_payments(
+                    adapter, qa.get("payments") or [], client=cl
                 )
-        preflight = master_contract.reconcile(qa, live_masters, live_paints)
-        if preflight["status"] != "ok":
-            return {
-                "ok": False,
-                "preflight": preflight["status"],
-                "field": preflight.get("field", ""),
-                "error_code": preflight.get("code", "ERR_DMS_MASTER_CHANGED"),
-                "qa": preflight["qa"],
-            }
-        payload["qa"] = preflight["qa"]
 
-        if qa.get("customer_dirty"):
-            draft = dict(qa.get("draft") or {})
-            draft["name"] = str((qa.get("customer") or {}).get("name") or "")
-            cl.save_customer(fields=draft, mode="overwrite", customer_id=customer_id)
-        master_card = card_from_customer(
-            cl,
-            customer_id=customer_id,
-            people_id=card.people_id,
-        )
-        booking = cl.resolve_booking_payload(defaults, master_card)
+        # 写阶段:销售会话,提交一次(表单/autonum/提交/附件/有限回读都在销售会话上)。
         if delivery_be:
-            payments = validate_company_bank_payments(adapter, qa.get("payments") or [])
             booking = dataclasses.replace(
                 booking,
                 delivery_date_be=delivery_be,
@@ -316,16 +392,28 @@ def _book_in_session(
         # 账套级互斥只护「取号→提交」:同账套不同销售账号并发时别撞单号。
         # 客户写入/附件挂载/主档刷新等慢步骤不进共享锁。
         with mrerp_booking_lock(ep):
+            create_options = {"on_attempt": on_attempt} if on_attempt is not None else {}
             booking_id, booking_no = cl.create_booking_via_form(
-                customer_id=customer_id, booking=booking, card=master_card
+                customer_id=customer_id, booking=booking, card=master_card, **create_options
             )
         attached = 0
         failed = list(attach_failed or [])
         if attach_files:
-            res = cl.attach_booking_files(booking_id=booking_id, files=attach_files)
-            attached = int(res.get("attached") or 0)
-            failed += list(res.get("failed") or [])
-        masters_cache.refresh_from_client(ep, cl)
+            try:
+                res = cl.attach_booking_files(booking_id=booking_id, files=attach_files)
+                attached = int(res.get("attached") or 0)
+                failed += list(res.get("failed") or [])
+            except Exception:
+                logger.warning("DMS booking exists but attachment upload failed", exc_info=True)
+                failed += [{"error": "attachment upload failed"}]
+        # 主档缓存用**本次提交前的权威快照**落库:不再用销售会话二次抓全量(那会把管理员
+        # 完整缓存覆盖成销售裁剪视图,还多一轮远程读取)。
+        masters_cache.write_authoritative_snapshot(
+            ep,
+            masters,
+            car_id=str(((qa.get("answers") or {}).get("car") or {}).get("id") or ""),
+            paints=paints,
+        )
         return {
             "ok": True,
             "booking_id": booking_id,
@@ -372,69 +460,4 @@ def _card_payload(payload: dict):
         prefix_id=str(d.get("prefix_id") or "17") or "17",
         prefix_name="",
         phone=str(d.get("phone") or "0800000000") or "0800000000",
-    )
-
-
-def _log_booking(user_id: str, ep: dict, payload: dict, result: dict) -> None:
-    """订车推送台账(与 flow 同一 erp_push_logs)· request_body.trigger='line_dms',
-    BK 单号进 invoice_no 位(照客户 push 把外部单号放该列的先例),push_type 保持 'id_card'。
-    qa 块只进摘要(place/term/regis/渠道/总额/凭证有无),audit 过大不进台账、留会话。"""
-    ok = bool(result.get("ok"))
-    qa = payload.get("qa") or {}
-    answers = qa.get("answers") or {}
-    adv = qa.get("advisor") or {}
-    payments = qa.get("payments") or []
-    request_body = {
-        "adapter": "mrerp_dms",
-        "trigger": "line_dms",
-        "mode": "booking",
-        "customer_id": str((qa.get("customer") or {}).get("id") or ""),
-        "car_id": str((answers.get("car") or {}).get("id") or ""),
-        "paint_id": str((answers.get("paint") or {}).get("id") or ""),
-        "advisor_id": str(adv.get("id") or ""),
-        # 归属名与 id 同层:对账翻台账时不用回查主档,也不用跨层拼。
-        "advisor_name": str(adv.get("name") or ""),
-        "qa": {
-            "place_id": str((answers.get("place") or {}).get("id") or ""),
-            "term_id": str((answers.get("term") or {}).get("id") or ""),
-            "regis_id": str((answers.get("regis") or {}).get("id") or ""),
-            "regis_name": str(answers.get("regis_name") or ""),
-            "payments": [
-                {"channel": str(p.get("channel") or ""), "amount": str(p.get("amount") or "")}
-                for p in payments
-            ],
-            "earnest_total": str(qa_cards.deposit_total(payments)),
-            "slip_attached": bool((qa.get("files") or {}).get("slip_mid")),
-            "master_snapshot_version": str((qa.get("master_snapshot") or {}).get("version") or ""),
-            "master_snapshot_at": str((qa.get("master_snapshot") or {}).get("captured_at") or ""),
-            "master_validated_at": str(
-                (qa.get("master_validation") or {}).get("validated_at") or ""
-            ),
-        },
-    }
-    response_body = {
-        "booking_id": result.get("booking_id", ""),
-        "booking_no": result.get("booking_no", ""),
-    }
-    if "attach_ok" in result:
-        response_body["attach_ok"] = result.get("attach_ok")
-        response_body["attached"] = result.get("attached", 0)
-        response_body["attach_failed"] = result.get("attach_failed") or []
-    if not ok:
-        response_body["raw_error"] = (result.get("response_body") or {}).get("raw_error", "")
-    db.insert_push_log(
-        user_id,
-        str(ep["id"]),
-        None,
-        result.get("booking_no") or "",
-        str((qa.get("customer") or {}).get("name") or ""),
-        None,
-        "success" if ok else "failed",
-        200 if ok else 0,
-        request_body,
-        json.dumps(response_body, ensure_ascii=False),
-        result.get("error_code"),
-        1,
-        0,
-        "id_card",
     )

@@ -207,6 +207,8 @@ def _boot_schema_ddl() -> None:
 
     # 自动做账/报税/一句话记账 schema 双跑(docs accounting·tax-filing·smart-intake)。NEW-DEBT-EXEMPT。
     for _path, _fn, _label in (
+        ("services.work_bridge.schema", "migrate_schema", "工作协作登录"),
+        ("services.cowork_line.work_store", "migrate_schema", "LINE 工作协调"),
         ("services.accounting.schema", "ensure_accounting_schema", "accounting"),
         ("services.tax.schema", "ensure_tax_schema", "tax"),
         ("services.expense.schema", "ensure_expense_schema", "expense"),
@@ -227,6 +229,15 @@ def _boot_schema_ddl() -> None:
             __import__(_mod, fromlist=["ensure_table"]).ensure_table()
         except Exception as e:
             logger.warning(f"启动 LINE {_label} schema 失败: {e}")
+
+    # DMS 多 OA 表/迁移(channel_key 列、复合唯一、账号 OA 分配)必须进串行 schema 闸;
+    # 首请求 _with_heal 只作兜底,不能当作发布步骤(alembic 0125 留档)。
+    try:
+        from services.line_dms.schema import ensure_tables as ensure_line_dms_schema
+
+        ensure_line_dms_schema()
+    except Exception as e:
+        logger.warning(f"启动 LINE DMS schema 失败: {e}")
 
     # 商户采购(进项)schema 双跑 · 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
     try:

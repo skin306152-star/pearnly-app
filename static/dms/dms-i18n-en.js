@@ -153,6 +153,9 @@ window.__DMS_I18N_EN__ = {
     'dic-needs-review': 'Incomplete ID scan — please retake a clear photo',
     'dic-need-fields': 'Name and ID number are required',
     'dic-push-fail': 'Push failed — please retry',
+    'dx-select-required': 'Choose a title and complete the address selections before saving',
+    'dx-geo-load-fail':
+        'Address options could not be loaded. Select the parent field again to retry.',
     'dx-erp-h': 'Push to ERP',
     'dx-erp-checking': 'Checking…',
     'dx-erp-not-connected': 'Not connected',
@@ -377,6 +380,7 @@ window.__DMS_I18N_EN__ = {
     'dms-op-code-title': 'Bind code',
     'dms-op-code-step1': 'Have the operator add Pearnly DMS as a LINE friend',
     'dms-op-code-step2': 'Send this bind code in the LINE chat to connect',
+    'dms-op-code-line-id': 'LINE ID',
     'dms-op-code-regen': 'Regenerate',
     'dms-op-code-expires': 'Expires in',
     'dms-op-code-expired': 'Bind code expired, regenerate it',

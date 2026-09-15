@@ -1,0 +1,222 @@
+# Pearnly / WeKan deployment
+
+Production entry: **https://pearnly.com/cowork** → การทำงานร่วมกัน →
+**https://work.pearnly.com**. Exact release identities and acceptance limits are in
+[the deployment ledger](../../docs/deployment/MIGRATION_STATUS.md) and
+[the task records](../../docs/project/WEKAN_SSO_20260912.md).
+
+All COWORK accounts use one service. There is no firm allowlist, first-owner
+configuration or per-firm activation. Pearnly's ordinary employee permissions
+apply in COWORK; native WeKan site and board roles apply after entry. A native
+WeKan administrator does not become a Pearnly owner or platform administrator.
+
+## Source and authentication
+
+The upstream checkout remains `/Users/skin/wekan`. The additive Docker image
+pins the official multi-architecture WeKan image by digest; the local checkout
+is a source reference, not proof of that image's source revision. The pinned
+running image reports WeKan 11.58.0. Pearnly integration code lives here and in
+`services/work_bridge`, `routes/work_bridge_routes.py` and `/work`.
+
+The installer preserves native permission checks. It adds missing awaits in
+the pinned `setCreateUser` and `inviteUserToBoard` account-creation and enrollment calls, and
+allows username-only invitations to finish without attempting an absent email, and
+extends SockJS's allowed request headers with the two private gateway identity
+headers. It fails if those upstream code shapes change.
+
+Pearnly's access token stays on the Pearnly origin. A 60-second, single-use
+ticket is bound to a gateway browser-state cookie. The gateway receives an
+opaque parent-session handle and stores it in an encrypted HttpOnly cookie.
+All HTTP requests, files and WebSocket upgrades require a live parent session.
+WebSockets revalidate that parent every five seconds and close on validation
+failure (including the bounded service-request timeout). WeKan login/resume
+tokens and HTTP authentication tokens must match the gateway's Pearnly identity.
+Native account disable/delete also closes its active DDP connections.
+The native logout button revokes the bridge session before returning to COWORK.
+
+Native permission-checked employee creation writes an ordinary Pearnly employee
+and retains WeKan's own role flags. The Pearnly password is the only login
+password; native public signup is closed. Existing Pearnly email invitations
+link by immutable account ID without resetting passwords or changing COWORK
+membership. New email invitations use Pearnly's existing password-setup flow.
+Pearnly account and tenant suspension govern access to Pearnly; WeKan role
+changes and account suspension govern WeKan only.
+
+## Durable hosting
+
+Pearnly Web/Worker retain Cloud Run. The separate stateful service runs in GCP
+project `pearnly`, zone `asia-southeast1-b`, on VM `pearnly-work` (e2-medium,
+4 GiB). Static address: `136.85.65.80`; retained 30 GiB data disk:
+`pearnly-work-data`, mounted at `/srv/pearnly-work`. Do not reuse or modify the ERPNext VM or its
+project. The WeKan/MongoDB disk must not be an ephemeral Cloud Run filesystem.
+
+`compose.yml` is the local stack. Add `compose.production.yml` for authenticated
+MongoDB, explicit memory/log limits and Caddy TLS. Only Caddy's 80/443 ports are
+public. Gateway 8096 binds loopback; WeKan 8080 and MongoDB 27017 have no host
+port. The only SSH ingress should be Google IAP. Use a dedicated VM service
+account with access only to its runtime secret and the image repository.
+
+Create `work.pearnly.com` on the Pearnly DNS zone and point it to the new VM's
+static address. Preserve the main/www Worker routes, other DNS records and
+existing TLS policy. Pearnly and WeKan use the same site so the state cookie
+remains compatible with the cross-origin form POST. Verify DNS and TLS before
+publishing the COWORK entry configuration.
+
+Populate `runtime.env.example` in Secret Manager with independent generated
+secrets and an immutable `WORK_IMAGE` digest. MongoDB passwords must be URL-safe.
+The application MongoDB user has only `readWrite` on database `wekan`; it is
+created only when the data volume is empty. Changing environment variables
+does not rotate an existing database user's password.
+
+The host uses dedicated Secret Manager secret `pearnly-work-env`; Web and
+Worker runtime secrets are separate. Fetch only the pinned secret version with
+the host service account, write it root-owned mode 0600, and pull the immutable
+image using short-lived registry authentication. Do not print secret contents.
+
+From `/srv/pearnly-work/app`, after the exact source/image is verified:
+
+```sh
+docker compose --env-file /srv/pearnly-work/app/runtime.env -p pearnly-work \
+  -f compose.yml -f compose.production.yml config --quiet
+docker compose --env-file /srv/pearnly-work/app/runtime.env -p pearnly-work \
+  -f compose.yml -f compose.production.yml up -d
+```
+
+The runtime file must be root-owned, mode 0600. Preserve database, files and
+certificate volumes on image updates; never use `down -v` in production.
+Use the application-consistent snapshot procedure below; test restoration from
+a cloned disk and an isolated MongoDB container, never over the live database. Before changing MongoDB or
+WeKan versions, take a version-labelled database/file backup and validate the
+upgrade against its copy. Initial single-instance hosting has no automatic
+failover; its capacity and monthly infrastructure cost require live readback.
+
+## Branding
+
+Only the logo, the product name and the palette differ from upstream; no native
+screen, permission or workflow is rewritten. Everything is reproducible from
+this directory, so a fresh host is branded by the image alone.
+
+- The name and the two logo slots are the **native** `productName`,
+  `customTopLeftCornerLogoImageUrl`/`Height` and `customLoginLogoImageUrl`
+  settings. `meteor-bridge.js` seeds them at startup through the Mongo driver
+  (the app already owns the `settings` collection, so a second `Mongo.Collection`
+  handle would throw). Only those five keys are ever written. Because the name is
+  the real setting, `<title>`, the header alt text, the page-title template and
+  the sign-in heading all follow natively.
+- Logos live in `branding/`. `install.mjs` copies the four stock icon files over
+  their upstream names and **fails the build** if one is renamed upstream; the two
+  Pearnly lockups are served by the gateway from `/_pearnly/`, because WeKan's own
+  asset server answers unknown paths with the app page rather than the file.
+  `branding/README.md` records how each image was derived from
+  `static/brand/logo-square.png`.
+- `branding.css` carries the palette (`--theme-accent`, the two header bars, the
+  primary/sidebar fills) and the boot cover. The boilerplate links it in `<head>`
+  so it is render-blocking, and the cover hides the native UI until the client
+  script has authenticated the Pearnly session: that is what removes the
+  transient native sign-in page and stock logo. The cover lifts on success, on a
+  failed login (with the retry message) and on a 12-second safety timeout, so it
+  can never strand a user.
+- The tab title and the two `application-name` metas are hardcoded in the native
+  layout, so `client.js` rewrites them, following the head rather than assuming
+  an order.
+- The top bar carries the page title only: `branding.css` hides the logo slot,
+  which sat beside the board name and added nothing.
+
+## Thai text and the language picker
+
+Pearnly's market is Thai first, so the Thai text is treated as product content
+rather than an upstream detail. `install.mjs` patches two places in the pinned
+bundle:
+
+- **The language picker** lists three languages (ไทย, English, 简体中文).
+  `getSupportedLanguages()` is filtered, not the language table: a profile that
+  already selected another language keeps loading it.
+- **The Thai text** is corrected from `i18n/th-overrides.json`. A block of
+  upstream's Thai file was Vietnamese (the create-board dialog offered "Mẫu" for
+  Template), and 26 keys the UI asks for are missing from every language file, so
+  the raw key was shown as a tooltip (for example `collapse-card`). Corrections
+  must exist in the bundle and additions must not, so an upstream fix or a stale
+  entry stops the build instead of silently doing nothing.
+
+The audit behind that list: all 2417 keys are present in Thai; 49 values were
+another language; 47 matched English, and all but one were product names or
+abbreviations; one placeholder mismatch is an example JSON whose Thai version
+translates the example itself. Two templates with hardcoded English
+(`originalPositionsView`, `originalPosition`) are unreachable in this build - no
+template includes them.
+
+To update the running image: build the pinned-architecture image, push it, put
+its immutable digest in a new `pearnly-work-env` secret version, then on the host
+refresh `runtime.env` from that version and run
+`docker compose --env-file runtime.env -p pearnly-work -f compose.yml -f compose.production.yml up -d`.
+Changing a compose file on the host means copying the updated file into
+`/srv/pearnly-work/app` first; the rest of this directory is a source reference
+and is not read at runtime.
+
+## Application-consistent snapshots
+
+The attached policy `pearnly-work-consistent-daily` snapshots the data disk at
+20:00 UTC (03:00 Bangkok), retains seven days, and keeps automatic snapshots
+when the source disk is deleted. It has `guestFlush=true` and regional storage
+in `asia-southeast1`. The retained data disk contains Docker volumes, MongoDB,
+attachments, Caddy certificates and the private runtime file.
+
+Install the supplied hooks on this dedicated host:
+
+```sh
+sudo install -d /etc/google/snapshots
+sudo install -m 755 snapshot-pre.sh /etc/google/snapshots/pre.sh
+sudo install -m 755 snapshot-post.sh /etc/google/snapshots/post.sh
+```
+
+In `/etc/default/instance_configs.cfg`, preserve existing sections and add or
+update `[Snapshots]` with `enabled = true` and `timeout_in_seconds = 60`, then
+restart `google-guest-agent`. The pre-hook locks MongoDB, runs `sync`, and freezes
+the data filesystem. The post-hook thaws it and unlocks MongoDB. A 240-second
+systemd timer invokes the same idempotent thaw if the guest agent fails.
+MongoDB lock status must be checked with the raw admin `currentOp` command;
+`db.currentOp()` omits that flag in this mongosh version.
+
+Recovery acceptance on 2026-09-12 restored snapshot
+`pearnly-work-verified-20260912` to a separate disk, mounted the clone with normal
+ext4 journal recovery, and copied its database into a disposable authenticated
+MongoDB container with `--network none`. Both a database marker and attachment
+volume bytes matched the originals. Temporary containers, copied data and clone
+disks were removed after verification. This proves recovery from the manual
+snapshot; the first scheduled execution is still to occur.
+
+Before a version upgrade, take a guest-flush snapshot, verify hook completion and
+an unlocked database, then validate that version against a clone. A live image
+rollback must keep the same volumes and use a previously recorded digest.
+See [Google's guest-flush instructions](https://docs.cloud.google.com/compute/docs/disks/creating-linux-application-consistent-pd-snapshots).
+
+## Pearnly release order
+
+1. Pass native login/creation/role/revocation acceptance and project gates.
+2. Build the pinned addon for the VM architecture and record its registry digest.
+3. Deploy the private persistent stack and TLS gateway; read back resource,
+   image and volume identities. `/_pearnly/health` must verify native MongoDB
+   access, not merely a running gateway process.
+4. Add the same `WORK_BRIDGE_URL` and `WORK_BRIDGE_SECRET` to Pearnly's existing
+   Web/Worker runtime secrets while preserving other fields.
+5. Release the exact reviewed Pearnly master SHA using
+   [the existing Cloud Run workflow](../../docs/deployment/CLOUD_RUN.md).
+   Its serialized schema job applies the additive `0128_work_bridge` schema;
+   do not run an independent production Alembic command.
+6. Verify both Cloud Run revisions/digests/traffic/readiness, then normal user
+   login, menu entry, native invitation, employee login, board roles, attachments
+   and revocation on the formal URLs. Do not create test business documents in
+   real customer workspaces or email real users for acceptance testing.
+
+Keep the previous verified Pearnly revision and WeKan image. Code rollback
+retains the additive identity tables and persistent volumes. Disabling WeKan
+must not disable COWORK accounts or promote/demote their Pearnly roles.
+
+## Acceptance limits
+
+The formal browser login/menu/logout, native employee issuance through Pearnly,
+board roles, file upload/download, revocation and backup restoration passed.
+Actual invitation-email receipt and user-device acceptance remain unverified.
+The pinned upstream's optional HTTP/DDP attachment-upload APIs fail; webpage
+upload/download works and has been checked byte-for-byte. See the task record
+for those exact failed API paths before implementing an API-based upload client.

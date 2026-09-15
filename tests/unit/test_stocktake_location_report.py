@@ -71,4 +71,19 @@ class StocktakeLocationReport(TestCase):
         self.assertEqual(detail["N3"].value, "ไม่ตรงกัน")
         self.assertEqual(detail["J4"].value, "ยกเลิก (ไม่รวมยอด)")
         self.assertEqual(summary["C2"].value, "00001")
+        self.assertEqual(summary["J2"].fill.fgColor.rgb, "00FFF2CC")
+        self.assertEqual(summary["M2"].fill.fgColor.rgb, "00FFF2CC")
+        self.assertEqual(summary["G2"].fill.patternType, None)
+        self.assertEqual(summary["G3"].fill.patternType, None)
+        self.assertEqual(summary["G4"].fill.fgColor.rgb, "00FFF2CC")
+        self.assertEqual(detail["E2"].fill.patternType, None)
+        self.assertEqual(detail["E3"].fill.fgColor.rgb, "00FFF2CC")
+        self.assertEqual(detail["E4"].fill.patternType, None)
+        # Explicit borders survive fills and viewers with gridlines switched off.
+        for sheet in (summary, detail):
+            for cells in sheet:
+                for cell in cells:
+                    for side in ("left", "right", "top", "bottom"):
+                        self.assertEqual(getattr(cell.border, side).style, "thin")
+                        self.assertEqual(getattr(cell.border, side).color.rgb, "00A6ACB3")
         wb.close()

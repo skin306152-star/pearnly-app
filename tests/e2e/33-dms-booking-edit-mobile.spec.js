@@ -92,11 +92,27 @@ const PAYMENT_DRAFT = {
     ...DRAFT,
     form: {
         ...DRAFT.form,
+        customer: {
+            ...DRAFT.form.customer,
+            prefix_id: '17',
+            province_id: '1',
+            district_id: '18',
+            subdistrict_id: '72',
+            zipcode_id: '197',
+        },
+        answers: {
+            place: { id: 'PL1' },
+            car: { id: 'C1' },
+            paint: { id: 'P1' },
+            term: { id: 'T1' },
+            regis: { id: 'R1' },
+        },
         payments: [
             {
                 channel: 'transfer',
                 amount: '1000.00',
                 extra: {
+                    src_bank_id: 'S1',
                     src_bank_name: 'KBank',
                     src_account_no: '111222333',
                     src_account_name: 'Customer',
@@ -109,10 +125,76 @@ const PAYMENT_DRAFT = {
     },
     masters: {
         ...DRAFT.masters,
+        prefixes: [{ id: '17', label: 'Mr' }],
+        places: [{ id: 'PL1', label: 'Place' }],
+        cars: [{ id: 'C1', label: 'Car' }],
+        paints: [{ id: 'P1', label: 'Paint' }],
+        terms: [{ id: 'T1', label: 'Cash' }],
+        regis: [{ id: 'R1', label: 'Person' }],
+        source_banks: [{ id: 'S1', label: 'KBank' }],
         company_banks: [
             { id: '2', label: 'BBL · Bbl 987654321 · ระยอง' },
             { id: '1', label: 'SCB · 1234567890123 · ระยอง' },
         ],
+    },
+};
+
+// 生产租户真形态:来源银行目录权威为空 → 编辑器给可填写的银行名称,不再是下拉。
+const PAYMENT_MANUAL_DRAFT = {
+    ...PAYMENT_DRAFT,
+    form: {
+        ...PAYMENT_DRAFT.form,
+        payments: [
+            {
+                channel: 'transfer',
+                amount: '1000.00',
+                extra: {
+                    src_bank_name: 'KBank ระยอง',
+                    src_account_no: '111222333',
+                    src_account_name: 'Customer',
+                    src_branch_name: 'Bangkok',
+                    src_time: '15:06',
+                    dst_id: '2',
+                },
+            },
+        ],
+    },
+    masters: {
+        ...PAYMENT_DRAFT.masters,
+        source_banks: [],
+    },
+    manual_banks: ['source_banks', 'cheque_banks', 'cashier_banks', 'card_banks'],
+};
+
+// 同一「目录权威为空」形态下的渠道银行草稿:对话里已存的是手工 bank_name(没有目录 id)。
+const PAYMENT_MANUAL_CHANNEL_DRAFT = {
+    ...PAYMENT_MANUAL_DRAFT,
+    form: {
+        ...PAYMENT_MANUAL_DRAFT.form,
+        files: { id_card: true, slip: false },
+        payments: [
+            {
+                channel: 'cheque',
+                amount: '500.00',
+                extra: { cheque_no: '123456', cheque_book_no: '01', bank_name: 'KBank ระยอง' },
+            },
+            {
+                channel: 'cashier_cheque',
+                amount: '600.00',
+                extra: { cashier_no: '778899', cashier_book_no: '02', bank_name: 'SCB ระยอง' },
+            },
+            {
+                channel: 'card',
+                amount: '700.00',
+                extra: { bank_name: 'BBL ระยอง', card_type: 'VISA' },
+            },
+        ],
+    },
+    masters: {
+        ...PAYMENT_MANUAL_DRAFT.masters,
+        cheque_banks: [],
+        cashier_banks: [],
+        card_banks: [],
     },
 };
 
@@ -146,6 +228,24 @@ const GEO = {
     zipcodes: {
         72: [{ id: '197', label: '10600' }],
         6472: [{ id: '6477', label: '81120' }],
+    },
+};
+
+const AUTO_DEFAULT_DRAFT = {
+    ...GEO_DRAFT,
+    form: {
+        ...GEO_DRAFT.form,
+        customer: { ...GEO_DRAFT.form.customer, prefix_id: '17' },
+    },
+    masters: {
+        ...GEO_DRAFT.masters,
+        prefixes: [{ id: '17', label: 'นาย' }],
+    },
+    geo: {
+        provinces: GEO.provinces,
+        districts: GEO.districts['1'],
+        subdistricts: GEO.subdistricts['18'],
+        zipcodes: GEO.zipcodes['72'],
     },
 };
 
@@ -211,6 +311,11 @@ async function setupPortalTest(page, os, inClient = true) {
         token,
     };
 }
+
+// Browser editors now always exchange the current LINE identity, even with a stored web JWT.
+test.beforeEach(async ({ page }) => {
+    await setupPortalTest(page, 'web', false);
+});
 
 test('Android opens MRERP DMS externally without cancelling the browser handoff', async ({
     page,
@@ -474,6 +579,8 @@ test('mobile payment and attachment controls stay aligned', async ({ page }) => 
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         const url = route.request().url();
         const data = url.includes('/draft') ? DRAFT : [];
         return route.fulfill({
@@ -516,7 +623,134 @@ test('mobile payment and attachment controls stay aligned', async ({ page }) => 
     await page.screenshot({ path: path.join(OUT, 'mobile-controls.png'), fullPage: true });
 });
 
-test('payment editor keeps bank, account and company destination as separate fields', async ({
+test('payment editor only requires selecting the receiving bank', async ({ page }) => {
+    let submitted;
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', async (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
+        if (route.request().method() === 'POST') {
+            submitted = route.request().postDataJSON();
+            return route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: { saved: true } }),
+            });
+        }
+        const url = new URL(route.request().url());
+        const level = url.searchParams.get('level');
+        const parent = url.searchParams.get('parent_id');
+        const data = url.pathname.endsWith('/draft')
+            ? PAYMENT_DRAFT
+            : level === 'provinces'
+              ? GEO.provinces
+              : GEO[level]?.[parent] || [];
+        return route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data }),
+        });
+    });
+
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=payment-fields`);
+    await page.waitForSelector('#editor:not([hidden])');
+    await expect(
+        page.locator('.src-bank, .src-bank-name, .src-account, .src-name, .src-branch')
+    ).toHaveCount(0);
+    await expect(page.locator('.dst-account, .dst-name, .dst-branch')).toHaveCount(0);
+    await page.locator('.dst').selectOption('');
+    await page.locator('#save').click();
+    expect(submitted).toBeUndefined();
+    await page.locator('.dst').selectOption('2');
+    for (const width of [390, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        expect(
+            await page.evaluate(
+                () => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth
+            )
+        ).toBe(true);
+        await page.screenshot({
+            path: path.join(OUT, `complete-payment-${width}.png`),
+            fullPage: true,
+        });
+    }
+    await page.locator('#save').click();
+    await expect.poll(() => submitted).toBeTruthy();
+    expect(submitted.form.payments[0]).toEqual({
+        channel: 'transfer',
+        amount: '1000.00',
+        extra: {
+            dst_id: '2',
+        },
+    });
+});
+
+test('empty source bank directory does not add any bank detail inputs', async ({ page }) => {
+    let submitted;
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', async (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
+        if (route.request().method() === 'POST') {
+            submitted = route.request().postDataJSON();
+            return route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: { saved: true } }),
+            });
+        }
+        const url = new URL(route.request().url());
+        const level = url.searchParams.get('level');
+        const parent = url.searchParams.get('parent_id');
+        const data = url.pathname.endsWith('/draft')
+            ? PAYMENT_MANUAL_DRAFT
+            : level === 'provinces'
+              ? GEO.provinces
+              : GEO[level]?.[parent] || [];
+        return route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data }),
+        });
+    });
+
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=manual-source-bank`);
+    await page.waitForSelector('#editor:not([hidden])');
+    await expect(
+        page.locator(
+            '.src-bank-name, .src-bank, .src-account, .dst-name, .dst-account, .dst-branch'
+        )
+    ).toHaveCount(0);
+    await expect(page.locator('.dst')).toHaveValue('2');
+    await page.screenshot({ path: path.join(OUT, 'manual-source-bank-390.png'), fullPage: true });
+    await page.locator('#save').click();
+    await expect.poll(() => submitted).toBeTruthy();
+    expect(submitted.form.payments[0]).toEqual({
+        channel: 'transfer',
+        amount: '1000.00',
+        extra: {
+            dst_id: '2',
+        },
+    });
+});
+
+test('empty channel bank directories show the saved manual bank name, not an id', async ({
     page,
 }) => {
     let submitted;
@@ -532,6 +766,8 @@ test('payment editor keeps bank, account and company destination as separate fie
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', async (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         if (route.request().method() === 'POST') {
             submitted = route.request().postDataJSON();
             return route.fulfill({
@@ -539,34 +775,52 @@ test('payment editor keeps bank, account and company destination as separate fie
                 body: JSON.stringify({ ok: true, data: { saved: true } }),
             });
         }
-        const data = route.request().url().includes('/draft') ? PAYMENT_DRAFT : [];
+        const url = new URL(route.request().url());
+        const level = url.searchParams.get('level');
+        const parent = url.searchParams.get('parent_id');
+        const data = url.pathname.endsWith('/draft')
+            ? PAYMENT_MANUAL_CHANNEL_DRAFT
+            : level === 'provinces'
+              ? GEO.provinces
+              : GEO[level]?.[parent] || [];
         return route.fulfill({
             contentType: 'application/json',
             body: JSON.stringify({ ok: true, data }),
         });
     });
 
-    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=payment-fields`);
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=manual-channel-bank`);
     await page.waitForSelector('#editor:not([hidden])');
-    await expect(page.locator('.src-bank')).toHaveValue('KBank');
-    await expect(page.locator('.src-account')).toHaveValue('111222333');
-    await expect(page.locator('.dst')).toHaveValue('2');
-    await expect(page.locator('.dst option:checked')).toHaveText('BBL · Bbl 987654321 · ระยอง');
-    await expect(page.locator('[data-t="loading"]')).toBeHidden();
+    await page.screenshot({ path: path.join(OUT, 'manual-channel-bank-390.png'), fullPage: true });
+    /* 支票目录为空 → 银行名称可填写;草稿里的 bank_name 必须回显,不能拿空 bank_id 顶替。 */
+    await expect(page.locator('.bank-name').nth(0)).toHaveValue('KBank ระยอง');
+    await expect(page.locator('.bank-name').nth(1)).toHaveValue('SCB ระยอง');
+    await expect(page.locator('.bank-name').nth(2)).toHaveValue('BBL ระยอง');
+    await expect(page.locator('.bank-id')).toHaveCount(0);
+    await expect(page.locator('.cheque-no')).toHaveValue('123456');
+    await expect(page.locator('.cheque-book-no')).toHaveValue('01');
+    await expect(page.locator('.cashier-no')).toHaveValue('778899');
+    await expect(page.locator('.cashier-book-no')).toHaveValue('02');
+    await expect(page.locator('.card-type')).toHaveValue('VISA');
     await page.locator('#save').click();
     await expect.poll(() => submitted).toBeTruthy();
-    expect(submitted.form.payments[0]).toEqual({
-        channel: 'transfer',
-        amount: '1000.00',
-        extra: {
-            src_bank_name: 'KBank',
-            src_account_no: '111222333',
-            src_account_name: 'Customer',
-            src_branch_name: 'Bangkok',
-            src_time: '15:06',
-            dst_id: '2',
+    expect(submitted.form.payments).toEqual([
+        {
+            channel: 'cheque',
+            amount: '500.00',
+            extra: { cheque_no: '123456', cheque_book_no: '01', bank_name: 'KBank ระยอง' },
         },
-    });
+        {
+            channel: 'cashier_cheque',
+            amount: '600.00',
+            extra: { cashier_no: '778899', cashier_book_no: '02', bank_name: 'SCB ระยอง' },
+        },
+        {
+            channel: 'card',
+            amount: '700.00',
+            extra: { bank_name: 'BBL ระยอง', card_type: 'VISA' },
+        },
+    ]);
 });
 
 test('restored LIFF draft callback opens the booking editor instead of Cowork login', async ({
@@ -640,6 +894,8 @@ test('booking editor exposes every live DMS title option', async ({ page }) => {
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         const data = route.request().url().includes('/draft') ? PREFIX_DRAFT : [];
         return route.fulfill({
             status: 200,
@@ -656,7 +912,7 @@ test('booking editor exposes every live DMS title option', async ({ page }) => {
         await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=prefix-${viewport.width}`);
         await page.waitForSelector('#editor:not([hidden])');
         await expect(page.locator('#prefix_id option')).toHaveCount(
-            PREFIX_DRAFT.masters.prefixes.length
+            PREFIX_DRAFT.masters.prefixes.length + 1
         );
         await expect(page.locator('#prefix_id option[value="18"]')).toHaveText('น.ส.');
         await expect(page.locator('#prefix_id option[value="19"]')).toHaveText('คุณ');
@@ -673,6 +929,38 @@ test('booking editor exposes every live DMS title option', async ({ page }) => {
             fullPage: true,
         });
     }
+});
+
+test('identity title and DMS postcode open selected without extra geo logins', async ({ page }) => {
+    let geoRequests = 0;
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
+        const url = new URL(route.request().url());
+        if (url.pathname.endsWith('/geo')) geoRequests += 1;
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: AUTO_DEFAULT_DRAFT }),
+        });
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=auto-defaults`);
+    await page.waitForSelector('#save:not([disabled])');
+    await expect(page.locator('#prefix_id')).toHaveValue('17');
+    await expect(page.locator('#zipcode_id')).toHaveValue('197');
+    expect(geoRequests).toBe(0);
+    await page.screenshot({ path: path.join(OUT, 'auto-title-postcode-390.png'), fullPage: true });
 });
 
 test('save errors are actionable on mobile and desktop', async ({ page }) => {
@@ -700,6 +988,8 @@ test('save errors are actionable on mobile and desktop', async ({ page }) => {
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         if (route.request().method() === 'POST') {
             return route.fulfill({
                 status: 400,
@@ -713,8 +1003,18 @@ test('save errors are actionable on mobile and desktop', async ({ page }) => {
                 }),
             });
         }
-        const url = route.request().url();
-        const data = url.includes('/draft') ? DRAFT : [];
+        const url = new URL(route.request().url());
+        const level = url.searchParams.get('level'),
+            parent = url.searchParams.get('parent_id');
+        const draft = {
+            ...PAYMENT_DRAFT,
+            form: { ...PAYMENT_DRAFT.form, payments: DRAFT.form.payments },
+        };
+        const data = url.pathname.endsWith('/draft')
+            ? draft
+            : level === 'provinces'
+              ? GEO.provinces
+              : GEO[level]?.[parent] || [];
         return route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -765,6 +1065,8 @@ test('geo master selects stay populated through the cascade', async ({ page }) =
         localStorage.setItem('pearnly_lang', 'zh');
     });
     await page.route('**/api/line/dms-booking/**', (route) => {
+        if (/\/(config|auth)$/.test(new URL(route.request().url()).pathname))
+            return route.fallback();
         const url = new URL(route.request().url());
         let data = [];
         if (url.pathname.endsWith('/draft')) data = GEO_DRAFT;
@@ -789,11 +1091,15 @@ test('geo master selects stay populated through the cascade', async ({ page }) =
         await page.waitForSelector('#editor:not([hidden])');
         await page.waitForSelector('#save:not([disabled])');
         await page.locator('#province_id').selectOption('65');
-        await expect(page.locator('#district_id')).toHaveValue('804');
+        await expect(page.locator('#district_id option[value="804"]')).toHaveCount(1);
+        await expect(page.locator('#district_id')).toHaveValue('');
         await page.locator('#district_id').selectOption('804');
-        await expect(page.locator('#subdistrict_id')).toHaveValue('6472');
+        await expect(page.locator('#subdistrict_id option[value="6472"]')).toHaveCount(1);
+        await expect(page.locator('#subdistrict_id')).toHaveValue('');
         await page.locator('#subdistrict_id').selectOption('6472');
-        await expect(page.locator('#zipcode_id')).toHaveValue('6477');
+        await expect(page.locator('#zipcode_id option[value="6477"]')).toHaveCount(1);
+        await expect(page.locator('#zipcode_id')).toHaveValue('');
+        await page.locator('#zipcode_id').selectOption('6477');
         await expect(page.locator('#province_id option')).not.toHaveCount(0);
         await expect(page.locator('#district_id option')).not.toHaveCount(0);
         await expect(page.locator('#subdistrict_id option')).not.toHaveCount(0);
@@ -804,3 +1110,146 @@ test('geo master selects stay populated through the cascade', async ({ page }) =
         });
     }
 });
+
+test('deleted master IDs stay unselected and cascades never choose the first row', async ({
+    page,
+}) => {
+    let writes = 0;
+    const draft = JSON.parse(JSON.stringify(PAYMENT_DRAFT));
+    Object.assign(draft.form.customer, { prefix_id: 'removed', province_id: 'removed' });
+    for (const key of ['place', 'car', 'paint', 'term', 'regis'])
+        draft.form.answers[key] = { id: 'removed' };
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'th');
+    });
+    await page.route('**/api/line/dms-booking/**', (route) => {
+        const url = new URL(route.request().url());
+        if (/\/(config|auth)$/.test(url.pathname)) return route.fallback();
+        if (route.request().method() === 'POST') writes++;
+        const level = url.searchParams.get('level'),
+            parent = url.searchParams.get('parent_id');
+        const data = url.pathname.endsWith('/draft')
+            ? draft
+            : url.pathname.endsWith('/paints')
+              ? [{ id: 'P2', label: 'New paint' }]
+              : level === 'provinces'
+                ? GEO.provinces
+                : GEO[level]?.[parent] || [];
+        return route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data }),
+        });
+    });
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=removed-master`);
+    await page.waitForSelector('#save:not([disabled])');
+    for (const id of [
+        'prefix_id',
+        'province_id',
+        'district_id',
+        'subdistrict_id',
+        'zipcode_id',
+        'place_id',
+        'car_id',
+        'paint_id',
+        'term_id',
+        'regis_id',
+    ]) {
+        await expect(page.locator('#' + id)).toHaveValue('');
+        await expect(page.locator('#' + id)).toHaveAttribute('required', '');
+    }
+    await page.locator('#save').click();
+    expect(writes).toBe(0);
+    await page.locator('#car_id').selectOption('C1');
+    await expect(page.locator('#paint_id option[value="P2"]')).toHaveCount(1);
+    await expect(page.locator('#paint_id')).toHaveValue('');
+    await page.locator('#paint_id').selectOption('P2');
+    await expect(page.locator('#paint_id')).toHaveValue('P2');
+    await page.locator('#province_id').selectOption('1');
+    await expect(page.locator('#district_id option[value="18"]')).toHaveCount(1);
+    await expect(page.locator('#district_id')).toHaveValue('');
+    await page.locator('#language').selectOption('zh');
+    await page.waitForSelector('#save:not([disabled])');
+    await expect(page.locator('#district_id')).toHaveValue('');
+    await page.locator('#save').click();
+    expect(writes).toBe(0);
+});
+
+for (const channel of ['dms', 'dms_a', 'dms_b']) {
+    test(`customer editor saves only customer review in ${channel}`, async ({ page }) => {
+        let submitted;
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.addInitScript(() => {
+            const payload = btoa(
+                JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+            );
+            localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+            localStorage.setItem('pearnly_lang', 'zh');
+        });
+        await page.route('https://static.line-scdn.net/**', (route) =>
+            route.fulfill({
+                contentType: 'application/javascript',
+                body: liffMockScript('ios', true, true),
+            })
+        );
+        await page.route('**/api/line/dms-booking/**', async (route) => {
+            const url = new URL(route.request().url());
+            if (url.pathname.endsWith('/config'))
+                return route.fulfill({
+                    json: { ok: true, data: { liff_id: 'DMS-LIFF', channel_key: channel } },
+                });
+            if (url.pathname.endsWith('/auth')) {
+                expect(route.request().postDataJSON().channel).toBe(channel);
+                const token = Buffer.from(
+                    JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+                ).toString('base64url');
+                return route.fulfill({ json: { ok: true, data: { token: `e2e.${token}.sig` } } });
+            }
+            expect(url.searchParams.get('editor')).toBe('customer');
+            if (route.request().method() === 'POST') {
+                submitted = route.request().postDataJSON();
+                return route.fulfill({ json: { ok: true, data: { nonce: 'new' } } });
+            }
+            const data = url.pathname.endsWith('/draft')
+                ? {
+                      form: {
+                          customer: {
+                              ...PAYMENT_DRAFT.form.customer,
+                              prefix_id: '18',
+                              house_no: '1',
+                          },
+                      },
+                      masters: { prefixes: PREFIX_DRAFT.masters.prefixes },
+                      geo: {
+                          provinces: GEO.provinces,
+                          districts: GEO.districts['1'],
+                          subdistricts: GEO.subdistricts['18'],
+                          zipcodes: GEO.zipcodes['72'],
+                      },
+                  }
+                : [];
+            return route.fulfill({ json: { ok: true, data } });
+        });
+        await page.goto(
+            `${BASE}/liff/dms-booking?draft=customer-test&editor=customer&channel=${channel}`
+        );
+        await expect(page.locator('h1')).toHaveText('修改客户资料');
+        await expect(page.locator('#prefix_id')).toHaveValue('18');
+        await expect(page.locator('#car_id, #payment-list, #keep-slip')).toHaveCount(0);
+        await page.locator('#phone').click();
+        await page.locator('#phone').press('ControlOrMeta+A');
+        await page.locator('#phone').pressSequentially('0891234567');
+        await page.screenshot({ path: path.join(OUT, `customer-${channel}.png`), fullPage: true });
+        await page.locator('#save').click();
+        await expect(page.locator('#result')).toBeVisible();
+        expect(Object.keys(submitted.form)).toEqual(['customer']);
+        expect(submitted.form.customer.prefix_id).toBe('18');
+        expect(submitted.form.customer.phone).toBe('0891234567');
+    });
+}

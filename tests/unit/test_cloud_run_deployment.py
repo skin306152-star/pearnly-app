@@ -17,6 +17,7 @@ def load_script(name, filename):
 
 renderer = load_script("cloud_run_renderer", "render_service.py")
 probe = load_script("cloud_run_storage_probe", "storage-probe.py")
+job_renderer = load_script("cloud_run_job_renderer", "render_job.py")
 
 
 class DeploymentTests(unittest.TestCase):
@@ -81,6 +82,39 @@ class DeploymentTests(unittest.TestCase):
             options = volumes[name]["csi"]["volumeAttributes"]["mountOptions"]
             self.assertIn("metadata-cache-ttl-secs=0", options)
             self.assertIn("uid=10001", options)
+
+    def test_multi_oa_credentials_mount_declaratively_on_every_role(self):
+        """`gcloud run services replace` rewrites the service, so A/B must be in the render."""
+        for role in ("web", "worker"):
+            spec = self.render(role)["spec"]["template"]["spec"]
+            env = {item["name"]: item for item in spec["containers"][0]["env"]}
+            for name, secret_name in (
+                ("LINE_DMS_A_CREDENTIALS", "pearnly-line-dms-a"),
+                ("LINE_DMS_B_CREDENTIALS", "pearnly-line-dms-b"),
+            ):
+                with self.subTest(role=role, name=name):
+                    self.assertEqual(
+                        env[name]["valueFrom"]["secretKeyRef"],
+                        {"name": secret_name, "key": "1"},
+                    )
+
+    def test_multi_oa_secret_version_is_pinned_and_validated(self):
+        spec = self.render("web", line_dms_secret_version="4")["spec"]["template"]["spec"]
+        env = {item["name"]: item for item in spec["containers"][0]["env"]}
+        self.assertEqual(env["LINE_DMS_A_CREDENTIALS"]["valueFrom"]["secretKeyRef"]["key"], "4")
+        for bad in ("latest", "0", "", "1.0"):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                self.render("web", line_dms_secret_version=bad)
+
+    def test_schema_job_keeps_multi_oa_secret_references(self):
+        job = job_renderer.render_job(self.render("worker"))
+        container = job["spec"]["template"]["spec"]["template"]["spec"]["containers"][0]
+        env = {item["name"]: item for item in container["env"]}
+        self.assertEqual(env["PEARNLY_RUNTIME_ROLE"]["value"], "schema")
+        self.assertEqual(
+            env["LINE_DMS_B_CREDENTIALS"]["valueFrom"]["secretKeyRef"],
+            {"name": "pearnly-line-dms-b", "key": "1"},
+        )
 
     def test_probe_reads_previous_execution_and_only_cleans_own_nonce(self):
         with tempfile.TemporaryDirectory() as directory:

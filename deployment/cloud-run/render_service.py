@@ -19,6 +19,7 @@ def render_service(
     installers_bucket,
     worker_url="",
     region="asia-southeast1",
+    line_dms_secret_version="1",
 ):
     if role not in {"web", "worker"}:
         raise ValueError("role must be web or worker")
@@ -26,6 +27,8 @@ def render_service(
         raise ValueError("image must be pinned by sha256 digest")
     if not re.fullmatch(r"[1-9][0-9]*", str(secret_version)):
         raise ValueError("secret version must be a positive numeric version")
+    if not re.fullmatch(r"[1-9][0-9]*", str(line_dms_secret_version)):
+        raise ValueError("LINE DMS secret version must be a positive numeric version")
     mount_options = (
         "implicit-dirs,metadata-cache-ttl-secs=0,stat-cache-max-size-mb=0,"
         "type-cache-max-size-mb=0,uid=10001,gid=10001"
@@ -73,6 +76,28 @@ def render_service(
     }
     if worker_url:
         env["PEARNLY_WORKER_URL"] = worker_url
+    # Multi-OA DMS credentials live in their own Secret Manager secrets, not in the shared
+    # runtime.env blob: `gcloud run services replace` rewrites the whole service, so an
+    # out-of-band `--update-secrets` would silently vanish on the next release. Declaring the
+    # two blob env vars here keeps A/B mounted on every Web/Worker revision (and on the schema
+    # Job, which reuses the worker spec). Versions are pinned numerically; rotation is a
+    # deliberate render change, never an implicit "latest".
+    env_items = [{"name": key, "value": value} for key, value in env.items()]
+    for name, secret_name in (
+        ("LINE_DMS_A_CREDENTIALS", "pearnly-line-dms-a"),
+        ("LINE_DMS_B_CREDENTIALS", "pearnly-line-dms-b"),
+    ):
+        env_items.append(
+            {
+                "name": name,
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": secret_name,
+                        "key": str(line_dms_secret_version),
+                    }
+                },
+            }
+        )
     return {
         "apiVersion": "serving.knative.dev/v1",
         "kind": "Service",
@@ -105,7 +130,7 @@ def render_service(
                                     "memory": "1Gi" if role == "web" else "2Gi",
                                 }
                             },
-                            "env": [{"name": key, "value": value} for key, value in env.items()],
+                            "env": env_items,
                             "volumeMounts": mounts,
                             "startupProbe": {
                                 "httpGet": {"path": "/api/health", "port": 8080},
@@ -135,6 +160,7 @@ def main():
     parser.add_argument("--installers-bucket", required=True)
     parser.add_argument("--worker-url", default="")
     parser.add_argument("--region", default="asia-southeast1")
+    parser.add_argument("--line-dms-secret-version", default="1")
     args = vars(parser.parse_args())
     print(json.dumps(render_service(**args), indent=2))
 

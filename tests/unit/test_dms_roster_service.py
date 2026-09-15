@@ -151,13 +151,28 @@ class MutateOperatorTest(unittest.TestCase):
         with (
             mock.patch.object(service.store, "get_profile", return_value={"user_id": "op-1"}),
             mock.patch(
+                "services.line_dms.account_channel.get_channel", return_value="dms_a"
+            ) as get_channel,
+            mock.patch(
                 "services.line_dms.store.generate_bind_code",
-                return_value={"code": "123456", "expires_at": "2026-07-19T00:00:00+00:00"},
-            ),
+                return_value={
+                    "code": "123456",
+                    "expires_at": "2026-07-19T00:00:00+00:00",
+                    "channel_key": "dms_a",
+                },
+            ) as gen,
         ):
             res = service.issue_bind_code(OWNER, "op-1")
         self.assertTrue(res.get("ok"))
         self.assertEqual(res["code"], "123456")
+        # 码绑定该账号被分配的 OA,响应回传该 OA 的公开信息(前端弹窗唯一数据源)。
+        self.assertEqual(gen.call_args.args[2], "dms_a")
+        self.assertEqual(res["line"]["channel_key"], "dms_a")
+        self.assertEqual(res["line"]["basic_id"], "@260oecde")
+        self.assertEqual(res["line"]["add_friend_url"], "https://line.me/R/ti/p/@260oecde")
+        self.assertNotIn("secret", str(res).lower())
+        self.assertNotIn("token", str(res).lower())
+        get_channel.assert_called_once()
 
 
 class ListOperatorsTest(unittest.TestCase):
@@ -173,18 +188,49 @@ class ListOperatorsTest(unittest.TestCase):
             "status": "active",
             "username": "dmsop-abcd1234",
             "line_name": "Somchai",
+            "line_user_id": "L1",
+            "line_channel_key": "dms_b",
             "bound_at": _Dt(),
             "ep_enabled": True,
             "can_query_dms": True,
         }
-        with mock.patch.object(service.store, "list_profiles", return_value=[row]):
+        with (
+            mock.patch.object(service.store, "list_profiles", return_value=[row]),
+            mock.patch("services.line_dms.account_channel.get_channel", return_value="dms_b"),
+        ):
             res = service.list_operators(OWNER)
+        self.assertEqual(res["channel"]["channel_key"], "dms_b")
+        self.assertEqual(res["channel"]["channel_name"], "B DMS")
         item = res["items"][0]
         self.assertTrue(item["line_bound"])
         self.assertTrue(item["endpoint_ready"])
         self.assertEqual(item["line_bound_at"], "2026-07-19T10:00:00+00:00")
         self.assertEqual(item["dms_role"], "sales")
         self.assertTrue(item["can_query_dms"])
+        self.assertEqual(item["line_user_id"], "L1")
+        self.assertEqual(item["line_channel_key"], "dms_b")
+        self.assertEqual(item["line_channel_name"], "B DMS")
+
+    def test_unbound_operator_has_no_channel_but_account_channel_is_reported(self):
+        row = {
+            "user_id": "op-2",
+            "display_name": "ใหม่",
+            "dms_role": "sales",
+            "status": "active",
+            "username": "dmsop-2",
+            "bound_at": None,
+            "ep_enabled": False,
+            "can_query_dms": False,
+        }
+        with (
+            mock.patch.object(service.store, "list_profiles", return_value=[row]),
+            mock.patch("services.line_dms.account_channel.get_channel", return_value="dms_a"),
+        ):
+            res = service.list_operators(OWNER)
+        self.assertEqual(res["channel"]["channel_key"], "dms_a")
+        self.assertFalse(res["items"][0]["line_bound"])
+        self.assertEqual(res["items"][0]["line_channel_key"], "")
+        self.assertEqual(res["items"][0]["line_channel_name"], "")
 
     def test_update_query_permission_without_credentials(self):
         with (

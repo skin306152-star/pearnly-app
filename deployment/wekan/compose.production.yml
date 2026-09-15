@@ -1,0 +1,48 @@
+services:
+    gateway:
+        mem_limit: 192m
+        security_opt: [no-new-privileges:true]
+        logging:
+            driver: json-file
+            options: { max-size: '10m', max-file: '3' }
+    wekan:
+        mem_limit: 2560m
+        environment:
+            NODE_OPTIONS: --max-old-space-size=1792
+            MONGO_URL: mongodb://wekan:${WORK_MONGO_PASSWORD:?required}@mongo:27017/wekan?authSource=wekan
+        security_opt: [no-new-privileges:true]
+        logging:
+            driver: json-file
+            options: { max-size: '10m', max-file: '3' }
+    mongo:
+        mem_limit: 768m
+        command: [mongod, --wiredTigerCacheSizeGB, '0.25']
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: work-root
+            MONGO_INITDB_ROOT_PASSWORD: ${WORK_MONGO_ROOT_PASSWORD:?required}
+            WORK_MONGO_PASSWORD: ${WORK_MONGO_PASSWORD:?required}
+        volumes:
+            - ./mongo-init.js:/docker-entrypoint-initdb.d/work.js:ro
+        logging:
+            driver: json-file
+            options: { max-size: '10m', max-file: '3' }
+    caddy:
+        image: caddy:2@sha256:13ba145cba2f3e28fa801994876e4c086d1b95d5aa2a520a734765ffb6b12017
+        restart: unless-stopped
+        network_mode: host
+        mem_limit: 128m
+        environment:
+            WORK_HOST: ${WORK_HOST:?required}
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            - certificates:/data
+            - caddy_config:/config
+        cap_drop: [ALL]
+        cap_add: [NET_BIND_SERVICE]
+        security_opt: [no-new-privileges:true]
+        logging:
+            driver: json-file
+            options: { max-size: '10m', max-file: '3' }
+volumes:
+    certificates:
+    caddy_config:

@@ -31,6 +31,8 @@ from core.feature_flags import DMS_PORTAL_KEY
 from core.route_helpers import _check_password_strength, _log_op, _require_super_admin
 from services.auth.account_provision import resolve_account_identifier
 from services.auth.entrance_store import DMS, grant_entrance_safe, revoke_entrance
+from services.line_dms import account_channel as line_account_channel
+from services.line_platform import channels as line_channels
 from services.platform_settings import store as platform_settings_store
 from services.tenant.owner_users import create_owner_user
 
@@ -42,11 +44,26 @@ _DEFAULT_QUOTA = 100
 _PASSWORD_LEN = 14
 _PASSWORD_GEN_ATTEMPTS = 50
 
+_CHANNEL_ERRORS = {
+    "dms_channel.invalid_channel": (422, "admin.dms_invalid_channel"),
+    "dms_channel.missing_subject": (400, "admin.dms_missing_subject"),
+    "dms_channel.unknown_channel": (409, "admin.dms_channel_unknown"),
+    "dms_channel.unavailable": (503, "admin.dms_channel_unavailable"),
+    "dms_channel.save_failed": (500, "admin.dms_channel_failed"),
+}
+
 
 class InviteBody(BaseModel):
     username_or_email: str = Field(..., min_length=1, max_length=200)
     # 留空 = 系统随机生成;传了原样用(超管口不设强度闸)。
     password: str | None = Field(None, min_length=1, max_length=200)
+    # 该 DMS 账号使用哪个 LINE OA;省略 = 兼容旧调用,默认 ลั่วหยง DMS。
+    line_channel_key: str | None = Field(None, min_length=1, max_length=40)
+
+
+class ChannelBody(BaseModel):
+    subject_id: str = Field(..., min_length=1, max_length=64)
+    line_channel_key: str = Field(..., min_length=1, max_length=40)
 
 
 class RevokeBody(BaseModel):
@@ -127,6 +144,60 @@ def _enrich_subjects(subject_ids: list[str]) -> dict[str, dict]:
     return out
 
 
+def _resolve_channel(channel_key: str | None) -> str:
+    """邀请/改配的 OA key。省略 = 兼容旧调用,落回 ลั่วหยง DMS;给了非法值直接 422。"""
+    key = (channel_key or "").strip()
+    if not key:
+        return line_channels.DEFAULT_DMS_CHANNEL
+    if not line_channels.is_valid(key):
+        raise HTTPException(422, detail="admin.dms_invalid_channel")
+    return key
+
+
+def _bindings_for_subjects(subject_ids: list[str]) -> dict[str, list[dict]]:
+    """每个账号当前已绑的 LINE 账号(owner + 操作员),按 subject_id 分组。
+
+    tenant-first 判据:团队账号的绑定按 tenant_id 归组;个人账号(无 tenant)按 user_id 归组。
+    """
+    if not subject_ids:
+        return {}
+    with db.get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT b.tenant_id::text AS tenant_id, b.user_id::text AS user_id,
+                   b.line_user_id, b.channel_key, b.display_name AS line_name, b.bound_at,
+                   u.username
+            FROM line_dms_bindings b
+            LEFT JOIN users u ON u.id = b.user_id
+            WHERE b.tenant_id::text = ANY(%s) OR b.user_id::text = ANY(%s)
+            ORDER BY b.bound_at
+            """,
+            (list(subject_ids), list(subject_ids)),
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+    out: dict[str, list[dict]] = {}
+    for r in rows:
+        for sid in (r.get("tenant_id"), r.get("user_id")):
+            if sid and sid in subject_ids:
+                out.setdefault(sid, []).append(
+                    {
+                        "user_id": r["user_id"],
+                        "username": r.get("username") or "",
+                        "line_user_id": r.get("line_user_id") or "",
+                        "channel_key": line_channels.normalize(r.get("channel_key")),
+                        "channel_name": line_channels.public(r.get("channel_key"))["channel_name"],
+                        "line_name": r.get("line_name") or "",
+                        "bound_at": (
+                            r["bound_at"].isoformat()
+                            if hasattr(r.get("bound_at"), "isoformat")
+                            else r.get("bound_at")
+                        ),
+                    }
+                )
+                break  # 团队账号只归 tenant,不再重复挂到 owner user_id
+    return out
+
+
 @router.get("/api/admin/dms/overview")
 async def dms_overview(request: Request):
     """闸状态(enabled/rollout)+ 邀请名单(每项配人类可读的用户/租户信息)。"""
@@ -144,17 +215,33 @@ async def dms_overview(request: Request):
         rows = [dict(r) for r in cur.fetchall()]
 
     info_by_id = _enrich_subjects([r["subject_id"] for r in rows])
-    allowlist = [
-        {
-            "subject_id": r["subject_id"],
-            "joined_at": r["created_at"].isoformat() if r.get("created_at") else None,
-            **info_by_id.get(
-                r["subject_id"],
-                {"subject_type": "unknown", "username": "", "email": "", "company_name": ""},
-            ),
-        }
-        for r in rows
-    ]
+    subject_ids = [r["subject_id"] for r in rows]
+    try:
+        channel_by_subject = line_account_channel.get_channels(subject_ids)
+    except line_account_channel.AccountChannelError:
+        raise HTTPException(503, detail="admin.dms_channel_unavailable")
+    bindings_by_subject = _bindings_for_subjects(subject_ids)
+    allowlist = []
+    for r in rows:
+        subject_id = r["subject_id"]
+        channel = line_channels.public(channel_by_subject.get(subject_id))
+        bindings = bindings_by_subject.get(subject_id, [])
+        allowlist.append(
+            {
+                "subject_id": subject_id,
+                "joined_at": r["created_at"].isoformat() if r.get("created_at") else None,
+                **info_by_id.get(
+                    subject_id,
+                    {"subject_type": "unknown", "username": "", "email": "", "company_name": ""},
+                ),
+                "channel_key": channel["channel_key"],
+                "channel_name": channel["channel_name"],
+                "channel_basic_id": channel["basic_id"],
+                "channel_add_friend_url": channel["add_friend_url"],
+                "line_bound": bool(bindings),
+                "line_accounts": bindings,
+            }
+        )
     return {
         "flag": {
             "enabled": bool(flag and flag.get("enabled")),
@@ -163,6 +250,7 @@ async def dms_overview(request: Request):
                 flag["updated_at"].isoformat() if flag and flag.get("updated_at") else None
             ),
         },
+        "channels": line_channels.list_public(),
         "allowlist": allowlist,
     }
 
@@ -175,6 +263,7 @@ async def dms_invite(request: Request, body: InviteBody):
     /pos 开通、/ai 邀请共口径,防多条建号路一硬一软)。
     """
     admin = _require_super_admin(request)
+    channel_key = _resolve_channel(body.line_channel_key)
     try:
         identity = resolve_account_identifier(body.username_or_email)
     except ValueError as e:
@@ -183,13 +272,13 @@ async def dms_invite(request: Request, body: InviteBody):
             raise HTTPException(400, detail="admin.dms_missing_identity") from e
         raise HTTPException(422, detail=f"admin.dms_{code}") from e
 
+    actor_id = str(admin.get("id")) if admin else None
     existing = db.find_user_by_username(identity["lookup_key"])
     if existing:
         subject_id = _subject_id(existing)
         platform_settings_store.add_to_allowlist(DMS_PORTAL_KEY, subject_id)
-        grant_entrance_safe(
-            DMS, existing.get("tenant_id"), str(admin.get("id")) if admin else None, context="dms"
-        )
+        grant_entrance_safe(DMS, existing.get("tenant_id"), actor_id, context="dms")
+        _apply_account_channel(subject_id, channel_key, actor_id)
         _log_op(
             request,
             admin,
@@ -203,6 +292,8 @@ async def dms_invite(request: Request, body: InviteBody):
             "created_account": False,
             "subject_id": subject_id,
             "username": existing.get("username"),
+            "channel_key": channel_key,
+            "channel_name": line_channels.public(channel_key)["channel_name"],
         }
 
     # 自由邀请制:用户名任意(不强制邮箱)。是邮箱就顺手落 users.email(supabase 侧可读),
@@ -233,7 +324,8 @@ async def dms_invite(request: Request, body: InviteBody):
     # 新号开箱余额 0(不再随邀请发额度)：老板进 /dms 门户「套餐与余额」页自助充值或订阅套餐
     # 后余额闸(get_billing_status_combined)才放行识别。发号只开门、不送钱。
     platform_settings_store.add_to_allowlist(DMS_PORTAL_KEY, tenant_id)
-    grant_entrance_safe(DMS, tenant_id, str(admin.get("id")) if admin else None, context="dms")
+    grant_entrance_safe(DMS, tenant_id, actor_id, context="dms")
+    _apply_account_channel(tenant_id, channel_key, actor_id)
     _log_op(
         request,
         admin,
@@ -248,6 +340,56 @@ async def dms_invite(request: Request, body: InviteBody):
         "subject_id": tenant_id,
         "username": username,
         "initial_password": temp_password,
+        "channel_key": channel_key,
+        "channel_name": line_channels.public(channel_key)["channel_name"],
+    }
+
+
+def _apply_account_channel(subject_id: str, channel_key: str, actor_id: str | None) -> dict:
+    """写账号的 OA 分配;改配时按策略清掉旧绑定/旧码(见 account_channel.set_channel)。"""
+    result = line_account_channel.set_channel(subject_id, channel_key, actor_id=actor_id)
+    err = result.get("error")
+    if err:
+        status, detail = _CHANNEL_ERRORS.get(err, (400, "admin.dms_channel_failed"))
+        raise HTTPException(status, detail=detail)
+    return result
+
+
+@router.post("/api/admin/dms/channel")
+async def dms_set_channel(request: Request, body: ChannelBody):
+    """改配既有 DMS 账号的 LINE OA(仅限邀请名单内主体)。
+
+    改配是显式策略:换到另一个 OA 时,该账号下所有既有 LINE 绑定与未用绑定码即刻作废,
+    使用者必须用新 OA 重新发码绑定 —— 旧绑定绝不会继续从旧 OA 收消息或回复。
+    """
+    admin = _require_super_admin(request)
+    subject_id = body.subject_id.strip()
+    if not subject_id:
+        raise HTTPException(400, detail="admin.dms_missing_subject")
+    if not platform_settings_store.is_allowlisted(DMS_PORTAL_KEY, subject_id):
+        raise HTTPException(404, detail="admin.dms_not_invited")
+
+    result = _apply_account_channel(
+        subject_id, _resolve_channel(body.line_channel_key), str(admin.get("id")) if admin else None
+    )
+    info = _enrich_subjects([subject_id]).get(subject_id, {})
+    _log_op(
+        request,
+        admin,
+        action="dms.channel_change",
+        target_type=info.get("subject_type", "unknown"),
+        target_id=subject_id,
+        target_name=info.get("username") or info.get("company_name"),
+    )
+    channel = line_channels.public(result["channel_key"])
+    return {
+        "ok": True,
+        "subject_id": subject_id,
+        "changed": bool(result.get("changed")),
+        "unbound": int(result.get("unbound") or 0),
+        "codes_voided": int(result.get("codes_voided") or 0),
+        "channel_key": channel["channel_key"],
+        "channel_name": channel["channel_name"],
     }
 
 

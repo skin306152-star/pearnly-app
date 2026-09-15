@@ -71,6 +71,7 @@ GATE_NAMES = [
             "_auth",
             "_authorize",
             "_require_owner",
+            "require_service",  # work_bridge_routes: dedicated service Bearer secret.
         ),
     ),
 ]

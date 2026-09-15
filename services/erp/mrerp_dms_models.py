@@ -101,6 +101,8 @@ class DMSBookingPayload:
     # 订金支付渠道明细,元素 {"channel", "amount", "extra"};由
     # mrerp_dms_payments.payment_form_fields 聚合进表单,空 = 现状(订金 0.00)
     payments: tuple = ()
+    # 原生顾问级联返回的订车/销售分店、团队、经理完整字段,不得用列表首行替代。
+    organization_fields: tuple = ()
 
 
 # booking_defaults 里属于「个人」的键:顾问 = 销售提成归属,是个人身份不是租户策略,

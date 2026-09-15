@@ -86,19 +86,29 @@ export function workspaceKey(): string {
     return LEGACY_WS_KEY;
 }
 
-/** 迁移收养:仅当 legacy token 的 JWT entry 精确匹配才把 legacy 复制进当前槽(cowork 接 main/cowork,erp 只接 erp)。 */
-export function migrateLegacyToken(): boolean {
+/** 本入口可收养的 legacy token(判据与 preboot 的 `_migratable` 一致)。 */
+function adoptableLegacyToken(): string {
     const e = entry();
-    if (e !== 'cowork' && e !== 'erp') return false;
+    if (e !== 'cowork' && e !== 'erp') return '';
     try {
-        const key = tokenKey();
-        if (localStorage.getItem(key)) return false; // 槽已有自己的 token,不覆盖
-        const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
-        if (!legacy) return false;
+        const legacy = localStorage.getItem(LEGACY_TOKEN_KEY) || '';
+        if (!legacy) return '';
         const jwtEntry = decodeJwtEntry(legacy);
         const accepted =
             e === 'cowork' ? jwtEntry === 'cowork' || jwtEntry === 'main' : jwtEntry === 'erp';
-        if (!accepted) return false;
+        return accepted ? legacy : '';
+    } catch (_) {
+        return '';
+    }
+}
+
+/** 迁移收养:仅当 legacy token 的 JWT entry 精确匹配才把 legacy 复制进当前槽(cowork 接 main/cowork,erp 只接 erp)。 */
+export function migrateLegacyToken(): boolean {
+    const legacy = adoptableLegacyToken();
+    if (!legacy) return false;
+    try {
+        const key = tokenKey();
+        if (localStorage.getItem(key)) return false; // 槽已有自己的 token,不覆盖
         localStorage.setItem(key, legacy);
         return true;
     } catch (_) {
@@ -129,12 +139,23 @@ export function setToken(value: string): void {
     window.token = value;
 }
 
-/** 只清当前槽并同步 window.token,绝不扫别的槽(cowork/erp 互不清)。 */
+/** 只清当前槽并同步 window.token,绝不扫别的槽(cowork/erp 互不清)。
+ *  例外:本入口原本会收养的 legacy token 必须一起清 —— 留着它,下一次进页面
+ *  (preboot 的 `_migratable` / 本文件的 migrateLegacyToken)会原样收养回来,
+ *  退出登录就变成"退不掉",只在服务端留下 active_jti 已清空的僵尸会话。
+ *  别的入口的 token(例如 /cowork 上的 erp token)仍不动。 */
 export function clearToken(): void {
     try {
         localStorage.removeItem(tokenKey());
     } catch (_) {
         /* silent */
+    }
+    if (adoptableLegacyToken()) {
+        try {
+            localStorage.removeItem(LEGACY_TOKEN_KEY);
+        } catch (_) {
+            /* silent */
+        }
     }
     window.token = '';
 }

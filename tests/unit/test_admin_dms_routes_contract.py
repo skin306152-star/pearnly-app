@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """admin_dms_routes 契约(dms_portal 闸发放侧 · 照 admin_pearnly_ai_routes 范式)。
 
-锁定:4 路由 path+method 契约;app include_router 挂上;全路由复用
+锁定:5 路由 path+method 契约(含多 OA 改配 /channel);app include_router 挂上;全路由复用
 route_helpers._require_super_admin 单一来源(非超管一律 403)。业务层重点钉死
 tenant-first 判据(core/feature_flags.dms_portal_enabled_for 同一口径:有 tenant_id 写
 tenant_id,没有才退回 user_id——写反了闸永远判不中且查不出根因)、一次性密码只在响应回显
@@ -69,6 +69,7 @@ class RoutesContractTests(unittest.TestCase):
             {
                 ("GET", "/api/admin/dms/overview"),
                 ("POST", "/api/admin/dms/invite"),
+                ("POST", "/api/admin/dms/channel"),
                 ("POST", "/api/admin/dms/revoke"),
                 ("POST", "/api/admin/dms/reset-password"),
             },
@@ -80,6 +81,7 @@ class RoutesContractTests(unittest.TestCase):
         paths = {r.path for r in app.app.routes if hasattr(r, "path")}
         self.assertIn("/api/admin/dms/overview", paths)
         self.assertIn("/api/admin/dms/invite", paths)
+        self.assertIn("/api/admin/dms/channel", paths)
         self.assertIn("/api/admin/dms/revoke", paths)
         self.assertIn("/api/admin/dms/reset-password", paths)
 
@@ -124,6 +126,14 @@ class GuardEnforcedTests(unittest.TestCase):
             r = self.client.post("/api/admin/dms/revoke", json={"subject_id": "t1"})
         self.assertEqual(r.status_code, 403)
 
+    def test_channel_non_super_403(self):
+        with self._as_non_super():
+            r = self.client.post(
+                "/api/admin/dms/channel",
+                json={"subject_id": "t1", "line_channel_key": "dms_a"},
+            )
+        self.assertEqual(r.status_code, 403)
+
     def test_reset_password_non_super_403(self):
         with self._as_non_super():
             r = self.client.post("/api/admin/dms/reset-password", json={"subject_id": "t1"})
@@ -160,6 +170,10 @@ class OverviewTests(unittest.TestCase):
         self.assertFalse(body["flag"]["enabled"])
         self.assertEqual(body["flag"]["rollout"], "allowlist")
         self.assertEqual(body["allowlist"], [])
+        self.assertEqual([c["channel_key"] for c in body["channels"]], ["dms", "dms_a", "dms_b"])
+        for item in body["channels"]:
+            self.assertNotIn("secret", str(item).lower())
+            self.assertNotIn("token", str(item).lower())
 
     def test_overview_enriches_tenant_subject(self):
         cur = _SeqCursor(
@@ -211,6 +225,13 @@ class InviteExistingUserTests(unittest.TestCase):
         )
         self._su.start()
         self.addCleanup(self._su.stop)
+        self.enterContext(
+            mock.patch.object(
+                admin_dms_routes.line_account_channel,
+                "set_channel",
+                return_value={"ok": True, "channel_key": "dms", "changed": False},
+            )
+        )
 
     def test_invite_existing_user_with_tenant_writes_tenant_id(self):
         existing = {"id": "user-1", "tenant_id": "tenant-9", "username": "member1"}
@@ -266,6 +287,179 @@ class InviteExistingUserTests(unittest.TestCase):
         self.assertEqual(m_log.call_args.kwargs.get("target_type"), "user")
 
 
+class ChannelSelectionTests(unittest.TestCase):
+    """多 OA:邀请带 OA key(省略=旧默认)、非法 key 422、保存失败 500、改配走 /channel。"""
+
+    def setUp(self):
+        self.app = FastAPI()
+        self.app.include_router(router)
+        self.client = TestClient(self.app)
+        self._su = mock.patch.object(
+            route_helpers,
+            "get_current_user_from_request",
+            return_value={"id": "earn", "is_super_admin": True},
+        )
+        self._su.start()
+        self.addCleanup(self._su.stop)
+
+    def _invite(self, body):
+        return self.client.post("/api/admin/dms/invite", json=body)
+
+    def test_invite_passes_selected_channel_and_returns_public_name(self):
+        existing = {"id": "user-1", "tenant_id": "tenant-9", "username": "member1"}
+        with (
+            mock.patch.object(admin_dms_routes.db, "find_user_by_username", return_value=existing),
+            mock.patch.object(admin_dms_routes.platform_settings_store, "add_to_allowlist"),
+            mock.patch.object(admin_dms_routes, "grant_entrance_safe"),
+            mock.patch.object(admin_dms_routes, "_log_op"),
+            mock.patch.object(
+                admin_dms_routes.line_account_channel,
+                "set_channel",
+                return_value={"ok": True, "channel_key": "dms_a", "changed": False},
+            ) as set_channel,
+        ):
+            r = self._invite({"username_or_email": "member1", "line_channel_key": "dms_a"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["channel_key"], "dms_a")
+        self.assertEqual(r.json()["channel_name"], "A DMS")
+        self.assertEqual(set_channel.call_args.args[:2], ("tenant-9", "dms_a"))
+        self.assertEqual(set_channel.call_args.kwargs.get("actor_id"), "earn")
+
+    def test_invite_omitted_channel_defaults_to_legacy(self):
+        existing = {"id": "user-1", "tenant_id": "tenant-9", "username": "member1"}
+        with (
+            mock.patch.object(admin_dms_routes.db, "find_user_by_username", return_value=existing),
+            mock.patch.object(admin_dms_routes.platform_settings_store, "add_to_allowlist"),
+            mock.patch.object(admin_dms_routes, "grant_entrance_safe"),
+            mock.patch.object(admin_dms_routes, "_log_op"),
+            mock.patch.object(
+                admin_dms_routes.line_account_channel,
+                "set_channel",
+                return_value={"ok": True, "channel_key": "dms", "changed": False},
+            ) as set_channel,
+        ):
+            r = self._invite({"username_or_email": "member1"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(set_channel.call_args.args[:2], ("tenant-9", "dms"))
+
+    def test_invite_invalid_channel_422_before_any_write(self):
+        with (
+            mock.patch.object(admin_dms_routes.db, "find_user_by_username") as find,
+            mock.patch.object(admin_dms_routes.platform_settings_store, "add_to_allowlist") as add,
+        ):
+            r = self._invite({"username_or_email": "member1", "line_channel_key": "nope"})
+        self.assertEqual(r.status_code, 422)
+        find.assert_not_called()
+        add.assert_not_called()
+
+    def test_invite_channel_save_failure_500(self):
+        existing = {"id": "user-1", "tenant_id": "tenant-9", "username": "member1"}
+        with (
+            mock.patch.object(admin_dms_routes.db, "find_user_by_username", return_value=existing),
+            mock.patch.object(admin_dms_routes.platform_settings_store, "add_to_allowlist"),
+            mock.patch.object(admin_dms_routes, "grant_entrance_safe"),
+            mock.patch.object(admin_dms_routes, "_log_op"),
+            mock.patch.object(
+                admin_dms_routes.line_account_channel,
+                "set_channel",
+                return_value={"error": "dms_channel.save_failed"},
+            ),
+        ):
+            r = self._invite({"username_or_email": "member1", "line_channel_key": "dms_b"})
+        self.assertEqual(r.status_code, 500)
+
+    def test_change_channel_requires_allowlist(self):
+        with mock.patch.object(
+            admin_dms_routes.platform_settings_store, "is_allowlisted", return_value=False
+        ):
+            r = self.client.post(
+                "/api/admin/dms/channel",
+                json={"subject_id": "tenant-x", "line_channel_key": "dms_a"},
+            )
+        self.assertEqual(r.status_code, 404)
+
+    def test_change_channel_invalid_key_422(self):
+        with mock.patch.object(
+            admin_dms_routes.platform_settings_store, "is_allowlisted", return_value=True
+        ):
+            r = self.client.post(
+                "/api/admin/dms/channel",
+                json={"subject_id": "tenant-9", "line_channel_key": "nope"},
+            )
+        self.assertEqual(r.status_code, 422)
+
+    def test_change_channel_success_reports_revoke_counts(self):
+        with (
+            mock.patch.object(
+                admin_dms_routes.platform_settings_store, "is_allowlisted", return_value=True
+            ),
+            mock.patch.object(
+                admin_dms_routes.line_account_channel,
+                "set_channel",
+                return_value={
+                    "ok": True,
+                    "channel_key": "dms_b",
+                    "changed": True,
+                    "unbound": 2,
+                    "codes_voided": 1,
+                },
+            ) as set_channel,
+            mock.patch.object(admin_dms_routes, "_enrich_subjects", return_value={}),
+            mock.patch.object(admin_dms_routes, "_log_op") as log,
+        ):
+            r = self.client.post(
+                "/api/admin/dms/channel",
+                json={"subject_id": "tenant-9", "line_channel_key": "dms_b"},
+            )
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["channel_key"], "dms_b")
+        self.assertTrue(body["changed"])
+        self.assertEqual(body["unbound"], 2)
+        self.assertEqual(body["codes_voided"], 1)
+        self.assertEqual(set_channel.call_args.args[:2], ("tenant-9", "dms_b"))
+        self.assertEqual(log.call_args.kwargs.get("action"), "dms.channel_change")
+
+
+class OverviewBindingRowsTests(unittest.TestCase):
+    def test_bindings_grouped_by_tenant_first_then_user(self):
+        rows = [
+            {
+                "tenant_id": "tenant-1",
+                "user_id": "user-1",
+                "line_user_id": "L1",
+                "channel_key": "dms_a",
+                "line_name": "Somchai",
+                "bound_at": None,
+                "username": "boss",
+            },
+            {
+                "tenant_id": None,
+                "user_id": "solo-1",
+                "line_user_id": "L2",
+                "channel_key": "dms_b",
+                "line_name": "Solo",
+                "bound_at": None,
+                "username": "solo",
+            },
+        ]
+        with mock.patch.object(
+            admin_dms_routes.db,
+            "get_cursor",
+            lambda *a, **k: _cursor_cm(_SeqCursor([rows])),
+        ):
+            grouped = admin_dms_routes._bindings_for_subjects(["tenant-1", "solo-1"])
+        self.assertEqual(grouped["tenant-1"][0]["line_user_id"], "L1")
+        self.assertEqual(grouped["tenant-1"][0]["channel_name"], "A DMS")
+        self.assertEqual(grouped["solo-1"][0]["line_user_id"], "L2")
+        self.assertEqual(grouped["solo-1"][0]["channel_name"], "B DMS")
+
+    def test_empty_subjects_skip_query(self):
+        with mock.patch.object(admin_dms_routes.db, "get_cursor") as cur:
+            self.assertEqual(admin_dms_routes._bindings_for_subjects([]), {})
+        cur.assert_not_called()
+
+
 class InviteCreateAccountTests(unittest.TestCase):
     def setUp(self):
         self.app = FastAPI()
@@ -278,6 +472,13 @@ class InviteCreateAccountTests(unittest.TestCase):
         )
         self._su.start()
         self.addCleanup(self._su.stop)
+        self.enterContext(
+            mock.patch.object(
+                admin_dms_routes.line_account_channel,
+                "set_channel",
+                return_value={"ok": True, "channel_key": "dms", "changed": False},
+            )
+        )
 
     def test_invite_unknown_email_creates_account_and_reveals_password_once(self):
         with (

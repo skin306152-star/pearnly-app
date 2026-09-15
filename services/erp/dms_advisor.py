@@ -100,15 +100,8 @@ def resolve_operator_advisor(
         return None, ""
     if masters is not None:
         return match_in_masters(masters, username), username
-    cached = dms_masters_cache.read_fresh_masters(ep)
-    hit = match_in_masters(cached, username)
-    if hit is None:
-        # 拦截话术让人「去 DMS 名册加上这个账号再试」——主档缓存 12 小时,不现抓一次的话
-        # 那句「再试一次」在半天内都是假的(缓存也可能是旧版分页只存了 10 行)。
-        # 缓存本来就冷/过期时 get_masters 自己会现抓,不必 force(免得同一请求连抓两遍)。
-        fresh = dms_masters_cache.get_masters(ep, force_refresh=cached is not None) or {}
-        hit = match_in_masters(fresh, username)
-    return hit, username
+    fresh = dms_masters_cache.get_masters(ep, force_refresh=True, require_complete=True) or {}
+    return match_in_masters(fresh, username), username
 
 
 def _pinned_advisor(
@@ -119,20 +112,16 @@ def _pinned_advisor(
 ) -> Optional[Dict[str, str]]:
     """老板在端点上钉死的归属(账号不在顾问名册时的出路)。
 
-    name 缺就从已暖的主档缓存按 id 补一个给预览卡显示;补不到也照样放行 —— 建单层
-    (_advisor_ref_strict)还会按 id 再解析一次拿权威名字。
+    指定 ID 仍必须在当前主档存在；名字采用实时值，读取失败不得使用旧配置放行。
     """
     advisor_id = str(pinned.get("advisor_id") or "").strip()
-    name = str(pinned.get("advisor_name") or "").strip()
-    cached = masters if masters is not None else dms_masters_cache.read_fresh_masters(ep) or {}
-    row = row_by_id(cached.get("advisors"), advisor_id)
-    if masters is not None:
-        if row is None:
-            return None
-        name = _cell(row, _COL_NAME)
-    elif not name and row:
-        name = _cell(row, _COL_NAME)
-    return {"id": advisor_id, "name": name}
+    fresh = (
+        masters
+        if masters is not None
+        else dms_masters_cache.get_masters(ep, force_refresh=True, require_complete=True) or {}
+    )
+    row = row_by_id(fresh.get("advisors"), advisor_id)
+    return _ref(row) if row is not None else None
 
 
 def _dms_username(cfg: Dict[str, Any]) -> str:

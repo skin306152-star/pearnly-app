@@ -138,17 +138,13 @@ def _missing_result(qa: dict, field: str, snapshot: dict, paints: List[list]) ->
             "qa": updated,
             "code": "ERR_DMS_ADVISOR_UNMATCHED",
         }
-    if field in ("bank", "source_bank", "cheque_bank", "cashier_cheque_bank", "card_bank"):
-        channel = "transfer" if field in ("bank", "source_bank") else field.removesuffix("_bank")
+    if field in ("bank", "cheque_bank", "cashier_cheque_bank", "card_bank"):
+        channel = "transfer" if field == "bank" else field.removesuffix("_bank")
         matching = [p for p in updated.get("payments") or [] if p.get("channel") == channel]
         missing = matching[0] if matching else {"channel": channel, "amount": ""}
         updated["payments"] = [p for p in updated.get("payments") or [] if p is not missing]
         updated["pending_channel"] = missing
-        updated["step"] = (
-            "pay_bank"
-            if channel != "transfer"
-            else ("pay_src" if field == "source_bank" else "pay_dst")
-        )
+        updated["step"] = "pay_bank" if channel != "transfer" else "pay_dst"
         return {
             "status": "unmatched",
             "field": field,
@@ -260,17 +256,6 @@ def reconcile(qa: dict, masters: Dict[str, Any], paints: Optional[List[list]]) -
             ):
                 _change(changes, "bank", str(extra.get(key) or ""), mapped[key])
         extra.update(mapped)
-        source = resolve_bank_identity(
-            masters.get("source_banks"),
-            "source_banks",
-            extra.get("src_bank_id"),
-            extra.get("src_bank_name"),
-        )
-        if source is None:
-            return _missing_result(updated, "source_bank", snapshot, paints or [])
-        _change(changes, "source_bank", str(extra.get("src_bank_name") or ""), source["name"])
-        assign_bank_identity(extra, source, id_key="src_bank_id", name_key="src_bank_name")
-
     car_id = str((answers.get("car") or {}).get("id") or "")
     paint_snapshot = build_paint_snapshot(car_id, paints or [])
     updated["master_snapshot"] = snapshot

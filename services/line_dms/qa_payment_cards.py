@@ -11,25 +11,6 @@
 # 不再声称「只能用 |」—— 用户怎么写都能收,只在真的拆不出来时才重问。
 TXT_SEP_HINT = "คั่นช่องด้วย | , / หรือ ·"
 
-TXT_ASK_PAY_SRC_DETAIL = (
-    "ข้อมูลต้นทาง — พิมพ์ ชื่อบัญชี | เลขบัญชี | สาขา\n"
-    "เช่น สมชาย ใจดี | 1234567890 | ระยอง\n"
-    "กรอกข้อมูลจริงให้ครบตามรายการโอน ไม่ใช้ - เพื่อข้าม\n" + TXT_SEP_HINT
-)
-TXT_ASK_PAY_SRC_MANUAL = (
-    "ธนาคารต้นทาง — พิมพ์ ชื่อธนาคาร | ชื่อบัญชี | เลขบัญชี | สาขา\n"
-    "เช่น KBank | สมชาย ใจดี | 1234567890 | ระยอง\n"
-    "DMS ยังไม่มีรายชื่อธนาคารต้นทาง พิมพ์ชื่อธนาคารเองได้เลย\n" + TXT_SEP_HINT
-)
-TXT_ASK_PAY_DST_DETAIL = (
-    "บัญชีบริษัทที่ได้รับเงิน — พิมพ์ เลขบัญชี | สาขา\n"
-    "เช่น 1234567890 | ระยอง\n"
-    "ใช้ข้อมูลบัญชีที่ลูกค้าโอนเข้าจริง\n" + TXT_SEP_HINT
-)
-_DST_FIELD_LABELS = {
-    "dst_account_no": ("เลขบัญชี", "1234567890"),
-    "dst_branch_name": ("สาขา", "ระยอง"),
-}
 # 该渠道银行目录权威为空时的兼容问法:多问一项银行名称(hidden bank id 允许为空)。
 TXT_ASK_CHEQUE_REF_MANUAL = (
     "พิมพ์ เลขที่เช็ค | เล่มที่เช็ค | ชื่อธนาคาร เช่น 123456 | 01 | KBank\n" + TXT_SEP_HINT
@@ -66,40 +47,4 @@ def ask_payment_bank(banks: list, page: int = 0, channel: str = "") -> dict:
     return _msg(
         _option_text("เลือกธนาคาร", banks, company_bank_label, page),
         _pick_rows(banks, "paybank", company_bank_label, page),
-    )
-
-
-def ask_transfer_details(destination: bool, manual_source: bool = False, fields=None) -> dict:
-    """转账资料问法;来源银行目录为空时先问银行名称(手工兼容流程)。"""
-    if destination:
-        wanted = tuple(fields or _DST_FIELD_LABELS)
-        labels = [_DST_FIELD_LABELS[key][0] for key in wanted]
-        examples = [_DST_FIELD_LABELS[key][1] for key in wanted]
-        text = "บัญชีบริษัทที่ได้รับเงิน — พิมพ์ " + " | ".join(labels)
-        text += "\nเช่น " + " | ".join(examples)
-        text += "\nใช้ข้อมูลบัญชีที่ลูกค้าโอนเข้าจริง"
-        if len(wanted) > 1:
-            text += "\n" + TXT_SEP_HINT
-        return {"type": "text", "text": text}
-    return {
-        "type": "text",
-        "text": TXT_ASK_PAY_SRC_MANUAL if manual_source else TXT_ASK_PAY_SRC_DETAIL,
-    }
-
-
-def ask_pay_src(banks: list, page: int = 0) -> dict:
-    from services.line_dms.qa_cards import (
-        _msg,
-        _option_text,
-        _pick_rows,
-        TXT_ASK_PAY_SRC,
-    )
-    from services.erp.mrerp_dms_company_banks import company_bank_label, sort_bank_rows
-
-    banks = sort_bank_rows(banks)
-    if not banks:
-        return ask_transfer_details(False, manual_source=True)
-    return _msg(
-        _option_text(TXT_ASK_PAY_SRC, banks, company_bank_label, page),
-        _pick_rows(banks, "srcbank", company_bank_label, page),
     )

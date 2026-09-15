@@ -250,13 +250,6 @@ def validate_company_bank_payments(
         if channel == "transfer":
             row = current_bank("company_banks", extra.get("dst_id"))
             extra.update(company_bank_payment_extra(row, extra))
-            apply_bank_identity(
-                extra,
-                "source_banks",
-                bank_rows("source_banks"),
-                id_key="src_bank_id",
-                name_key="src_bank_name",
-            )
         elif channel in PAYMENT_CHANNEL_BANKS:
             key = PAYMENT_CHANNEL_BANKS[channel]
             apply_bank_identity(extra, key, bank_rows(key), id_key="bank_id", name_key="bank_name")

@@ -227,23 +227,16 @@ class CompanyBankTests(unittest.TestCase):
             ],
         )
 
-    def test_generic_bank_and_amount_do_not_count_as_complete_payment(self):
+    def test_generic_selected_bank_and_amount_are_sufficient(self):
         with mock.patch(
             "services.erp.mrerp_dms_company_banks._fetch_banks",
             return_value=[["1", "SCB", "SCB", "", ""]],
         ):
-            with self.assertRaises(DMSClientError) as ctx:
-                validate_company_bank_payments(
-                    object(),
-                    [
-                        {
-                            "channel": "transfer",
-                            "amount": "1000",
-                            "extra": {"dst_id": "1", "src_bank_id": "1"},
-                        }
-                    ],
-                )
-        self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
+            out = validate_company_bank_payments(
+                object(), [{"channel": "transfer", "amount": "1000", "extra": {"dst_id": "1"}}]
+            )
+        self.assertEqual(out[0]["extra"]["dst_account_no"], "")
+        self.assertEqual(out[0]["extra"]["dst_bank_id"], "1")
 
 
 class ManualBankDirectoryTests(unittest.TestCase):
@@ -336,7 +329,7 @@ class ProductionProtocolShapeTests(unittest.TestCase):
         ]
         out = validate_company_bank_payments(object(), payments, client=self._client(bodies))
         extra = out[0]["extra"]
-        self.assertEqual(extra[MANUAL_BANK_FLAG], "1")
+        self.assertNotIn(MANUAL_BANK_FLAG, extra)
         self.assertEqual(extra["src_bank_name"], "KBank")
         self.assertEqual(extra["dst_bank_name"], "SCB")
 
@@ -391,25 +384,21 @@ class ProductionShapeSubmitTests(unittest.TestCase):
         extra = out[0]["extra"]
         self.assertEqual(extra["src_bank_name"], "KBank")
         self.assertEqual(extra["src_bank_id"], "")
-        self.assertEqual(extra[MANUAL_BANK_FLAG], "1")
+        self.assertNotIn(MANUAL_BANK_FLAG, extra)
         self.assertEqual(extra["dst_id"], "1")  # 收款账户仍来自实时目录
         self.assertEqual(extra["dst_bank_name"], "SCB")
 
-    def test_manual_source_bank_without_a_name_is_incomplete(self):
-        payments = [
-            {
-                "channel": "transfer",
-                "amount": "1500.00",
-                "extra": _transfer_extra(src_bank_id=""),
-            }
-        ]
+    def test_transfer_without_source_or_account_details_validates_selected_bank(self):
+        payments = [{"channel": "transfer", "amount": "1500.00", "extra": {"dst_id": "1"}}]
         with mock.patch(
             "services.erp.mrerp_dms_company_banks._fetch_banks",
-            side_effect=[PRODUCTION_BANKS["company_banks"], []],
-        ):
-            with self.assertRaises(DMSClientError) as ctx:
-                validate_company_bank_payments(object(), payments)
-        self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
+            return_value=[["1", "SCB", "SCB", "00", "00"]],
+        ) as read:
+            result = validate_company_bank_payments(object(), payments)
+        self.assertEqual(read.call_count, 1)
+        self.assertEqual(result[0]["extra"]["dst_bank_id"], "1")
+        self.assertEqual(result[0]["extra"]["dst_account_no"], "")
+        self.assertNotIn("src_bank_name", result[0]["extra"])
 
     def test_manual_channel_bank_passes_but_only_where_the_directory_is_empty(self):
         manual = {
@@ -458,10 +447,7 @@ class ProductionShapeSubmitTests(unittest.TestCase):
         ]
         with mock.patch(
             "services.erp.mrerp_dms_company_banks._fetch_banks",
-            side_effect=[
-                PRODUCTION_BANKS["company_banks"],
-                DMSClientError("bank master not ready", "ERR_DMS_MASTER_UNAVAILABLE"),
-            ],
+            side_effect=DMSClientError("bank master not ready", "ERR_DMS_MASTER_UNAVAILABLE"),
         ):
             with self.assertRaises(DMSClientError) as ctx:
                 validate_company_bank_payments(object(), payments)

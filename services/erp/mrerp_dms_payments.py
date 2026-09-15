@@ -73,10 +73,15 @@ _MANUAL_OPTIONAL_FIELDS = {
     "card": frozenset({"bank_id"}),
 }
 
-# DMS accepts and persists a transfer while the receiving company-account name stays blank.
-# Keep mapping the field when a trusted source provides it, but never block LINE/editor users
-# or a native booking submission merely because the bank master does not expose it.
-_OPTIONAL_FIELDS = {"transfer": frozenset({"dst_business_name"})}
+# Transfer selection requires the receiving bank identity. Other bank fields are mapped
+# when present, but do not create extra questions or block a bank-only transfer.
+TRANSFER_SOURCE_FIELDS = frozenset(
+    {"src_bank_id", "src_bank_name", "src_account_name", "src_account_no", "src_branch_name"}
+)
+_OPTIONAL_FIELDS = {
+    "transfer": frozenset({"dst_business_name", "dst_account_no", "dst_branch_name"})
+    | TRANSFER_SOURCE_FIELDS
+}
 
 
 def manual_bank_entry(extra: dict) -> bool:

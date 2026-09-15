@@ -17,9 +17,7 @@ from services.erp.erp_dms_push import _DMS_FRIENDLY
 from services.line_dms import booking_car_details, edit_link
 from services.line_dms.qa_payment_cards import (
     ask_pay_ref as ask_pay_ref,
-    ask_pay_src as ask_pay_src,
     ask_payment_bank as ask_payment_bank,
-    ask_transfer_details as ask_transfer_details,
     TXT_SEP_HINT,
 )
 from services.line_dms.cards import (
@@ -67,8 +65,7 @@ PAY_LABELS = {
 }
 TXT_ASK_AMOUNT = "ยอดเงิน ({channel}) — พิมพ์จำนวนเงิน เช่น 5000"
 TXT_BAD_AMOUNT = "จำนวนเงินไม่ถูกต้อง พิมพ์เป็นตัวเลข เช่น 5000 หรือ 5,000.50"
-TXT_ASK_PAY_SRC = "ธนาคารต้นทาง — เลือกธนาคารที่ลูกค้าโอนเงินออก"
-TXT_ASK_PAY_DST = "ธนาคารปลายทาง — เลือกธนาคารที่บริษัทได้รับเงิน แล้วระบุบัญชีรับเงิน"
+TXT_ASK_PAY_DST = "ธนาคารปลายทาง — เลือกธนาคารที่บริษัทได้รับเงิน"
 # 目录为空说的是「公司还没配收款账户」,不是「读不到」(读失败另有 TXT_MASTER_UNAVAILABLE)。
 TXT_NO_COMPANY_BANK = (
     "ยังไม่มีข้อมูลบัญชีรับเงินของบริษัท กรุณาให้ผู้ดูแลตั้งค่าใน DMS แล้วลองใหม่อีกครั้ง"

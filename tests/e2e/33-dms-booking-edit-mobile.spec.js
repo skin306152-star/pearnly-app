@@ -623,9 +623,7 @@ test('mobile payment and attachment controls stay aligned', async ({ page }) => 
     await page.screenshot({ path: path.join(OUT, 'mobile-controls.png'), fullPage: true });
 });
 
-test('payment editor keeps bank and account details while company name stays optional', async ({
-    page,
-}) => {
+test('payment editor only requires selecting the receiving bank', async ({ page }) => {
     let submitted;
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => {
@@ -664,27 +662,14 @@ test('payment editor keeps bank and account details while company name stays opt
 
     await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=payment-fields`);
     await page.waitForSelector('#editor:not([hidden])');
-    await expect(page.locator('.src-bank')).toHaveValue('S1');
-    await expect(page.locator('.src-account')).toHaveValue('111222333');
-    await expect(page.locator('.src-time')).toHaveCount(0);
-    await expect(page.locator('.dst')).toHaveValue('2');
-    await expect(page.locator('.dst option:checked')).toHaveText('BBL · Bbl 987654321 · ระยอง');
-    await expect(page.locator('.dst-name')).not.toHaveAttribute('required', '');
-    await expect(page.locator('[data-t="loading"]')).toBeHidden();
+    await expect(
+        page.locator('.src-bank, .src-bank-name, .src-account, .src-name, .src-branch')
+    ).toHaveCount(0);
+    await expect(page.locator('.dst-account, .dst-name, .dst-branch')).toHaveCount(0);
+    await page.locator('.dst').selectOption('');
     await page.locator('#save').click();
     expect(submitted).toBeUndefined();
-    await page.locator('.dst-account').fill('987654321');
-    await page.locator('.dst-branch').fill('Rayong');
-    await page.locator('.src-bank').selectOption('');
-    await page.locator('#save').click();
-    expect(submitted).toBeUndefined();
-    await page.locator('.src-bank').selectOption('S1');
-    await page.locator('.dst').selectOption('1');
-    await expect(page.locator('.dst-account')).toHaveValue('');
-    await expect(page.locator('.dst-branch')).toHaveValue('');
     await page.locator('.dst').selectOption('2');
-    await page.locator('.dst-account').fill('987654321');
-    await page.locator('.dst-branch').fill('Rayong');
     for (const width of [390, 1280]) {
         await page.setViewportSize({ width, height: 900 });
         expect(
@@ -703,19 +688,12 @@ test('payment editor keeps bank and account details while company name stays opt
         channel: 'transfer',
         amount: '1000.00',
         extra: {
-            src_bank_id: 'S1',
-            dst_business_name: '',
-            dst_account_no: '987654321',
-            dst_branch_name: 'Rayong',
-            src_account_no: '111222333',
-            src_account_name: 'Customer',
-            src_branch_name: 'Bangkok',
             dst_id: '2',
         },
     });
 });
 
-test('empty source bank directory falls back to a typed bank name', async ({ page }) => {
+test('empty source bank directory does not add any bank detail inputs', async ({ page }) => {
     let submitted;
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => {
@@ -754,14 +732,12 @@ test('empty source bank directory falls back to a typed bank name', async ({ pag
 
     await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=manual-source-bank`);
     await page.waitForSelector('#editor:not([hidden])');
-    // 目录为空 → 银行名称可填写、hidden bank id 不留下拉;草稿里的手工名称原样回显。
-    await expect(page.locator('.src-bank-name')).toHaveValue('KBank ระยอง');
-    await expect(page.locator('.src-bank')).toHaveCount(0);
+    await expect(
+        page.locator(
+            '.src-bank-name, .src-bank, .src-account, .dst-name, .dst-account, .dst-branch'
+        )
+    ).toHaveCount(0);
     await expect(page.locator('.dst')).toHaveValue('2');
-    await page.locator('.dst').selectOption('2');
-    await page.locator('.dst-name').fill('Example Company');
-    await page.locator('.dst-account').fill('987654321');
-    await page.locator('.dst-branch').fill('Rayong');
     await page.screenshot({ path: path.join(OUT, 'manual-source-bank-390.png'), fullPage: true });
     await page.locator('#save').click();
     await expect.poll(() => submitted).toBeTruthy();
@@ -769,14 +745,7 @@ test('empty source bank directory falls back to a typed bank name', async ({ pag
         channel: 'transfer',
         amount: '1000.00',
         extra: {
-            src_bank_name: 'KBank ระยอง',
-            src_account_no: '111222333',
-            src_account_name: 'Customer',
-            src_branch_name: 'Bangkok',
             dst_id: '2',
-            dst_business_name: 'Example Company',
-            dst_account_no: '987654321',
-            dst_branch_name: 'Rayong',
         },
     });
 });

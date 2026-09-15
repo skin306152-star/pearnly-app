@@ -211,7 +211,7 @@ class TestPaymentFormFields(unittest.TestCase):
                 )
             )
         self.assertEqual(ctx.exception.error_code, "ERR_DMS_PAYMENT_INCOMPLETE")
-        self.assertIn("src_bank_name", str(ctx.exception))
+        self.assertIn("dst_bank_name", str(ctx.exception))
 
         fields = payment_form_fields(
             (

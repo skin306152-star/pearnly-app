@@ -267,15 +267,15 @@ class ManualBankReconcileTests(unittest.TestCase):
         payment = result["qa"]["payments"][0]["extra"]
         self.assertEqual(payment["src_bank_name"], "KBank")
         self.assertEqual(payment["src_bank_id"], "")
-        self.assertEqual(payment["bank_manual"], "1")
+        self.assertNotIn("bank_manual", payment)
         self.assertEqual(result["qa"]["master_snapshot"]["counts"]["source_banks"], 0)
 
-    def test_empty_source_directory_without_a_name_asks_for_that_step_again(self):
-        qa = self._production_qa(src_bank_name="")
-        result = master_contract.reconcile(qa, _production_masters(), [["p1", "RED", "Red"]])
-        self.assertEqual(result["status"], "unmatched")
-        self.assertEqual(result["field"], "source_bank")
-        self.assertEqual(result["qa"]["step"], "pay_src")
+    def test_empty_source_directory_does_not_restart_transfer(self):
+        result = master_contract.reconcile(
+            self._production_qa(src_bank_name=""), _production_masters(), [["p1", "RED", "Red"]]
+        )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["qa"]["payments"][0]["extra"]["dst_bank_id"], "b1")
 
     def test_directory_rows_still_require_a_real_match(self):
         masters = _production_masters()
@@ -295,8 +295,8 @@ class ManualBankReconcileTests(unittest.TestCase):
             masters,
             [["p1", "RED", "Red"]],
         )
-        self.assertEqual(removed["status"], "unmatched")
-        self.assertEqual(removed["field"], "source_bank")
+        self.assertEqual(removed["status"], "ok")
+        self.assertEqual(removed["qa"]["payments"][0]["extra"]["dst_bank_id"], "b1")
 
     def test_manual_cheque_bank_and_removed_channel_bank(self):
         qa = _qa()

@@ -9,7 +9,6 @@
 import unittest
 
 from services.line_dms.booking_payments import parse_payment_detail
-from services.line_dms.booking_qa_transfer import parse_details
 from services.line_dms.text_fields import split_fields
 
 
@@ -75,86 +74,6 @@ class SplitFieldsTests(unittest.TestCase):
         self.assertEqual(split_fields("KBank . VISA", 2), ["KBank", "VISA"])
 
 
-class ParseTransferDetailsTests(unittest.TestCase):
-    """逐问转账资料(src 4 段 / dst 3 段 / 手工来源 5 段)吃同一套分隔规则。"""
-
-    def test_source_details_accept_common_separators(self):
-        for text in (
-            "Customer | 123456789 | Bangkok",
-            "Customer, 123456789, Bangkok",
-            "Customer/123456789/Bangkok",
-            "Customer · 123456789 · Bangkok",
-            # 旧卡已经展示给用户时仍兼容收尾，但时间会被丢弃。
-            "Customer | 123456789 | Bangkok | 14:36",
-            "Customer, 123456789, Bangkok, 14:36",
-            "Customer、123456789、Bangkok、14:36",
-            "Customer/123456789/Bangkok/14:36",
-            "Customer · 123456789 · Bangkok · 14:36",
-        ):
-            with self.subTest(text=text):
-                self.assertEqual(
-                    parse_details(text),
-                    {
-                        "src_account_name": "Customer",
-                        "src_account_no": "123456789",
-                        "src_branch_name": "Bangkok",
-                    },
-                )
-
-    def test_destination_details_accept_common_separators(self):
-        for text in (
-            "Company | 1234567890 | Rayong",
-            "Company, 1234567890, Rayong",
-            "Company/1234567890/Rayong",
-            "Company · 1234567890 · Rayong",
-        ):
-            with self.subTest(text=text):
-                self.assertEqual(
-                    parse_details(text, destination=True),
-                    {
-                        "dst_business_name": "Company",
-                        "dst_account_no": "1234567890",
-                        "dst_branch_name": "Rayong",
-                    },
-                )
-
-    def test_manual_source_details_keep_the_leading_bank_name(self):
-        self.assertEqual(
-            parse_details("KBank, สมชาย ใจดี, 1234567890, ระยอง, 14:36", manual_source=True),
-            {
-                "src_bank_name": "KBank",
-                "src_account_name": "สมชาย ใจดี",
-                "src_account_no": "1234567890",
-                "src_branch_name": "ระยอง",
-            },
-        )
-
-    def test_strict_field_checks_still_apply(self):
-        for text in (
-            "-",
-            "Customer | 123",  # 段数不足
-            "Customer | abc | Bangkok | 14:36",  # 账号无数字
-            "Customer | 123456789 | Bangkok | 27:00",  # 时间不合法
-            "Customer | 123456789 | Bangkok | 14:36 | extra",  # 段数过多
-            f"{'ก' * 161} | 123456789 | Bangkok | 14:36",  # 单段超 160
-        ):
-            with self.subTest(text=text):
-                self.assertIsNone(parse_details(text))
-
-    def test_account_slash_and_date_stay_inside_one_segment(self):
-        # 竖线分段时,账号里的 / 原样留在账号段里。
-        self.assertEqual(
-            parse_details("Customer | 123/456 | Bangkok | 14:36"),
-            {
-                "src_account_name": "Customer",
-                "src_account_no": "123/456",
-                "src_branch_name": "Bangkok",
-            },
-        )
-        # 用斜杠当分隔符时,日期串只会让段数对不上 → 重问,不拆。
-        self.assertIsNone(parse_details("Customer / 123456789 / 19/09/2569 / 14:36"))
-
-
 class ParsePaymentDetailSeparatorTests(unittest.TestCase):
     """渠道资料(cheque/cashier/card/transfer)共用同一套分隔规则。"""
 
@@ -185,18 +104,9 @@ class ParsePaymentDetailSeparatorTests(unittest.TestCase):
                 )
         self.assertIsNone(parse_payment_detail("cheque", "123456 | 01", manual_bank=True))
 
-    def test_transfer_bank_and_account_keep_the_legacy_space_rule(self):
-        self.assertEqual(
-            parse_payment_detail("transfer", "KBank Rayong | 1234567890"),
-            {"src_bank_name": "KBank Rayong", "src_account_no": "1234567890"},
-        )
-        # 没有分隔符时沿用老写法:末段当账号(银行名里的空格保留)。
-        self.assertEqual(
-            parse_payment_detail("transfer", "KBank Rayong 1234567890"),
-            {"src_bank_name": "KBank Rayong", "src_account_no": "1234567890"},
-        )
-        # 账号必须含数字。
-        self.assertIsNone(parse_payment_detail("transfer", "KBank | แปดเก้า"))
+    def test_transfer_bank_and_account_are_no_longer_collected(self):
+        for text in ("SCB 123/456", "KBank Rayong | 1234567890", "Customer | 999 | Bangkok"):
+            self.assertIsNone(parse_payment_detail("transfer", text))
 
     def test_amount_and_abbreviation_are_not_split_into_two_fields(self):
         self.assertIsNone(parse_payment_detail("cheque", "1,000.00"))
@@ -204,24 +114,9 @@ class ParsePaymentDetailSeparatorTests(unittest.TestCase):
         self.assertIsNone(parse_payment_detail("cheque", "123456.01"))
         self.assertIsNone(parse_payment_detail("card", "Mr. Somchai", manual_bank=True))
 
-    def test_account_with_an_inner_slash_is_not_split(self):
-        # 账号里的半角斜杠(数字/数字紧邻)不当分隔符:账号原样留在末段。
-        self.assertEqual(
-            parse_payment_detail("transfer", "SCB 123/456"),
-            {"src_bank_name": "SCB", "src_account_no": "123/456"},
-        )
-        # 整行只有一个「数字/数字」时没有第二种读法 → 重问,不猜着拆。
-        self.assertIsNone(parse_payment_detail("transfer", "123/456"))
-        self.assertIsNone(parse_payment_detail("cheque", "123456/01"))
-        # 全角斜杠不是数字写法,照常当分隔符。
-        self.assertEqual(
-            parse_payment_detail("cheque", "123456／01"),
-            {"cheque_no": "123456", "cheque_book_no": "01"},
-        )
-        self.assertEqual(
-            parse_payment_detail("transfer", "SCB/1234567890"),
-            {"src_bank_name": "SCB", "src_account_no": "1234567890"},
-        )
+    def test_transfer_source_input_is_not_parsed(self):
+        for text in ("SCB 123/456", "KBank Rayong | 1234567890", "Customer | 999 | Bangkok"):
+            self.assertIsNone(parse_payment_detail("transfer", text))
 
 
 if __name__ == "__main__":

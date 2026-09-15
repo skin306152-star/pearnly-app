@@ -15,10 +15,10 @@ MAX_AMOUNT = Decimal("99999999")
 THAI_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")
 
 # 支付渠道补充信息的形态(单一事实源:booking_qa 步进 / qa_cards 文案共用):
-# src_dst=转账问来源+到账两步;ref=单条补充文本;detail=自由描述;None=金额即完结。
+# destination=转账选择收款银行;ref=单条补充文本;detail=自由描述;None=金额即完结。
 CHANNEL_EXTRA_SHAPE = {
     "cash": None,
-    "transfer": "src_dst",
+    "transfer": "destination",
     "cheque": "ref",
     "cashier_cheque": "ref",
     "card": "ref",

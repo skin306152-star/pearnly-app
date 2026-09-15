@@ -1,14 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Collect the native transfer fields without mistaking a bank for a company account.
-
-来源/支票/本票/银行卡银行目录**权威为空**时(生产租户真实形态:company_banks 有行、这四类
-0 行),退回改前的可填写文本流程:问银行名称 + 原生必要资料,hidden bank id 留空。目录有行
-时照旧走实时目录选择;目录读取失败由 snapshot_rows 抛 MasterSyncError(fail closed),不落进这条。
-"""
+"""转账只收金额和收款银行，再收凭证；支票、本票和银行卡保留各自资料。"""
 
 from __future__ import annotations
-
-import re
 
 from services.erp.mrerp_dms_company_banks import (
     company_bank_payment_extra,
@@ -23,20 +16,9 @@ from services.line_dms.qa_util import (
     complete_channel,
     find_row,
     parse_amount,
-    THAI_DIGITS,
 )
-from services.line_dms.text_fields import split_fields
 
-_SRC_KEYS = ("src_account_name", "src_account_no", "src_branch_name")
-_SRC_MANUAL_KEYS = ("src_bank_name", *_SRC_KEYS)
-_DST_KEYS = ("dst_account_no", "dst_branch_name")
-_LEGACY_DST_KEYS = ("dst_business_name", *_DST_KEYS)
-_LEGACY_TIME = re.compile(r"(?:[01]?\d|2[0-3]):[0-5]\d")
-
-# 逐问里所有付款资料文本步:金额 / 来源银行(含目录为空时的手工名称)/ 渠道资料。
-TEXT_STEPS = frozenset(
-    {"pay_amount", "pay_src", "pay_src_detail", "pay_dst_detail", "pay_bank", "pay_ref"}
-)
+TEXT_STEPS = frozenset({"pay_amount", "pay_bank", "pay_ref"})
 
 
 def masters_reader(tenant_id, *, persist):
@@ -51,44 +33,8 @@ def masters_reader(tenant_id, *, persist):
     return read
 
 
-def parse_details(text, destination=False, manual_source=False, keys=None):
-    """一行资料 → 原生字段。manual_source=来源银行目录权威为空:首段是手工银行名称。
-
-    分段用共用分隔符规则(text_fields):| ｜ , ， 、 / ／ · 都行,点号另有保守规则;
-    一种规则切出的段数必须精确等于字段数,否则照旧重问。"""
-    keys = tuple(
-        keys
-        or (_LEGACY_DST_KEYS if destination else (_SRC_MANUAL_KEYS if manual_source else _SRC_KEYS))
-    )
-    raw = str(text or "").strip()
-    parts = [raw] if len(keys) == 1 and raw else split_fields(text, len(keys))
-    # 已经看到旧问法的会话可能仍回「... | 时间」。兼容接收这一轮，但丢弃非 DMS
-    # 必填的时间，不再保存/展示/提交；新问法只收上面的三项(手工银行时四项)。
-    if parts is None and not destination:
-        legacy = split_fields(text, len(keys) + 1)
-        if legacy and _LEGACY_TIME.fullmatch(legacy[-1].translate(THAI_DIGITS)):
-            parts = legacy[:-1]
-    if parts is None or any(not value or value == "-" or len(value) > 160 for value in parts):
-        return None
-    account_key = "dst_account_no" if destination else "src_account_no"
-    if account_key in keys:
-        account_index = keys.index(account_key)
-        if not any(ch.isdigit() for ch in parts[account_index].translate(THAI_DIGITS)):
-            return None
-    return dict(zip(keys, parts))
-
-
-def destination_missing_keys(qa) -> tuple:
-    """Only ask for DMS-required account fields absent from the selected bank row/draft."""
-    extra = (qa.get("pending_channel") or {}).get("extra") or {}
-    return tuple(key for key in _DST_KEYS if str(extra.get(key) or "").strip() in {"", "-", "00"})
-
-
 def manual_bank(qa, key) -> bool:
-    """本会话该渠道银行目录是否权威为空(→ 银行名称手工填)。
-
-    兼容老会话:已经卡在 pay_src 且 master_snapshot 里该目录是空表的会话,不必重新开局、
-    不必重扫身份证,直接按手工流程继续。"""
+    """支票、本票和银行卡目录为空时允许手工银行名称。"""
     if key in (qa.get("manual_banks") or ()):
         return True
     return manual_bank_allowed_for_rows(
@@ -104,16 +50,6 @@ def _clear_manual_bank(qa, key) -> None:
     qa["manual_banks"] = [item for item in (qa.get("manual_banks") or ()) if item != key]
 
 
-async def prepare_source_step(tenant_id, line_user_id, qa, *, masters, persist) -> str:
-    """转账来源银行步骤:目录有行 → pay_src(实时目录选择);权威为空 → pay_src_detail(手工)。"""
-    rows = await masters(line_user_id, qa, "source_banks", persist=persist)
-    if rows:
-        _clear_manual_bank(qa, "source_banks")
-        return "pay_src"
-    _mark_manual_bank(qa, "source_banks")
-    return "pay_src_detail"
-
-
 async def prepare_channel_bank_step(tenant_id, line_user_id, qa, *, masters, persist) -> str:
     """支票/本票/银行卡银行步骤:目录有行 → pay_bank(选择);权威为空 → pay_ref(手工)。"""
     key = PAYMENT_CHANNEL_BANKS[(qa.get("pending_channel") or {}).get("channel")]
@@ -123,14 +59,6 @@ async def prepare_channel_bank_step(tenant_id, line_user_id, qa, *, masters, per
         return "pay_bank"
     _mark_manual_bank(qa, key)
     return "pay_ref"
-
-
-def transfer_details_question(qa) -> dict:
-    """转账资料问法:来源银行目录权威为空时先问银行名称(与 collect_details 同一判据)。"""
-    destination = qa.get("step") == "pay_dst_detail"
-    manual_source = not destination and manual_bank(qa, "source_banks")
-    fields = destination_missing_keys(qa) if destination else None
-    return qa_cards.ask_transfer_details(destination, manual_source=manual_source, fields=fields)
 
 
 def channel_ref_question(qa) -> dict:
@@ -143,7 +71,7 @@ def channel_ref_question(qa) -> dict:
 async def handle_text(
     step, tenant_id, line_user_id, qa, text, reply_token, *, persist, send_step, reask
 ) -> None:
-    """付款资料文本步:金额 → (目录为空时先问)银行名称+账户资料 → 公司收款银行 → 渠道资料。"""
+    """转账金额后直接选择收款银行；其他渠道保留各自资料。"""
     masters = masters_reader(tenant_id, persist=persist)
     if step == "pay_amount":
         await _on_amount(
@@ -155,22 +83,6 @@ async def handle_text(
             masters=masters,
             persist=persist,
             send_step=send_step,
-        )
-    elif step == "pay_src":
-        await _on_source_step_text(
-            tenant_id,
-            line_user_id,
-            qa,
-            text,
-            reply_token,
-            masters=masters,
-            persist=persist,
-            send_step=send_step,
-            reask=reask,
-        )
-    elif step in ("pay_src_detail", "pay_dst_detail"):
-        await collect_details(
-            tenant_id, line_user_id, qa, text, reply_token, persist=persist, send_step=send_step
         )
     elif step == "pay_bank":
         await _on_bank_step_text(
@@ -200,12 +112,8 @@ async def _on_amount(
     pending = qa["pending_channel"]
     pending["amount"] = f"{amount:.2f}"
     shape = CHANNEL_EXTRA_SHAPE.get(pending.get("channel", ""))
-    if shape == "src_dst":
-        # 来源银行目录有行 → 选按钮;权威为空(生产租户形态)→ 直接问手工银行名称+账户资料,
-        # 不再停在 pay_src 报「读不到银行列表」。
-        next_step = await prepare_source_step(
-            tenant_id, line_user_id, qa, masters=masters, persist=persist
-        )
+    if shape == "destination":
+        next_step = "pay_dst"
     elif shape == "ref":
         next_step = await prepare_channel_bank_step(
             tenant_id, line_user_id, qa, masters=masters, persist=persist
@@ -218,25 +126,6 @@ async def _on_amount(
     qa["step"] = next_step
     await persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, next_step, reply_token)
-
-
-async def _on_source_step_text(
-    tenant_id, line_user_id, qa, text, reply_token, *, masters, persist, send_step, reask
-) -> None:
-    """pay_src 收到文字:目录有行 → 原步重问;权威为空 → 这条文字就是手工来源银行资料。
-
-    老会话(已卡在 pay_src、快照里 source_banks=[])重试即从此继续,不必重扫身份证。"""
-    next_step = await prepare_source_step(
-        tenant_id, line_user_id, qa, masters=masters, persist=persist
-    )
-    if next_step != "pay_src_detail":
-        await reask(tenant_id, line_user_id, qa, "", reply_token)
-        return
-    qa["step"] = next_step
-    await persist(tenant_id, line_user_id, qa)
-    await collect_details(
-        tenant_id, line_user_id, qa, text, reply_token, persist=persist, send_step=send_step
-    )
 
 
 async def _on_bank_step_text(
@@ -277,13 +166,11 @@ async def _on_reference_text(
 
 
 async def pick_bank(
-    tenant_id, line_user_id, qa, value, reply_token, *, source=False, masters, persist, send_step
+    tenant_id, line_user_id, qa, value, reply_token, *, masters, persist, send_step
 ):
     channel = qa["pending_channel"].get("channel")
     other = qa.get("step") == "pay_bank"
-    key = (
-        PAYMENT_CHANNEL_BANKS[channel] if other else ("source_banks" if source else "company_banks")
-    )
+    key = PAYMENT_CHANNEL_BANKS[channel] if other else "company_banks"
     rows = await masters(tenant_id, line_user_id, qa, key, persist=persist)
     row = find_row(rows, value)
     if row is None:
@@ -293,14 +180,12 @@ async def pick_bank(
     extra = qa["pending_channel"].setdefault("extra", {})
     if other:
         extra.update(bank_id=str(row[0]), bank_name=str(row[2] or row[1]))
-    elif source:
-        extra.update(src_bank_id=str(row[0]), src_bank_name=str(row[2] or row[1]))
     else:
         if extra.get("dst_id") and str(extra["dst_id"]) != str(row[0]):
             extra.pop("dst_account_no", None)
             extra.pop("dst_branch_name", None)
         extra.update(company_bank_payment_extra(row, extra))
-    if not other and not source and not destination_missing_keys(qa):
+    if not other:
         await _finish_destination(
             tenant_id,
             line_user_id,
@@ -310,70 +195,13 @@ async def pick_bank(
             send_step=send_step,
         )
         return
-    qa["step"] = "pay_ref" if other else ("pay_src_detail" if source else "pay_dst_detail")
+    qa["step"] = "pay_ref"
     await persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, qa["step"], reply_token)
 
 
-async def collect_details(tenant_id, line_user_id, qa, text, reply_token, *, persist, send_step):
-    destination = qa.get("step") == "pay_dst_detail"
-    manual_source = not destination and manual_bank(qa, "source_banks")
-    fields = destination_missing_keys(qa) if destination else None
-    if destination and not fields:
-        await _finish_destination(
-            tenant_id,
-            line_user_id,
-            qa,
-            reply_token,
-            persist=persist,
-            send_step=send_step,
-        )
-        return
-    # A conversation may have received the old prompt immediately before a release. Try
-    # its optional leading company-name field first so a two-part legacy reply cannot be
-    # mistaken for one account-number field. New prompts never request that leading field.
-    legacy_fields = (
-        tuple(key for key in _LEGACY_DST_KEYS if key == "dst_business_name" or key in fields)
-        if destination
-        else ()
-    )
-    details = parse_details(text, destination=True, keys=legacy_fields) if legacy_fields else None
-    if details is None:
-        details = parse_details(
-            text,
-            destination=destination,
-            manual_source=manual_source,
-            keys=fields,
-        )
-    if details is None:
-        _send(line_user_id, transfer_details_question(qa), reply_token)
-        return
-    extra = qa["pending_channel"].setdefault("extra", {})
-    extra.update(details)
-    if not destination:
-        # An authoritatively empty source-bank directory has no hidden bank id.
-        # Keep that provenance on the completed payment so the final native-field
-        # guard does not reject an otherwise complete manual source account.
-        if manual_source:
-            extra[MANUAL_BANK_FLAG] = "1"
-        else:
-            extra.pop(MANUAL_BANK_FLAG, None)
-        qa["step"] = "pay_dst"
-        await persist(tenant_id, line_user_id, qa)
-        await send_step(tenant_id, line_user_id, qa, "pay_dst", reply_token)
-        return
-    await _finish_destination(
-        tenant_id,
-        line_user_id,
-        qa,
-        reply_token,
-        persist=persist,
-        send_step=send_step,
-    )
-
-
 async def _finish_destination(tenant_id, line_user_id, qa, reply_token, *, persist, send_step):
-    """Finish a transfer once selected DMS data plus entered gaps are complete."""
+    """Finish a transfer after selecting the receiving bank."""
     complete_channel(qa)
     if not (qa.get("files") or {}).get("slip_mid"):
         await booking_qa_payment.request_slip(

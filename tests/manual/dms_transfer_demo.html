@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>三个 OA 转账对话验证</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f2f4f7;
+        --ink: #243047;
+        --line: #dce2ea;
+        --green: #9cec99;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 1300px;
+        margin: auto;
+        padding: 24px;
+      }
+      h1 {
+        font-size: 25px;
+        margin-bottom: 8px;
+      }
+      .note {
+        line-height: 1.6;
+        color: #536176;
+      }
+      .panels {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 22px;
+      }
+      section {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        overflow: hidden;
+      }
+      header {
+        padding: 16px;
+        font-weight: 650;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .chat {
+        height: 500px;
+        overflow: auto;
+        padding: 16px;
+        background: #e7edf5;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .msg {
+        white-space: pre-wrap;
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: white;
+        max-width: 94%;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+      }
+      .mine {
+        background: var(--green);
+        align-self: flex-end;
+      }
+      .choices {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+      }
+      .choices button {
+        border-radius: 18px;
+        background: white;
+        color: #17643c;
+        border: 1px solid #86bca1;
+        text-align: left;
+      }
+      button {
+        cursor: pointer;
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: white;
+      }
+      form {
+        padding: 12px;
+        display: flex;
+        gap: 8px;
+      }
+      input {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px;
+      }
+      footer {
+        padding: 0 12px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: #536176;
+      }
+      @media (max-width: 800px) {
+        .panels {
+          grid-template-columns: 1fr;
+        }
+        .chat {
+          height: 400px;
+        }
+        main {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>三个 OA，同一条转账流程</h1>
+      <p class="note">
+        金额 → 选择收款银行 → 上传凭证。选择 BBL 可验证账号和分行都为空时仍不补问。<br />本地模拟使用实际对话处理代码及捕获的
+        LINE 消息；银行和凭证为测试资料，不向 LINE 或 DMS 发出业务请求。
+      </p>
+      <div class="panels"></div>
+    </main>
+    <script>
+      const channels = { dms: '默认 DMS', dms_a: 'A DMS', dms_b: 'B DMS' };
+      for (const [key, label] of Object.entries(channels)) {
+        const panel = document.createElement('section');
+        panel.dataset.channel = key;
+        panel.innerHTML = `<header>${label}<button class="reset">重新开始</button></header><div class="chat" aria-live="polite"></div><form><input aria-label="${label}转账金额" placeholder="输入金额，如 1000" inputmode="decimal"><button>发送</button></form><footer><span class="step"></span><button class="slip">模拟上传凭证</button></footer>`;
+        document.querySelector('.panels').append(panel);
+        function bubble(text, mine = false) {
+          const el = document.createElement('div');
+          el.className = 'msg' + (mine ? ' mine' : '');
+          el.textContent = text;
+          panel.querySelector('.chat').append(el);
+        }
+        async function send(action, value = '', echo = '') {
+          if (action === 'reset') panel.querySelector('.chat').replaceChildren();
+          if (echo) bubble(echo, true);
+          const response = await fetch('/step', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channel: key, action, value }),
+          });
+          const result = await response.json();
+          for (const msg of result.messages || []) {
+            bubble(msg.text || msg.altText || '');
+            if (msg.quickReply) {
+              const box = document.createElement('div');
+              box.className = 'choices';
+              for (const item of msg.quickReply.items) {
+                const a = item.action;
+                if (a.type !== 'postback') continue;
+                const b = document.createElement('button');
+                b.textContent = a.label;
+                b.onclick = () => send('postback', a.data, a.label);
+                box.append(b);
+              }
+              panel.querySelector('.chat').append(box);
+            }
+          }
+          panel.querySelector('.step').textContent = result.step;
+          panel.querySelector('.slip').disabled = result.step !== 'slip_after';
+          const chat = panel.querySelector('.chat');
+          chat.scrollTop = chat.scrollHeight;
+        }
+        panel.querySelector('form').onsubmit = (e) => {
+          e.preventDefault();
+          const input = panel.querySelector('input');
+          send('text', input.value, input.value);
+          input.value = '';
+        };
+        panel.querySelector('.reset').onclick = () => send('reset');
+        panel.querySelector('.slip').onclick = () => send('image', '', '已上传模拟凭证');
+        send('reset');
+      }
+    </script>
+  </body>
+</html>

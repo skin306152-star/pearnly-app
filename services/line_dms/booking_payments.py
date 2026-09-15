@@ -17,7 +17,6 @@ from services.erp.mrerp_dms_payments import (
 )
 from services.line_dms.qa_util import (
     CHANNEL_EXTRA_SHAPE,
-    THAI_DIGITS,
     find_row,
     parse_amount,
 )
@@ -37,36 +36,8 @@ _DETAIL_KEYS = {
 }
 
 
-def restore_manual_source_bank_marker(qa: dict) -> None:
-    """Repair confirmation drafts made while the source-bank directory was empty.
-
-    ``manual_banks`` is the session's authoritative evidence. Older drafts could
-    contain every visible source field but miss the provenance marker, causing
-    the pre-write guard to demand an impossible DMS bank id. Live reconciliation
-    still accepts a bank that now exists or rejects a mismatch.
-    """
-    if "source_banks" not in set(qa.get("manual_banks") or ()):
-        return
-    for payment in qa.get("payments") or ():
-        if payment.get("channel") != "transfer":
-            continue
-        extra = payment.setdefault("extra", {})
-        if (
-            not str(extra.get("src_bank_id") or "").strip()
-            and str(extra.get("src_bank_name") or "").strip()
-            and all(
-                str(extra.get(key) or "").strip()
-                for key in ("src_account_name", "src_account_no", "src_branch_name")
-            )
-        ):
-            extra[MANUAL_BANK_FLAG] = "1"
-
-
-def _two_parts(channel: str, value: str) -> Optional[Tuple[str, str]]:
-    """两段拆法:共用分隔符规则先试;只剩空格(或竖线段数不是 2)时沿用老写法。
-
-    老写法:有 | 就取首个 | 的左右;否则按空格拆 —— 转账的银行名可含空格,故取末段当账号,
-    其余渠道反之(word[0] 当编号)。"""
+def _two_parts(value: str) -> Optional[Tuple[str, str]]:
+    """支票/本票编号与簿号：先用明确分隔符，再按首个空格拆分。"""
     parts = split_fields(value, 2)
     if parts is not None:
         return parts[0], parts[1]
@@ -77,8 +48,6 @@ def _two_parts(channel: str, value: str) -> Optional[Tuple[str, str]]:
     words = normalized.split()
     if len(words) < 2:
         return None
-    if channel == "transfer":
-        return " ".join(words[:-1]), words[-1]
     return words[0], " ".join(words[1:])
 
 
@@ -105,14 +74,10 @@ def parse_payment_detail(
         if parts is None or any(part == "-" for part in parts):
             return None
         return {keys[0]: parts[0], keys[1]: parts[1], "bank_name": parts[2]}
-    parts = _two_parts(channel, value)
+    parts = _two_parts(value)
     if parts is None:
         return None
     left, right = parts
-    if channel == "transfer":
-        if not any(ch.isdigit() for ch in right.translate(THAI_DIGITS)):
-            return None
-        return {"src_bank_name": left, "src_account_no": right}
     if keys:
         return {keys[0]: left, keys[1]: right}
     if channel == "other":
@@ -128,11 +93,7 @@ def _required(value: Any) -> str:
 
 
 def normalize_editor_payments(rows: list, masters: dict) -> list[dict]:
-    """校验编辑器载荷并补全公司收款账户的 DMS 主档字段。
-
-    收款账户(dst)必须命中实时 company_banks;来源/支票/本票/银行卡银行目录权威为空时,
-    该笔允许用手工银行名称(目录非空则仍要求命中,已删除的旧选项不放行)—— 与 LINE 对话
-    同一套判据(resolve_bank_identity)。"""
+    """转账只接受收款银行选择，账户资料来自主档；其他渠道校验各自字段。"""
     if not rows:
         raise PaymentValidationError("dms_booking.payment_required")
     banks = masters.get("company_banks") or []
@@ -153,33 +114,7 @@ def normalize_editor_payments(rows: list, masters: dict) -> list[dict]:
             bank = find_row(banks, str(extra.get("dst_id") or ""))
             if bank is None:
                 raise PaymentValidationError("dms_booking.invalid_bank")
-            source = resolve_bank_identity(
-                masters.get("source_banks"),
-                "source_banks",
-                extra.get("src_bank_id"),
-                extra.get("src_bank_name"),
-            )
-            if source is None:
-                raise PaymentValidationError("dms_booking.invalid_bank")
-            extra = {
-                "src_bank_id": source["id"],
-                "src_bank_name": source["name"],
-                **{
-                    key: _required(extra.get(key))
-                    for key in (
-                        "src_account_no",
-                        "src_account_name",
-                        "src_branch_name",
-                    )
-                },
-                **(
-                    {"dst_business_name": str(extra.get("dst_business_name") or "").strip()}
-                    if str(extra.get("dst_business_name") or "").strip() not in {"", "-"}
-                    else {}
-                ),
-                **company_bank_payment_extra(bank, extra),
-                **({MANUAL_BANK_FLAG: "1"} if source["manual"] else {}),
-            }
+            extra = company_bank_payment_extra(bank)
             if missing_transfer_fields(extra):
                 raise PaymentValidationError("dms_booking.payment_detail_required")
         elif channel in PAYMENT_CHANNEL_BANKS:

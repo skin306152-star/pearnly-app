@@ -184,12 +184,6 @@ class BookingEditTests(TestCase):
         self.assertEqual(
             qa["payments"][0]["extra"],
             {
-                "src_bank_id": "S1",
-                "dst_business_name": "Company",
-                "src_bank_name": "KBANK",
-                "src_account_no": "99",
-                "src_account_name": "Customer",
-                "src_branch_name": "Bangkok",
                 "dst_id": "B1",
                 "dst": "SCB · 1234567890123 · Rayong",
                 "dst_bank_id": "B1",
@@ -286,21 +280,17 @@ class BookingEditTests(TestCase):
         self.assertEqual(options[0]["account_no"], "")
         self.assertEqual(options[0]["branch_name"], "")
 
-    def test_generic_receiving_bank_requires_account_details_in_editor(self):
-        from services.line_dms.booking_payments import (
-            normalize_editor_payments,
-            PaymentValidationError,
-        )
+    def test_generic_receiving_bank_uses_master_data_only(self):
+        from services.line_dms.booking_payments import normalize_editor_payments
 
         masters = {**MASTERS, "company_banks": [["B1", "SCB", "SCB", "", ""]]}
         payment = form()["payments"][0]
-        with self.assertRaises(PaymentValidationError) as ctx:
-            normalize_editor_payments([payment], masters)
-        self.assertEqual(ctx.exception.code, "dms_booking.payment_detail_required")
         payment["extra"].update(dst_account_no="987654321", dst_branch_name="Rayong")
-        clean = normalize_editor_payments([payment], masters)
-        self.assertEqual(clean[0]["extra"]["dst_account_no"], "987654321")
-        self.assertEqual(clean[0]["extra"]["dst_business_name"], "Company")
+        clean = normalize_editor_payments([payment], masters)[0]["extra"]
+        self.assertEqual(clean["dst_account_no"], "")
+        self.assertEqual(clean["dst_branch_name"], "")
+        self.assertNotIn("src_bank_id", clean)
+        self.assertNotIn("dst_business_name", clean)
 
     def test_receiving_company_account_name_is_optional_in_editor(self):
         from services.line_dms.booking_payments import normalize_editor_payments
@@ -364,24 +354,25 @@ class BookingEditTests(TestCase):
 
         saved = replace.call_args.args[3]["qa"]
         payment = saved["payments"][0]["extra"]
-        self.assertEqual(payment["src_bank_name"], "KBank สาขาระยอง")
-        self.assertEqual(payment["src_bank_id"], "")
-        self.assertEqual(payment["bank_manual"], "1")
+        self.assertNotIn("src_bank_name", payment)
+        self.assertNotIn("src_bank_id", payment)
+        self.assertNotIn("bank_manual", payment)
         self.assertEqual(payment["dst_id"], "B1")  # 收款账户仍来自实时目录
         self.assertEqual(saved["master_snapshot"]["counts"]["source_banks"], 0)
 
-    def test_save_rejects_a_source_bank_missing_from_a_non_empty_directory(self):
-        submitted = form()
-        submitted["payments"][0]["extra"]["src_bank_id"] = "S9"  # 目录里已删除的旧选项
-        with contextlib.ExitStack() as es:
-            for patcher in self.patches():
-                es.enter_context(patcher)
-            replace = es.enter_context(
-                mock.patch.object(booking_edit.store, "replace_review_payload")
-            )
-            with self.assertRaisesRegex(booking_edit.BookingEditError, "invalid_bank"):
-                booking_edit.save(self.user, "N1", submitted)
-        replace.assert_not_called()
+    def test_editor_ignores_source_bank_input_but_rejects_unknown_destination(self):
+        from services.line_dms.booking_payments import (
+            normalize_editor_payments,
+            PaymentValidationError,
+        )
+
+        payment = form()["payments"][0]
+        payment["extra"]["src_bank_id"] = "S9"
+        result = normalize_editor_payments([payment], MASTERS)
+        self.assertNotIn("src_bank_id", result[0]["extra"])
+        payment["extra"]["dst_id"] = "missing"
+        with self.assertRaises(PaymentValidationError):
+            normalize_editor_payments([payment], MASTERS)
 
     def test_save_accepts_a_unique_exact_bank_name_from_a_non_empty_directory(self):
         submitted = form()
@@ -397,8 +388,8 @@ class BookingEditTests(TestCase):
             es.enter_context(mock.patch.object(booking_edit, "_send"))
             booking_edit.save(self.user, "N1", submitted)
         payment = replace.call_args.args[3]["qa"]["payments"][0]["extra"]
-        self.assertEqual(payment["src_bank_id"], "S1")
-        self.assertEqual(payment["src_bank_name"], "KBANK")
+        self.assertNotIn("src_bank_id", payment)
+        self.assertNotIn("src_bank_name", payment)
         self.assertNotIn("bank_manual", payment)
 
     def test_save_accepts_manual_cheque_bank_when_its_directory_is_empty(self):

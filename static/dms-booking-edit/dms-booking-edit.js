@@ -158,54 +158,20 @@
             '</select></div>'
         );
     }
-    function sourceBankField(x) {
-        if (manualBank('source_banks'))
-            return paymentField('src-bank-name', 'sourceBank', x.src_bank_name, false, true);
-        return (
-            '<div class="field"><label>' +
-            t('sourceBank') +
-            '</label><select class="src-bank" required>' +
-            bankOptions(masters.source_banks, x.src_bank_id) +
-            '</select></div>'
-        );
-    }
     function manualBank(key) {
         return manualBanks.indexOf(key) >= 0;
-    }
-    function legacySource(x) {
-        if (x.src_bank_name || x.src_account_no) return x;
-        var parts = String(x.src || '')
-            .trim()
-            .split(/\s+/);
-        if (parts.length > 1) {
-            x.src_account_no = parts.pop();
-            x.src_bank_name = parts.join(' ');
-        } else if (/\d/.test(parts[0] || '')) {
-            x.src_account_no = parts[0];
-        } else {
-            x.src_bank_name = parts[0] || '';
-        }
-        return x;
     }
     function paymentRow(p) {
         p = p || { channel: 'cash', amount: '', extra: {} };
         var x = p.extra || {};
-        if (p.channel === 'transfer') x = legacySource(x);
         var extra =
             p.channel === 'transfer'
                 ? '<div class="extra grid">' +
-                  sourceBankField(x) +
-                  paymentField('src-account', 'sourceAccount', x.src_account_no, false, true) +
-                  paymentField('src-name', 'sourceAccountName', x.src_account_name, false, true) +
-                  paymentField('src-branch', 'sourceBranch', x.src_branch_name, false, true) +
                   '<div class="field wide"><label>' +
                   t('destination') +
                   '</label><select class="dst" required>' +
                   bankOptions(masters.company_banks, x.dst_id) +
                   '</select></div>' +
-                  paymentField('dst-name', 'destinationName', x.dst_business_name, true, false) +
-                  paymentField('dst-account', 'destinationAccount', x.dst_account_no, false, true) +
-                  paymentField('dst-branch', 'destinationBranch', x.dst_branch_name, false, true) +
                   '</div>'
                 : p.channel === 'cash'
                   ? '<div class="extra"></div>'
@@ -304,16 +270,6 @@
     }
     function wirePayments() {
         document.querySelectorAll('.payment').forEach(function (row) {
-            var destination = row.querySelector('.dst');
-            if (destination)
-                destination.onchange = function () {
-                    var bank =
-                        (masters.company_banks || []).find(function (item) {
-                            return String(item.id) === destination.value;
-                        }) || {};
-                    row.querySelector('.dst-account').value = bank.account_no || '';
-                    row.querySelector('.dst-branch').value = bank.branch_name || '';
-                };
             row.querySelector('.remove').onclick = function () {
                 row.remove();
                 syncChannelOptions();
@@ -609,17 +565,7 @@
             var ch = row.querySelector('.pay-channel').value,
                 x = {};
             if (ch === 'transfer') {
-                // 目录权威为空 → 输入框里的银行名称就是这一笔的银行身份(bank id 留空)。
-                if (manualBank('source_banks'))
-                    x.src_bank_name = row.querySelector('.src-bank-name').value.trim();
-                else x.src_bank_id = row.querySelector('.src-bank').value;
-                x.src_account_no = row.querySelector('.src-account').value.trim();
-                x.src_account_name = row.querySelector('.src-name').value.trim();
-                x.src_branch_name = row.querySelector('.src-branch').value.trim();
                 x.dst_id = row.querySelector('.dst').value;
-                x.dst_business_name = row.querySelector('.dst-name').value.trim();
-                x.dst_account_no = row.querySelector('.dst-account').value.trim();
-                x.dst_branch_name = row.querySelector('.dst-branch').value.trim();
             } else if (ch === 'cheque') {
                 x.cheque_no = row.querySelector('.cheque-no').value.trim();
                 if (manualBank('cheque_banks'))

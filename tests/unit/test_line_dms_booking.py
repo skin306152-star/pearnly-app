@@ -622,10 +622,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             [item["filename"] for item in rec["attach_files"]], ["idcard.jpg", "slip.jpg"]
         )
-        self.assertEqual(
-            rec["booking"].payments[0]["extra"]["bank_manual"],
-            "1",
-        )
+        self.assertNotIn("bank_manual", rec["booking"].payments[0]["extra"])
 
     async def test_d4_attach_failure_appends_attach_note(self):
         """建单成功但附件没挂全 → 回执如实追加 TXT_ATTACH_FAIL,不谎报附件成功。"""

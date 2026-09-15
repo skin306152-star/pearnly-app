@@ -81,7 +81,7 @@ async def start(
 async def send_step(tenant_id, line_user_id, qa, step, reply_token=None) -> None:
     """按步发问。reply_token 有则 reply,无则 push(逐问可被 postback / 收料两种上下文调)。"""
     try:
-        if step in ("place", "paint", "term", "regis", "pay_src", "pay_dst", "pay_bank"):
+        if step in ("place", "paint", "term", "regis", "pay_dst", "pay_bank"):
             msg = await booking_qa_pages.question(
                 line_user_id,
                 qa,
@@ -163,7 +163,6 @@ _POSTBACK_ACTIONS = {
     "regis": "regis",
     "regis_name": "regisname",
     "pay_channel": "pay",
-    "pay_src": "srcbank",
     "pay_bank": "paybank",
     "pay_dst": "bank",
     "pay_more": "more",
@@ -232,14 +231,13 @@ async def _handle_postback(tenant_id, line_user_id, data, params, reply_token) -
             reask=_reask,
             to_preview=_to_preview,
         )
-    elif action in {"bank", "srcbank", "paybank"}:
+    elif action in {"bank", "paybank"}:
         await booking_qa_transfer.pick_bank(
             tenant_id,
             line_user_id,
             qa,
             value,
             reply_token,
-            source=action == "srcbank",
             masters=booking_qa_sync.masters,
             persist=_persist,
             send_step=send_step,
@@ -434,6 +432,9 @@ async def _qa(tenant_id, line_user_id, sess=None) -> Optional[Dict[str, Any]]:
     if not sess or sess.get("state") != _STATE:
         return None
     qa = (sess.get("payload") or {}).get("qa") or {}
+    if qa.get("step") in {"pay_src", "pay_src_detail", "pay_dst_detail"}:
+        qa["step"] = "pay_dst"
+        await _persist(tenant_id, line_user_id, qa)
     return qa if qa.get("step") else None
 
 

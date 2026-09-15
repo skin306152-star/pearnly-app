@@ -8,6 +8,7 @@
 // MAIN_ENTRY_ROUTES / ROUTE_LOADERS)、摘掉侧栏项的内联 display:none、把 exceptions 加回
 // nav-presets 的 NAV_NODES + FIRM_PRESET,并把后端 EXCEPTIONS_ENGINE 开关打开。
 export const VALID_ROUTES = [
+    'buyer-clients',
     'dms-intake',
     'dashboard',
     'history',
@@ -116,6 +117,7 @@ export const COWORK_ALLOWED_ROUTES = new Set<string>([
 ]);
 
 export const ERP_ALLOWED_ROUTES = new Set<string>([
+    'buyer-clients',
     'dashboard',
     'dms-intake',
     'stock-card',
@@ -141,6 +143,7 @@ export const ROUTE_LOADERS: Record<string, string> = {
     history: 'loadHistoryPage',
     'push-logs': 'loadPushLogs',
     clients: 'loadClientsPage',
+    'buyer-clients': 'loadClientsPage',
     'erp-team': 'loadErpTeam',
     company: 'loadCompanyProfile',
     inventory: 'loadInventoryPage',

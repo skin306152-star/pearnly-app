@@ -1,3 +1,4 @@
+import { configureCustomerNavigation } from './clients-navigation.js';
 // 侧栏 + 头像菜单显隐 · 业态驱动。两条路(唯一入口 · core-boot 用户就绪后调 applyModuleNav):
 //   ① firm / 未选业态(老事务所兜底)与 pos_only(拆卖收银壳)= Zihao 终版白名单写死(nav-presets.ts),
 //      清单内显、清单外隐,与后端模块开关解耦(pos_only 后端不开 sales/expense 也要出采购/销售菜单;
@@ -250,6 +251,7 @@ function apply(
     // 兜的是 landing.js 层1 管不到的场景(手输 /home?canonical= 或 token.entry 服务端已变)。
     // 仅 cowork/main/erp 三个主壳入口参与;pos/dms/ai/daily 各自独立壳,不走本桁。
     const shellEntry = window._entry || '';
+    configureCustomerNavigation(shellEntry);
     if (shellEntry === 'erp' || shellEntry === 'cowork' || shellEntry === 'main') {
         const want = shellEntry === 'erp' ? '/erp' : '/cowork';
         if (location.pathname !== want) {

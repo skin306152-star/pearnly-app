@@ -1431,3 +1431,28 @@ for (const direction of ['purchase', 'sales']) {
         await expect(page.locator('#dx-s-inv-submit.active')).toHaveCount(0);
     });
 }
+
+for (const entry of ['erp', 'pos', 'cowork']) {
+    test(`${entry} customer navigation keeps the original buyer controls`, async ({ page }) => {
+        await boot(page, entry);
+        if (entry === 'cowork') {
+            await page.evaluate(() => window.routeTo('clients'));
+            await expect(page.locator('#page-clients [data-cust-tab="buyer"]')).toBeVisible();
+            await expect(page.locator('#nav-buyer-clients')).not.toBeVisible();
+            return;
+        }
+        await expect(page.locator('#nav-buyer-clients')).toBeVisible();
+        await expect(page.locator('.nav-item[data-route="clients"]')).toContainText('公司主档');
+        await page.locator('#nav-buyer-clients').click();
+        await expect(page.locator('#page-buyer-clients.active')).toBeVisible();
+        await expect(page.locator('#page-buyer-clients .h1')).toHaveText('客户');
+        await expect(page.locator('#page-buyer-clients #btn-buyer-new')).toBeVisible();
+        await page.locator('#btn-buyer-new').click();
+        await expect(page.locator('#client-modal-mask')).toBeVisible();
+        await page.evaluate(() => window.routeTo('clients'));
+        await expect(page.locator('#page-clients .h1')).toHaveText('公司主档');
+        await expect(page.locator('#page-clients #cust-pane-buyer')).toHaveCount(0);
+        await expect(page.locator('#page-clients [data-cust-tab="buyer"]')).toHaveCount(0);
+        await expect(page.locator('#page-clients #cust-pane-seller')).toHaveClass(/active/);
+    });
+}

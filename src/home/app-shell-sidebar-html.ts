@@ -294,6 +294,7 @@ export const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-sales-records">销售记录</span>
             </div>
+            <div class="nav-item nav-sub-item" data-route="buyer-clients" id="nav-buyer-clients" style="display:none;"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="6" r="3"/><path d="M4 18v-3a6 6 0 0112 0v3"/></svg><span class="nav-label" data-i18n="buyer-customers-title">客户</span></div>
             <div class="nav-item nav-sub-item" data-route="sales-invoices" data-module="sales">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 2h8l3 3v13H5z"/>

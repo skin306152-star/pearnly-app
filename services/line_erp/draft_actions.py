@@ -8,7 +8,7 @@ from typing import Any
 
 from core import db
 from services.erp import team_access
-from services.line_erp import store
+from services.line_erp import cards, draft_view, store
 from services.line_platform import client as line_client
 
 CHANNEL = "erp"
@@ -93,11 +93,49 @@ async def act_draft(
             payload,
         )
         if not result["ok"]:
+            if reply_token:
+                line_client.reply_text(
+                    reply_token, "บันทึกไม่สำเร็จ กรุณาเปิดแก้ไขรายการแล้วลองใหม่", channel=CHANNEL
+                )
             return result
-        text = "บันทึกใน Pearnly เรียบร้อยแล้วครับ"
+        text = "บันทึกแล้ว"
     store.clear_session(binding["tenant_id"], line_user_id)
-    if reply_token:
-        line_client.reply_text(reply_token, text, channel=CHANNEL)
+    if action == "discard":
+        if reply_token:
+            line_client.reply_text(reply_token, text, channel=CHANNEL)
+    else:
+        # Receipt errors must not turn an already committed save into a failed save.
+        try:
+            records = await asyncio.to_thread(
+                draft_view.records,
+                str(binding["user_id"]),
+                str(binding["tenant_id"]),
+                history_id,
+                history_ids,
+            )
+            messages = [
+                cards.saved_card(
+                    cards.preview_card(
+                        str(record.get("id") or history_id),
+                        mode,
+                        (record.get("pages") or [{}])[0].get("fields") or {},
+                        target={"label": payload.get("target_label")},
+                        posting_mode="",
+                    )
+                )
+                for record in records
+            ]
+            if reply_token:
+                line_client.reply_messages(reply_token, messages[:5], channel=CHANNEL)
+                messages = messages[5:]
+            for offset in range(0, len(messages), 5):
+                line_client.push_messages(
+                    line_user_id, messages[offset : offset + 5], channel=CHANNEL
+                )
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("ERP saved receipt delivery failed")
     response = {"ok": True, "action": action, "history_ids": history_ids}
     if action != "discard":
         response.update({"status": "saved", "converted": result.get("converted", [])})

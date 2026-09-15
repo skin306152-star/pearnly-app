@@ -89,6 +89,10 @@ def install(app, *, line_user_id: str):
             source.replace("https://static.line-scdn.net/liff/edge/2/sdk.js", "/__line_sim/sdk.js")
         )
 
+    @router.get("/__line_sim/messages")
+    def captured_messages():
+        return {"messages": list(messages)}
+
     @router.post("/__line_sim/event")
     async def event(body: Event):
         messages.clear()

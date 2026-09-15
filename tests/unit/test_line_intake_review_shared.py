@@ -92,16 +92,9 @@ class SharedEditorSourceTests(unittest.TestCase):
         for css in (cowork_css, erp_css):
             self.assertIn(".item-field--name", css)
             self.assertIn("overflow-wrap: anywhere", css)
-        self.assertIn("result.push_ok !== true", erp_app)
-        self.assertIn("row.error_msg === 'erp.workspace_endpoint_required'", erp_app)
-        manual_branch = erp_app.index("row.error_msg === 'erp.workspace_endpoint_required'")
-        self.assertLess(manual_branch, erp_app.index("show('saved');", manual_branch))
-        self.assertLess(
-            erp_app.index("show('saved');", manual_branch),
-            erp_app.index("show('pushFailed', 'error');", manual_branch),
-        )
-        self.assertNotIn("result.push_ok = true", erp_app)
-        self.assertIn("waiting ? 'waiting' : 'confirmed'", erp_app)
+        self.assertNotIn("result.push_ok", erp_app)
+        self.assertNotIn("show('pushFailed'", erp_app)
+        self.assertIn("show('saved');", erp_app)
 
     def test_both_products_use_the_same_batch_runtime_and_old_runtime_is_removed(self):
         cowork = (ROOT / "static/cowork-line-intake/index.html").read_text(encoding="utf-8")
@@ -114,13 +107,12 @@ class SharedEditorSourceTests(unittest.TestCase):
             encoding="utf-8"
         )
         shared_i18n = (ROOT / "static/line-intake-review/i18n.js").read_text(encoding="utf-8")
-        self.assertIn("/static/dist/erp-line-editor.js", erp)
+        self.assertIn("/static/erp-line-intake/erp-line-intake.js", erp)
+        self.assertIn("/static/line-intake-review/batch-review.js", erp)
         self.assertNotIn("/static/line-intake-review/target-select.js", erp)
-        web_form = (ROOT / "src/home/erp-record-entry.ts").read_text()
-        line_form = (ROOT / "src/erp/line-editor.ts").read_text()
-        self.assertIn("record-form.js", web_form)
-        self.assertIn("record-form.js", line_form)
-        for html in (cowork,):
+        self.assertFalse((ROOT / "src/erp/line-editor.ts").exists())
+        self.assertNotIn("/static/dist/erp-line-editor.js", erp)
+        for html in (cowork, erp):
             self.assertIn("/static/line-intake-review/batch-review.js?v=3", html)
             self.assertIn("/static/line-intake-review/i18n.js?v=3", html)
             self.assertIn("/static/line-intake-review/document-viewer.js?v=1", html)

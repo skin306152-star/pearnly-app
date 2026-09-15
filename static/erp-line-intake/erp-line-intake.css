@@ -132,3 +132,19 @@ textarea {
     padding: 15px;
   }
 }
+
+/* ERP saves finish the record; retain the original review editor's Save and Discard. */
+[data-review-action='save'] {
+  display: none;
+}
+.field,
+input,
+select,
+textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+header select {
+  width: auto;
+}

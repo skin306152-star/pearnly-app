@@ -39,6 +39,10 @@ def book_from_history(
     """
     is_expense, _src = item_verdict_svc.item_verdict(fields)
     kind = "expense" if is_expense else "purchase_invoice"
+    # Internal purchase records are merchandise entries, independent of external
+    # tax-invoice routing; otherwise manual purchases disappear from stock cards.
+    if source in {"erp_web", "line_erp"}:
+        kind = "purchase_invoice"
     draft = intake_svc.build_draft_from_invoice(fields, kind=kind)
     if source in {"erp_web", "line_erp"}:
         from decimal import Decimal

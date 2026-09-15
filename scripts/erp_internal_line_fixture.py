@@ -22,7 +22,7 @@ def install():
             date="2026-09-15",
             seller_name="Simulator supplier",
             buyer_name="Simulator customer",
-            **{f"{own}_tax": "0105559999999"},
+            **{f"{own}_tax": "0105559999996"},
             items=[{"name": "SIMULATED OCR item", "qty": "2", "price": "100", "subtotal": "200"}],
             subtotal="200",
             vat="14",

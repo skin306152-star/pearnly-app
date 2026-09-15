@@ -5,15 +5,17 @@
     var S = window.lineIntakeSourcePage;
     var I = window.erpLineIntakeI18n;
     var F = window.erpLineFieldRenderer;
-    var T = window.lineIntakeTargetSelect;
-    var lang = (localStorage.getItem('pearnly_lang') || 'th').slice(0, 2);
+    var lang = (
+        new URLSearchParams(location.search).get('lang') ||
+        localStorage.getItem('pearnly_lang') ||
+        'th'
+    ).slice(0, 2);
     var state = document.getElementById('state');
     var form = document.getElementById('editor');
     var model = null;
     var draftId = '';
     var busy = false;
     var review = null;
-    var targetSelect = null;
 
     var COMMON_ORDER = ['invoice_number', 'date', 'document_type'];
     var PURCHASE_ORDER = [
@@ -50,7 +52,19 @@
     ]);
 
     function t(key, values) {
-        return I.text(lang, key, values);
+        var labels = {
+            confirmBatch: { th: 'บันทึก', en: 'Save', zh: '保存', ja: '保存' },
+            failed: {
+                th: 'ดำเนินการไม่สำเร็จ ข้อมูลยังอยู่ กรุณาลองใหม่',
+                en: 'Could not complete. Your entries are retained; please retry.',
+                zh: '操作失败，内容已保留，请重试。',
+                ja: '操作できませんでした。入力内容は保持されています。再試行してください。',
+            },
+            saved: { th: 'บันทึกแล้ว', en: 'Saved', zh: '已保存', ja: '保存しました' },
+            addItem: { th: 'เพิ่มรายการ', en: 'Add a line', zh: '添加一行', ja: '行を追加' },
+            removeItem: { th: 'ลบ', en: 'Remove', zh: '移除', ja: '削除' },
+        };
+        return labels[key] ? labels[key][lang] || labels[key].th : I.text(lang, key, values);
     }
 
     function label(key) {
@@ -71,46 +85,16 @@
         return fetch(path, options).then(window.lineIntakeLiff.responseJson);
     }
 
-    function loadTarget(target) {
-        var path =
-            '/api/line/erp/draft/' +
-            encodeURIComponent(draftId) +
-            '/target/' +
-            encodeURIComponent(target.endpoint_id || target.id || '') +
-            '/refresh';
-        var connectionWorkspace =
-            target.connection_workspace_client_id == null
-                ? target.workspace_client_id
-                : target.connection_workspace_client_id;
-        if (connectionWorkspace != null) {
-            path += '?workspace_client_id=' + encodeURIComponent(connectionWorkspace);
-        }
-        return T.refreshTarget(api, path);
-    }
-
     function rows() {
         return model && Array.isArray(model.records) ? model.records : [];
     }
 
     function direction() {
-        return (
-            (targetSelect && targetSelect.selection().direction) ||
-            (model && (model.direction || model.mode)) ||
-            'purchase'
-        );
+        return (model && (model.direction || model.mode)) || 'purchase';
     }
 
     function expressTarget() {
-        return targetSelect && targetSelect.adapter() === 'express';
-    }
-
-    function applyPostingDefault(value) {
-        if (!/^(stock|service)$/.test(value || '')) return;
-        rows().forEach(function (record) {
-            fieldsOf(record).items.forEach(function (item) {
-                item.posting_kind = value;
-            });
-        });
+        return false;
     }
 
     function moveAlias(target, canonical, alias) {
@@ -155,9 +139,7 @@
     }
 
     function requiredField(key) {
-        return direction() === 'sales'
-            ? ['invoice_number', 'date'].indexOf(key) >= 0
-            : ['seller_name', 'date', 'total_amount'].indexOf(key) >= 0;
+        return key === 'date';
     }
 
     function renderOriginals(record) {
@@ -226,14 +208,24 @@
                         })
                         .join('') +
                     posting +
-                    '</div></div>'
+                    '</div><button type="button" class="pu-btn pu-btn--secondary" data-remove-item="' +
+                    itemIndex +
+                    '">' +
+                    R.escape(t('removeItem')) +
+                    '</button></div>'
                 );
             })
             .join('');
         return (
-            section(t('original'), renderOriginals(record)) +
+            (record.filename === 'manual' ? '' : section(t('original'), renderOriginals(record))) +
             section(t('fields'), '<div class="grid">' + fieldGrid + '</div>') +
-            section(t('items'), items)
+            section(
+                t('items'),
+                items +
+                    '<button type="button" class="pu-btn pu-btn--secondary" data-add-item>' +
+                    R.escape(t('addItem')) +
+                    '</button>'
+            )
         );
     }
 
@@ -259,9 +251,49 @@
     }
 
     function bindDetail(root, _recordIndex, changed) {
+        root.querySelector('[data-add-item]').onclick = function () {
+            fieldsOf(rows()[_recordIndex]).items.push({
+                name: '',
+                qty: '1',
+                price: '',
+                subtotal: '',
+            });
+            review.render();
+        };
+        root.querySelectorAll('[data-remove-item]').forEach(function (button) {
+            button.onclick = function () {
+                fieldsOf(rows()[_recordIndex]).items.splice(Number(button.dataset.removeItem), 1);
+                review.render();
+            };
+        });
         root.querySelectorAll('[data-field]').forEach(function (element) {
             element.oninput = function () {
                 applyField(element);
+                if (
+                    /:item:\d+:(qty|price)$/.test(element.dataset.field) ||
+                    /:field:vat$/.test(element.dataset.field)
+                ) {
+                    var fields = fieldsOf(rows()[_recordIndex]);
+                    var total = 0;
+                    fields.items.forEach(function (item, i) {
+                        item.subtotal = (Number(item.qty || 0) * Number(item.price || 0)).toFixed(
+                            2
+                        );
+                        total += Number(item.subtotal);
+                        var input = root.querySelector(
+                            '[data-field="' + _recordIndex + ':item:' + i + ':subtotal"]'
+                        );
+                        if (input) input.value = item.subtotal;
+                    });
+                    fields.subtotal = total.toFixed(2);
+                    fields.total_amount = (total + Number(fields.vat || 0)).toFixed(2);
+                    ['subtotal', 'total_amount'].forEach(function (key) {
+                        var input = root.querySelector(
+                            '[data-field="' + _recordIndex + ':field:' + key + '"]'
+                        );
+                        if (input) input.value = fields[key];
+                    });
+                }
                 changed();
             };
         });
@@ -282,23 +314,12 @@
     }
 
     function save() {
-        var selection = targetSelect.selection();
         return api('/api/line/erp/draft/' + encodeURIComponent(draftId), {
             method: 'PUT',
             body: JSON.stringify({
                 records: rows(),
-                endpoint_id: selection.endpoint_id,
-                connection_workspace_client_id: selection.connection_workspace_client_id,
-                workspace_client_id: selection.workspace_client_id,
-                direction: selection.direction,
-                adapter: selection.adapter,
-                target_label: selection.target_label,
-                account_root: selection.account_root,
-                account_set: selection.account_set,
-                catalog_refresh_request_id: selection.catalog_refresh_request_id,
-                catalog_refresh_revision: selection.catalog_refresh_revision,
-                posting_kind: selection.posting_kind,
-                payment: selection.payment,
+                workspace_client_id: model.selection.workspace_client_id,
+                direction: direction(),
             }),
         }).then(function (updated) {
             if (updated) model = Object.assign(model, updated);
@@ -336,29 +357,7 @@
                     return;
                 }
                 form.hidden = true;
-                if (result.push_ok !== true) {
-                    var savedWithoutProfile =
-                        result.status === 'manual' &&
-                        (result.push_results || []).length > 0 &&
-                        (result.push_results || []).every(function (row) {
-                            return (
-                                row.status === 'manual' &&
-                                row.error_msg === 'erp.workspace_endpoint_required'
-                            );
-                        });
-                    if (savedWithoutProfile) {
-                        show('saved');
-                        return;
-                    }
-                    show('pushFailed', 'error');
-                    return;
-                }
-                var waiting =
-                    /pending|queued|retrying/.test(result.status || '') ||
-                    (result.push_results || []).some(function (row) {
-                        return /pending|queued|retrying/.test(row.status || '');
-                    });
-                show(waiting ? 'waiting' : 'confirmed');
+                show('saved');
             })
             .catch(function (error) {
                 show(error.status === 401 || error.status === 403 ? 'expired' : 'failed', 'error');
@@ -370,18 +369,6 @@
     }
 
     function buildReview() {
-        targetSelect = T.create({
-            model: function () {
-                return model;
-            },
-            text: t,
-            escape: R.escape,
-            lockDirection: true,
-            loadTarget: loadTarget,
-            onChange: function (field, value) {
-                if (field === 'posting_kind') applyPostingDefault(value);
-            },
-        });
         review = R.create({
             root: form,
             records: rows,
@@ -398,18 +385,17 @@
             },
             issues: function (record) {
                 fieldsOf(record);
-                return R.documentIssues(record, direction(), {
-                    requirePostingKind: expressTarget(),
-                });
+                return R.documentIssues(record, direction(), { requirePostingKind: false }).filter(
+                    function (issue) {
+                        return ['invoice_number', 'seller_name', 'total_amount'].indexOf(issue) < 0;
+                    }
+                );
             },
             globalReady: function () {
-                return targetSelect.valid();
+                return true;
             },
             renderPrefix: function () {
-                return targetSelect.html();
-            },
-            bindPrefix: function (root, render) {
-                targetSelect.bind(root, render);
+                return '';
             },
             renderDetail: renderDetail,
             bindDetail: bindDetail,
@@ -419,12 +405,15 @@
             },
         });
         review.render();
+        if (rows().length === 1) form.querySelector('[data-open-record]').click();
         state.hidden = true;
     }
 
+    document.documentElement.lang = lang;
     document.getElementById('lang').value = lang;
     document.getElementById('lang').onchange = function (event) {
         lang = event.target.value;
+        document.documentElement.lang = lang;
         localStorage.setItem('pearnly_lang', lang);
         if (review) review.render();
         else show('loading');

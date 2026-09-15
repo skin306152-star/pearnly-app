@@ -156,7 +156,7 @@ async def _handle_postback(
         await internal_flow.manual(binding, line_user_id, reply_token)
     elif action == "internal-upload":
         _notify(line_user_id, reply_token, "กรุณาส่งรูปภาพหรือ PDF ครับ")
-    elif action == "discard":
+    elif action in {"discard", "confirm"}:
         draft_id = (params.get("draft") or [""])[0]
         await act_draft(binding, line_user_id, reply_token, draft_id, action)
 
@@ -173,12 +173,7 @@ async def _handle_text(
         return
     text = (message.get("text") or "").strip()
     if session.get("state") in ("draft", "editing"):
-        if reply_token:
-            line_client.reply_text(
-                reply_token,
-                "กรุณายืนยัน แก้ไข หรือทิ้งเอกสารปัจจุบันก่อนเริ่มรายการใหม่",
-                channel=CHANNEL,
-            )
+        await internal_flow.remind_draft(binding, line_user_id, reply_token, session)
         return
     if text.lower() in _MENU_WORDS:
         store.set_session(binding["tenant_id"], line_user_id, "menu", {})
@@ -245,7 +240,8 @@ async def _queue_document(
     if session.get("state") == "ocr_processing":
         text = "กำลังอ่านเอกสารอยู่ กรุณารอผลการตรวจสอบสักครู่"
     elif session.get("state") in ("draft", "editing"):
-        text = "กรุณายืนยัน แก้ไข หรือทิ้งเอกสารปัจจุบันก่อนส่งเอกสารใหม่"
+        await internal_flow.remind_draft(binding, line_user_id, reply_token, session)
+        return
     elif session.get("state") in ("target", "posting"):
         text = "กรุณาเลือกบัญชี ERP และรูปแบบการบันทึกก่อนส่งเอกสาร"
     else:

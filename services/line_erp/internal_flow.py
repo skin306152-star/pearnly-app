@@ -56,11 +56,14 @@ def notify(line_user_id, reply_token, messages):
 
 async def begin_mode(binding, line_user_id, reply_token, mode):
     current = store.get_session(binding["tenant_id"], line_user_id) or {}
-    if current.get("state") in {"draft", "editing", "ocr_processing"}:
+    if current.get("state") in {"draft", "editing"}:
+        await remind_draft(binding, line_user_id, reply_token, current)
+        return
+    if current.get("state") == "ocr_processing":
         notify(
             line_user_id,
             reply_token,
-            [{"type": "text", "text": "กรุณาบันทึกหรือทิ้งรายการปัจจุบันก่อนครับ"}],
+            [{"type": "text", "text": "กำลังอ่านเอกสารอยู่ กรุณารอสักครู่"}],
         )
         return
     try:
@@ -138,6 +141,9 @@ async def offer_methods(binding, line_user_id, reply_token, payload):
 
 async def manual(binding, line_user_id, reply_token):
     session = store.get_session(binding["tenant_id"], line_user_id) or {}
+    if session.get("state") in {"draft", "editing"}:
+        await remind_draft(binding, line_user_id, reply_token, session)
+        return
     if session.get("state") != "receiving":
         raise HTTPException(409, detail="line_erp.draft_expired")
     user, payload = await asyncio.to_thread(selection, binding, session.get("payload") or {})
@@ -148,7 +154,16 @@ async def manual(binding, line_user_id, reply_token):
         history_id=history_id,
         workspace_id=payload["workspace_client_id"],
         direction=payload["direction"],
-        fields={"date": date.today().isoformat(), "items": []},
+        fields={
+            "date": date.today().isoformat(),
+            "invoice_number": "",
+            "seller_name": "",
+            "buyer_name": "",
+            "seller_tax": "",
+            "buyer_tax": "",
+            "notes": "",
+            "items": [],
+        },
         source="line_erp",
     )
     store.set_session(
@@ -161,25 +176,33 @@ async def manual(binding, line_user_id, reply_token):
             "nonce": secrets.token_urlsafe(24),
         },
     )
-    notify(
-        line_user_id,
-        reply_token,
-        [
-            {
-                "type": "text",
-                "text": "กรอกข้อมูลแล้วกดยืนยันบันทึกใน Pearnly ครับ",
-                "quickReply": {
-                    "items": [
-                        {
-                            "type": "action",
-                            "action": {
-                                "type": "uri",
-                                "label": "กรอกข้อมูล",
-                                "uri": cards.edit_uri(history_id),
-                            },
-                        }
-                    ]
-                },
-            }
-        ],
+    await remind_draft(binding, line_user_id, reply_token)
+
+
+async def remind_draft(binding, line_user_id, reply_token, session=None):
+    from services.line_erp import draft_view
+
+    session = session or store.get_session(binding["tenant_id"], line_user_id) or {}
+    payload = session.get("payload") or {}
+    ids = [str(value) for value in payload.get("history_ids") or []]
+    if not ids:
+        return
+    records = await asyncio.to_thread(
+        draft_view.records, str(binding["user_id"]), str(binding["tenant_id"]), ids[0], ids
     )
+    fields = (records[0].get("pages") or [{}])[0].get("fields") or {}
+    card = cards.preview_card(
+        ids[0],
+        payload.get("mode"),
+        fields,
+        target={"label": payload.get("target_label")},
+        posting_mode="",
+        record_count=len(ids),
+        item_count=sum(
+            len((record.get("pages") or [{}])[0].get("fields", {}).get("items") or [])
+            for record in records
+        ),
+    )
+    if records[0].get("filename") == "manual" and not fields.get("items"):
+        card["contents"]["footer"]["contents"].pop(0)
+    notify(line_user_id, reply_token, [card])

@@ -292,6 +292,22 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         recognize.assert_not_called()
         clear.assert_called_once_with("t1", "line-u1")
 
+    async def test_pending_draft_menu_and_mode_restore_actions_without_clearing(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        session = {"state": "draft", "payload": {"mode": "purchase", "history_ids": ["h1"]}}
+        with (
+            mock.patch.object(webhook.store, "get_session", return_value=session),
+            mock.patch.object(
+                webhook.internal_flow, "remind_draft", new_callable=mock.AsyncMock
+            ) as remind,
+            mock.patch.object(webhook.store, "clear_session") as clear,
+        ):
+            await webhook._handle_text({"text": "เมนู"}, binding, "line-u1", "reply")
+            await webhook.internal_flow.begin_mode(binding, "line-u1", "reply", "sales")
+            await webhook.internal_flow.manual(binding, "line-u1", "reply")
+        self.assertEqual(remind.await_count, 3)
+        clear.assert_not_called()
+
     async def test_failed_confirm_keeps_session(self):
         await self._assert_confirm({"ok": False, "status": 409, "detail": "erp.confirm_failed"})
 
@@ -319,6 +335,12 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook.team_access, "mode_allowed", return_value=True),
             mock.patch.object(webhook, "_confirm", return_value=saved),
+            mock.patch.object(
+                webhook.draft_actions.draft_view,
+                "records",
+                return_value=[{"id": "h1", "pages": [{"fields": {"total_amount": "120"}}]}],
+            ),
+            mock.patch.object(webhook.line_client, "push_messages") as receipt,
             mock.patch.object(webhook.line_push, "dispatch_confirmed") as push,
         ):
             result = await webhook.act_draft(
@@ -329,6 +351,8 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         if saved["ok"]:
             self.assertEqual(result["status"], "saved")
             clear.assert_called_once()
+            receipt.assert_called_once()
+            self.assertIn("120", str(receipt.call_args))
         else:
             clear.assert_not_called()
 

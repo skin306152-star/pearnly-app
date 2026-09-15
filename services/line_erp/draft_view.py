@@ -13,6 +13,13 @@ def records(user_id: str, tenant_id: str, draft_id: str, history_ids: list[str])
         detail = get_ocr_history_detail(user_id, history_id, tenant_id=tenant_id)
         if detail is None:
             raise HTTPException(403, detail="line_erp.draft_forbidden")
+        if detail.get("filename") == "manual":
+            for page in detail.get("pages") or []:
+                fields = page.get("fields") or {}
+                for key in ("seller_name", "buyer_name", "seller_tax", "buyer_tax", "notes"):
+                    fields.setdefault(key, "")
+                if fields.get("invoice_number") == f"REC-{history_id}":
+                    fields["invoice_number"] = ""
         page_numbers = []
         for index, page in enumerate(detail.get("pages") or []):
             raw_number = page.get("page_number") if isinstance(page, dict) else None

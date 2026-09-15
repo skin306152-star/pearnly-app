@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 
+from services.cowork_line import flow_cards, review_cards
 from services.line_platform.summary_review_card import postback_action
 
 
@@ -17,23 +18,59 @@ def preview_card(
     preflight: dict | None = None,
     lang: str = "th",
 ) -> dict:
-    return {
-        "type": "text",
-        "text": f"{target.get('label', '')} · {'ซื้อ' if direction == 'purchase' else 'ขาย'}\n{record_count} เอกสาร · กรุณาตรวจสอบก่อนบันทึกใน Pearnly ครับ",
-        "quickReply": {
-            "items": [
-                {
-                    "type": "action",
-                    "action": {
-                        "type": "uri",
-                        "label": "ตรวจสอบ / แก้ไข",
-                        "uri": edit_uri(draft_id),
-                    },
-                },
-                {"type": "action", "action": postback_action("ทิ้งรายการ", "discard", draft_id)},
-            ]
+    card = review_cards.preview_card(
+        draft_id=draft_id,
+        fields=fields,
+        target=target,
+        direction=direction,
+        mode="stock",
+        lang=lang,
+        record_count=record_count,
+        item_count=item_count,
+        preflight=preflight,
+        edit_uri=edit_uri(draft_id),
+        discard_action=postback_action(flow_cards._t(lang, "discard"), "discard", draft_id),
+    )
+    # Keep the existing purchase/sales card and colors; remove external posting metadata.
+    body = card["contents"]["body"]["contents"]
+    body[0]["contents"][0]["text"] = {
+        "th": "บริษัท",
+        "zh": "公司",
+        "en": "Company",
+        "ja": "会社",
+    }.get(lang, "บริษัท")
+    body[0]["contents"][1]["text"] = str(target.get("label") or "-")
+    del body[2]
+    footer = card["contents"]["footer"]["contents"]
+    footer[0]["action"]["label"] = {"th": "แก้ไข", "zh": "编辑", "en": "Edit", "ja": "編集"}.get(
+        lang, "แก้ไข"
+    )
+    edit, discard = footer
+    edit["style"] = "secondary"
+    edit.pop("color", None)
+    card["contents"]["footer"]["contents"] = [
+        {
+            "type": "button",
+            "style": "primary",
+            "height": "sm",
+            "action": postback_action(
+                {"th": "ยืนยัน", "zh": "确定", "en": "Confirm", "ja": "確定"}.get(lang, "ยืนยัน"),
+                "confirm",
+                draft_id,
+            ),
         },
-    }
+        {"type": "box", "layout": "horizontal", "spacing": "sm", "contents": [edit, discard]},
+    ]
+    return card
+
+
+def saved_card(card: dict) -> dict:
+    card["altText"] = "บันทึกแล้ว"
+    card["contents"]["header"]["contents"][0]["text"] = "บันทึกแล้ว"
+    del card["contents"]["body"]["contents"][-2:]
+    del card["contents"]["header"]["contents"][1:]
+    card["contents"].pop("footer", None)
+    return card
 
 
 def edit_uri(draft_id: str) -> str:

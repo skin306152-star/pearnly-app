@@ -139,6 +139,27 @@ class InternalRecordsPgSmoke(unittest.TestCase):
                 )
                 self.assertEqual(self.cur.fetchone()["n"], 0)
 
+    def test_line_orders_feed_the_same_stockcard_movements_and_discard_does_not(self):
+        from datetime import date
+        from services.stockcard import movements
+
+        purchase, _ = self.draft("purchase", "line_erp", invoice_number="LINE-BUY")
+        sale, _ = self.draft("sales", "line_erp", invoice_number="LINE-SELL")
+        unsaved, _ = self.draft("purchase", "line_erp", invoice_number="LINE-DRAFT")
+        self.confirm(purchase, "purchase")
+        self.confirm(sale, "sales")
+        result = movements.load(
+            self.cur, tenant_id=self.tid, workspace_client_id=self.wid, date_to=date(2026, 9, 15)
+        )
+        rows = [row for group in result.by_key.values() for row in group]
+        self.assertEqual({row.doc_no for row in rows}, {"LINE-BUY", "LINE-SELL"})
+        self.assertEqual([row.qty for row in rows], [2, 2])
+        self.cur.execute(
+            "SELECT count(*) AS n FROM erp_push_logs WHERE history_id=ANY(%s::uuid[])",
+            ([purchase, sale, unsaved],),
+        )
+        self.assertEqual(self.cur.fetchone()["n"], 0)
+
     def test_retry_query_excludes_internal_sources_and_keeps_cowork(self):
         from services.erp.push_retry import list_logs_due_for_retry
 

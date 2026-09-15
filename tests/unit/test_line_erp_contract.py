@@ -194,11 +194,23 @@ class ErpFlowTests(unittest.TestCase):
                 card = cards.preview_card(
                     "h1", direction, {}, target={"label": "Local Company"}, posting_mode=""
                 )
-                self.assertIn("Pearnly", card["text"])
-                self.assertIn("Local Company", card["text"])
-                actions = [item["action"] for item in card["quickReply"]["items"]]
-                self.assertEqual([item["type"] for item in actions], ["uri", "postback"])
-                self.assertIn("draft=h1", actions[0]["uri"])
+                self.assertEqual(card["type"], "flex")
+                self.assertIn("Local Company", json.dumps(card))
+                footer = card["contents"]["footer"]["contents"]
+                actions = [footer[0]["action"], *[item["action"] for item in footer[1]["contents"]]]
+                self.assertEqual(footer[1]["layout"], "horizontal")
+                self.assertEqual(footer[1]["contents"][0]["style"], "secondary")
+                self.assertEqual(footer[1]["contents"][1]["style"], "link")
+                self.assertEqual(
+                    [item["type"] for item in actions], ["postback", "uri", "postback"]
+                )
+                self.assertIn("a=confirm", actions[0]["data"])
+                self.assertIn("draft=h1", actions[1]["uri"])
+                self.assertIn("a=discard", actions[2]["data"])
+                self.assertEqual(
+                    card["contents"]["header"]["backgroundColor"],
+                    "#16873E" if direction == "purchase" else "#B11B50",
+                )
                 self.assertNotIn("ERP /", json.dumps(card))
 
     @mock.patch("services.ocr_history.queries.get_ocr_history_detail")

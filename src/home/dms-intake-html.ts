@@ -57,7 +57,14 @@ const TITLE_KEYS: Record<string, [string, string]> = {
 
 export function dxShell(t: (k: string) => string, task = 'invoice'): string {
     const [titleKey, subKey] = TITLE_KEYS[task] || TITLE_KEYS.invoice;
-    const steps = STEP_KEYS[task] || STEP_KEYS.invoice;
+    const internal = isErpEntry();
+    const steps = internal
+        ? [
+              ['page-ocr-title', 'dxi-st1s'],
+              ['pur-edit', 'dxi-st3s'],
+              ['btn-save', 'dxi-st4s'],
+          ]
+        : STEP_KEYS[task] || STEP_KEYS.invoice;
     const step = (n: number, b: string, s: string) =>
         `<div class="dx-step" data-step="${n}"><div class="dx-step-no">${n}</div>` +
         `<div class="dx-step-c"><b>${dxEsc(t(b))}</b><span>${dxEsc(t(s))}</span></div></div>`;
@@ -69,8 +76,11 @@ export function dxShell(t: (k: string) => string, task = 'invoice'): string {
         '<div class="dx-flow-h"><div>' +
         `<b id="dx-flow-title">${dxEsc(t(titleKey))}</b>` +
         `<p id="dx-flow-sub">${dxEsc(t(subKey))}</p></div>` +
+        (internal
+            ? `<button class="btn" id="dx-internal-manual">${dxEsc(t('pur-cap-manual'))}</button>`
+            : '') +
         `<button class="btn" id="dx-records">${dxEsc(t('dxk-records'))}</button></div>` +
-        '<div class="dx-stepper">' +
+        `<div class="dx-stepper${internal ? ' dx-stepper-internal' : ''}">` +
         steps.map((s, i) => step(i + 1, s[0], s[1])).join('') +
         '</div>' +
         // state 容器(控制器注入内部)· 共享:上传/识别中/成功;发票:复核/导出
@@ -86,7 +96,7 @@ export function dxShell(t: (k: string) => string, task = 'invoice'): string {
         '<div class="dx-state" id="dx-s-success"></div>' +
         '</div>' + // close .dx-card(流程卡)
         // 上下文 ERP 连接卡(控制器 renderDxErpCards 按任务填充:发票/汇总表 → MR.ERP+Express)
-        '<div id="dx-erp-cards" class="dx-erp-cards-zone"></div>' +
+        (internal ? '' : '<div id="dx-erp-cards" class="dx-erp-cards-zone"></div>') +
         '</div></div>' + // close .dx-wrap / .dmsx
         // 确认弹窗(站内 .modal)
         '<div class="modal-overlay" id="dx-modal-mask" style="display:none;"></div>'

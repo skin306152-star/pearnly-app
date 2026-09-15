@@ -125,7 +125,8 @@ def test_erp_target_detection_uses_compact_cached_readiness_before_ocr_and_push(
     assert "connection_state" in push
     assert "ready: state === 'online'" in push
     assert "ensureErpTargetReady" not in push
-    assert "await preflightInvoiceErp(IV)" in invoice
+    assert "await preflightInvoiceErp(IV)" not in invoice
+    assert "if (!isErpEntry()) void probeInvoiceErp" in invoice
     assert "state.endpoints = await fetchErpEndpoints(true)" in invoice_erp
     assert "await fetchErpEndpoints(true" in submit
     assert "await fetchErpEndpoints(true" in batch

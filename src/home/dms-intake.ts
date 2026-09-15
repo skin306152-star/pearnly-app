@@ -33,7 +33,7 @@ import {
     onBatchSubmitChange,
     onBatchSubmitClick,
 } from './dms-intake-batch-submit.js';
-import { isErpEntry } from './erp-intake.js';
+import { erpIntakeDirection, intakeRecordsRoute, isErpEntry } from './erp-intake.js';
 import { loadErpRecordEntry } from './erp-record-entry.js';
 
 // ── 导航 / 重置 ──────────────────────────────────────────────
@@ -63,7 +63,7 @@ function selectTask(task: 'invoice' | 'summary_batch') {
 
 // 查看记录:两任务均进识别记录页
 function openRecords() {
-    if (typeof window.routeTo === 'function') window.routeTo('history');
+    window.routeTo?.(intakeRecordsRoute());
 }
 
 // ── 事件委托 ──────────────────────────────────────────────────
@@ -89,6 +89,7 @@ function bind() {
         const tg = ev.target as HTMLElement;
         const taskCard = tg.closest('[data-task]') as HTMLElement | null;
         if (taskCard) return selectTask(taskCard.dataset.task as 'invoice' | 'summary_batch');
+        if (isErpEntry() && tg.closest('#dx-internal-manual')) return loadErpRecordEntry(el);
         if (tg.closest('#dx-records')) return openRecords();
         if (S.task === 'summary_batch') {
             if (tg.closest('#dxb-restart')) return resetFlow();
@@ -134,6 +135,7 @@ function resumeFlow(): boolean {
     if (S.task === 'summary_batch') {
         return rerenderBatch() || rerenderBatchReview();
     }
+    if (isErpEntry() && IV.direction !== erpIntakeDirection()) return false;
     if (IV.view !== 'review' && IV.view !== 'submit') return false;
     rerenderInvoice();
     return true;
@@ -142,7 +144,7 @@ function resumeFlow(): boolean {
 window.loadDmsIntake = function () {
     const el = sec();
     if (!el) return;
-    if (isErpEntry()) return loadErpRecordEntry(el);
+    if (isErpEntry()) S.task = 'invoice';
     el.innerHTML = dxShell(t, S.task);
     renderDxErpCards(S.task);
     bind();

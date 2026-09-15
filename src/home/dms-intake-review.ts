@@ -140,7 +140,7 @@ function accItemHtml(r: IvResult, i: number): string {
     const row =
         `<div class="dx-acc-row" data-iv-toggle="${i}">` +
         `<div class="dx-file-ic">${esc(ext(r.filename))}</div>` +
-        `<div class="dx-file-c"><b>${esc(r.filename)}</b><span>${sub} · ${esc(t(confirmed ? 'dxi-rev-confirmed' : 'dxi-rev-editable'))}</span></div>` +
+        `<div class="dx-file-c"><b>${esc(r.filename)}</b><span>${sub} · ${esc(t(confirmed ? 'dxi-rev-confirmed' : isErpEntry() ? 'dxi-st3s' : 'dxi-rev-editable'))}</span></div>` +
         statusHtml(r, i) +
         `<button class="dx-acc-btn" data-iv-toggle="${i}">${esc(t(open ? 'dxi-rev-collapse' : 'dxi-rev-view'))}</button></div>`;
     const panel = open ? accPanelHtml(r, i) : '';
@@ -248,7 +248,7 @@ function fieldsFootHtml(locked: boolean): string {
     if (locked)
         return `<div class="dx-fields-foot"><div class="dx-note">${esc(t('dxi-rev-confirmed'))}</div></div>`;
     return (
-        `<div class="dx-fields-foot"><div class="dx-note">${esc(t('dxi-rev-hint'))}</div>` +
+        `<div class="dx-fields-foot"><div class="dx-note">${esc(t(isErpEntry() ? 'dxi-st3s' : 'dxi-rev-hint'))}</div>` +
         '<div class="dx-fields-foot-a">' +
         `<button class="btn small dx-save-one">${esc(t('dxi-rev-save'))}</button>` +
         `<button class="btn small primary dx-confirm-one">${esc(t('dxi-rev-next'))}</button>` +
@@ -274,10 +274,10 @@ function imageCardHtml(r: IvResult): string {
 
 function footHtml(): string {
     return (
-        `<div class="dx-foot"><div class="dx-note">${esc(t('dxi-rev-hint'))}</div>` +
+        `<div class="dx-foot"><div class="dx-note">${esc(t(isErpEntry() ? 'dxi-st3s' : 'dxi-rev-hint'))}</div>` +
         '<div style="display:flex;gap:8px">' +
         `<button class="btn" id="dx-inv-rev-back">${esc(t('dxi-rev-back'))}</button>` +
-        `<button class="btn primary" id="dx-inv-rev-next">${esc(t('dxi-rev-goexport'))}</button></div></div>`
+        `<button class="btn primary" id="dx-inv-rev-next">${esc(t(isErpEntry() ? 'btn-save' : 'dxi-rev-goexport'))}</button></div></div>`
     );
 }
 

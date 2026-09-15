@@ -1,4 +1,4 @@
-// ERP 网页录入薄适配层：只保存入口方向，手填与识别共用内部记录表单。
+// ERP 网页录入薄适配层：只保存入口方向，上传复用原工作台，手填使用独立入口。
 export type ErpDirection = 'purchase' | 'sales';
 const DIRECTION_KEY = 'pearnly_erp_intake_direction';
 
@@ -24,4 +24,12 @@ export function erpIntakeDirection(): ErpDirection | '' {
     if (!isErpEntry()) return '';
     const value = sessionStorage.getItem(DIRECTION_KEY);
     return value === 'purchase' || value === 'sales' ? value : '';
+}
+
+export function intakeRecordsRoute(): string {
+    return isErpEntry()
+        ? erpIntakeDirection() === 'sales'
+            ? 'sales-records'
+            : 'purchase'
+        : 'history';
 }

@@ -1,3 +1,4 @@
+import { tr } from '../erp/record-form.js';
 // ============================================================
 // 录入工作台 · 发票任务 导出/推送/结果(步骤4)· 从 invoice.ts 拆出控行数
 //   导出复用 /api/ocr/export·mrerp-xlsx-batch·reports/history/batch_export(多发票按 invoices 展平);
@@ -22,6 +23,7 @@ import {
 import { renderReview } from './dms-intake-review.js';
 import {
     confirmationErrorMessage,
+    confirmIndices,
     confirmedIndices,
     convertedHistoryIds,
     pagesForInvoice,
@@ -31,9 +33,30 @@ import { isErpEntry } from './erp-intake.js';
 
 // ── 步骤 4:导出 / 推送 ──────────────────────────────────────
 export async function enterSubmit() {
+    if (isErpEntry()) return finishInternal();
     if (!(await ensureErpFormalConfirmation())) return;
     await loadEndpoints();
     renderSubmit();
+}
+
+async function finishInternal() {
+    if (IV.busy) return;
+    IV.busy = true;
+    const button = $('dx-inv-rev-next') as HTMLButtonElement | null;
+    if (button) button.disabled = true;
+    try {
+        if (!(await confirmIndices(IV.results.map((_, index) => index)))) {
+            returnToReviewForConfirmation(confirmationErrorMessage());
+            return;
+        }
+        IV.output = { excel: false, erp: false };
+        renderResult(false, 0, 0);
+    } catch {
+        returnToReviewForConfirmation(t('dxi-rev-save-fail'));
+    } finally {
+        IV.busy = false;
+        if (button) button.disabled = false;
+    }
 }
 
 async function ensureErpFormalConfirmation(): Promise<boolean> {
@@ -159,6 +182,7 @@ function submitFootHtml() {
 }
 
 export async function doFinish() {
+    if (isErpEntry()) return finishInternal();
     if (IV.busy) return;
     if (IV.output.erp && !isErpAccountSelectionComplete(IV.endpoints, IV.target)) {
         showToast(t('dxi-need-erp-account'), 'warn');
@@ -376,11 +400,15 @@ function renderResult(excelOk: boolean, erpOk: number, erpFail: number, erpPendi
         : sitem('dxi-res-erp', t('dxi-res-none'), null);
     el.innerHTML =
         '<div class="dx-success"><div class="dx-suc-ic">✓</div>' +
-        `<h3>${esc(t('dxi-res-title'))}</h3><p>${esc(t('dxi-res-sub'))}</p>` +
-        `<div class="dx-sgrid">${exLine}${erpLine}</div>` +
+        (isErpEntry()
+            ? `<h3>${esc(tr('saved', currentLang))}</h3>`
+            : `<h3>${esc(t('dxi-res-title'))}</h3><p>${esc(t('dxi-res-sub'))}</p>`) +
+        (isErpEntry() ? '' : `<div class="dx-sgrid">${exLine}${erpLine}</div>`) +
         '<div class="dx-sact">' +
         `<button class="btn" id="dx-inv-view-rec">${esc(t('dxi-res-view-record'))}</button>` +
-        `<button class="btn" id="dx-inv-view-push">${esc(t('dxi-res-view-push'))}</button>` +
+        (isErpEntry()
+            ? ''
+            : `<button class="btn" id="dx-inv-view-push">${esc(t('dxi-res-view-push'))}</button>`) +
         `<button class="btn primary" id="dx-inv-new">${esc(t('dxi-res-new'))}</button></div></div>`;
     showStepInv(4, 'dx-s-success');
 }

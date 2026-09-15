@@ -418,10 +418,8 @@ test('ERP purchase and sales record buttons open the shared intake with an expli
     );
     await expect(page.locator('[data-task="summary_batch"]')).toHaveCount(0);
 
-    await page.evaluate(() => window.routeTo('sales-invoices'));
-    await page.waitForSelector('#sx-new-btn');
-    await expect(page.locator('#sx-upload-btn')).toHaveCount(0);
-    await expect(page.locator('#sx-record-btn')).toHaveCount(0);
+    await expect(page.locator('.nav-item[data-route="sales-invoices"]')).not.toBeVisible();
+    await expect(page.locator('.nav-item[data-route="sellers"]')).not.toBeVisible();
 
     await page.evaluate(() => window.routeTo('sales-records'));
     await page.waitForSelector('#sr-record-btn');
@@ -793,7 +791,7 @@ test('ERP reports the exact missing item field after a type was selected', async
     );
 });
 
-test('ERP next and finish do not replay the confirmed history write', async ({ page }) => {
+test('ERP save does not replay the confirmed history write', async ({ page }) => {
     const state = {};
     await boot(page, 'erp', state);
     await page.evaluate(() => window.routeTo('purchase'));
@@ -821,10 +819,8 @@ test('ERP next and finish do not replay the confirmed history write', async ({ p
         page.locator('.dx-acc-item.open .dx-save-one, .dx-acc-item.open .dx-confirm-one')
     ).toHaveCount(0);
     await page.click('#dx-inv-rev-next');
-    await page.waitForSelector('#dx-s-inv-submit.active');
-    expect(state.historyPuts).toBe(1);
-    await page.click('#dx-inv-finish');
     await page.waitForSelector('#dx-s-success.active');
+    expect(state.erpPushes).toBe(0);
     expect(state.historyPuts).toBe(1);
     expect(state.commits).toBe(0);
     expect(state.converts).toBe(1);
@@ -1402,3 +1398,47 @@ test('ERP LINE binding card has a truthful bound state and touch-sized mobile ac
     await expect(boundPage.locator('#erp-linebot-unbound')).toBeHidden();
     await boundPage.close();
 });
+
+for (const direction of ['purchase', 'sales']) {
+    test(`ERP original upload saves ${direction} internally without endpoints and retries failed writes`, async ({
+        page,
+    }) => {
+        const recognized = JSON.parse(JSON.stringify(RECOGNIZED));
+        recognized.invoices[0].fields.direction = direction;
+        const state = { recognized, erpEndpoints: [], failSave: true };
+        await boot(page, 'erp', state);
+        await page.evaluate(
+            (route) => window.routeTo(route),
+            direction === 'purchase' ? 'purchase' : 'sales-records'
+        );
+        await page.click(direction === 'purchase' ? '#pur-record-btn' : '#sr-record-btn');
+        await expect(page.locator('.dx-step')).toHaveCount(3);
+        await expect(page.locator('#dx-erp-cards')).toHaveCount(0);
+        await expect(page.locator('#dx-internal-manual')).toBeVisible();
+        await page.setInputFiles('#dx-inv-file', {
+            name: 'original.pdf',
+            mimeType: 'application/pdf',
+            buffer: Buffer.from('invoice'),
+        });
+        await page.click('#dx-inv-start');
+        await page.waitForSelector('#dx-s-inv-review.active');
+        await page.locator('select.dx-item-type').selectOption('stock');
+        await page.locator('[data-iv-field="0:0:invoice_number"]').fill('EDITED-001');
+        await page.click('#dx-inv-rev-next');
+        await expect.poll(() => state.historyPuts).toBe(1);
+        await expect(page.locator('#dx-s-inv-review.active')).toBeVisible();
+        expect(state.converts).toBe(0);
+        expect(state.erpPushes).toBe(0);
+        await expect(page.locator('[data-iv-field="0:0:invoice_number"]')).toHaveValue(
+            'EDITED-001'
+        );
+        state.failSave = false;
+        await page.click('#dx-inv-rev-next');
+        await page.waitForSelector('#dx-s-success.active');
+        expect(state.historyPutBodies[1].pages[0].fields.invoice_number).toBe('EDITED-001');
+        expect(state.converts).toBe(1);
+        expect(state.erpPushes).toBe(0);
+        await expect(page.locator('#dx-inv-view-push')).toHaveCount(0);
+        await expect(page.locator('#dx-s-inv-submit.active')).toHaveCount(0);
+    });
+}

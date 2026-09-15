@@ -1,3 +1,4 @@
+import { focusDxErpCards } from './dms-intake-erp-cards.js';
 /* global t, showToast */
 import { S, esc, $ } from './dms-intake-core.js';
 import { saveStep } from './step-resume.js';
@@ -5,13 +6,8 @@ import { enterSubmit, renderSubmit, doFinish } from './dms-intake-invoice-submit
 import { renderReview, onReviewClick } from './dms-intake-review.js';
 import { imagesToPdf, analyzeImageQuality } from './camera-image-utils.js';
 import { recognizeOne, ctrls, recState } from './dms-intake-invoice-recognize.js';
-import { focusDxErpCards } from './dms-intake-erp-cards.js';
-import {
-    hasReadyExpressTarget,
-    preflightInvoiceErp,
-    probeInvoiceErp,
-} from './dms-intake-invoice-erp.js';
-import { erpIntakeDirection, isErpEntry } from './erp-intake.js';
+import { hasReadyExpressTarget, probeInvoiceErp } from './dms-intake-invoice-erp.js';
+import { erpIntakeDirection, intakeRecordsRoute, isErpEntry } from './erp-intake.js';
 import type { ErpEndpoint } from './dms-intake-erp-accounts.js';
 import {
     changeErpCatalogSelection,
@@ -126,13 +122,17 @@ export function showStepInv(step: number, stateId: string) {
     const sc = document.getElementById('page-dms-intake');
     sc?.querySelectorAll('.dx-state').forEach((s) => s.classList.remove('active'));
     document.getElementById(stateId)?.classList.add('active');
-    sc?.querySelector('.dx-stepper')?.setAttribute('data-frac', step + ' / 4');
+    const visibleStep = isErpEntry() ? Math.max(1, step - 1) : step;
+    sc?.querySelector('.dx-stepper')?.setAttribute(
+        'data-frac',
+        visibleStep + (isErpEntry() ? ' / 3' : ' / 4')
+    );
     sc?.querySelectorAll('.dx-step').forEach((el, i) => {
         const n = i + 1;
-        el.classList.toggle('active', n === step);
-        el.classList.toggle('done', n < step);
+        el.classList.toggle('active', n === visibleStep);
+        el.classList.toggle('done', n < visibleStep);
         const no = el.querySelector('.dx-step-no');
-        if (no) no.textContent = n < step ? '✓' : String(n);
+        if (no) no.textContent = n < visibleStep ? '✓' : String(n);
     });
 }
 
@@ -141,7 +141,7 @@ export function renderInvoiceUpload() {
     IV.view = 'upload';
     const el = $('dx-s-upload');
     if (!el) return;
-    void probeInvoiceErp(IV, renderInvoiceUpload);
+    if (!isErpEntry()) void probeInvoiceErp(IV, renderInvoiceUpload);
     const maxF = w.getMaxFiles?.() || 500;
     const maxMb = w.getMaxMbPerFile?.() || 100;
     const fmt = t('dxi-up-formats').replace('{mb}', String(maxMb)).replace('{n}', String(maxF));
@@ -282,11 +282,6 @@ async function startRecognize() {
     const lockedDirection = isErpEntry() ? erpIntakeDirection() : '';
     if (isErpEntry() && (!lockedDirection || IV.direction !== lockedDirection)) {
         showToast(t('dxi-dir-hint'), 'error');
-        return;
-    }
-    if (isErpEntry() && !(await preflightInvoiceErp(IV))) {
-        showToast(t('dxi-need-erp'), 'warn');
-        focusDxErpCards();
         return;
     }
     const waiting = IV.files.filter((f) => f.status === 'waiting');
@@ -436,7 +431,7 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
     if (hit('dx-inv-go-int')) return (focusDxErpCards(), true);
     if (hit('dx-inv-sub-back')) return (renderReview(), true);
     if (hit('dx-inv-finish')) return (void doFinish(), true);
-    if (hit('dx-inv-view-rec')) return (go('history'), true);
+    if (hit('dx-inv-view-rec')) return (go(intakeRecordsRoute()), true);
     // 推送日志使用独立路由，不再跳到集成配置页。
     if (hit('dx-inv-view-push')) return (go('push-logs'), true);
     if (hit('dx-inv-new')) {

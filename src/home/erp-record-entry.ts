@@ -15,7 +15,6 @@ type Draft = { id: string; fields: Fields; source?: string };
 let records: Draft[] = [];
 let index = 0;
 let direction = 'purchase';
-let method = 'manual';
 let busy = false;
 const attachments = new Map<string, File>();
 let workspaceId: number | null = null;
@@ -52,14 +51,12 @@ function message(text: string) {
 function reset() {
     records = [{ id: crypto.randomUUID(), fields: emptyFields() }];
     index = 0;
-    method = 'manual';
     render();
 }
 function render() {
     const record = records[index];
     host.innerHTML = `<div class="er-entry"><div class="er-head"><h2>${esc(label(direction))}</h2><button class="btn" data-records>${esc(label('records'))}</button></div>
-    <div class="er-tabs"><button class="btn ${method === 'manual' ? 'primary' : ''}" data-method="manual">${esc(label('manual'))}</button><button class="btn ${method === 'upload' ? 'primary' : ''}" data-method="upload">${esc(label('upload'))}</button></div>
-    ${method === 'upload' ? `<div class="er-upload"><p>${esc(label('hint'))}</p><input type="file" data-files multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv,.docx,.doc"><button class="btn" data-recognize>${esc(label('upload'))}</button></div>` : ''}
+    <div class="er-tabs"><button class="btn primary" data-method="manual">${esc(label('manual'))}</button><button class="btn" data-method="upload">${esc(label('upload'))}</button></div>
     ${records.length > 1 ? `<select data-select-record>${records.map((_, i) => `<option value="${i}" ${i === index ? 'selected' : ''}>${i + 1} / ${records.length}</option>`).join('')}</select>` : ''}
     <form data-record-form>${record ? formHtml(record.fields, direction, lang()) : ''}</form>
     <label>${esc(label('attachment'))}<input type="file" data-attachment accept="application/pdf,image/*"></label><div class="er-message" data-message role="status"></div><div class="er-actions"><button class="btn" data-draft>${esc(label('draft'))}</button><button class="btn primary" data-confirm>${esc(label('confirm'))}</button></div>
@@ -78,16 +75,13 @@ function render() {
         (button) =>
             (button.onclick = () => {
                 capture();
-                method = button.dataset.method!;
-                render();
+                if (button.dataset.method === 'upload') window.loadDmsIntake?.();
             })
     );
     host.querySelector<HTMLElement>('[data-records]')!.onclick = () =>
         window.routeTo?.(direction === 'purchase' ? 'purchase' : 'sales-records');
     host.querySelector<HTMLElement>('[data-draft]')!.onclick = () => void save(false);
     host.querySelector<HTMLElement>('[data-confirm]')!.onclick = () => void save(true);
-    const fileButton = host.querySelector<HTMLElement>('[data-recognize]');
-    if (fileButton) fileButton.onclick = () => void recognize();
     const selector = host.querySelector<HTMLSelectElement>('[data-select-record]');
     if (selector)
         selector.onchange = () => {
@@ -163,59 +157,6 @@ async function save(confirm: boolean) {
         lock(false);
     }
 }
-async function recognize() {
-    if (busy || !workspaceId) return;
-    const files = Array.from(host.querySelector<HTMLInputElement>('[data-files]')?.files || []);
-    if (!files.length) return;
-    capture();
-    lock(true);
-    message(label('busy'));
-    const recognized: Draft[] = [];
-    try {
-        for (const file of files) {
-            const form = new FormData();
-            form.append('file', file);
-            form.append('direction', direction);
-            form.append('workspace_client_id', String(workspaceId));
-            const response = await fetch('/api/ocr/recognize', {
-                method: 'POST',
-                headers: authHeaders(),
-                body: form,
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(String(data.detail));
-            for (const invoice of data.invoices || []) {
-                if (invoice.history_id)
-                    recognized.push({
-                        id: invoice.history_id,
-                        fields: { ...invoice.fields, direction },
-                        source: 'upload',
-                    });
-            }
-            if (!data.invoices?.length && (data.history_ids?.length || data.history_id)) {
-                const fields = data.pages?.[0]?.fields || data.fields || {};
-                recognized.push({
-                    id: data.history_ids?.[0] || data.history_id,
-                    fields: { ...fields, direction },
-                    source: 'upload',
-                });
-            }
-        }
-        if (!recognized.length) throw new Error(label('emptyRecognition'));
-        records = recognized;
-        index = 0;
-        render();
-    } catch (error) {
-        if (recognized.length) {
-            records = recognized;
-            index = 0;
-            render();
-        }
-        message(describeError(error, lang()));
-    } finally {
-        lock(false);
-    }
-}
 export function loadErpRecordEntry(element: HTMLElement) {
     host = element;
     const nextDirection = erpIntakeDirection() || 'purchase';
@@ -244,7 +185,9 @@ async function showDrafts() {
         );
         if (!target.isConnected) return;
         target.replaceChildren();
-        const drafts = data.drafts as Array<Draft & { source_ref?: string }>;
+        const drafts = (data.drafts as Array<Draft & { source_ref?: string }>).filter(
+            (draft) => draft.source_ref === 'manual'
+        );
         if (!drafts.length) return;
         const title = document.createElement('h3');
         title.textContent = label('drafts');
@@ -259,7 +202,6 @@ async function showDrafts() {
                     { ...draft, source: draft.source_ref === 'manual' ? undefined : 'upload' },
                 ];
                 index = 0;
-                method = 'manual';
                 render();
             };
             target.append(button);

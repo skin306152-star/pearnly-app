@@ -20,4 +20,10 @@
 
 ## 发布
 
-待候选 pre-push、Manual CD 与生产身份回读后补充。真实手机和外部业务验收不由单测/HTTP 200 代替。
+2026-09-15 12:54（UTC+7）发布完成。应用 SHA `328b90e426eb2099ee9dd5c36c9a08995f9687a6`，Manual CD [34933957608](https://github.com/skin306152-star/pearnly-app/actions/runs/34933957608) success。完整 pre-push 1,190 模块/6 分片通过。
+
+Web `pearnly-web-328b90e426eb-s3` / Worker `pearnly-worker-328b90e426eb-s3`，均 Ready、各 100%，同镜像 digest `sha256:3ca4a4c48ba01fc4db53b06c9dcf0b6cb78aff938dbd251c03c629083665d628`。schema `pearnly-schema-qzl9s` 成功，候选和正式 SHA/健康/就绪/完整安装包下载验证通过。
+
+正式域名 HTML/JS/i18n 与本地候选逐字节一致；三个 OA available；health/ready 200。最初 urllib 资源探针 403，改用 curl 对公开同源资源回读成功，没有改动访问控制。证据 `/tmp/customer-release-readback.json`、`/tmp/customer-deploy-complete.log`、`/tmp/customer-release-push.log`；手机布局截图 `/tmp/dms-customer-evidence/`。
+
+未向真实 DMS 写测试资料，未发送真实 LINE 测试消息。真实手机和外部业务验收仍待用户确认。

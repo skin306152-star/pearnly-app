@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-15 12:54（UTC+7）。状态：**客户卡网页编辑器、称谓修复和旧逐字段修改删除已发布（`328b90e426eb`）。Web/Worker Ready、各 100% 流量；客户编辑保存只发新卡，确认更新后才写 DMS。正式 HTML/JS/i18n 与候选逐字节一致，三个 OA 配置可用。队列与速度逻辑未修改；真实 LINE 手机及外部 DMS 业务验收仍待用户确认。**
+更新时间：2026-09-15 13:13（UTC+7）。状态：**客户卡“修改”按钮恢复原尺寸已发布（`9cbe603e49c5`）。Web/Worker Ready、各 100% 流量。链接按钮复用原按钮，仅替换 action，保留 height=sm 等外观属性；此前客户编辑器、称谓修复和旧逻辑删除继续有效。已发送旧卡不会随部署改变；新卡真机视觉验收待用户确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,6 +27,14 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- 完整 SHA：`9cbe603e49c5788e39e650a4c163371e679f890d`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:151d50748a99769786489a588a99da908cd9e7f0ebceb949ac6e40aeb9294060`。
+- Web `pearnly-web-9cbe603e49c5-s3`、Worker `pearnly-worker-9cbe603e49c5-s3` 均 Ready，各 100% 流量，同 digest。
+- [Manual CD 34935332766](https://github.com/skin306152-star/pearnly-app/actions/runs/34935332766) success。schema `pearnly-schema-c8zkr` 成功；候选/正式精确版本、健康/就绪、完整安装包下载验证通过。正式页面资源与候选一致、三 OA 配置可用。
+- 全量 pre-push 1,191 模块/6 分片通过。新增外观契约测试：链接按钮除 action 外所有属性与原按钮相同，整张差异卡三个按钮均 height=sm。三 OA 各两条消息通过 LINE validate/reply，未发送真实测试消息。回读 `/tmp/button-release-readback.json`，发布日志 `/tmp/button-deploy-complete.log`。
+
+### 上一发布身份（2026-09-15 客户编辑器）
 
 - 完整 SHA：`328b90e426eb2099ee9dd5c36c9a08995f9687a6`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:3ca4a4c48ba01fc4db53b06c9dcf0b6cb78aff938dbd251c03c629083665d628`。

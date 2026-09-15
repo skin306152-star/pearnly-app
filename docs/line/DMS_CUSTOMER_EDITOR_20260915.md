@@ -27,3 +27,10 @@ Web `pearnly-web-328b90e426eb-s3` / Worker `pearnly-worker-328b90e426eb-s3`，�
 正式域名 HTML/JS/i18n 与本地候选逐字节一致；三个 OA available；health/ready 200。最初 urllib 资源探针 403，改用 curl 对公开同源资源回读成功，没有改动访问控制。证据 `/tmp/customer-release-readback.json`、`/tmp/customer-deploy-complete.log`、`/tmp/customer-release-push.log`；手机布局截图 `/tmp/dms-customer-evidence/`。
 
 未向真实 DMS 写测试资料，未发送真实 LINE 测试消息。真实手机和外部业务验收仍待用户确认。
+
+
+## 按钮外观回归修复
+
+2026-09-15 用户真机发现修改按钮变高：新 URI 按钮没有继承旧 height=sm。已改为复用 `_btn` 后只替换 action；新增测试锁定其余所有属性一致，并检查整张差异卡三个按钮高度与样式。
+
+版本 `9cbe603e49c5788e39e650a4c163371e679f890d` 已发布，Manual CD `34935332766` success，Web/Worker 各 100% Ready。全量 1,191 模块通过，三个 OA 的官方载荷验证通过；未发送测试卡，实际 LINE 新卡视觉验收仍待用户。旧聊天卡不会因部署而重绘。

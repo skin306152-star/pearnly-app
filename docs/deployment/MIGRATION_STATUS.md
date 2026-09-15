@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-15 13:13（UTC+7）。状态：**客户卡“修改”按钮恢复原尺寸已发布（`9cbe603e49c5`）。Web/Worker Ready、各 100% 流量。链接按钮复用原按钮，仅替换 action，保留 height=sm 等外观属性；此前客户编辑器、称谓修复和旧逻辑删除继续有效。已发送旧卡不会随部署改变；新卡真机视觉验收待用户确认。**
+更新时间：2026-09-15 16:09（UTC+7）。状态：**ERP 网页/LINE 内部录入及 ERP/POS 客户导航整批已发布（`e342486d7deb`）。Web/Worker Ready、各 100% 流量；正式资源回读一致。用户线上网页及 LINE 真机业务验收待确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,6 +27,16 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- 完整 SHA：`e342486d7deb214200b78de5e50f03f789a08ae4`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:fd106ccbc6e8e514805fedc0594aa1c632c6614e2e5d2c1bdd60b2c1b8f05fad`。
+- Web `pearnly-web-e342486d7deb-s3`、Worker `pearnly-worker-e342486d7deb-s3` 均 Ready，各 100% 流量，同 digest。
+- [Manual CD 34950160763](https://github.com/skin306152-star/pearnly-app/actions/runs/34950160763) success；schema `pearnly-schema-7dqzr` 成功，候选与正式版本/健康/就绪/完整安装包下载校验通过。
+- 本批 ERP 网页/LINE 只做内部保存，禁止第三方推送；上传沿用旧预览编辑组件简化为三步，去掉库存/服务选择，保留手动录入；移除销售发票和开票资料入口。ERP/POS 将原买方客户独立为“客户”，原客户管理改“公司主档”，复用原数据与编辑界面。保留主线 DMS/LINE 修改，Cowork 业务未改。
+- 全量 pre-push 1192 模块/6 分片及所有机械闸通过；合并后 11 项入口浏览器回归、盘点 EAN/QR 浏览器回归通过。内部保存真库测试及 LINE 采购/销售各手填/上传四条模拟对话均通过，无第三方推送日志；真实 Vertex PDF 识别在本地通过。本地漏配 Vertex 的问题已修正，生产 OCR 配置未变。
+- 正式 `/api/health`、`/api/ready`、`/erp`、`/pos`、`/liff/erp` 均 HTTP 200；main.js?v=09150401、record-form.css?v=09150301、i18n-data.js?v=09150401、erp-line-editor.js?v=erp-internal-2 与候选字节一致。未向真实账套写测试单、未发送真实 LINE 测试消息；真机业务验收仍由用户确认。详见 [本任务记录](../erp/ERP-INTERNAL-ENTRY-LOCAL.md)。
+
+### 上一发布身份（2026-09-15 客户编辑按钮）
 
 - 完整 SHA：`9cbe603e49c5788e39e650a4c163371e679f890d`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:151d50748a99769786489a588a99da908cd9e7f0ebceb949ac6e40aeb9294060`。

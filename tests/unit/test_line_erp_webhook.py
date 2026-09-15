@@ -75,7 +75,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_menu_does_not_probe_targets_before_rendering(self):
-        with mock.patch.object(webhook.target_preflight, "inspect_targets") as inspect:
+        with mock.patch("services.line_erp.target_preflight.inspect_targets") as inspect:
             card = await webhook._menu_card(
                 {"tenant_id": "t1", "user_id": "u1"}, ("purchase", "sales")
             )
@@ -88,7 +88,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         event = {"postback": {"data": "a=mode%3Asales"}}
         with (
             mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
-            mock.patch.object(webhook.target_flow, "begin_mode") as begin_mode,
+            mock.patch.object(webhook.internal_flow, "begin_mode") as begin_mode,
             mock.patch.object(webhook.line_client, "reply_text") as reply_text,
         ):
             await webhook._handle_postback(event, binding, "line-u1", "reply")
@@ -101,40 +101,30 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         event = {"postback": {"data": "a=mode%3Apurchase"}}
         with (
             mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
-            mock.patch.object(webhook.target_flow, "begin_mode") as begin_mode,
+            mock.patch.object(webhook.internal_flow, "begin_mode") as begin_mode,
         ):
             await webhook._handle_postback(event, binding, "line-u1", "reply")
         begin_mode.assert_awaited_once_with(binding, "line-u1", "reply", "purchase")
 
-    async def test_erp_type_postback_uses_mode_from_current_session(self):
+    async def test_old_external_postbacks_do_not_open_a_picker(self):
+        from services.line_erp import target_flow
+
+        with mock.patch.object(target_flow, "show_account_picker") as show:
+            await webhook._handle_postback(
+                {"postback": {"data": "a=erp-type&erp=express"}},
+                {"tenant_id": "t1", "user_id": "u1"},
+                "line-u1",
+                "reply",
+            )
+        show.assert_not_called()
+
+    async def test_internal_manual_postback_uses_shared_flow(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}
-        event = {"postback": {"data": "a=erp-type&erp=express&page=2"}}
-        with (
-            mock.patch.object(
-                webhook.store,
-                "get_session",
-                return_value={"state": "target", "payload": {"mode": "sales"}},
-            ),
-            mock.patch.object(webhook.target_flow, "show_account_picker") as show,
-        ):
-            await webhook._handle_postback(event, binding, "line-u1", "reply")
-
-        show.assert_awaited_once_with(
-            binding,
-            "line-u1",
-            "reply",
-            "sales",
-            "express",
-            page=2,
-        )
-
-    async def test_old_target_page_postback_restarts_new_picker(self):
-        binding = {"tenant_id": "t1", "user_id": "u1"}
-        event = {"postback": {"data": "a=target-page&mode=purchase&page=1"}}
-        with mock.patch.object(webhook.target_flow, "begin_mode") as begin:
-            await webhook._handle_postback(event, binding, "line-u1", "reply")
-
-        begin.assert_awaited_once_with(binding, "line-u1", "reply", "purchase")
+        with mock.patch.object(webhook.internal_flow, "manual") as manual:
+            await webhook._handle_postback(
+                {"postback": {"data": "a=internal-manual"}}, binding, "line-u1", "reply"
+            )
+        manual.assert_awaited_once_with(binding, "line-u1", "reply")
 
     async def test_media_event_queues_ocr_instead_of_waiting_for_reply(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}
@@ -207,142 +197,78 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         reply_text.assert_called_once()
         self.assertIn("กำลังอ่านเอกสาร", reply_text.call_args.args[1])
 
-    async def test_document_backfills_preview_before_opening_draft(self):
-        binding = {"tenant_id": "t1", "user_id": "u1", "workspace_client_id": 7}
-        selection = _express_selection()
-        resolved_target = {
-            **_ready(selection)["target"],
-            "connection_workspace_client_id": 7,
-            "workspace_client_id": 9,
-        }
-        with (
-            mock.patch.object(
-                webhook.store,
-                "get_session",
-                return_value={"state": "receiving", "payload": selection},
-            ),
-            mock.patch.object(webhook.store, "set_session") as set_session,
-            mock.patch.object(webhook.line_client, "download_message_content", return_value=b"pdf"),
-            mock.patch.object(webhook.line_client, "reply_messages"),
-            mock.patch.object(
-                webhook.db,
-                "find_user_by_id",
-                return_value={"id": "u1", "tenant_id": "t1", "plan": "free"},
-            ),
-            mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
-            mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
-            mock.patch.object(
-                webhook.target_selection,
-                "normalize",
-                return_value=(_ready(selection), selection),
-            ),
-            mock.patch.object(
-                webhook,
-                "run_recognition_core",
-                return_value={
-                    "history_ids": ["h1"],
-                    "raw_pages": [
-                        {
-                            "page_number": 1,
-                            "fields": {
-                                "invoice_number": "P-1",
-                                "items": [{"name": "Widget"}],
-                            },
-                        }
-                    ],
-                },
-            ),
-            mock.patch.object(
-                webhook.intake,
-                "generate_and_save_pdf",
-                return_value={"saved": False, "updated": 0},
-            ) as backfill,
-            mock.patch.object(
-                webhook.workspace_resolution,
-                "resolve_history_workspace",
-                return_value=resolved_target,
-            ) as resolve_workspace,
-            mock.patch.object(
-                webhook.cards,
-                "preview_card",
-                return_value={"type": "flex", "contents": {}},
-            ) as preview_card,
-        ):
-            await webhook._handle_document(
-                {"id": "m1", "type": "file", "fileName": "invoice.pdf"},
-                binding,
-                "line-u1",
-                "reply",
-            )
-        backfill.assert_called_once()
-        resolve_workspace.assert_called_once()
-        payload = set_session.call_args.args[3]
-        self.assertEqual(set_session.call_args.args[:3], ("t1", "line-u1", "draft"))
-        self.assertEqual(payload["history_ids"], ["h1"])
-        self.assertEqual(payload["connection_workspace_client_id"], 7)
-        self.assertEqual(payload["workspace_client_id"], 9)
-        self.assertTrue(payload["nonce"])
-        self.assertTrue(resolve_workspace.call_args.kwargs["provisional_history_assignment"])
-        preview_card.assert_called_once_with(
-            "h1",
-            "purchase",
-            {"invoice_number": "P-1", "items": [{"name": "Widget"}]},
-            target=resolved_target,
-            posting_mode="stock",
-            record_count=1,
-            item_count=1,
-        )
-
-    async def test_unbound_cowork_target_resolves_workspace_after_ocr(self):
-        binding = {"tenant_id": "t1", "user_id": "u1"}
+    async def test_document_saves_preview_and_keeps_internal_workspace(self):
         selection = {
-            **_express_selection(),
-            "connection_workspace_client_id": None,
-            "workspace_client_id": None,
+            "mode": "purchase",
+            "direction": "purchase",
+            "workspace_client_id": 7,
+            "target_label": "Local Company",
         }
-        ready = _ready(selection)
+        binding = {"tenant_id": "t1", "user_id": "u1"}
         with (
             mock.patch.object(
                 webhook.store,
                 "get_session",
                 return_value={"state": "receiving", "payload": selection},
             ),
-            mock.patch.object(webhook.store, "set_session") as set_session,
+            mock.patch.object(webhook.store, "set_session") as session,
+            mock.patch.object(
+                webhook.internal_flow,
+                "selection",
+                return_value=({"id": "u1", "tenant_id": "t1"}, selection),
+            ),
             mock.patch.object(webhook.line_client, "download_message_content", return_value=b"pdf"),
             mock.patch.object(webhook.line_client, "reply_messages"),
+            mock.patch.object(webhook.line_client, "start_loading"),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
-            mock.patch.object(
-                webhook.target_selection,
-                "normalize",
-                return_value=(ready, selection),
-            ),
             mock.patch.object(
                 webhook,
                 "run_recognition_core",
                 return_value={"history_ids": ["h1"], "raw_pages": []},
             ) as recognize,
-            mock.patch.object(webhook.intake, "generate_and_save_pdf"),
-            mock.patch.object(
-                webhook.workspace_resolution,
-                "resolve_history_workspace",
-                return_value={**ready["target"], "workspace_client_id": 9},
-            ) as resolve_workspace,
+            mock.patch.object(webhook.intake, "generate_and_save_pdf") as pdf,
         ):
             await webhook._handle_document(
-                {"id": "m1", "type": "file", "fileName": "invoice.pdf"},
-                binding,
-                "line-u1",
-                "reply",
+                {"id": "m1", "fileName": "invoice.pdf"}, binding, "line-u1", "reply"
             )
+        pdf.assert_called_once()
+        self.assertEqual(recognize.call_args.kwargs["source"], "line_erp")
+        self.assertEqual(recognize.call_args.kwargs["ws_client_id"], 7)
+        self.assertTrue(recognize.call_args.kwargs["staged"])
+        payload = session.call_args.args[3]
+        self.assertEqual(payload["workspace_client_id"], 7)
+        self.assertEqual(payload["history_ids"], ["h1"])
+        self.assertTrue(payload["nonce"])
+        self.assertNotIn("endpoint_id", payload)
 
-        self.assertIsNone(recognize.call_args.kwargs["ws_client_id"])
-        self.assertTrue(resolve_workspace.call_args.kwargs["provisional_history_assignment"])
-        self.assertEqual(set_session.call_args.args[3]["workspace_client_id"], 9)
+    async def test_missing_internal_workspace_stops_before_download(self):
+        from fastapi import HTTPException
+
+        with (
+            mock.patch.object(
+                webhook.store,
+                "get_session",
+                return_value={"state": "receiving", "payload": {"mode": "purchase"}},
+            ),
+            mock.patch.object(
+                webhook.internal_flow,
+                "selection",
+                side_effect=HTTPException(404, "workspace.not_found"),
+            ),
+            mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
+            mock.patch.object(webhook, "_restore_receiving") as restore,
+            mock.patch.object(webhook, "_notify"),
+            mock.patch.object(webhook.line_client, "download_message_content") as download,
+        ):
+            await webhook._handle_document(
+                {"id": "m1"}, {"tenant_id": "t1", "user_id": "u1"}, "line-u1", "reply"
+            )
+        download.assert_not_called()
+        restore.assert_called_once()
 
     async def test_inactive_bound_user_never_reaches_ocr(self):
-        binding = {"tenant_id": "t1", "user_id": "u1", "workspace_client_id": 7}
-        selection = _express_selection("sales")
+        selection = {"mode": "sales", "workspace_client_id": 7}
         with (
             mock.patch.object(
                 webhook.store,
@@ -350,35 +276,41 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 return_value={"state": "receiving", "payload": selection},
             ),
             mock.patch.object(
-                webhook.target_selection,
-                "normalize",
-                side_effect=webhook.target_selection.SelectionError("erp_user_inactive"),
+                webhook.internal_flow,
+                "selection",
+                return_value=({"id": "u1", "tenant_id": "t1", "is_active": False}, selection),
             ),
-            mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
+            mock.patch.object(webhook.line_client, "download_message_content", return_value=b"pdf"),
             mock.patch.object(webhook, "_allowed_modes", return_value=("sales",)),
+            mock.patch.object(webhook, "_notify"),
             mock.patch.object(webhook, "run_recognition_core") as recognize,
-            mock.patch.object(webhook.store, "clear_session") as clear_session,
+            mock.patch.object(webhook.store, "clear_session") as clear,
         ):
             await webhook._handle_document(
-                {"id": "m1", "type": "image"}, binding, "line-u1", "reply"
+                {"id": "m1"}, {"tenant_id": "t1", "user_id": "u1"}, "line-u1", "reply"
             )
         recognize.assert_not_called()
-        clear_session.assert_called_once_with("t1", "line-u1")
+        clear.assert_called_once_with("t1", "line-u1")
 
-    async def test_incomplete_confirm_keeps_session_and_rolls_back_batch(self):
-        binding = {"tenant_id": "t1", "user_id": "u1"}
-        cursor = _Cursor()
-        selection = _express_selection()
+    async def test_failed_confirm_keeps_session(self):
+        await self._assert_confirm({"ok": False, "status": 409, "detail": "erp.confirm_failed"})
+
+    async def test_complete_confirm_saves_without_push(self):
+        await self._assert_confirm(
+            {"ok": True, "status": "saved", "converted": [{"history_id": "h1"}]}
+        )
+
+    async def _assert_confirm(self, saved):
         with (
             mock.patch.object(
                 webhook.store,
                 "get_session",
                 return_value={
                     "state": "draft",
-                    "payload": {**selection, "history_ids": ["h1", "h2"]},
+                    "payload": {"mode": "purchase", "history_ids": ["h1"]},
                 },
             ),
-            mock.patch.object(webhook.store, "clear_session") as clear_session,
+            mock.patch.object(webhook.store, "clear_session") as clear,
             mock.patch.object(
                 webhook.db,
                 "find_user_by_id",
@@ -386,162 +318,19 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             ),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook.team_access, "mode_allowed", return_value=True),
-            mock.patch.object(
-                webhook.target_selection,
-                "normalize",
-                return_value=(_ready(selection), selection),
-            ),
-            mock.patch.object(
-                webhook,
-                "draft_records",
-                return_value=[
-                    {
-                        "pages": [
-                            {
-                                "fields": {
-                                    "direction": "purchase",
-                                    "date": "2026-08-28",
-                                    "seller_name": "Supplier A",
-                                    "total_amount": "100",
-                                    "items": [{"name": "A", "qty": "1", "posting_kind": "stock"}],
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "pages": [
-                            {
-                                "fields": {
-                                    "direction": "purchase",
-                                    "date": "2026-08-28",
-                                    "seller_name": "Supplier B",
-                                    "total_amount": "200",
-                                    "items": [{"name": "B", "qty": "1", "posting_kind": "service"}],
-                                }
-                            }
-                        ]
-                    },
-                ],
-            ),
-            mock.patch.object(
-                webhook.draft_actions.line_document_subject,
-                "matches",
-                return_value=(True, None),
-            ),
-            mock.patch.object(
-                webhook.convert_svc,
-                "convert_histories",
-                return_value={"converted": [{"history_id": "h1"}], "skipped": []},
-            ),
-            mock.patch.object(webhook.db, "get_cursor_rls", return_value=_Context(cursor)),
+            mock.patch.object(webhook, "_confirm", return_value=saved),
+            mock.patch.object(webhook.line_push, "dispatch_confirmed") as push,
         ):
-            result = await webhook.act_draft(binding, "line-u1", None, "h1", "confirm")
-        self.assertEqual(result["detail"], "line_erp.confirm_incomplete")
-        clear_session.assert_not_called()
-        self.assertFalse(
-            any("UPDATE ocr_history SET staged = FALSE" in sql for sql, _ in cursor.sql)
-        )
-
-    async def test_complete_confirm_books_and_pushes_document_workspace_b(self):
-        binding = {
-            "tenant_id": "t1",
-            "user_id": "u1",
-            "workspace_client_id": 7,
-        }
-        cursor = _Cursor(count=2)
-        selection = _express_selection()
-        selection["workspace_client_id"] = 9
-        selection.update(
-            {
-                "account_set": r"S:\\70EXP\\TEST2020",
-                "catalog_refresh_request_id": "11111111-1111-4111-8111-111111111111",
-                "catalog_refresh_revision": 8,
-            }
-        )
-        records = [
-            {
-                "pages": [
-                    {
-                        "fields": {
-                            "direction": "purchase",
-                            "date": "2026-09-01",
-                            "seller_name": "Supplier " + name,
-                            "total_amount": "100",
-                            "items": [{"name": name, "qty": "1", "posting_kind": "stock"}],
-                        }
-                    }
-                ]
-            }
-            for name in ("A", "B")
-        ]
-        pushed = mock.AsyncMock(
-            return_value={
-                "ok": True,
-                "push_ok": True,
-                "push_results": [
-                    {"history_id": "h1", "ok": True, "status": "success", "log_id": "l1"},
-                    {"history_id": "h2", "ok": True, "status": "pending", "log_id": "l2"},
-                ],
-            }
-        )
-        with (
-            mock.patch.object(
-                webhook.store,
-                "get_session",
-                return_value={
-                    "state": "draft",
-                    "payload": {**selection, "history_ids": ["h1", "h2"]},
-                },
-            ),
-            mock.patch.object(webhook.store, "clear_session") as clear_session,
-            mock.patch.object(
-                webhook.db,
-                "find_user_by_id",
-                return_value={"id": "u1", "tenant_id": "t1", "is_active": True},
-            ),
-            mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
-            mock.patch.object(webhook.team_access, "mode_allowed", return_value=True),
-            mock.patch.object(
-                webhook.target_selection,
-                "normalize",
-                return_value=(_ready(selection), selection),
-            ),
-            mock.patch.object(webhook, "draft_records", return_value=records),
-            mock.patch.object(
-                webhook.draft_actions.line_document_subject,
-                "matches",
-                return_value=(True, None),
-            ) as subject_matches,
-            mock.patch.object(
-                webhook.convert_svc,
-                "convert_histories",
-                return_value={
-                    "converted": [{"history_id": "h1"}, {"history_id": "h2"}],
-                    "skipped": [],
-                },
-            ),
-            mock.patch.object(webhook.db, "get_cursor_rls", return_value=_Context(cursor)),
-            mock.patch.object(webhook.line_push, "dispatch_confirmed", pushed),
-        ):
-            result = await webhook.act_draft(binding, "line-u1", None, "h1", "confirm")
-
-        self.assertTrue(result["ok"])
-        self.assertTrue(result["push_ok"])
-        self.assertEqual([row["status"] for row in result["push_results"]], ["success", "pending"])
-        pushed.assert_awaited_once_with(
-            user={"id": "u1", "tenant_id": "t1", "is_active": True, "entry": "erp"},
-            history_ids=["h1", "h2"],
-            endpoint_id="ep-1",
-            workspace_client_id=9,
-            posting_kind="stock",
-            account_set_key=r"S:\\70EXP\\TEST2020",
-            account_config=None,
-            catalog_refresh_request_id="11111111-1111-4111-8111-111111111111",
-            catalog_refresh_revision=8,
-        )
-        for subject_call in subject_matches.call_args_list:
-            self.assertEqual(subject_call.args[3], 9)
-        clear_session.assert_called_once_with("t1", "line-u1")
+            result = await webhook.act_draft(
+                {"tenant_id": "t1", "user_id": "u1"}, "line-u1", None, "h1", "confirm"
+            )
+        self.assertEqual(result["ok"], saved["ok"])
+        push.assert_not_called()
+        if saved["ok"]:
+            self.assertEqual(result["status"], "saved")
+            clear.assert_called_once()
+        else:
+            clear.assert_not_called()
 
 
 if __name__ == "__main__":

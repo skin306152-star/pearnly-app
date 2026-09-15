@@ -1,3 +1,4 @@
+import { isErpEntry } from './erp-intake.js';
 // 商户采购 · 屏6 单据详情(顶栏面包屑 + 摘要条 + 左主右栏 + 逐行税率税额 + 诚实时间线)。
 // 处理记录按真实 status/payment_status 诚实推导(无审计轨迹 · 不编造人名/时间)。四态。
 // 费用单(无 VAT)隐藏品项/进项税段;已作废 = 灰态 + 回冲提示。
@@ -216,11 +217,12 @@ function actions(d: DocDetail): string {
     if (d.status === 'void') return '';
     if (d.status === 'draft')
         return `<button class="btn" id="pur-edit-btn">${escapeHtml(t('pur-edit'))}</button>`;
-    const push = d.ocr_history_id
-        ? `<span data-erp-push-state="${escapeHtml(erpState || 'not_pushed')}">${escapeHtml(
-              erpState ? pushStateLabel(erpState) : t('sr-push-not_pushed')
-          )}</span><button class="btn primary" id="pur-erp-push"${erpState === 'success' ? ' disabled' : ''}>${escapeHtml(t('sr-push-not_pushed'))}</button>`
-        : '';
+    const push =
+        !isErpEntry() && d.ocr_history_id
+            ? `<span data-erp-push-state="${escapeHtml(erpState || 'not_pushed')}">${escapeHtml(
+                  erpState ? pushStateLabel(erpState) : t('sr-push-not_pushed')
+              )}</span><button class="btn primary" id="pur-erp-push"${erpState === 'success' ? ' disabled' : ''}>${escapeHtml(t('sr-push-not_pushed'))}</button>`
+            : '';
     return `${push}<button class="btn" id="pur-correct-btn">${escapeHtml(t('pur-correct'))}</button><button class="btn danger" id="pur-void-btn">${escapeHtml(t('pur-void'))}</button><button class="btn primary" id="pur-pay-btn2"${d.payment_status === 'paid' ? ' disabled' : ''}>${escapeHtml(t('pur-pay'))}</button>`;
 }
 
@@ -315,7 +317,7 @@ function bind(): void {
 }
 
 async function loadErpState(historyId: string | null | undefined): Promise<PushOutcome | null> {
-    if (!historyId) return null;
+    if (isErpEntry() || !historyId) return null;
     try {
         const response = await fetch(
             `/api/erp/logs?history_id=${encodeURIComponent(historyId)}&limit=1`,

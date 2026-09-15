@@ -172,6 +172,9 @@ async def dispatch_confirmed_history(
     catalog_evidence_required: bool = False,
 ) -> dict[str, Any]:
     """Reuse the web push path from LINE without exposing endpoint selection."""
+    from services.erp.internal_push_guard import require_external_user
+
+    require_external_user(user)
     assigned_endpoint = team_access.assigned_endpoint_for_request(user, endpoint_id)
     effective_endpoint_id = (
         str(assigned_endpoint["id"]) if assigned_endpoint is not None else endpoint_id
@@ -222,6 +225,9 @@ async def dispatch_confirmed_history(
     )
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
+    from services.erp.internal_push_guard import require_external_history
+
+    require_external_history(history)
     try:
         history_workspace_id = int(history.get("workspace_client_id") or 0) or None
     except (TypeError, ValueError):

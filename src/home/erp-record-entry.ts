@@ -1,0 +1,270 @@
+import {
+    bindLines,
+    describeError,
+    emptyFields,
+    esc,
+    formHtml,
+    readFields,
+    tr,
+    type Fields,
+} from '../erp/record-form.js';
+import { erpIntakeDirection } from './erp-intake.js';
+import { authHeaders } from './dms-intake-core.js';
+
+type Draft = { id: string; fields: Fields; source?: string };
+let records: Draft[] = [];
+let index = 0;
+let direction = 'purchase';
+let method = 'manual';
+let busy = false;
+const attachments = new Map<string, File>();
+let workspaceId: number | null = null;
+let host: HTMLElement;
+const lang = () => String(window.currentLang || localStorage.getItem('lang') || 'th');
+const label = (key: string) => tr(key, lang());
+const activeWorkspace = () =>
+    (
+        window as unknown as { getActiveWorkspaceClientId: () => number | null }
+    ).getActiveWorkspaceClientId?.() || null;
+async function api(url: string, body?: unknown, verb = 'POST') {
+    const response = await fetch(url, {
+        method: verb,
+        headers: authHeaders(true),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    const data = await response.json();
+    if (!response.ok)
+        throw new Error(
+            typeof data.detail === 'string'
+                ? data.detail
+                : JSON.stringify(data.detail || response.status)
+        );
+    return data;
+}
+function capture() {
+    const form = host.querySelector<HTMLElement>('[data-record-form]');
+    if (form && records[index]) records[index].fields = readFields(form, records[index].fields);
+}
+function message(text: string) {
+    const el = host.querySelector('[data-message]');
+    if (el) el.textContent = text;
+}
+function reset() {
+    records = [{ id: crypto.randomUUID(), fields: emptyFields() }];
+    index = 0;
+    method = 'manual';
+    render();
+}
+function render() {
+    const record = records[index];
+    host.innerHTML = `<div class="er-entry"><div class="er-head"><h2>${esc(label(direction))}</h2><button class="btn" data-records>${esc(label('records'))}</button></div>
+    <div class="er-tabs"><button class="btn ${method === 'manual' ? 'primary' : ''}" data-method="manual">${esc(label('manual'))}</button><button class="btn ${method === 'upload' ? 'primary' : ''}" data-method="upload">${esc(label('upload'))}</button></div>
+    ${method === 'upload' ? `<div class="er-upload"><p>${esc(label('hint'))}</p><input type="file" data-files multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv,.docx,.doc"><button class="btn" data-recognize>${esc(label('upload'))}</button></div>` : ''}
+    ${records.length > 1 ? `<select data-select-record>${records.map((_, i) => `<option value="${i}" ${i === index ? 'selected' : ''}>${i + 1} / ${records.length}</option>`).join('')}</select>` : ''}
+    <form data-record-form>${record ? formHtml(record.fields, direction, lang()) : ''}</form>
+    <label>${esc(label('attachment'))}<input type="file" data-attachment accept="application/pdf,image/*"></label><div class="er-message" data-message role="status"></div><div class="er-actions"><button class="btn" data-draft>${esc(label('draft'))}</button><button class="btn primary" data-confirm>${esc(label('confirm'))}</button></div>
+    <div data-drafts></div></div>`;
+    const root = host.querySelector<HTMLElement>('[data-record-form]')!;
+    root.onsubmit = (e) => e.preventDefault();
+    bindLines(
+        root,
+        () => records[index].fields,
+        (fields) => {
+            records[index].fields = fields;
+            render();
+        }
+    );
+    host.querySelectorAll<HTMLButtonElement>('[data-method]').forEach(
+        (button) =>
+            (button.onclick = () => {
+                capture();
+                method = button.dataset.method!;
+                render();
+            })
+    );
+    host.querySelector<HTMLElement>('[data-records]')!.onclick = () =>
+        window.routeTo?.(direction === 'purchase' ? 'purchase' : 'sales-records');
+    host.querySelector<HTMLElement>('[data-draft]')!.onclick = () => void save(false);
+    host.querySelector<HTMLElement>('[data-confirm]')!.onclick = () => void save(true);
+    const fileButton = host.querySelector<HTMLElement>('[data-recognize]');
+    if (fileButton) fileButton.onclick = () => void recognize();
+    const selector = host.querySelector<HTMLSelectElement>('[data-select-record]');
+    if (selector)
+        selector.onchange = () => {
+            capture();
+            index = Number(selector.value);
+            render();
+        };
+    host.querySelector<HTMLInputElement>('[data-attachment]')!.onchange = (event) => {
+        const file = (event.target as HTMLInputElement).files?.[0];
+        if (file) attachments.set(records[index].id, file);
+    };
+    if (!workspaceId) message(label('workspace'));
+    else void showDrafts();
+}
+function lock(on: boolean) {
+    busy = on;
+    host.querySelectorAll<HTMLButtonElement | HTMLInputElement | HTMLSelectElement>(
+        'button,input,select'
+    ).forEach((el) => (el.disabled = on));
+}
+async function save(confirm: boolean) {
+    if (busy) return;
+    if (!workspaceId || activeWorkspace() !== workspaceId) {
+        message(label('workspace'));
+        return;
+    }
+    const form = host.querySelector<HTMLFormElement>('[data-record-form]')!;
+    if (!form.reportValidity()) return;
+    capture();
+    lock(true);
+    message(label('busy'));
+    try {
+        for (const record of records) {
+            await api('/api/erp/intake/draft', {
+                history_id: record.id,
+                workspace_client_id: workspaceId,
+                direction,
+                fields: record.fields,
+            });
+        }
+        for (const record of records) {
+            const file = attachments.get(record.id);
+            if (file) {
+                const form = new FormData();
+                form.append('file', file);
+                const r = await fetch(`/api/erp/intake/draft/${record.id}/attachment`, {
+                    method: 'POST',
+                    headers: authHeaders(),
+                    body: form,
+                });
+                if (!r.ok) throw new Error(label('attachmentError'));
+                attachments.delete(record.id);
+            }
+        }
+        if (confirm) {
+            const saved = await api('/api/erp/intake/confirm', {
+                history_ids: records.map((r) => r.id),
+                workspace_client_id: workspaceId,
+                direction,
+            });
+            host.innerHTML = `<div class="er-entry"><h2>${esc(label('saved'))}</h2><p>${(saved.converted || []).map((doc: { doc_no?: string }) => esc(doc.doc_no || '')).join(' · ')}</p><div class="er-actions"><button class="btn" data-records>${esc(label('records'))}</button><button class="btn primary" data-again>${esc(label('again'))}</button></div></div>`;
+            host.querySelector<HTMLElement>('[data-records]')!.onclick = () =>
+                window.routeTo?.(direction === 'purchase' ? 'purchase' : 'sales-records');
+            host.querySelector<HTMLElement>('[data-again]')!.onclick = reset;
+            records = [];
+        } else {
+            message(label('draftSaved'));
+            void showDrafts();
+        }
+    } catch (error) {
+        message(describeError(error, lang()));
+    } finally {
+        lock(false);
+    }
+}
+async function recognize() {
+    if (busy || !workspaceId) return;
+    const files = Array.from(host.querySelector<HTMLInputElement>('[data-files]')?.files || []);
+    if (!files.length) return;
+    capture();
+    lock(true);
+    message(label('busy'));
+    const recognized: Draft[] = [];
+    try {
+        for (const file of files) {
+            const form = new FormData();
+            form.append('file', file);
+            form.append('direction', direction);
+            form.append('workspace_client_id', String(workspaceId));
+            const response = await fetch('/api/ocr/recognize', {
+                method: 'POST',
+                headers: authHeaders(),
+                body: form,
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(String(data.detail));
+            for (const invoice of data.invoices || []) {
+                if (invoice.history_id)
+                    recognized.push({
+                        id: invoice.history_id,
+                        fields: { ...invoice.fields, direction },
+                        source: 'upload',
+                    });
+            }
+            if (!data.invoices?.length && (data.history_ids?.length || data.history_id)) {
+                const fields = data.pages?.[0]?.fields || data.fields || {};
+                recognized.push({
+                    id: data.history_ids?.[0] || data.history_id,
+                    fields: { ...fields, direction },
+                    source: 'upload',
+                });
+            }
+        }
+        if (!recognized.length) throw new Error(label('emptyRecognition'));
+        records = recognized;
+        index = 0;
+        render();
+    } catch (error) {
+        if (recognized.length) {
+            records = recognized;
+            index = 0;
+            render();
+        }
+        message(describeError(error, lang()));
+    } finally {
+        lock(false);
+    }
+}
+export function loadErpRecordEntry(element: HTMLElement) {
+    host = element;
+    const nextDirection = erpIntakeDirection() || 'purchase';
+    const nextWorkspace = activeWorkspace();
+    if (direction !== nextDirection || workspaceId !== nextWorkspace || !records.length) {
+        direction = nextDirection;
+        workspaceId = nextWorkspace;
+        reset();
+    } else render();
+}
+window.subscribeI18n?.('erp-record-entry', () => {
+    if (!busy && host?.querySelector('[data-record-form]')) {
+        capture();
+        render();
+    }
+});
+
+async function showDrafts() {
+    const target = host.querySelector<HTMLElement>('[data-drafts]');
+    if (!target || !workspaceId) return;
+    try {
+        const data = await api(
+            `/api/erp/intake/drafts?workspace_client_id=${workspaceId}&direction=${direction}`,
+            undefined,
+            'GET'
+        );
+        if (!target.isConnected) return;
+        target.replaceChildren();
+        const drafts = data.drafts as Array<Draft & { source_ref?: string }>;
+        if (!drafts.length) return;
+        const title = document.createElement('h3');
+        title.textContent = label('drafts');
+        target.append(title);
+        for (const draft of drafts) {
+            const button = document.createElement('button');
+            button.className = 'btn';
+            button.textContent = `${draft.fields.date || ''} · ${draft.fields.seller_name || draft.fields.buyer_name || draft.id}`;
+            button.onclick = () => {
+                if (busy) return;
+                records = [
+                    { ...draft, source: draft.source_ref === 'manual' ? undefined : 'upload' },
+                ];
+                index = 0;
+                method = 'manual';
+                render();
+            };
+            target.append(button);
+        }
+    } catch {
+        /* Main form remains usable when the saved-draft list is unavailable. */
+    }
+}

@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS ocr_history (
     last_push_status TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS source TEXT;
 ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS last_pushed_at TIMESTAMPTZ;
 ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS last_push_status TEXT;
 CREATE TABLE IF NOT EXISTS erp_push_logs (
@@ -215,6 +216,16 @@ class ExpressQueueAtMostOnceTests(_PgFixture):
                 (log_id,),
             )
             return dict(cur.fetchone())
+
+    def test_internal_history_is_never_leased(self):
+        for source in ("erp_web", "line_erp"):
+            history_id = self._history()
+            with self._cursor() as cur:
+                cur.execute("UPDATE ocr_history SET source=%s WHERE id=%s", (source, history_id))
+            log_id = self._log(PLAIN_PAYLOAD, history_id=history_id)
+            leased = agent_store.lease_pending(ENDPOINT_ID, "agentB", 10)
+            self.assertNotIn(log_id, {str(row["id"]) for row in leased})
+            self.assertIsNone(self._row(log_id)["lease_owner"])
 
     def test_plain_row_with_a_dead_lease_is_still_re_leased(self):
         """不带确认位的行照旧 at-least-once —— 这条改动不该动到普通重投。"""

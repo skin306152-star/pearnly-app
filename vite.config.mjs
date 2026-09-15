@@ -18,10 +18,11 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 main: resolve(__dirname, 'src/main.js'),
+                'erp-line-editor': resolve(__dirname, 'src/erp/line-editor.ts'),
             },
             output: {
                 entryFileNames: '[name].js',
-                chunkFileNames: '[name].js',
+                chunkFileNames: '[name]-[hash].js',
                 assetFileNames: '[name].[ext]',
             },
         },

@@ -21,7 +21,14 @@ from services.purchase import settings as settings_svc
 
 
 def book_from_history(
-    cur, *, tenant_id, workspace_client_id, created_by, fields: dict, source: str = ""
+    cur,
+    *,
+    tenant_id,
+    workspace_client_id,
+    created_by,
+    fields: dict,
+    source: str = "",
+    manual_entry: bool = False,
 ) -> tuple:
     """建进项单据(draft)并立即过账(posted)。返回 (doc_id, doc_no)。
 
@@ -33,7 +40,26 @@ def book_from_history(
     is_expense, _src = item_verdict_svc.item_verdict(fields)
     kind = "expense" if is_expense else "purchase_invoice"
     draft = intake_svc.build_draft_from_invoice(fields, kind=kind)
-    draft["source"] = {"line_erp": "line", "erp_web": "upload"}.get(source, "manual")
+    if source in {"erp_web", "line_erp"}:
+        from decimal import Decimal
+
+        base = Decimal(str(fields.get("subtotal") or "0"))
+        vat = Decimal(str(fields.get("vat") or "0"))
+        rate = vat * 100 / base if base else Decimal("0")
+        for line in draft.get("lines") or []:
+            line["vat_rate"] = str(rate)
+        from services.purchase.totals import compute_purchase_totals
+
+        calculated = compute_purchase_totals(draft["lines"])
+        draft["rounding"] = str(
+            Decimal(str(fields.get("total_amount") or "0")) - calculated["grand_total"]
+        )
+        draft["note"] = fields.get("notes") or ""
+    draft["source"] = (
+        "manual"
+        if manual_entry
+        else {"line_erp": "line", "erp_web": "upload"}.get(source, "manual")
+    )
     settings = settings_svc.get_settings(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
     )

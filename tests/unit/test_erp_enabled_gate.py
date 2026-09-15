@@ -84,8 +84,8 @@ class EnabledGateTests(unittest.TestCase):
             response = self._client().post(
                 "/api/erp/push", json={"history_id": "h-1", "endpoint_id": "ep-x"}
             )
-        self.assertEqual(response.status_code, 409, response.text)
-        self.assertEqual(response.json().get("detail"), "erp.history_not_converted")
+        self.assertEqual(response.status_code, 403, response.text)
+        self.assertEqual(response.json().get("detail"), "erp.internal_only")
         get_endpoint.assert_not_called()
         push.assert_not_called()
 

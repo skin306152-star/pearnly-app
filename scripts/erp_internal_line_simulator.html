@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ERP LINE 本地模拟</title>
+    <link rel="stylesheet" href="/static/pearnly-ui.css" />
+    <link rel="stylesheet" href="/static/dist/record-form.css" />
+  </head>
+  <body>
+    <main class="er-entry">
+      <h2>ERP LINE 本地模拟对话</h2>
+      <p>模拟 LINE 收发与登录，草稿和保存使用本地真实接口与数据库。</p>
+      <div id="chat" aria-live="polite"></div>
+      <form id="send">
+        <input id="text" aria-label="消息" value="菜单" /><button class="btn primary">发送</button>
+      </form>
+      <button class="btn" id="menu">打开菜单</button>
+      <form id="upload">
+        <label
+          ><input type="checkbox" id="fixture" />使用固定识别样本（仅验证录入流程，不验证 OCR
+          准确率）</label
+        ><input type="file" id="file" required /><button class="btn">发送文件</button>
+      </form>
+    </main>
+    <script>
+      const chat = document.getElementById('chat');
+      function add(text) {
+        const p = document.createElement('p');
+        p.textContent = text;
+        chat.append(p);
+      }
+      async function send(body) {
+        add(body.text || body.postback);
+        const r = await fetch('/__line_sim/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          add(JSON.stringify(data));
+          return;
+        }
+        for (const message of data.messages) {
+          add(message.text || message.altText || '');
+          render(message);
+        }
+      }
+      function render(node) {
+        if (!node || typeof node !== 'object') return;
+        if (node.action) {
+          const action = node.action;
+          const b = document.createElement('button');
+          b.className = 'btn';
+          b.textContent = action.label || action.displayText || '选择';
+          b.onclick = () => {
+            if (action.type === 'postback') send({ postback: action.data });
+            else if (action.type === 'uri') {
+              const url = new URL(action.uri);
+              const draft = url.searchParams.get('draft');
+              window.open(
+                '/liff/erp?draft=' + encodeURIComponent(draft) + '&lang=zh',
+                'erp-local-editor'
+              );
+            }
+          };
+          chat.append(b);
+        }
+        for (const [key, value] of Object.entries(node)) {
+          if (key === 'action') continue;
+          if (Array.isArray(value)) value.forEach(render);
+          else if (value && typeof value === 'object') render(value);
+        }
+      }
+      document.getElementById('send').onsubmit = (e) => {
+        e.preventDefault();
+        send({ text: document.getElementById('text').value });
+      };
+      document.getElementById('menu').onclick = () => send({ text: 'menu' });
+      document.getElementById('upload').onsubmit = async (e) => {
+        e.preventDefault();
+        const file = document.getElementById('file').files[0];
+        if (!file) return;
+        add(file.name + '：识别中…');
+        const form = new FormData();
+        form.append('file', file);
+        form.append('fixture', String(document.getElementById('fixture').checked));
+        const r = await fetch('/__line_sim/upload', { method: 'POST', body: form });
+        const data = await r.json();
+        for (const message of data.messages || []) {
+          add(message.text || message.altText || '');
+          render(message);
+        }
+        if (!r.ok) add(JSON.stringify(data));
+      };
+    </script>
+  </body>
+</html>

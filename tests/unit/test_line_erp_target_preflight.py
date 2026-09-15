@@ -362,7 +362,7 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("MR.ERP", target_preflight.status_text(result))
         self.assertIn("Express", target_preflight.status_text(result))
 
-    async def test_ocr_stops_before_downloading_when_exact_target_is_offline(self):
+    async def test_ocr_stops_before_downloading_when_internal_workspace_is_forbidden(self):
         result = {
             "ready": False,
             "block_reason": "companion_offline",
@@ -383,9 +383,9 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
             ),
             mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
             mock.patch.object(
-                webhook.target_selection,
-                "normalize",
-                side_effect=target_selection.SelectionError("companion_offline", readiness=result),
+                webhook.internal_flow,
+                "selection",
+                side_effect=PermissionError("workspace forbidden"),
             ),
             mock.patch.object(webhook, "_restore_receiving") as restore,
             mock.patch.object(webhook, "_notify"),

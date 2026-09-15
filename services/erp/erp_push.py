@@ -304,6 +304,9 @@ def push_to_endpoint(
         "adapter": "webhook",
     }
     """
+    from services.erp.internal_push_guard import require_external_history
+
+    require_external_history(history_record)
     adapter = endpoint.get("adapter", "webhook")
     config = endpoint.get("config") or {}
 

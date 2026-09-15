@@ -1,3 +1,4 @@
+import { isErpEntry } from './erp-intake.js';
 /* global t, escapeHtml, showToast */
 import { PURCHASE_DETAIL_CSS } from './purchase-detail-css.js';
 import { injectPurBase, injectStyle } from './purchase-common.js';
@@ -127,6 +128,7 @@ function timelineCard(doc: SalesDoc): string {
 }
 
 function pushCard(doc: SalesDoc): string {
+    if (isErpEntry()) return '';
     const state =
         doc.push_status === 'not_pushed'
             ? null

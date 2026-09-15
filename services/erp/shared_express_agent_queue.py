@@ -203,6 +203,9 @@ def lease_managed(token: str, agent_id: object, max_n: int) -> Dict[str, Any]:
                     SELECT id
                     FROM erp_push_logs
                     WHERE endpoint_id = %s AND status = 'pending'
+                      AND NOT EXISTS (SELECT 1 FROM ocr_history ih
+                          WHERE ih.id = erp_push_logs.history_id
+                          AND ih.source IN ('erp_web', 'line_erp'))
                       AND COALESCE(
                             request_body->'meta'->>'managed_generation',
                             request_body->>'managed_generation'

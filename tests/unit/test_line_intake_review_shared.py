@@ -114,7 +114,13 @@ class SharedEditorSourceTests(unittest.TestCase):
             encoding="utf-8"
         )
         shared_i18n = (ROOT / "static/line-intake-review/i18n.js").read_text(encoding="utf-8")
-        for html in (cowork, erp):
+        self.assertIn("/static/dist/erp-line-editor.js", erp)
+        self.assertNotIn("/static/line-intake-review/target-select.js", erp)
+        web_form = (ROOT / "src/home/erp-record-entry.ts").read_text()
+        line_form = (ROOT / "src/erp/line-editor.ts").read_text()
+        self.assertIn("record-form.js", web_form)
+        self.assertIn("record-form.js", line_form)
+        for html in (cowork,):
             self.assertIn("/static/line-intake-review/batch-review.js?v=3", html)
             self.assertIn("/static/line-intake-review/i18n.js?v=3", html)
             self.assertIn("/static/line-intake-review/document-viewer.js?v=1", html)

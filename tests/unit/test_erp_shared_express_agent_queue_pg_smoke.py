@@ -56,7 +56,7 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
               live_profile_key text, agent_last_seen_at timestamptz, revoked_at timestamptz
             );
             CREATE TABLE ocr_history (
-              id uuid primary key, last_push_status text, last_pushed_at timestamptz
+              id uuid primary key, last_push_status text, last_pushed_at timestamptz, source text
             );
             CREATE TABLE erp_push_logs (
               id uuid primary key, user_id uuid not null, endpoint_id uuid,
@@ -207,6 +207,21 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
             (LOG,),
         )
         return self.cur.fetchone()
+
+    def test_internal_sources_are_never_leased(self):
+        for source in ("erp_web", "line_erp"):
+            with self.subTest(source=source):
+                self.cur.execute("UPDATE ocr_history SET source=%s WHERE id=%s", (source, HISTORY))
+                self.conn.commit()
+                with (
+                    mock.patch.object(queue.db, "get_cursor", side_effect=self._db_cursor),
+                    mock.patch.object(
+                        queue, "erp_shared_express_endpoint_enabled_for", return_value=True
+                    ),
+                ):
+                    result = queue.lease_managed(TOKEN, "comp-a", 1)
+                self.assertEqual(result["jobs"], [])
+                self.assertIsNone(self._row()["lease_owner"])
 
     def test_lease_ack_stale_and_cross_endpoint(self):
         with mock.patch.object(queue.db, "get_cursor", side_effect=self._db_cursor):

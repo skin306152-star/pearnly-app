@@ -283,11 +283,14 @@ class CoworkErpEntryGuardTests(unittest.TestCase):
             "dashboard",
             "stock-card",
             "purchase",
-            "sales-invoices",
+            "sales-records",
             "clients",
             "company",
         ):
             self.assertIn(f"'{route}'", erp)
+        self.assertNotIn("'sales-invoices'", erp)
+        self.assertNotIn("'sales-account'", erp)
+        self.assertNotIn("'push-logs'", erp)
         self.assertNotIn("'guide'", erp)
         self.assertNotIn("'stock-card'", cowork)
 

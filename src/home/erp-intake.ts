@@ -1,4 +1,4 @@
-// ERP 网页录入薄适配层：只保存入口方向，业务仍由共享 DMS/OCR 工作台执行。
+// ERP 网页录入薄适配层：只保存入口方向，手填与识别共用内部记录表单。
 export type ErpDirection = 'purchase' | 'sales';
 const DIRECTION_KEY = 'pearnly_erp_intake_direction';
 

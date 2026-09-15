@@ -307,6 +307,10 @@ def dispatch_endpoint_batch(
 
     adapter 差异只在本函数内一处:mrerp 走真批量,express 批级预取查询,其余循环 push_to_endpoint。
     """
+    from services.erp.internal_push_guard import require_external_history
+
+    for history in histories:
+        require_external_history(history)
     if not histories:
         return []
     adapter = endpoint.get("adapter", "webhook")

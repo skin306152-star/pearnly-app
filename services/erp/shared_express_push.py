@@ -310,6 +310,9 @@ def reserve_managed_manual_push(
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
         )
+        from services.erp.internal_push_guard import require_external_history
+
+        require_external_history(history)
         direction = _confirmed_direction(
             cur,
             history_id=history_id,

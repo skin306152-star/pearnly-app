@@ -83,6 +83,9 @@ def enqueue_express(
     posting_kind:调用方显式指定的过账去向;不传则读票上的声明(见 posting_kind 模块)。
     解析必须留在本函数:push_dispatch 的批量分拣绕过 push_to_endpoint 直调这里。
     """
+    from services.erp.internal_push_guard import require_external_history
+
+    require_external_history(history)
     t0 = time.time()
     posting_kind = resolve_posting_kind(posting_kind, history)
     pf = preflight_express(endpoint, history, prefetch=prefetch, posting_kind=posting_kind)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 
-from services.cowork_line import flow_cards, review_cards
 from services.line_platform.summary_review_card import postback_action
 
 
@@ -18,19 +17,23 @@ def preview_card(
     preflight: dict | None = None,
     lang: str = "th",
 ) -> dict:
-    return review_cards.preview_card(
-        draft_id=draft_id,
-        fields=fields,
-        target=target,
-        direction=direction,
-        mode=posting_mode,
-        lang=lang,
-        record_count=record_count,
-        item_count=item_count,
-        preflight=preflight,
-        edit_uri=edit_uri(draft_id),
-        discard_action=postback_action(flow_cards._t(lang, "discard"), "discard", draft_id),
-    )
+    return {
+        "type": "text",
+        "text": f"{target.get('label', '')} · {'ซื้อ' if direction == 'purchase' else 'ขาย'}\n{record_count} เอกสาร · กรุณาตรวจสอบก่อนบันทึกใน Pearnly ครับ",
+        "quickReply": {
+            "items": [
+                {
+                    "type": "action",
+                    "action": {
+                        "type": "uri",
+                        "label": "ตรวจสอบ / แก้ไข",
+                        "uri": edit_uri(draft_id),
+                    },
+                },
+                {"type": "action", "action": postback_action("ทิ้งรายการ", "discard", draft_id)},
+            ]
+        },
+    }
 
 
 def edit_uri(draft_id: str) -> str:

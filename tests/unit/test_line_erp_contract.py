@@ -75,420 +75,70 @@ class ErpChannelTests(unittest.TestCase):
         self.assertEqual(data["bot_basic_id"], "@erp-test")
         self.assertEqual(data["bot_friend_url"], "https://line.me/R/ti/p/@erp-test")
 
-    @mock.patch.object(routes.webhook, "draft_records", return_value=[])
-    @mock.patch.object(
-        routes.target_preflight,
-        "inspect_targets",
-        return_value={"targets": []},
-    )
-    @mock.patch.object(
-        routes,
-        "_draft_token",
-        return_value=(
-            {"user_id": "u1"},
-            {"tenant_id": "t1", "user_id": "u1"},
-            {
-                "payload": {
-                    "history_ids": [],
-                    "endpoint_id": "ep-1",
-                    "workspace_client_id": 7,
-                }
-            },
-        ),
-    )
-    def test_draft_poll_never_reloads_third_party_master_data(self, _token, inspect, _records):
-        app = FastAPI()
-        app.include_router(routes.router)
-
-        response = TestClient(app).get("/api/line/erp/draft/d1")
-
-        self.assertEqual(response.status_code, 200)
-        inspect.assert_called_once_with(
-            {"tenant_id": "t1", "user_id": "u1"},
-            endpoint_id="ep-1",
-            workspace_client_id=7,
-            refresh=False,
-            include_account_catalog=False,
-        )
-
-    def test_catalog_refresh_starts_only_for_the_exact_draft_target(self):
-        target = {
-            "endpoint_id": "ep-1",
-            "workspace_client_id": 7,
-            "adapter": "express",
-            "supports_master_refresh": True,
-        }
-        response = routes.Response()
+    def test_draft_poll_returns_internal_records_without_external_catalog(self):
         with (
             mock.patch.object(
                 routes,
                 "_draft_token",
                 return_value=(
                     {"user_id": "u1"},
-                    {"tenant_id": "t1", "user_id": "u1"},
-                    {"payload": {}},
+                    {"tenant_id": "t1"},
+                    {
+                        "payload": {
+                            "history_ids": ["h1"],
+                            "mode": "purchase",
+                            "workspace_client_id": 7,
+                        }
+                    },
                 ),
             ),
-            mock.patch.object(
-                routes.catalog_refresh.target_preflight,
-                "require_ready",
-                return_value={"target": target},
-            ) as require,
-            mock.patch.object(
-                routes.catalog_refresh, "erp_target_projection_enabled_for", return_value=True
-            ),
-            mock.patch.object(
-                routes.catalog_refresh.target_refresh,
-                "request_refresh",
-                return_value={"request_id": "refresh-1", "status": "requested"},
-            ) as request_refresh,
+            mock.patch.object(routes.webhook, "draft_records", return_value=[{"id": "h1"}]),
+            mock.patch("services.line_erp.target_preflight.inspect_targets") as external,
         ):
-            result = asyncio.run(
-                routes.erp_draft_target_refresh(
-                    None,
-                    "d1",
-                    "ep-1",
-                    response,
-                    workspace_client_id=7,
-                )
-            )
+            result = asyncio.run(routes.erp_draft_get(None, "h1"))
+        self.assertTrue(result["data"]["internal_only"])
+        self.assertEqual(result["data"]["records"], [{"id": "h1"}])
+        self.assertNotIn("targets", result["data"])
+        external.assert_not_called()
 
-        require.assert_called_once_with(
-            {"tenant_id": "t1", "user_id": "u1"},
-            endpoint_id="ep-1",
-            workspace_client_id=7,
-            refresh=False,
-            include_account_catalog=False,
-        )
-        request_refresh.assert_called_once_with(
-            tenant_id="t1",
-            user_id="u1",
-            endpoint_id="ep-1",
-            account_set_key=routes.catalog_refresh.target_refresh.ENDPOINT_SCOPE_KEY,
-            adapter="express",
-            reason="line_editor_account_catalog",
-        )
-        self.assertEqual(result["data"]["request_id"], "refresh-1")
-        self.assertEqual(response.headers["cache-control"], "no-store")
-
-    def test_catalog_refresh_status_rechecks_workspace_before_reading_request(self):
-        response = routes.Response()
-        error = routes.target_preflight.TargetNotReady(
-            {"ready": False, "block_reason": "erp_target_changed"}
-        )
-        with (
-            mock.patch.object(
-                routes,
-                "_draft_token",
-                return_value=(
-                    {"user_id": "u1"},
-                    {"tenant_id": "t1", "user_id": "u1"},
-                    {"payload": {}},
+    def test_legacy_catalog_routes_refuse_external_refresh(self):
+        with mock.patch.object(routes, "_draft_token", return_value=({}, {}, {})):
+            for function, args in (
+                (routes.erp_draft_target_refresh, (None, "h1", "ep1", routes.Response())),
+                (
+                    routes.erp_draft_target_refresh_status,
+                    (None, "h1", "ep1", "r1", routes.Response()),
                 ),
-            ),
-            mock.patch.object(
-                routes.catalog_refresh.target_preflight,
-                "require_ready",
-                side_effect=error,
-            ) as require,
-            mock.patch.object(
-                routes.catalog_refresh.target_refresh, "refresh_status"
-            ) as refresh_status,
-        ):
-            with self.assertRaises(routes.HTTPException) as caught:
-                asyncio.run(
-                    routes.erp_draft_target_refresh_status(
-                        None,
-                        "d1",
-                        "ep-1",
-                        "refresh-1",
-                        response,
-                        workspace_client_id=99,
-                    )
-                )
-
-        self.assertEqual(caught.exception.status_code, 409)
-        require.assert_called_once_with(
-            {"tenant_id": "t1", "user_id": "u1"},
-            endpoint_id="ep-1",
-            workspace_client_id=99,
-            refresh=False,
-            include_account_catalog=False,
-        )
-        refresh_status.assert_not_called()
-
-    def test_successful_catalog_refresh_returns_only_the_exact_full_target(self):
-        compact = {
-            "endpoint_id": "ep-1",
-            "workspace_client_id": 7,
-            "adapter": "mrerp",
-        }
-        full = line_target_projection.legacy_target(
-            {
-                "id": "ep-1",
-                "name": "MR.ERP",
-                "adapter": "mrerp",
-                "enabled": True,
-                "config": {
-                    "username": "operator",
-                    "password": "secret",
-                    "comidyear": "15",
-                    "seldb": "1",
-                },
-            },
-            {"id": 7, "name": "Client", "erp_endpoint_id": "ep-1"},
-            binding_count=1,
-            probe={
-                "ok": True,
-                "companies": [{"label": "2026", "comidyear": "15", "seldb": "1"}],
-                "projection_revision": 7,
-                "account_sets_revision": 4,
-            },
-        )
-        response = routes.Response()
-        with (
-            mock.patch.object(
-                routes,
-                "_draft_token",
-                return_value=(
-                    {"user_id": "u1"},
-                    {"tenant_id": "t1", "user_id": "u1"},
-                    {"payload": {}},
-                ),
-            ),
-            mock.patch.object(
-                routes.catalog_refresh.target_preflight,
-                "require_ready",
-                side_effect=[{"target": compact}, {"target": full}],
-            ) as require,
-            mock.patch.object(
-                routes.catalog_refresh, "erp_target_projection_enabled_for", return_value=True
-            ),
-            mock.patch.object(
-                routes.catalog_refresh.target_refresh,
-                "refresh_status",
-                return_value={
-                    "request_id": "refresh-1",
-                    "status": "succeeded",
-                    "account_set_key": routes.catalog_refresh.target_refresh.ENDPOINT_SCOPE_KEY,
-                    "result_revision": 7,
-                },
-            ),
-            mock.patch.object(
-                routes.catalog_refresh.target_catalog_evidence,
-                "validate_refresh_receipt",
-                return_value={"ok": True},
-            ) as validate_receipt,
-        ):
-            result = asyncio.run(
-                routes.erp_draft_target_refresh_status(
-                    None,
-                    "d1",
-                    "ep-1",
-                    "refresh-1",
-                    response,
-                    workspace_client_id=7,
-                )
-            )
-
-        self.assertEqual(result["data"]["target"], full)
-        self.assertEqual(require.call_count, 2)
-        self.assertFalse(require.call_args_list[0].kwargs["include_account_catalog"])
-        self.assertTrue(require.call_args_list[1].kwargs["include_account_catalog"])
-        validate_receipt.assert_called_once_with(
-            tenant_id="t1",
-            user_id="u1",
-            endpoint_id="ep-1",
-            adapter="mrerp",
-            request_id="refresh-1",
-            request_revision=7,
-            catalog_revision=7,
-        )
-        self.assertEqual(response.headers["cache-control"], "no-store")
-
-    def test_catalog_refresh_rejects_a_superseded_catalog_snapshot(self):
-        compact = {"endpoint_id": "ep-1", "workspace_client_id": 7, "adapter": "mrerp"}
-        full = {**compact, "projection_revision": 8, "account_catalog_loaded": True}
-        response = routes.Response()
-        with (
-            mock.patch.object(
-                routes,
-                "_draft_token",
-                return_value=(
-                    {"user_id": "u1"},
-                    {"tenant_id": "t1", "user_id": "u1"},
-                    {"payload": {}},
-                ),
-            ),
-            mock.patch.object(
-                routes.catalog_refresh.target_preflight,
-                "require_ready",
-                side_effect=[{"target": compact}, {"target": full}],
-            ),
-            mock.patch.object(
-                routes.catalog_refresh, "erp_target_projection_enabled_for", return_value=True
-            ),
-            mock.patch.object(
-                routes.catalog_refresh.target_refresh,
-                "refresh_status",
-                return_value={
-                    "status": "succeeded",
-                    "account_set_key": routes.catalog_refresh.target_refresh.ENDPOINT_SCOPE_KEY,
-                    "result_revision": 7,
-                },
-            ),
-            mock.patch.object(
-                routes.catalog_refresh.target_catalog_evidence,
-                "validate_refresh_receipt",
-                return_value={"ok": False, "reason": "revision_mismatch"},
-            ),
-        ):
-            with self.assertRaises(routes.HTTPException) as caught:
-                asyncio.run(
-                    routes.erp_draft_target_refresh_status(
-                        None,
-                        "d1",
-                        "ep-1",
-                        "refresh-1",
-                        response,
-                        workspace_client_id=7,
-                    )
-                )
-
-        self.assertEqual(caught.exception.status_code, 409)
-        self.assertEqual(caught.exception.detail, "line_erp.target_refresh_superseded")
+            ):
+                with (
+                    self.subTest(function=function.__name__),
+                    self.assertRaises(routes.HTTPException) as caught,
+                ):
+                    asyncio.run(function(*args, workspace_client_id=7))
+                self.assertEqual(caught.exception.status_code, 403)
+                self.assertEqual(caught.exception.detail, "erp.internal_only")
 
 
 class ErpDraftSelectionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_invalid_catalog_proof_is_rejected_before_page_mutation(self):
-        request = routes.DraftUpdateIn(
-            records=[{"id": "h1", "pages": [{"fields": {}}]}],
-            endpoint_id="ep-1",
-            workspace_client_id=7,
-            direction="sales",
-            adapter="mrerp",
-            account_set="15:1",
-            payment="cash",
-        )
+    async def test_update_rejects_records_outside_session_before_saving(self):
         with (
             mock.patch.object(
                 routes,
                 "_draft_token",
                 return_value=(
-                    {"user_id": "u1", "line_user_id": "line-1"},
-                    {"tenant_id": "t1", "user_id": "u1"},
-                    {"payload": {"mode": "sales", "history_ids": ["h1"]}},
+                    {},
+                    {},
+                    {"payload": {"history_ids": ["h1"], "mode": "purchase"}},
                 ),
             ),
-            mock.patch.object(
-                routes.target_selection,
-                "normalize",
-                side_effect=routes.target_selection.SelectionError(
-                    "line_erp.catalog_refresh_required"
-                ),
-            ),
-            mock.patch("services.ocr_history.mutations.update_ocr_history_pages") as update_pages,
-            mock.patch.object(routes.store, "set_session") as set_session,
+            mock.patch("services.erp.internal_records.save_draft") as save,
         ):
             with self.assertRaises(routes.HTTPException) as caught:
-                await routes.erp_draft_update(None, "h1", request)
-
-        self.assertEqual(caught.exception.detail, "line_erp.catalog_refresh_required")
-        update_pages.assert_not_called()
-        set_session.assert_not_called()
-
-    async def test_editor_year_replaces_initial_refresh_evidence(self):
-        target = {
-            "endpoint_id": "ep-1",
-            "workspace_client_id": 7,
-            "adapter": "mrerp",
-            "supports_master_refresh": True,
-        }
-        selection = {
-            "endpoint_id": "ep-1",
-            "workspace_client_id": 7,
-            "adapter": "mrerp",
-            "target_label": "MR.ERP · TEST2019",
-            "account_root": None,
-            "account_set": "6:1",
-            "account_config": {"comidyear": "6", "seldb": "1"},
-            "direction": "sales",
-            "mode": "sales",
-            "posting_kind": None,
-            "payment": "cash",
-            "posting_mode": "cash",
-        }
-        session = {
-            "payload": {
-                "mode": "sales",
-                "history_ids": ["h1"],
-                "master_refresh_request_id": "refresh-15-1",
-            }
-        }
-        request = routes.DraftUpdateIn(
-            records=[{"id": "h1", "pages": [{"fields": {}}]}],
-            endpoint_id="ep-1",
-            workspace_client_id=7,
-            direction="sales",
-            adapter="mrerp",
-            account_set="6:1",
-            payment="cash",
-        )
-        with (
-            mock.patch.object(
-                routes,
-                "_draft_token",
-                return_value=(
-                    {"user_id": "u1", "line_user_id": "line-1"},
-                    {"tenant_id": "t1", "user_id": "u1"},
-                    session,
-                ),
-            ),
-            mock.patch.object(
-                routes.target_selection,
-                "normalize",
-                return_value=({"target": target}, selection),
-            ),
-            mock.patch.object(routes.target_selection, "apply_to_records"),
-            mock.patch(
-                "services.ocr_history.mutations.update_ocr_history_pages",
-                return_value=True,
-            ),
-            mock.patch.object(
-                routes.workspace_resolution,
-                "resolve_history_workspace",
-                return_value=target,
-            ),
-            mock.patch.object(routes.target_selection, "update_scope"),
-            mock.patch.object(
-                routes.selected_account_refresh,
-                "ensure_for_editor",
-                return_value={
-                    "request_id": "refresh-6-1",
-                    "status": "succeeded",
-                    "account_set_key": "6:1",
-                },
-            ) as ensure_refresh,
-            mock.patch.object(routes.store, "set_session") as set_session,
-            mock.patch.object(
-                routes.target_preflight,
-                "inspect_targets",
-                return_value={"targets": [target]},
-            ),
-            mock.patch.object(routes.webhook, "draft_records", return_value=[]),
-        ):
-            result = await routes.erp_draft_update(None, "h1", request)
-
-        ensure_refresh.assert_called_once_with(
-            {"tenant_id": "t1", "user_id": "u1"},
-            target,
-            "6:1",
-            previous_request_id="refresh-15-1",
-        )
-        saved_payload = set_session.call_args.args[3]
-        self.assertEqual(saved_payload["target_label"], "MR.ERP · TEST2019")
-        self.assertEqual(saved_payload["master_refresh_request_id"], "refresh-6-1")
-        self.assertEqual(result["data"]["master_refresh"]["account_set_key"], "6:1")
+                await routes.erp_draft_update(
+                    None, "h1", routes.DraftUpdateIn(records=[{"id": "other"}])
+                )
+        self.assertEqual(caught.exception.status_code, 409)
+        save.assert_not_called()
 
 
 class ErpFlowTests(unittest.TestCase):
@@ -538,103 +188,18 @@ class ErpFlowTests(unittest.TestCase):
                 self.assertEqual(icon.size, (96, 96))
                 self.assertEqual(icon.mode, "RGBA")
 
-    def test_sales_preview_is_the_cowork_card_with_erp_actions(self):
-        fields = {
-            "invoice_number": "S-2026-18",
-            "date": "2026-08-28",
-            "document_type": "simplified_tax_invoice",
-            "seller_name": "Own Shop",
-            "buyer_name": "Customer A",
-            "buyer_tax": "0105555000111",
-            "subtotal": "1000",
-            "vat": "70",
-            "total_amount": "1070",
-            "payment_method": "card",
-            "items": [
-                {
-                    "name": "Coffee beans",
-                    "qty": "2",
-                    "price": "400",
-                    "subtotal": "800",
-                    "posting_kind": "stock",
-                },
-                {
-                    "name": "Delivery",
-                    "qty": "1",
-                    "price": "200",
-                    "subtotal": "200",
-                    "posting_kind": "service",
-                },
-            ],
-        }
-        target = {
-            "adapter": "mrerp",
-            "label": "MR.ERP · TEST2020",
-            "workspace_name": "TEST",
-        }
-        card = cards.preview_card(
-            "h1",
-            "sales",
-            fields,
-            target=target,
-            posting_mode="cash",
-            item_count=2,
-        )
-        expected = cowork_review_cards.preview_card(
-            draft_id="h1",
-            fields=fields,
-            target=target,
-            direction="sales",
-            mode="cash",
-            lang="th",
-            item_count=2,
-            edit_uri=cards.edit_uri("h1"),
-            discard_action=postback_action(cowork_flow_cards._t("th", "discard"), "discard", "h1"),
-        )
-
-        self.assertEqual(card, expected)
-        rendered = json.dumps(card, ensure_ascii=False)
-        for value in (
-            "ตรวจสอบเอกสาร · ขาย",
-            "ERP / ชุดบัญชี",
-            "MR.ERP · TEST",
-            "วิธีลงบัญชี",
-            "เงินสด",
-            "S-2026-18",
-            "Own Shop",
-            "Customer A",
-            "ใบกำกับภาษีอย่างย่อ",
-            "บัตร",
-            "รายการ · 2",
-        ):
-            self.assertIn(value, rendered)
-        self.assertNotIn("Coffee beans", rendered)
-        self.assertNotIn("Delivery", rendered)
-        self.assertNotIn("ยืนยันบันทึก", rendered)
-        footer = card["contents"]["footer"]["contents"]
-        self.assertEqual(
-            [button["action"]["label"] for button in footer],
-            ["ดู / แก้ไขรายละเอียด", "ทิ้ง"],
-        )
-        self.assertIn("flow=erp-intake", footer[0]["action"]["uri"])
-        self.assertEqual(footer[1]["action"]["type"], "postback")
-
-    def test_purchase_preview_keeps_the_same_full_field_order(self):
-        card = cards.preview_card(
-            "h1",
-            "purchase",
-            {
-                "invoice_number": "P-1",
-                "seller_name": "Supplier A",
-                "buyer_name": "Own Shop",
-                "items": [],
-            },
-            target={"adapter": "express", "workspace_name": "TEST"},
-            posting_mode="stock",
-        )
-        rendered = json.dumps(card, ensure_ascii=False)
-        self.assertIn("ตรวจสอบเอกสาร · ซื้อ", rendered)
-        self.assertLess(rendered.index("Supplier A"), rendered.index("Own Shop"))
+    def test_both_previews_offer_internal_review_and_discard(self):
+        for direction in ("purchase", "sales"):
+            with self.subTest(direction=direction):
+                card = cards.preview_card(
+                    "h1", direction, {}, target={"label": "Local Company"}, posting_mode=""
+                )
+                self.assertIn("Pearnly", card["text"])
+                self.assertIn("Local Company", card["text"])
+                actions = [item["action"] for item in card["quickReply"]["items"]]
+                self.assertEqual([item["type"] for item in actions], ["uri", "postback"])
+                self.assertIn("draft=h1", actions[0]["uri"])
+                self.assertNotIn("ERP /", json.dumps(card))
 
     @mock.patch("services.ocr_history.queries.get_ocr_history_detail")
     def test_preview_urls_follow_original_page_numbers(self, detail):
@@ -691,26 +256,17 @@ class ErpWebhookTests(unittest.TestCase):
 
 
 class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
-    async def test_confirm_rechecks_catalog_proof_before_read_or_push(self):
-        selection = {
-            "mode": "purchase",
-            "direction": "purchase",
-            "endpoint_id": "ep-1",
-            "workspace_client_id": 7,
-            "adapter": "mrerp",
-            "account_set": "15:1",
-            "payment": "credit",
-        }
+    async def test_confirm_uses_shared_internal_service(self):
         with (
-            mock.patch.object(
-                webhook.target_selection,
-                "normalize",
-                side_effect=webhook.target_selection.SelectionError(
-                    "line_erp.catalog_refresh_invalid"
-                ),
+            mock.patch(
+                "services.line_erp.internal_flow.selection",
+                return_value=({}, {"workspace_client_id": 7}),
             ),
-            mock.patch.object(webhook, "draft_records") as records,
-            mock.patch.object(webhook.db, "get_cursor_rls") as cursor,
+            mock.patch(
+                "services.erp.internal_records.confirm",
+                return_value={"ok": True, "status": "saved"},
+            ) as save,
+            mock.patch("services.line_erp.push.push_histories", create=True) as external,
         ):
             result = await webhook._confirm(
                 {"user_id": "u1", "tenant_id": "t1"},
@@ -719,149 +275,32 @@ class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
                 ["h1"],
                 None,
                 "purchase",
-                selection,
+                {},
             )
-
-        self.assertEqual(result["detail"], "line_erp.catalog_refresh_invalid")
-        records.assert_not_called()
-        cursor.assert_not_called()
-
-    async def test_confirm_waits_for_background_master_refresh(self):
-        selection = {
-            "mode": "purchase",
-            "direction": "purchase",
-            "endpoint_id": "ep-1",
-            "workspace_client_id": 7,
-            "adapter": "mrerp",
-            "payment": "credit",
-            "master_refresh_request_id": "11111111-1111-4111-8111-111111111111",
-        }
-        with (
-            mock.patch.object(
-                webhook.draft_actions.selected_account_refresh,
-                "status_for_selection",
-                return_value={"status": "leased"},
-            ) as refresh_status,
-            mock.patch.object(webhook.target_selection, "normalize") as normalize,
-        ):
-            result = await webhook._confirm(
-                {"user_id": "u1", "tenant_id": "t1"},
-                {"id": "u1"},
-                "h1",
-                ["h1"],
-                None,
-                "purchase",
-                selection,
-            )
-
-        self.assertEqual(result["detail"], "line_erp.master_refresh_pending")
-        refresh_status.assert_called_once_with(
-            {"tenant_id": "t1", "user_id": "u1"},
-            {"endpoint_id": "ep-1", "adapter": "mrerp"},
-            None,
-            selection["master_refresh_request_id"],
+        self.assertEqual(result["status"], "saved")
+        save.assert_called_once_with(
+            {"id": "u1"}, history_ids=["h1"], workspace_id=7, direction="purchase"
         )
-        normalize.assert_not_called()
+        external.assert_not_called()
 
-    async def test_confirm_stops_before_conversion_when_one_document_has_anomaly(self):
-        records = [
-            {
-                "id": "h1",
-                "pages": [
-                    {
-                        "fields": {
-                            "seller_name": "Supplier",
-                            "date": "2026-09-01",
-                            "total_amount": "120",
-                            "items": [{"name": "Widget", "qty": "1", "posting_kind": ""}],
-                        }
-                    }
-                ],
-            }
-        ]
-        selection = {
-            "mode": "purchase",
-            "direction": "purchase",
-            "endpoint_id": "ep-1",
-            "workspace_client_id": 7,
-            "adapter": "express",
-            "posting_kind": "stock",
-            "payment": None,
-        }
-        with (
-            mock.patch.object(webhook, "draft_records", return_value=records),
-            mock.patch.object(
-                webhook.target_selection,
-                "normalize",
-                return_value=({"endpoint_id": "ep-1"}, selection),
-            ),
-            mock.patch.object(webhook.db, "get_cursor_rls") as cursor,
-        ):
-            result = await webhook._confirm(
-                {"user_id": "u1", "tenant_id": "t1"},
-                {"id": "u1"},
-                "h1",
-                ["h1"],
-                None,
-                "purchase",
-                selection,
-            )
-
-        self.assertEqual(result["detail"], "line_erp.posting_kind_required")
-        cursor.assert_not_called()
-
-    async def test_confirm_stops_before_conversion_when_document_company_mismatches_target(self):
-        records = [
-            {
-                "id": "h1",
-                "pages": [
-                    {
-                        "fields": {
-                            "buyer_name": "Different Company",
-                            "seller_name": "Supplier",
-                            "date": "2026-09-01",
-                            "total_amount": "120",
-                            "items": [{"name": "Widget", "qty": "1", "posting_kind": "stock"}],
-                        }
-                    }
-                ],
-            }
-        ]
-        selection = {
-            "mode": "purchase",
-            "direction": "purchase",
-            "endpoint_id": "ep-1",
-            "workspace_client_id": 7,
-            "adapter": "express",
-            "posting_kind": "stock",
-            "payment": None,
-        }
-        with (
-            mock.patch.object(webhook, "draft_records", return_value=records),
-            mock.patch.object(
-                webhook.target_selection,
-                "normalize",
-                return_value=({"endpoint_id": "ep-1"}, selection),
-            ),
-            mock.patch.object(
-                webhook.draft_actions.line_document_subject,
-                "matches",
-                return_value=(False, "workspace_subject_mismatch"),
-            ),
-            mock.patch.object(webhook.db, "get_cursor_rls") as cursor,
-        ):
-            result = await webhook._confirm(
-                {"user_id": "u1", "tenant_id": "t1"},
-                {"id": "u1"},
-                "h1",
-                ["h1"],
-                None,
-                "purchase",
-                selection,
-            )
-
-        self.assertEqual(result["detail"], "line_erp.workspace_subject_mismatch")
-        cursor.assert_not_called()
+    async def test_confirm_preserves_internal_validation_errors(self):
+        for code in ("erp.workspace_mismatch", "erp.declaration_required", "authz.forbidden"):
+            with (
+                self.subTest(code=code),
+                mock.patch(
+                    "services.line_erp.internal_flow.selection",
+                    return_value=({}, {"workspace_client_id": 7}),
+                ),
+                mock.patch(
+                    "services.erp.internal_records.confirm",
+                    side_effect=routes.HTTPException(403, detail=code),
+                ),
+                mock.patch.object(store, "clear_session") as clear,
+            ):
+                result = await webhook._confirm({}, {}, "h1", ["h1"], None, "purchase", {})
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["detail"], code)
+                clear.assert_not_called()
 
 
 if __name__ == "__main__":

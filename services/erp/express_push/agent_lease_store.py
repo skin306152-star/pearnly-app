@@ -41,6 +41,9 @@ def lease_pending_rows(
         WITH due AS (
             SELECT id FROM erp_push_logs
             WHERE endpoint_id = %s AND status = 'pending'
+              AND NOT EXISTS (SELECT 1 FROM ocr_history ih
+                  WHERE ih.id = erp_push_logs.history_id
+                  AND ih.source IN ('erp_web', 'line_erp'))
               {account_filter}
               AND (lease_owner IS NULL
                    OR (NOT ({confirmed_predicate})

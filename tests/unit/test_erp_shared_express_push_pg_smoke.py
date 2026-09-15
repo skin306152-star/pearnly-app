@@ -60,7 +60,7 @@ class SharedExpressPushPgSmoke(unittest.TestCase):
               archive_name text, category_tag text, fields_edited_at timestamptz, edit_count integer,
               created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
               client_id bigint, seller_name_official text, seller_name_verified boolean,
-              posting_kind text, last_push_status text, last_pushed_at timestamptz
+              posting_kind text, last_push_status text, last_pushed_at timestamptz, source text, source_ref text
             );
             CREATE TABLE purchase_docs (
               id uuid primary key default gen_random_uuid(), tenant_id uuid not null,

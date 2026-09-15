@@ -72,6 +72,9 @@ def _email_content(doc: dict, seller: dict, message: Optional[str]) -> tuple[str
 @router.post("/{doc_id}/send")
 async def api_send_document(doc_id: str, req: SendIn, request: Request):
     """发送已开票:channel=email 官方代发 PDF;channel=line 出分享链接。各渠道唯一发法,其余拒。"""
+    from services.erp.removed_invoice_access import require_invoice_feature
+
+    require_invoice_feature(request)
     tid, uid = require_perm_tid(request, "sales.doc.approve")
     creator = team_access.record_creator_scope(request)
     p = req.model_dump() if hasattr(req, "model_dump") else req.dict()

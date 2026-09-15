@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Literal
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import File, UploadFile, APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core.auth import get_current_user_from_request
@@ -57,3 +58,67 @@ async def erp_discard_staged(req: ErpDiscardRequest, request: Request):
             # 数据库删除已经提交；孤立留底可由后续维护任务清理。
             continue
     return {"ok": True, "discarded": deleted, "skipped": max(0, len(req.history_ids) - deleted)}
+
+
+class InternalDraftRequest(BaseModel):
+    history_id: UUID
+    workspace_client_id: int = Field(..., gt=0)
+    direction: Literal["purchase", "sales"]
+    fields: dict
+
+
+class InternalConfirmRequest(BaseModel):
+    history_ids: List[UUID] = Field(..., min_length=1, max_length=500)
+    workspace_client_id: int = Field(..., gt=0)
+    direction: Literal["purchase", "sales"]
+
+
+@router.post("/api/erp/intake/draft")
+def erp_internal_draft(req: InternalDraftRequest, request: Request):
+    from services.erp import internal_records
+
+    user = _authorize(request)
+    return internal_records.save_draft(
+        user,
+        history_id=req.history_id,
+        workspace_id=req.workspace_client_id,
+        direction=req.direction,
+        fields=req.fields,
+    )
+
+
+@router.post("/api/erp/intake/confirm")
+def erp_internal_confirm(req: InternalConfirmRequest, request: Request):
+    from services.erp import internal_records
+
+    user = _authorize(request)
+    return internal_records.confirm(
+        user,
+        history_ids=req.history_ids,
+        workspace_id=req.workspace_client_id,
+        direction=req.direction,
+    )
+
+
+@router.get("/api/erp/intake/drafts")
+def erp_internal_drafts(
+    request: Request, workspace_client_id: int, direction: Literal["purchase", "sales"]
+):
+    from services.erp import internal_records
+
+    user = _authorize(request)
+    return {
+        "drafts": internal_records.list_drafts(
+            user, workspace_id=workspace_client_id, direction=direction
+        )
+    }
+
+
+@router.post("/api/erp/intake/draft/{history_id}/attachment")
+async def erp_internal_attachment(request: Request, history_id: UUID, file: UploadFile = File(...)):
+    import asyncio
+    from services.erp import internal_attachments
+
+    user = _authorize(request)
+    content = await file.read(20 * 1024 * 1024 + 1)
+    return await asyncio.to_thread(internal_attachments.attach, user, history_id, content)

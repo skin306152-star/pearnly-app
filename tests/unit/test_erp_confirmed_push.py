@@ -10,7 +10,7 @@ from services.erp import confirmed_push
 
 class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
     async def test_line_non_default_push_rechecks_proof_before_direct_outbound(self):
-        user = {"id": "owner", "tenant_id": "tenant", "entry": "erp"}
+        user = {"id": "owner", "tenant_id": "tenant", "entry": "cowork"}
         endpoint = {
             "id": "endpoint-1",
             "name": "MR.ERP",
@@ -65,7 +65,7 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
         outbound.assert_not_called()
 
     async def test_non_default_push_reserves_before_outbound_and_finalizes_same_log(self):
-        user = {"id": "owner", "tenant_id": "tenant", "entry": "erp"}
+        user = {"id": "owner", "tenant_id": "tenant", "entry": "cowork"}
         history = {
             "id": "history",
             "invoice_no": "INV-1",
@@ -89,7 +89,7 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
             "user_id": "owner",
             "tenant_id": "tenant",
             "account_set": "15:2",
-            "source": "line_erp",
+            "source": "cowork_line",
             "target_intent": {"account_set": "15:2"},
         }
         pushed = {
@@ -307,7 +307,7 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
         outbound.assert_not_called()
 
     async def test_retryable_first_failure_is_presented_as_waiting(self):
-        user = {"id": "owner", "tenant_id": "tenant", "entry": "erp"}
+        user = {"id": "owner", "tenant_id": "tenant", "entry": "cowork"}
         endpoint = {
             "id": "endpoint-1",
             "name": "MR.ERP",
@@ -363,7 +363,7 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["status"], "retrying")
-        self.assertEqual(log.call_args.kwargs["request_body"]["source"], "line_erp")
+        self.assertEqual(log.call_args.kwargs["request_body"]["source"], "cowork_line")
         self.assertEqual(log.call_args.kwargs["workspace_client_id"], 7)
         retry.assert_called_once_with("log-1", 5)
 
@@ -371,7 +371,7 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
         user = {
             "id": "member",
             "tenant_id": "tenant",
-            "entry": "erp",
+            "entry": "cowork",
             "role": "member",
         }
         endpoint = {
@@ -443,7 +443,7 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
         user = {
             "id": "member",
             "tenant_id": "tenant",
-            "entry": "erp",
+            "entry": "cowork",
             "role": "member",
         }
         endpoint = {"id": "shared-express", "adapter": "express", "enabled": True}
@@ -489,3 +489,16 @@ class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InternalEntryRefusalTests(unittest.IsolatedAsyncioTestCase):
+    async def test_internal_entry_is_rejected_before_target_or_network(self):
+        with mock.patch.object(
+            confirmed_push.team_access, "assigned_endpoint_for_request"
+        ) as target:
+            with self.assertRaises(HTTPException) as caught:
+                await confirmed_push.dispatch_confirmed_history(
+                    user={"entry": "erp"}, history_id="h"
+                )
+        self.assertEqual(caught.exception.detail, "erp.internal_only")
+        target.assert_not_called()

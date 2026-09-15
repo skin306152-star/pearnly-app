@@ -86,7 +86,7 @@ def menu_card(modes=("purchase", "sales")) -> dict:
                         },
                         {
                             "type": "text",
-                            "text": "เลือกรายการก่อนส่งรูปภาพหรือ PDF",
+                            "text": "เลือกซื้อหรือขาย แล้วกรอกเองหรืออัปโหลดเอกสาร",
                             "size": "xxs",
                             "color": "#8A8A8A",
                             "wrap": True,

@@ -1,3 +1,4 @@
+import { isErpEntry } from './erp-intake.js';
 /* global t, escapeHtml, apiGet, showToast */
 import { type SalesDoc, fmtMoney } from './sales-common.js';
 import { BAHT } from './money.js';
@@ -142,7 +143,7 @@ function filterHtml(): string {
         <label>${escapeHtml(t('sr-filter-date'))}<select data-sr-select="date">${option('', 'sr-filter-all')}${option('this', 'sr-date-this')}${option('last', 'sr-date-last')}</select></label>
         <label>${escapeHtml(t('sr-filter-doc'))}<select data-sr-select="doc">${option('', 'sr-filter-all')}${option('tax_invoice', 'sx-dt-tax_invoice')}${option('receipt', 'sx-dt-receipt')}${option('tax_invoice_simple', 'sx-dt-tax_invoice_simple')}</select></label>
         <label>${escapeHtml(t('sr-filter-source'))}<select data-sr-select="source">${option('', 'sr-filter-all')}${option('web', 'sr-source-web')}${option('line', 'sr-source-line')}${option('legacy', 'sr-source-legacy')}</select></label>
-        <label>${escapeHtml(t('sr-filter-push'))}<select data-sr-select="push">${option('', 'sr-filter-all')}${option('not_pushed', 'sr-push-not_pushed')}${option('pending', 'sr-push-pending')}${option('success', 'sr-push-success')}${option('failed', 'sr-push-failed')}</select></label>
+        ${isErpEntry() ? '' : `<label>${escapeHtml(t('sr-filter-push'))}<select data-sr-select="push">${option('', 'sr-filter-all')}${option('not_pushed', 'sr-push-not_pushed')}${option('pending', 'sr-push-pending')}${option('success', 'sr-push-success')}${option('failed', 'sr-push-failed')}</select></label>`}
         <div class="datebasis" id="sr-datebasis">
             <span class="o ${dateBasis === 'doc' ? 'on' : ''}" data-sr-basis="doc">${escapeHtml(t('pur-basis-doc'))}</span>
             <span class="o ${dateBasis === 'upload' ? 'on' : ''}" data-sr-basis="upload">${escapeHtml(t('pur-basis-upload'))}</span>
@@ -173,6 +174,7 @@ function kindChip(doc: SalesDoc): string {
 }
 
 function pushButton(doc: SalesDoc): string {
+    if (isErpEntry()) return '';
     const status = doc.push_status || 'not_pushed';
     const disabled = status === 'success' ? ' disabled' : '';
     const state =

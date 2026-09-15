@@ -69,6 +69,7 @@ class CacheBustDir(NamedTuple):
 # (pearnly-ui.css 被五个入口共用,漏 bump = 五个站一起吃旧样式)。
 _ENTRY_ASSETS = {
     "home.html": (
+        "/static/dist/record-form.css",
         "/static/dist/main.js",
         "/static/dist/main.css",
         "/static/dist/home.css",
@@ -102,6 +103,8 @@ _ENTRY_ASSETS = {
         "/static/dms-booking-edit/dms-booking-edit.js",
     ),
     "static/erp-line-intake/index.html": (
+        "/static/dist/record-form.css",
+        "/static/dist/erp-line-editor.js",
         "/static/pearnly-ui.css",
         "/static/line-intake-review/batch-review.css",
         "/static/line-intake-review/document-viewer.css",

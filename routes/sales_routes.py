@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""销项单据路由(PO-4 · docs/sales-module/docs/13)。
-薄层:鉴权 + 请求整形 + 状态错误映射(404/409);开票业务在 services/sales/document.py。
-开票=钱+合规高敏:草稿可改,正式开出走事务取连号+冻结,开出后改→409。金额按
-docs/04 一律字符串化传输(前端不做 float 运算)。
-"""
+"""Sales record and invoice routes; issuing is unavailable in the ERP portal."""
 
 from __future__ import annotations
 
@@ -32,6 +28,7 @@ from services.sales import render as sales_render
 from services.sales import seller_profile
 from services.sales import settings as settings_svc
 from services.erp import team_access
+from services.erp.removed_invoice_access import require_invoice_feature
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/documents", tags=["sales-documents"])
@@ -161,6 +158,7 @@ async def api_list_documents(
 
 @router.post("")
 async def api_create_document(req: DocumentIn, request: Request):
+    require_invoice_feature(request)
     tid, uid = require_perm_tid(request, "sales.doc.create")
     p = _dump(req)
     with db.get_cursor_rls(tid, commit=True) as cur:
@@ -253,6 +251,7 @@ async def api_document_pdf(
 
 @router.patch("/{doc_id}")
 async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
+    require_invoice_feature(request)
     tid, _ = require_perm_tid(request, "sales.doc.edit")
     creator = _creator_scope(request)
     p = _dump(req)
@@ -292,6 +291,7 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
 
 @router.post("/{doc_id}/issue")
 async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
+    require_invoice_feature(request)
     """正式开出。连号前缀/重置/起始号与审批模式取账套设置(§M7)默认,请求可覆盖前缀/重置/日期。
     审批模式开启(!=none)时草稿不能直开,返 approval_required(走提交→审批)。"""
     tid, _ = require_perm_tid(request, "sales.doc.approve")
@@ -358,6 +358,7 @@ async def api_delete_draft(doc_id: str, request: Request):
 
 @router.post("/{doc_id}/submit")
 async def api_submit_for_approval(doc_id: str, request: Request):
+    require_invoice_feature(request)
     """提交审批(§F):草稿/被驳回 → 待审批。任意成员可提交。"""
     tid, _ = require_perm_tid(request, "sales.doc.create")
     creator = _creator_scope(request)
@@ -372,6 +373,7 @@ async def api_submit_for_approval(doc_id: str, request: Request):
 
 @router.post("/{doc_id}/approve")
 async def api_approve_document(doc_id: str, req: IssueIn, request: Request):
+    require_invoice_feature(request)
     """审批通过(§F · 仅 owner/超管):待审批 → 取号开出 + 记审批人。"""
     user = require_perm(request, "sales.doc.approve")
     tid, uid = require_perm_tid(request, "sales.doc.approve")
@@ -400,6 +402,7 @@ async def api_approve_document(doc_id: str, req: IssueIn, request: Request):
 
 @router.post("/{doc_id}/reject")
 async def api_reject_document(doc_id: str, req: RejectIn, request: Request):
+    require_invoice_feature(request)
     """驳回(§F · 仅 owner/超管):待审批 → 驳回(留理由),改后回到草稿。"""
     tid, _ = require_perm_tid(request, "sales.doc.approve")
     creator = _creator_scope(request)
@@ -415,6 +418,7 @@ async def api_reject_document(doc_id: str, req: RejectIn, request: Request):
 
 
 def _make_note(doc_id: str, req: NoteIn, request: Request, note_type: str) -> dict:
+    require_invoice_feature(request)
     tid, uid = require_perm_tid(request, "sales.doc.approve")
     creator = _creator_scope(request)
     p = _dump(req)
@@ -454,6 +458,7 @@ async def api_debit_note(doc_id: str, req: NoteIn, request: Request):
 
 @router.post("/{doc_id}/convert")
 async def api_convert_quotation(doc_id: str, req: ConvertIn, request: Request):
+    require_invoice_feature(request)
     """报价单 → 发票转换(§L3):复制成目标类型草稿,引用原报价单(报价单本身不变)。"""
     tid, uid = require_perm_tid(request, "sales.doc.create")
     creator = _creator_scope(request)
@@ -470,6 +475,7 @@ async def api_convert_quotation(doc_id: str, req: ConvertIn, request: Request):
 
 @router.get("/{doc_id}/promptpay-qr")
 async def api_promptpay_qr(doc_id: str, request: Request):
+    require_invoice_feature(request)
     """PromptPay 付款二维码 PNG(§L1):金额=应付额(partial 取未收余额)。已收款不出。"""
     tid, _ = require_perm_tid(request, "sales.doc.view")
     creator = _creator_scope(request)

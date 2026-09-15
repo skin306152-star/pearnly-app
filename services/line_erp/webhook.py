@@ -18,13 +18,10 @@ from services.line_erp import (
     draft_view,
     flow,
     intake,
+    internal_flow,
     menu_cards,
     push as line_push,  # noqa: F401 - compatibility seam for route tests
     store,
-    target_flow,
-    target_preflight,
-    target_selection,
-    workspace_resolution,
 )
 from services.line_erp.out import make_spawn
 from services.line_platform import client as line_client
@@ -138,33 +135,27 @@ async def _handle_postback(
                     channel=CHANNEL,
                 )
             return
-        await target_flow.begin_mode(binding, line_user_id, reply_token, mode)
-    elif action == "erp-type":
+        await internal_flow.begin_mode(binding, line_user_id, reply_token, mode)
+    elif action == "internal-workspace":
         session = store.get_session(binding["tenant_id"], line_user_id) or {}
-        session_mode = str((session.get("payload") or {}).get("mode") or "")
-        mode = str((params.get("mode") or [session_mode])[0])
-        adapter = str((params.get("erp") or [""])[0])
-        try:
-            page = int((params.get("page") or ["0"])[0])
-        except ValueError:
-            page = 0
-        await target_flow.show_account_picker(
+        mode = str((params.get("mode") or [""])[0])
+        if session.get("state") != "workspace" or mode != (session.get("payload") or {}).get(
+            "mode"
+        ):
+            return
+        await internal_flow.offer_methods(
             binding,
             line_user_id,
             reply_token,
-            mode,
-            adapter,
-            page=page,
+            {
+                "mode": mode,
+                "workspace_client_id": int((params.get("workspace") or ["0"])[0]),
+            },
         )
-    elif action == "target-page":
-        mode = str((params.get("mode") or [""])[0])
-        await target_flow.begin_mode(binding, line_user_id, reply_token, mode)
-    elif action == "target":
-        await target_flow.choose_target(params, binding, line_user_id, reply_token)
-    elif action.startswith("posting:"):
-        await target_flow.choose_posting_mode(
-            action.split(":", 1)[1], binding, line_user_id, reply_token
-        )
+    elif action == "internal-manual":
+        await internal_flow.manual(binding, line_user_id, reply_token)
+    elif action == "internal-upload":
+        _notify(line_user_id, reply_token, "กรุณาส่งรูปภาพหรือ PDF ครับ")
     elif action == "discard":
         draft_id = (params.get("draft") or [""])[0]
         await act_draft(binding, line_user_id, reply_token, draft_id, action)
@@ -207,7 +198,7 @@ async def _handle_text(
                 reply_token, "บัญชีนี้ไม่มีสิทธิ์สำหรับรายการนี้", channel=CHANNEL
             )
         return
-    await target_flow.begin_mode(binding, line_user_id, reply_token, mode)
+    await internal_flow.begin_mode(binding, line_user_id, reply_token, mode)
 
 
 def _notify(line_user_id: str, reply_token: str | None, text: str) -> None:
@@ -300,23 +291,10 @@ async def _handle_document(
             )
         return
     try:
-        readiness, selection = await asyncio.to_thread(
-            target_selection.normalize,
-            binding,
-            target_selection.from_payload(session_payload),
-            refresh=True,
-        )
-    except target_selection.SelectionError as exc:
-        if exc.code == "erp_user_inactive":
-            store.clear_session(binding["tenant_id"], line_user_id)
-        else:
-            _restore_receiving(binding, line_user_id, session_payload)
-        text = (
-            target_preflight.status_text(exc.readiness)
-            if exc.readiness
-            else "กรุณาเลือกบัญชี ERP และรูปแบบการบันทึกใหม่"
-        )
-        _notify(line_user_id, reply_token, text)
+        user, selection = await asyncio.to_thread(internal_flow.selection, binding, session_payload)
+    except Exception:
+        _restore_receiving(binding, line_user_id, session_payload)
+        _notify(line_user_id, reply_token, "กรุณาเลือกบริษัทใน Pearnly ใหม่ครับ")
         return
     message_id = message.get("id")
     content = await asyncio.to_thread(
@@ -326,7 +304,6 @@ async def _handle_document(
         _restore_receiving(binding, line_user_id, selection)
         _notify(line_user_id, reply_token, "อ่านไฟล์ไม่สำเร็จ กรุณาส่งใหม่")
         return
-    user = readiness["user"]
     if (
         not user.get("is_active", True)
         or str(user.get("tenant_id")) != str(binding.get("tenant_id"))
@@ -378,26 +355,10 @@ async def _handle_document(
         str(user["id"]),
         str(binding["tenant_id"]),
     )
-    try:
-        target = await asyncio.to_thread(
-            workspace_resolution.resolve_history_workspace,
-            binding,
-            readiness["target"],
-            history_ids,
-            mode,
-            provisional_history_assignment=True,
-        )
-    except (workspace_resolution.WorkspaceResolutionError, target_preflight.TargetNotReady):
-        await draft_actions.discard(binding, history_ids)
-        _restore_receiving(binding, line_user_id, selection)
-        _notify(
-            line_user_id,
-            reply_token,
-            "ไม่สามารถจับคู่บริษัทในเอกสารกับบัญชี Pearnly ได้ กรุณาตรวจสอบข้อมูลบริษัท",
-        )
-        return
-    selection["connection_workspace_client_id"] = target.get("connection_workspace_client_id")
-    selection["workspace_client_id"] = int(target["workspace_client_id"])
+    target = {
+        "label": selection["target_label"],
+        "workspace_client_id": selection["workspace_client_id"],
+    }
     nonce = secrets.token_urlsafe(24)
     store.set_session(
         binding["tenant_id"],

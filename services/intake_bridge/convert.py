@@ -136,11 +136,22 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
             created_by=user_id,
             fields=fields,
             source=str(history.get("source") or ""),
+            **(
+                {"manual_entry": True}
+                if history.get("source") == "erp_web" and history.get("source_ref") == "manual"
+                else {}
+            ),
         )
         _stamp_ocr_history_id(
             cur, table="purchase_docs", tenant_id=tenant_id, doc_id=doc_id, history_id=history_id
         )
         return {"doc_type": "purchase", "doc_id": str(doc_id), "doc_no": doc_no}
+    if history.get("source") in {"erp_web", "line_erp"}:
+        from decimal import Decimal
+
+        base = Decimal(str(fields.get("subtotal") or "0"))
+        vat = Decimal(str(fields.get("vat") or "0"))
+        fields = {**fields, "internal_vat_rate": str(vat * 100 / base) if base else "0"}
     doc_id, doc_no = sales_leg.issue_from_history(
         cur,
         tenant_id=tenant_id,
@@ -156,7 +167,7 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
 
 def _load_history(cur, *, tenant_id: str, history_id: str) -> Optional[dict]:
     cur.execute(
-        "SELECT pages, workspace_client_id, source FROM ocr_history "
+        "SELECT pages, workspace_client_id, source, source_ref FROM ocr_history "
         "WHERE id = %s::uuid AND tenant_id = %s::uuid",
         (history_id, tenant_id),
     )

@@ -34,6 +34,7 @@ import {
     onBatchSubmitClick,
 } from './dms-intake-batch-submit.js';
 import { isErpEntry } from './erp-intake.js';
+import { loadErpRecordEntry } from './erp-record-entry.js';
 
 // ── 导航 / 重置 ──────────────────────────────────────────────
 function resetFlow() {
@@ -141,7 +142,7 @@ function resumeFlow(): boolean {
 window.loadDmsIntake = function () {
     const el = sec();
     if (!el) return;
-    if (isErpEntry()) S.task = 'invoice';
+    if (isErpEntry()) return loadErpRecordEntry(el);
     el.innerHTML = dxShell(t, S.task);
     renderDxErpCards(S.task);
     bind();

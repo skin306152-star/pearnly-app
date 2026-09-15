@@ -207,6 +207,8 @@ def list_logs_due_for_retry(limit: int = 20) -> List[Dict[str, Any]]:
                   ON endpoint.id = l.endpoint_id
                  AND endpoint.binding_generation = 0
                 WHERE l.status = 'failed'
+                  AND NOT EXISTS (SELECT 1 FROM ocr_history ih WHERE ih.id = l.history_id
+                                  AND ih.source IN ('erp_web', 'line_erp'))
                   AND l.next_retry_at IS NOT NULL
                   AND l.next_retry_at <= NOW()
                   AND l.retry_count < l.max_retries

@@ -175,7 +175,7 @@ const ERP_MEMBER_ROUTES: Record<string, Set<string>> = {
         'purchase-export',
         'purchase-capture',
     ]),
-    sales: new Set(['sales-records', 'sales-record-detail', 'sales-invoices']),
+    sales: new Set(['sales-records', 'sales-record-detail']),
 };
 
 let erpAccessRequest: Promise<void> | null = null;
@@ -199,7 +199,7 @@ function applyErpMemberAccess(access: ErpTeamAccess): void {
     show(qs('.nav-item[data-route="purchase-settings"]'), false);
     show(qs('[data-collapsible="sales"]'), modules.has('sales'));
     show(document.getElementById('nav-sales-records'), modules.has('sales'));
-    show(qs('.nav-item[data-route="sales-invoices"]'), modules.has('sales'));
+    show(qs('.nav-item[data-route="sales-invoices"]'), false);
     show(qs('.nav-item[data-route="sales-account"]'), false);
     hideErpOwnerAreas();
 

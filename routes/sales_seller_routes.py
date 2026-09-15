@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, Field
 
 from core import db
@@ -19,7 +19,13 @@ from services.authz.deps import require_perm_tid
 from services.sales import seller_profile
 
 logger = logging.getLogger("mr-pilot")
-router = APIRouter(prefix="/api/sales/sellers", tags=["sales-sellers"])
+from services.erp.removed_invoice_access import require_invoice_feature
+
+router = APIRouter(
+    prefix="/api/sales/sellers",
+    tags=["sales-sellers"],
+    dependencies=[Depends(require_invoice_feature)],
+)
 
 
 class SellerProfileIn(BaseModel):

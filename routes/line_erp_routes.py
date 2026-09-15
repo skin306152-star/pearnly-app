@@ -8,23 +8,19 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jwt
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import File, UploadFile, APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 
 from core import db
 from core.auth import JWT_ALGORITHM, get_current_user_from_request
 from core.feature_flags import erp_line_enabled_for
 from core.workspace_context import WS_HEADER
-from services.erp import selected_account_refresh, target_refresh, team_access
+from services.erp import team_access
 from services.auth.entrance import require_erp_portal
 from services.line_erp import (
-    catalog_refresh,
     route_contract,
     store,
-    target_preflight,
-    target_selection,
     webhook,
-    workspace_resolution,
 )
 from services.line_platform import client as line_client
 from services.line_platform import webhook_runner as line_webhook_runner
@@ -244,32 +240,14 @@ async def erp_draft_get(request: Request, draft_id: str):
     claims, binding, session = _draft_token(request, draft_id)
     payload = session.get("payload") or {}
     history_ids = [str(value) for value in payload.get("history_ids") or []]
-    target_result = await asyncio.to_thread(
-        target_preflight.inspect_targets,
-        binding,
-        endpoint_id=str(payload.get("endpoint_id") or "") or None,
-        workspace_client_id=target_selection.connection_workspace_id(payload),
-        refresh=False,
-        include_account_catalog=False,
-    )
-    refresh_state = None
-    refresh_request_id = str(payload.get("master_refresh_request_id") or "")
-    if refresh_request_id:
-        refresh_state = await asyncio.to_thread(
-            target_refresh.refresh_status,
-            refresh_request_id,
-            tenant_id=str(binding["tenant_id"]),
-            endpoint_id=str(payload.get("endpoint_id") or ""),
-        )
     return {
         "ok": True,
         "data": {
             "draft_id": draft_id,
             "mode": payload.get("mode"),
             "direction": payload.get("mode"),
-            "targets": target_result["targets"],
-            "selection": target_selection.from_payload(payload),
-            "master_refresh": refresh_state,
+            "selection": payload,
+            "internal_only": True,
             "records": webhook.draft_records(
                 str(claims["user_id"]), str(binding["tenant_id"]), draft_id, history_ids
             ),
@@ -285,18 +263,8 @@ async def erp_draft_target_refresh(
     response: Response,
     workspace_client_id: int | None = Query(default=None),
 ):
-    claims, binding, _ = _draft_token(request, draft_id)
-    try:
-        refresh = await catalog_refresh.start(
-            binding,
-            str(claims["user_id"]),
-            endpoint_id,
-            workspace_client_id,
-        )
-    except catalog_refresh.CatalogRefreshError as exc:
-        raise HTTPException(exc.status_code, detail=f"line_erp.{exc.code}") from None
-    response.headers["Cache-Control"] = "no-store"
-    return {"ok": True, "data": refresh}
+    _draft_token(request, draft_id)
+    raise HTTPException(403, detail="erp.internal_only")
 
 
 @router.get("/api/line/erp/draft/{draft_id}/target/{endpoint_id}/refresh/{request_id}")
@@ -308,18 +276,8 @@ async def erp_draft_target_refresh_status(
     response: Response,
     workspace_client_id: int | None = Query(default=None),
 ):
-    _, binding, _ = _draft_token(request, draft_id)
-    try:
-        data = await catalog_refresh.status(
-            binding,
-            endpoint_id,
-            workspace_client_id,
-            request_id,
-        )
-    except catalog_refresh.CatalogRefreshError as exc:
-        raise HTTPException(exc.status_code, detail=f"line_erp.{exc.code}") from None
-    response.headers["Cache-Control"] = "no-store"
-    return {"ok": True, "data": data}
+    _draft_token(request, draft_id)
+    raise HTTPException(403, detail="erp.internal_only")
 
 
 @router.put("/api/line/erp/draft/{draft_id}")
@@ -332,123 +290,34 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
     if submitted_ids != expected_ids:
         raise HTTPException(409, detail="line_erp.records_incomplete")
     payload = session.get("payload") or {}
-    requested = {
-        "endpoint_id": req.endpoint_id,
-        "connection_workspace_client_id": target_selection.connection_workspace_id(
-            payload, req.workspace_client_id, req.connection_workspace_client_id
-        ),
-        "workspace_client_id": req.workspace_client_id,
-        "direction": req.direction,
-        "adapter": req.adapter,
-        "target_label": req.target_label,
-        "account_root": req.account_root,
-        "account_set": req.account_set,
-        "catalog_refresh_request_id": req.catalog_refresh_request_id,
-        "catalog_refresh_revision": req.catalog_refresh_revision,
-        "posting_kind": req.posting_kind,
-        "payment": req.payment,
-    }
-    try:
-        readiness, selection = await asyncio.to_thread(
-            target_selection.normalize,
-            binding,
-            requested,
-            refresh=False,
-        )
-    except target_selection.SelectionError as exc:
-        raise HTTPException(exc.status_code, detail=exc.code) from None
-    if str(payload.get("mode") or "") != selection["direction"]:
-        raise HTTPException(409, detail="line_erp.direction_changed")
-    target_selection.apply_to_records(req.records, selection)
-    from services.ocr_history.mutations import update_ocr_history_pages
+    from services.erp import internal_records
+    from services.line_erp import internal_flow
 
-    allowed_ids = set(expected_ids)
+    user, selection = await asyncio.to_thread(internal_flow.selection, binding, payload)
+    if req.direction and req.direction != selection["direction"]:
+        raise HTTPException(409, detail="line_erp.direction_changed")
+    if req.workspace_client_id and req.workspace_client_id != selection["workspace_client_id"]:
+        raise HTTPException(409, detail="erp.workspace_mismatch")
     for record in req.records:
-        history_id = str(record.get("id") or record.get("history_id") or "")
-        pages = record.get("pages")
-        if history_id not in allowed_ids or not isinstance(pages, list):
-            raise HTTPException(403, detail="line_erp.draft_forbidden")
-        if not update_ocr_history_pages(
-            str(claims["user_id"]), history_id, pages, tenant_id=str(binding["tenant_id"])
-        ):
-            raise HTTPException(409, detail="line_erp.draft_save_failed")
-    try:
-        target = await asyncio.to_thread(
-            workspace_resolution.resolve_history_workspace,
-            binding,
-            readiness["target"],
-            expected_ids,
-            selection["direction"],
-            provisional_history_assignment=True,
+        pages = record.get("pages") or []
+        fields = (pages[0].get("fields") or {}) if pages else record.get("fields") or {}
+        await asyncio.to_thread(
+            internal_records.save_draft,
+            user,
+            history_id=record.get("id") or record.get("history_id"),
+            workspace_id=selection["workspace_client_id"],
+            direction=selection["direction"],
+            fields=fields,
+            source="line_erp",
         )
-        _, selection = await asyncio.to_thread(
-            target_selection.normalize,
-            binding,
-            {
-                **requested,
-                "workspace_client_id": target["workspace_client_id"],
-            },
-        )
-    except (
-        workspace_resolution.WorkspaceResolutionError,
-        target_preflight.TargetNotReady,
-        target_selection.SelectionError,
-    ):
-        raise HTTPException(409, detail="line_erp.workspace_resolution_failed") from None
-    try:
-        target_selection.update_scope(binding, expected_ids, selection)
-    except target_selection.SelectionError as exc:
-        raise HTTPException(exc.status_code, detail=exc.code) from None
-    try:
-        master_refresh = await asyncio.to_thread(
-            selected_account_refresh.ensure_for_editor,
-            {"tenant_id": binding["tenant_id"], "user_id": binding["user_id"]},
-            target,
-            selection["account_set"],
-            previous_request_id=payload.get("master_refresh_request_id"),
-        )
-    except Exception:
-        logger.exception(
-            "LINE ERP selected-account refresh failed: %s",
-            str(selection.get("endpoint_id") or "")[:8],
-        )
-        raise HTTPException(409, detail="line_erp.master_refresh_failed") from None
-    next_payload = {**payload, **selection, "history_ids": expected_ids}
-    for key in (
-        "master_refresh_request_id",
-        "master_refresh_status",
-        "master_refresh_account_set",
-    ):
-        next_payload.pop(key, None)
-    if master_refresh:
-        next_payload.update(
-            {
-                "master_refresh_request_id": master_refresh["request_id"],
-                "master_refresh_status": master_refresh["status"],
-                "master_refresh_account_set": master_refresh["account_set_key"],
-            }
-        )
-    store.set_session(
-        str(binding["tenant_id"]),
-        str(claims["line_user_id"]),
-        "editing",
-        next_payload,
-    )
-    target_result = target_preflight.inspect_targets(
-        binding,
-        endpoint_id=selection["endpoint_id"],
-        workspace_client_id=target_selection.connection_workspace_id(selection),
-    )
     return {
         "ok": True,
         "data": {
             "draft_id": draft_id,
+            "selection": selection,
             "records": webhook.draft_records(
                 str(claims["user_id"]), str(binding["tenant_id"]), draft_id, expected_ids
             ),
-            "targets": target_result["targets"],
-            "selection": target_selection.from_payload(next_payload),
-            "master_refresh": master_refresh,
         },
     }
 
@@ -498,3 +367,18 @@ async def erp_webhook(request: Request):
             failed_text="ดำเนินการไม่สำเร็จ กรุณาส่งใหม่",
         )
     return {"ok": True}
+
+
+@router.post("/api/line/erp/draft/{draft_id}/attachment/{history_id}")
+async def erp_line_attachment(
+    request: Request, draft_id: str, history_id: str, file: UploadFile = File(...)
+):
+    from services.line_erp import internal_flow
+    from services.erp import internal_attachments
+
+    _, binding, session = _draft_token(request, draft_id)
+    if history_id not in (session.get("payload") or {}).get("history_ids", []):
+        raise HTTPException(403, detail="line_erp.draft_forbidden")
+    user = await asyncio.to_thread(internal_flow.actor, binding)
+    content = await file.read(20 * 1024 * 1024 + 1)
+    return await asyncio.to_thread(internal_attachments.attach, user, history_id, content)

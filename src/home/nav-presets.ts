@@ -143,5 +143,9 @@ export function applyNavPreset(preset: NavPreset): void {
     // (stock-card.ts probeStockCardStatus)。探针与本函数谁先跑到不定——探针那边算完也会
     // 直接把元素收起,这里再按已知结果收一遍,两处双写但只收不显,顺序不影响收敛结果。
     if (window._stockCardDisabled) show(document.getElementById('nav-group-firm-goods'), false);
+    if (preset === ERP_PRESET) {
+        show(document.querySelector('.nav-item[data-route="sales-invoices"]'), false);
+        show(document.querySelector('.nav-item[data-route="sales-account"]'), false);
+    }
     redirectOffHidden(preset.home);
 }

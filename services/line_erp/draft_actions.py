@@ -7,9 +7,8 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from core import db
-from services.erp import line_document_subject, selected_account_refresh, team_access
-from services.intake_bridge import convert as convert_svc
-from services.line_erp import push as line_push, store, target_preflight, target_selection
+from services.erp import team_access
+from services.line_erp import store
 from services.line_platform import client as line_client
 
 CHANNEL = "erp"
@@ -91,28 +90,17 @@ async def act_draft(
             history_ids,
             reply_token,
             mode,
-            target_selection.from_payload(payload),
+            payload,
         )
         if not result["ok"]:
             return result
-        if result.get("push_ok"):
-            text = "บันทึกเอกสารและส่งคำสั่งไป ERP แล้ว"
-        elif _saved_without_profile(result):
-            text = "บันทึกเอกสารเรียบร้อยแล้ว"
-        else:
-            text = "บันทึกเอกสารแล้ว แต่ส่ง ERP ไม่สำเร็จ กรุณาตรวจสอบประวัติการส่ง"
+        text = "บันทึกใน Pearnly เรียบร้อยแล้วครับ"
     store.clear_session(binding["tenant_id"], line_user_id)
     if reply_token:
         line_client.reply_text(reply_token, text, channel=CHANNEL)
     response = {"ok": True, "action": action, "history_ids": history_ids}
     if action != "discard":
-        response.update(
-            {
-                "push_ok": bool(result.get("push_ok")),
-                "push_results": list(result.get("push_results") or []),
-                "status": str(result.get("status") or "failed"),
-            }
-        )
+        response.update({"status": "saved", "converted": result.get("converted", [])})
     return response
 
 
@@ -149,164 +137,23 @@ async def confirm(
     *,
     records_loader: Callable[..., list[dict[str, Any]]],
 ) -> dict[str, Any]:
-    refresh_request_id = str(selection_values.get("master_refresh_request_id") or "")
-    if refresh_request_id:
-        refresh_state = await asyncio.to_thread(
-            selected_account_refresh.status_for_selection,
-            {"tenant_id": binding["tenant_id"], "user_id": binding["user_id"]},
-            {
-                "endpoint_id": selection_values.get("endpoint_id"),
-                "adapter": selection_values.get("adapter"),
-            },
-            selection_values.get("account_set"),
-            refresh_request_id,
-        )
-        refresh_status = str((refresh_state or {}).get("status") or "")
-        if refresh_status != "succeeded":
-            refresh_failed = refresh_status in {"failed", "mismatch"}
-            if reply_token:
-                line_client.reply_text(
-                    reply_token,
-                    (
-                        "อัปเดตข้อมูล ERP ไม่สำเร็จ กรุณาเลือกบัญชี ERP ใหม่"
-                        if refresh_failed
-                        else "กำลังอัปเดตข้อมูล ERP ล่าสุด กรุณารอสักครู่แล้วลองยืนยันอีกครั้ง"
-                    ),
-                    channel=CHANNEL,
-                )
-            return {
-                "ok": False,
-                "status": 409,
-                "detail": (
-                    "line_erp.master_refresh_failed"
-                    if refresh_failed
-                    else "line_erp.master_refresh_pending"
-                ),
-            }
-    try:
-        readiness, selection = await asyncio.to_thread(
-            target_selection.normalize,
-            binding,
-            selection_values,
-            refresh=True,
-        )
-    except target_selection.SelectionError as exc:
-        if reply_token:
-            line_client.reply_text(
-                reply_token,
-                (
-                    target_preflight.status_text(exc.readiness)
-                    if exc.readiness
-                    else "กรุณาเลือกบัญชี ERP และรูปแบบการบันทึกใหม่"
-                ),
-                channel=CHANNEL,
-            )
-        return {"ok": False, "status": exc.status_code, "detail": exc.code}
-    if selection["direction"] != mode:
-        return {"ok": False, "status": 409, "detail": "line_erp.direction_changed"}
-    records = records_loader(
-        str(binding["user_id"]), str(binding["tenant_id"]), draft_id, history_ids
-    )
-    from services.line_platform.draft_validation import batch_issues
+    from fastapi import HTTPException
+    from services.erp import internal_records
+    from services.line_erp import internal_flow
 
-    require_posting_kind = selection["adapter"] == "express"
-    if batch_issues(records, mode, require_posting_kind=require_posting_kind):
-        text = "กรุณาแก้ไขและเลือกประเภทสินค้า stock หรือบริการ service ให้ครบก่อนยืนยัน"
-        if reply_token:
-            line_client.reply_text(reply_token, text, channel=CHANNEL)
-        return {"ok": False, "status": 409, "detail": "line_erp.posting_kind_required"}
-    identity = {
-        "user_id": str(binding["user_id"]),
-        "tenant_id": str(binding["tenant_id"]),
-    }
-    for record in records:
-        matches, reason = line_document_subject.matches(
-            identity,
-            record,
-            mode,
-            selection["workspace_client_id"],
-        )
-        if matches:
-            continue
-        if reply_token:
-            line_client.reply_text(
-                reply_token,
-                "บริษัทในเอกสารไม่ตรงกับบัญชี Pearnly ที่เลือก กรุณาเลือกบัญชีให้ถูกต้อง",
-                channel=CHANNEL,
-            )
-        return {
-            "ok": False,
-            "status": 409,
-            "detail": f"line_erp.{reason or 'workspace_subject_mismatch'}",
-        }
     try:
-        with db.get_cursor_rls(
-            binding["tenant_id"], user_id=str(binding["user_id"]), commit=True
-        ) as cur:
-            cur.execute(
-                "SELECT count(*) AS n FROM ocr_history WHERE id = ANY(%s::uuid[]) "
-                "AND tenant_id = %s::uuid AND user_id = %s::uuid AND staged = TRUE "
-                "AND workspace_client_id = %s",
-                (
-                    history_ids,
-                    str(binding["tenant_id"]),
-                    str(binding["user_id"]),
-                    selection["workspace_client_id"],
-                ),
-            )
-            if int((cur.fetchone() or {}).get("n") or 0) != len(set(history_ids)):
-                raise BatchIncomplete({"reason": "target_scope_changed"})
-            result = convert_svc.convert_histories(
-                cur,
-                tenant_id=binding["tenant_id"],
-                user_id=str(binding["user_id"]),
-                history_ids=history_ids,
-            )
-            converted_ids = {str(row.get("history_id")) for row in result.get("converted") or []}
-            already_ids = {
-                str(row.get("history_id"))
-                for row in result.get("skipped") or []
-                if row.get("reason") == "already_converted"
-            }
-            if set(history_ids) - (converted_ids | already_ids):
-                raise BatchIncomplete(result)
-            cur.execute(
-                "UPDATE ocr_history SET staged = FALSE, updated_at = NOW() "
-                "WHERE id = ANY(%s::uuid[]) AND tenant_id = %s::uuid "
-                "AND user_id = %s::uuid AND staged = TRUE",
-                (history_ids, str(binding["tenant_id"]), str(binding["user_id"])),
-            )
-            cur.execute(
-                "SELECT count(*) AS n FROM ocr_history WHERE id = ANY(%s::uuid[]) "
-                "AND tenant_id = %s::uuid AND user_id = %s::uuid AND staged = FALSE",
-                (history_ids, str(binding["tenant_id"]), str(binding["user_id"])),
-            )
-            if int((cur.fetchone() or {}).get("n") or 0) != len(set(history_ids)):
-                raise BatchIncomplete(result)
-    except BatchIncomplete as exc:
-        if reply_token:
-            line_client.reply_text(
-                reply_token,
-                "ยืนยันไม่สำเร็จ เอกสารยังไม่ถูกบันทึก กรุณาตรวจสอบรายการ",
-                channel=CHANNEL,
-            )
-        return {
-            "ok": False,
-            "status": 409,
-            "detail": "line_erp.confirm_incomplete",
-            "result": exc.result,
-        }
-    return await line_push.dispatch_confirmed(
-        user=user,
-        history_ids=history_ids,
-        endpoint_id=str(readiness["endpoint_id"]),
-        workspace_client_id=selection["workspace_client_id"],
-        posting_kind=selection.get("posting_kind"),
-        account_set_key=selection.get("account_set"),
-        account_config=selection.get("account_config"),
-        catalog_refresh_request_id=selection.get("catalog_refresh_request_id"),
-        catalog_refresh_revision=selection.get("catalog_refresh_revision"),
-    )
+        _, selection = await asyncio.to_thread(
+            internal_flow.selection, binding, {**selection_values, "mode": mode}
+        )
+        return await asyncio.to_thread(
+            internal_records.confirm,
+            user,
+            history_ids=history_ids,
+            workspace_id=selection["workspace_client_id"],
+            direction=mode,
+        )
+    except HTTPException as exc:
+        return {"ok": False, "status": exc.status_code, "detail": exc.detail}
 
 
 __all__ = ["BatchIncomplete", "act_draft", "confirm", "discard"]

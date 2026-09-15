@@ -126,15 +126,12 @@ export const ERP_ALLOWED_ROUTES = new Set<string>([
     'purchase-detail',
     'purchase-export',
     'purchase-capture',
-    'sales-invoices',
     'sales-records',
     'sales-record-detail',
-    'sales-account',
     'clients',
     'company',
     'integrations',
     'erp-team',
-    'push-logs',
 ]);
 
 // route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。

@@ -83,7 +83,11 @@ def issue_from_history(cur, *, tenant_id, workspace_client_id, created_by, field
         raise SkipConversion("no_date")
 
     vat = to_decimal(fields.get("vat"))
-    vat_rate = Decimal("7") if vat > 0 else Decimal("0")
+    vat_rate = (
+        Decimal(str(fields["internal_vat_rate"]))
+        if "internal_vat_rate" in fields
+        else (Decimal("7") if vat > 0 else Decimal("0"))
+    )
 
     buyer_tax = clean_tax_id(fields.get("buyer_tax"))
     buyer_name = (

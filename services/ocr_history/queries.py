@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
-"""OCR 识别历史 · 读取/分页/详情/PDF 留底/去重查询(只读 DAL · REFACTOR-WA)
-
-从 services/ocr_history/store.py 按域拆出读取半边(纯搬家 · 0 逻辑改)。
-覆盖:list_ocr_history(分页+多租户+客户过滤)/ get_ocr_history_detail /
-get_history_pdf_info / check_duplicate_invoice。(哈希缓存两版在 hash_dedup.py)
-游标走 db.get_cursor(...)·跨域调用走 db.*(find_user_by_id)·store.py 文件头 re-export 回
-services.ocr_history.store 命名空间(db.xxx() / store.xxx() 调用点不变)。
-"""
+"""Tenant-scoped OCR history reads, including persisted entry source."""
 
 import logging
 import uuid as _uuid
@@ -190,7 +183,7 @@ def list_ocr_history(
 
 # 详情列 / 归属边界 / 行映射 · 单条版与批量版共用:分开写迟早漂,
 # 漏搬一个归属条件 = 跨租户读数,漏搬一列 = 批量导出比单条少字段。
-_DETAIL_COLUMNS = """id, filename, page_count, confidence, elapsed_ms,
+_DETAIL_COLUMNS = """id, filename, page_count, confidence, elapsed_ms, source, source_ref,
                        pages, invoice_no, invoice_date, seller_name, total_amount,
                        archive_name, category_tag,
                        fields_edited_at, edit_count, created_at, updated_at,
@@ -235,6 +228,8 @@ def _detail_row(r) -> dict:
         "seller_name_verified": bool(r.get("seller_name_verified")),
         # 上传时声明的过账去向 · 推送四条腿共用(express_push.posting_kind 解析)
         "posting_kind": r.get("posting_kind"),
+        "source": r.get("source"),
+        "source_ref": r.get("source_ref"),
     }
 
 

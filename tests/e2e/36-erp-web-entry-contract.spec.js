@@ -727,7 +727,7 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
     await posPage.close();
 });
 
-test('ERP review applies one batch item type and keeps mixed-line overrides', async ({ page }) => {
+test('ERP review keeps original item fields without third-party item types', async ({ page }) => {
     const recognized = JSON.parse(JSON.stringify(RECOGNIZED));
     recognized.invoices[0].fields.items = [
         { name: 'Stock item', qty: '1', price: '80', subtotal: '80' },
@@ -748,23 +748,17 @@ test('ERP review applies one batch item type and keeps mixed-line overrides', as
 
     const batch = page.locator('[data-iv-posting-default]');
     const itemTypes = page.locator('select.dx-item-type');
-    await expect(batch).toBeVisible();
-    await expect(batch).toHaveValue('');
-    await batch.selectOption('stock');
-    await expect(itemTypes).toHaveCount(2);
-    await expect(itemTypes.nth(0)).toHaveValue('stock');
-    await expect(itemTypes.nth(1)).toHaveValue('stock');
-
-    await itemTypes.nth(1).selectOption('service');
-    await expect(batch).toHaveValue('');
+    await expect(batch).toHaveCount(0);
+    await expect(itemTypes).toHaveCount(0);
     await page.click('.dx-confirm-one');
     await expect.poll(() => state.historyPutBodies.length).toBe(1);
-    expect(
-        state.historyPutBodies[0].pages[0].fields.items.map((item) => item.posting_kind)
-    ).toEqual(['stock', 'service']);
+    expect(state.historyPutBodies[0].pages[0].fields.items.map((item) => item.name)).toEqual([
+        'Stock item',
+        'Installation',
+    ]);
 });
 
-test('ERP reports the exact missing item field after a type was selected', async ({ page }) => {
+test('ERP reports the exact missing item field without requiring a type', async ({ page }) => {
     const state = {
         convertErrorDetail: {
             code: 'erp.declaration_required',
@@ -781,7 +775,6 @@ test('ERP reports the exact missing item field after a type was selected', async
     });
     await page.click('#dx-inv-start');
     await page.waitForSelector('#dx-s-inv-review.active');
-    await page.locator('select.dx-item-type').selectOption('stock');
     await page.click('.dx-confirm-one');
     await expect(page.locator('#mp-toast-wrap .mp-toast.error').last()).toContainText(
         '请填写商品 / 服务名称'
@@ -804,7 +797,6 @@ test('ERP save does not replay the confirmed history write', async ({ page }) =>
     });
     await page.click('#dx-inv-start');
     await page.waitForSelector('#dx-s-inv-review.active');
-    await page.locator('select.dx-item-type').selectOption('stock');
     await page.evaluate(() => {
         const button = document.querySelector('.dx-confirm-one');
         button.click();
@@ -1110,7 +1102,6 @@ test('ERP step four keeps MR.ERP as one account selector inside the target card'
     });
     await page.click('#dx-inv-start');
     await page.waitForSelector('#dx-s-inv-review.active');
-    await page.locator('select.dx-item-type').selectOption('stock');
     await page.click('.dx-confirm-one');
     await page.click('#dx-inv-rev-next');
     await page.waitForSelector('#dx-s-inv-submit.active');
@@ -1148,7 +1139,6 @@ test('ERP review save failure does not create a formal document', async ({ page 
     });
     await page.click('#dx-inv-start');
     await page.waitForSelector('#dx-s-inv-review.active');
-    await page.locator('select.dx-item-type').selectOption('stock');
     await page.click('.dx-confirm-one');
     await expect.poll(() => state.historyPuts).toBe(1);
     expect(state.converts).toBe(0);
@@ -1422,7 +1412,6 @@ for (const direction of ['purchase', 'sales']) {
         });
         await page.click('#dx-inv-start');
         await page.waitForSelector('#dx-s-inv-review.active');
-        await page.locator('select.dx-item-type').selectOption('stock');
         await page.locator('[data-iv-field="0:0:invoice_number"]').fill('EDITED-001');
         await page.click('#dx-inv-rev-next');
         await expect.poll(() => state.historyPuts).toBe(1);

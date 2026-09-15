@@ -68,8 +68,7 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
         if not isinstance(value, dict):
             raise HTTPException(422, detail="erp.declaration_required")
         name = str(value.get("name") or "").strip()
-        kind = value.get("posting_kind")
-        if not name or kind not in {"stock", "service"}:
+        if not name:
             raise HTTPException(422, detail="erp.declaration_required")
         qty = _decimal(value.get("qty"), positive=True)
         price = _decimal(value.get("price"), positive=True)

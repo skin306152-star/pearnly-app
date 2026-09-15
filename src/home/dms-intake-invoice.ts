@@ -233,6 +233,7 @@ function directionHtml(): string {
 }
 
 function postingKindHtml(): string {
+    if (isErpEntry()) return '';
     if (isErpEntry()) return ''; // ERP 在复核页逐行选择，支持同票库存+服务混合。
     if (!hasReadyExpressTarget(IV)) return ''; // 非 Express 目标:隐藏(MR.ERP 不区分库存/服务)
     const opt = (k: 'service' | 'stock', tk: string, dk: string) =>

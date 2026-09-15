@@ -32,8 +32,6 @@ def erp_declaration_error(fields: dict) -> Optional[str]:
             return "item_name_required"
         if not str(item.get("qty") or "").strip():
             return "item_qty_required"
-        if str(item.get("posting_kind") or "").strip().lower() not in ("stock", "service"):
-            return "posting_kind_required"
     return None
 
 

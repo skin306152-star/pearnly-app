@@ -55,8 +55,7 @@ function reset() {
 }
 function render() {
     const record = records[index];
-    host.innerHTML = `<div class="er-entry"><div class="er-head"><h2>${esc(label(direction))}</h2><button class="btn" data-records>${esc(label('records'))}</button></div>
-    <div class="er-tabs"><button class="btn primary" data-method="manual">${esc(label('manual'))}</button><button class="btn" data-method="upload">${esc(label('upload'))}</button></div>
+    host.innerHTML = `<div class="er-entry"><div class="er-head"><h2>${esc(label(direction))}</h2><div class="er-tabs"><button class="btn primary" data-method="manual">${esc(label('manual'))}</button><button class="btn" data-method="upload">${esc(label('upload'))}</button></div><button class="btn" data-records>${esc(label('records'))}</button></div>
     ${records.length > 1 ? `<select data-select-record>${records.map((_, i) => `<option value="${i}" ${i === index ? 'selected' : ''}>${i + 1} / ${records.length}</option>`).join('')}</select>` : ''}
     <form data-record-form>${record ? formHtml(record.fields, direction, lang()) : ''}</form>
     <label>${esc(label('attachment'))}<input type="file" data-attachment accept="application/pdf,image/*"></label><div class="er-message" data-message role="status"></div><div class="er-actions"><button class="btn" data-draft>${esc(label('draft'))}</button><button class="btn primary" data-confirm>${esc(label('confirm'))}</button></div>

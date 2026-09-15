@@ -89,10 +89,7 @@ def test_erp_declaration_requires_direction_and_explicit_complete_lines():
         )
         == "item_qty_required"
     )
-    assert (
-        erp_declaration_error({**valid, "items": [{"name": "A", "qty": "1"}]})
-        == "posting_kind_required"
-    )
+    assert erp_declaration_error({**valid, "items": [{"name": "A", "qty": "1"}]}) is None
 
 
 def test_validate_erp_histories_fails_closed_for_missing_and_invalid_rows():

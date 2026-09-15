@@ -1,6 +1,6 @@
 import './record-form.css';
 export type Fields = Record<string, unknown>;
-export type Item = { name: string; qty: string; price: string; posting_kind: string };
+export type Item = { name: string; qty: string; price: string };
 const copy: Record<string, string[]> = {
     amountError: [
         'กรุณาตรวจสอบจำนวน ราคา และภาษี',
@@ -34,8 +34,8 @@ const copy: Record<string, string[]> = {
     ],
     purchase: ['บันทึกซื้อ', 'Record a purchase', '记一笔采购', '仕入を記録'],
     sales: ['บันทึกขาย', 'Record a sale', '记一笔销售', '売上を記録'],
-    manual: ['กรอกเอง', 'Enter manually', '手动填写', '手入力'],
-    upload: ['อัปโหลดเอกสาร', 'Upload and recognize', '上传识别', '書類を読み取る'],
+    manual: ['กรอกเอง', 'Enter manually', '手动录入', '手入力'],
+    upload: ['อัปโหลดเอกสาร', 'Upload attachment', '上传附件', '添付ファイルをアップロード'],
     date: ['วันที่', 'Date', '日期', '日付'],
     supplier: ['ผู้ขาย', 'Supplier', '供应商', '仕入先'],
     customer: ['ลูกค้า', 'Customer', '客户', '顧客'],
@@ -120,7 +120,7 @@ export function emptyFields(): Fields {
     const now = new Date();
     return {
         date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
-        items: [{ name: '', qty: '1', price: '', posting_kind: 'stock' }],
+        items: [{ name: '', qty: '1', price: '' }],
         vat: '0',
     };
 }
@@ -137,7 +137,6 @@ export function formHtml(fields: Fields, direction: string, lang: string): strin
         <label>${label('name')}<input data-field="name" value="${esc(item.name)}" required></label>
         <label>${label('qty')}<input data-field="qty" type="number" min="0.000001" step="any" value="${esc(item.qty)}" required></label>
         <label>${label('price')}<input data-field="price" type="number" min="0.000001" step="any" value="${esc(item.price)}" required></label>
-        <label>${label('kind')}<select data-field="posting_kind"><option value="stock" ${item.posting_kind === 'stock' ? 'selected' : ''}>${label('stock')}</option><option value="service" ${item.posting_kind === 'service' ? 'selected' : ''}>${label('service')}</option></select></label>
         <button type="button" class="btn" data-remove="${index}">${label('remove')}</button></div>`
             )
             .join('')}</div>
@@ -189,7 +188,7 @@ export function bindLines(
         if (!add && !remove) return;
         const value = readFields(root, fields());
         const items = value.items as Item[];
-        if (add) items.push({ name: '', qty: '1', price: '', posting_kind: 'stock' });
+        if (add) items.push({ name: '', qty: '1', price: '' });
         else items.splice(Number(remove!.dataset.remove), 1);
         render(value);
     };

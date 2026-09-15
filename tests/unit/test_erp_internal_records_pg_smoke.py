@@ -93,7 +93,7 @@ class InternalRecordsPgSmoke(unittest.TestCase):
             "date": "2026-09-15",
             "seller_name": "Supplier",
             "buyer_name": "Customer",
-            "items": [{"name": "Smoke item", "qty": "2", "price": "100", "posting_kind": "stock"}],
+            "items": [{"name": "Smoke item", "qty": "2", "price": "100"}],
             "vat": "0",
             **fields,
         }

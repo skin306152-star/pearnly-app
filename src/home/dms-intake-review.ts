@@ -28,14 +28,6 @@ import {
     convertChipHtml,
     pagesForInvoice,
 } from './dms-intake-review-convert.js';
-import {
-    applyPostingDefault,
-    editablePostingItems,
-    missingPostingKind,
-    selectedPostingDefault,
-} from './dms-intake-review-posting.js';
-import type { PostingKind } from './dms-intake-review-posting.js';
-
 // 保留 guard 初始化接口；归属已由后端完成，横幅只展示结果。
 initGuard(renderReview);
 
@@ -65,7 +57,6 @@ export function renderReview() {
     const items = IV.results.map((r, i) => accItemHtml(r, i)).join('');
     el.innerHTML = banner + wsguard + barHtml() + `<div class="dx-acc">${items}</div>` + footHtml();
     showStepInv(3, 'dx-s-inv-review');
-    bindPostingDefault();
     bindOpenViewer();
     void ensureGuardData();
 }
@@ -75,47 +66,10 @@ function barHtml(): string {
         '<div class="dx-rv-bar"><div class="dx-rv-bar-t">' +
         `<b>${esc(t('dxi-rev-files-h'))}</b><span>${esc(t('dxi-rev-files-tip'))}</span></div>` +
         '<div class="dx-rv-bar-a">' +
-        postingDefaultHtml() +
         `<button class="btn small" id="dx-inv-collapse-all">${esc(t('dxi-rev-collapse-all'))}</button>` +
         `<button class="btn small primary" id="dx-inv-confirm-all">${esc(t('dxi-rev-confirm-all'))}</button>` +
         '</div></div>'
     );
-}
-
-function postingDefaultHtml(): string {
-    if (!isErpEntry()) return '';
-    const items = editablePostingItems(IV.results, IV.confirmed);
-    const selected = selectedPostingDefault(items);
-    const disabled = items.length ? '' : ' disabled';
-    return (
-        `<label class="dx-item-default"><span>${esc(t('dxi-item-type'))}</span>` +
-        `<select data-iv-posting-default${disabled}>` +
-        `<option value=""${selected ? '' : ' selected'}>${esc(t('dxi-item-type-batch'))}</option>` +
-        `<option value="stock"${selected === 'stock' ? ' selected' : ''}>${esc(t('dxi-item-type-all-stock'))}</option>` +
-        `<option value="service"${selected === 'service' ? ' selected' : ''}>${esc(t('dxi-item-type-all-service'))}</option>` +
-        '</select></label>'
-    );
-}
-
-function syncPostingDefault(): void {
-    const select = document.querySelector('[data-iv-posting-default]') as HTMLSelectElement | null;
-    if (select)
-        select.value = selectedPostingDefault(editablePostingItems(IV.results, IV.confirmed));
-}
-
-function bindPostingDefault(): void {
-    const select = document.querySelector('[data-iv-posting-default]') as HTMLSelectElement | null;
-    select?.addEventListener('change', () => {
-        if (!['stock', 'service'].includes(select.value)) return;
-        applyPostingDefault(
-            editablePostingItems(IV.results, IV.confirmed),
-            select.value as PostingKind
-        );
-        renderReview();
-    });
-    document.querySelectorAll('.dx-item-type').forEach((itemSelect) => {
-        itemSelect.addEventListener('change', () => window.setTimeout(syncPostingDefault, 0));
-    });
 }
 
 function statusHtml(r: IvResult, i: number): string {
@@ -231,16 +185,12 @@ function itemsTableHtml(fi: number, ii: number, inv: IvInvoice, locked: boolean)
                     ` data-iv-item="${fi}:${ii}:${ti}:${k}" value="${esc(v)}"${locked ? ' disabled' : ''}></td>`
                 );
             }).join('');
-            const postingKind = String(it.posting_kind || '');
-            const typeCell = isErpEntry()
-                ? `<td><select class="dx-item-type" data-iv-item="${fi}:${ii}:${ti}:posting_kind"${locked ? ' disabled' : ''}><option value="">${esc(t('dxi-item-type-pick'))}</option><option value="stock"${postingKind === 'stock' ? ' selected' : ''}>${esc(t('dxi-posting-stock-t'))}</option><option value="service"${postingKind === 'service' ? ' selected' : ''}>${esc(t('dxi-posting-service-t'))}</option></select></td>`
-                : '';
-            return `<tr>${tds}${typeCell}</tr>`;
+            return `<tr>${tds}</tr>`;
         })
         .join('');
-    const ths =
-        ITEM_COLS.map(([, lk], ci) => `<th${ci ? ' class="r"' : ''}>${esc(t(lk))}</th>`).join('') +
-        (isErpEntry() ? `<th>${esc(t('dxi-item-type'))}</th>` : '');
+    const ths = ITEM_COLS.map(
+        ([, lk], ci) => `<th${ci ? ' class="r"' : ''}>${esc(t(lk))}</th>`
+    ).join('');
     return `<table class="dx-item-tbl"><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -339,10 +289,6 @@ export function onReviewClick(tg: HTMLElement): boolean {
         if (IV.openIdx >= 0) {
             const idx = IV.openIdx;
             if (IV.confirmed.has(idx)) return true;
-            if (isErpEntry() && missingPostingKind(IV.results[idx])) {
-                showToast(t('dxi-item-type-required'), 'error');
-                return true;
-            }
             void confirmAndRender([idx], idx);
         }
         return true;
@@ -353,13 +299,9 @@ export function onReviewClick(tg: HTMLElement): boolean {
     }
     if (tg.closest('#dx-inv-confirm-all')) {
         const idxs = IV.results.reduce<number[]>((acc, r, i) => {
-            if (passable(r) && (!isErpEntry() || !missingPostingKind(r))) acc.push(i);
+            if (passable(r)) acc.push(i);
             return acc;
         }, []);
-        if (isErpEntry() && idxs.length < IV.results.filter((r) => passable(r)).length) {
-            showToast(t('dxi-item-type-required'), 'error');
-            return true;
-        }
         void confirmAndRender(idxs, -1);
         return true;
     }

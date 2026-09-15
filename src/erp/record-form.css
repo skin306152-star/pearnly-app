@@ -20,8 +20,8 @@
   margin: 0;
 }
 .er-tabs {
-  justify-content: flex-start;
-  margin: 24px 0;
+  justify-content: center;
+  margin: 0;
 }
 .er-grid {
   display: grid;
@@ -53,7 +53,7 @@
 }
 .er-line {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  grid-template-columns: 2fr 1fr 1fr auto;
   gap: 10px;
   align-items: end;
   margin-bottom: 14px;

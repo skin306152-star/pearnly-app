@@ -1,3 +1,4 @@
+import { tr } from '../erp/record-form.js';
 // ============================================================
 // 录入工作台 · HTML 模板与纯构建函数(发票 + 汇总表批量)
 // 作用域 .dmsx · 控制器在 dms-intake.ts。标签为 i18n 键 · 渲染时 t() · 跟随语言切换。
@@ -77,7 +78,7 @@ export function dxShell(t: (k: string) => string, task = 'invoice'): string {
         `<b id="dx-flow-title">${dxEsc(t(titleKey))}</b>` +
         `<p id="dx-flow-sub">${dxEsc(t(subKey))}</p></div>` +
         (internal
-            ? `<button class="btn" id="dx-internal-manual">${dxEsc(t('pur-cap-manual'))}</button>`
+            ? `<div class="er-tabs"><button class="btn" id="dx-internal-manual">${dxEsc(tr('manual', window.currentLang))}</button><button class="btn primary" aria-pressed="true" id="dx-internal-upload">${dxEsc(tr('upload', window.currentLang))}</button></div>`
             : '') +
         `<button class="btn" id="dx-records">${dxEsc(t('dxk-records'))}</button></div>` +
         `<div class="dx-stepper${internal ? ' dx-stepper-internal' : ''}">` +

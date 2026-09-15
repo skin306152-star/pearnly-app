@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-14 23:42（UTC+7）。状态：**已发布 LINE 原生 DMS 按钮、三色菜单及 LIFF 实时工作台（`bf19d3c0df2b`），Web/Worker Ready、各 100% 流量；网页保留紫色、任务卡无左侧色条，Cowork Rich Menu v3 已同步更新并回读校验。邀请、绑定、派工、员工回报/附件、退回重提和老板验收已通过隔离真实存储模拟与 LINE 官方格式验证；手机 LINE 真机验收尚未完成。此前 Google/LINE 登录缓存修复仍包含在当前版本中。**
+更新时间：2026-09-15 11:43（UTC+7）。状态：**DMS 三 OA 转账流程统一已发布（`b88937dd71e0`），Web/Worker Ready、各 100% 流量。转账统一为金额 → 收款银行 → 凭证，删除买方银行采集与收方资料补填，编辑器只保留银行选择。正式 HTML/JS 与候选逐字节一致，三个 OA 配置可用；真实 LINE 手机与外部 DMS 空资料写入验收尚未完成。此前 LINE 原生按钮、菜单及实时工作台仍包含在当前版本中。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,6 +27,14 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- Pearnly 完整 SHA：`b88937dd71e0901b8838464458862a26b1b2cbfb`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:92d44efbe00b032983a614b1cac380484a632f1985766c3aebc5831931332b2a`。
+- Web revision：`pearnly-web-b88937dd71e0-s3`；Worker revision：`pearnly-worker-b88937dd71e0-s3`；两端 Ready、各 100% 流量，镜像 digest 相同。
+- [Manual CD 34929375996](https://github.com/skin306152-star/pearnly-app/actions/runs/34929375996) success。schema execution `pearnly-schema-2nvmq` 成功；Web/Worker 候选与正式版本、健康、就绪、完整安装包下载校验全部通过。正式域名 health/ready 200，编辑器 HTML/JS 与候选逐字节一致；`dms`/`dms_a`/`dms_b` 配置均 available。
+- 完整 pre-push 1,189 模块/6 分片及机械闸通过；三个 OA 各三条新版消息均通过 LINE 官方 validate/reply（不发送消息）。实际处理器三 OA × 三种资料完整度模拟、CUA 三对话及手机编辑器保存通过。未创建真实测试订车单，真实 LINE 手机及外部 DMS 业务结果仍待验收。详情见[本任务记录](../line/DMS_TRANSFER_FLOW_20260915.md)。
+
+### 上一发布身份（2026-09-14）
 
 - Pearnly 完整 SHA：`bf19d3c0df2bcecce082d4e69214e4dab8f2e046`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:406731f005a269d85b16b889fc80ca2205fc3d8b6615630e59586f69cc74e24a`。

@@ -4,7 +4,7 @@
 
 ## 实现
 
-隔离工作树 `/Users/skin/Developer/Pearnly/pearnly-dms-transfer-flow`，分支 `codex/dms-transfer-flow`，基于远端 `c437b479`。未改共享主工作目录的其他任务文件，未提交、推送或部署。
+隔离工作树 `/Users/skin/Developer/Pearnly/pearnly-dms-transfer-flow`，分支 `codex/dms-transfer-flow`，基于远端 `c437b479`。未改共享主工作目录的其他任务文件，已按用户后续授权提交、推送并发布；应用 SHA 为 `b88937dd71e0901b8838464458862a26b1b2cbfb`。
 
 删除来源银行选择、来源资料解析、收款资料补问、旧手工来源标记修补和编辑器银行资料输入。旧会话的已删除步骤统一迁移到 `pay_dst`，不再解释旧资料或执行旧提问。转账保留银行 ID 选择和提交前当前目录核对；未知或已删除收款银行仍拒绝。账号/分行由目录提供，缺失不阻断本地转账校验。凭证要求、其他支付渠道及 OA 会话隔离保留。
 
@@ -29,4 +29,10 @@
 
 本地模拟：`http://127.0.0.1:18109`。启动：仓库虚拟环境 Python 执行 `tests/manual/dms_transfer_demo.py`。服务仅监听 loopback，保留供用户查看。
 
-未部署、未做真实 LINE 真机验收、未向真实 DMS 创建测试单。因此不能宣称外部 DMS 已验证接受账号/分行为空的订车单；发布和外部业务验收仍是独立步骤。
+2026-09-15 11:42（UTC+7）发布完成：[Manual CD 34929375996](https://github.com/skin306152-star/pearnly-app/actions/runs/34929375996) success。Web/Worker 分别为 `pearnly-web-b88937dd71e0-s3` / `pearnly-worker-b88937dd71e0-s3`，各 100%，Ready，同镜像 `sha256:92d44efbe00b032983a614b1cac380484a632f1985766c3aebc5831931332b2a`。schema `pearnly-schema-2nvmq` 成功，两端候选及正式 SHA、镜像、健康、就绪、完整下载验证通过。
+
+正式域名编辑器 HTML/JS 逐字节匹配候选，三个 OA 配置 available，health/ready 200。HTML SHA256 `211074d9e2bed80844c00eff37cf1131a1db37e55b40cfd364d016b1b9832e7f`；JS SHA256 `8cb7fa746fb1f1730dd6769b5410be2a87bb4cfc10d036eabda7f4319dc4d9b1`。生产回读 `/tmp/dms-transfer-online-results.json`；发布日志 `/tmp/dms-transfer-deploy-complete.log`；完整 pre-push `/tmp/dms-transfer-release-push.log`。
+
+三个 OA 的金额、收款银行选择、凭证提示均通过 LINE 官方 validate/reply，HTTP 200，每 OA 三条消息，未发送真实测试消息。
+
+未做真实 LINE 真机验收、未向真实 DMS 创建测试单。不能宣称外部 DMS 已验证接受账号/分行为空的订车单；发布成功与外部业务验收分别记录。

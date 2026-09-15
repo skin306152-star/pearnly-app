@@ -279,13 +279,19 @@ def replace_review_payload(
     expected_nonce: str,
     payload: dict,
     channel_key: Optional[str] = None,
+    *,
+    state: str = "booking_review",
 ) -> bool:
-    """Replace one booking review draft and rotate its nonce in one guarded write."""
+    """Replace one review draft and rotate its nonce in one guarded write."""
     from core import db
     from services.line_dms.store import _with_heal, state_ttl_minutes
     from services.line_dms import binding_state
 
-    if not expected_nonce or not payload.get("nonce"):
+    if (
+        state not in {"reviewing", "booking_review"}
+        or not expected_nonce
+        or not payload.get("nonce")
+    ):
         return False
     key = _channel(channel_key)
 
@@ -296,14 +302,15 @@ def replace_review_payload(
                 "UPDATE dms_line_sessions SET payload = %s::jsonb, "
                 "expires_at = now() + make_interval(mins => %s) "
                 "WHERE tenant_id = %s AND channel_key = %s AND line_user_id = %s "
-                "AND state = 'booking_review' AND expires_at > now() "
+                "AND state = %s AND expires_at > now() "
                 "AND payload->>'nonce' = %s",
                 (
                     json.dumps(payload, ensure_ascii=False),
-                    state_ttl_minutes("booking_review"),
+                    state_ttl_minutes(state),
                     str(tenant_id),
                     key,
                     str(line_user_id),
+                    state,
                     expected_nonce,
                 ),
             )

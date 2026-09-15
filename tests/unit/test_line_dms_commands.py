@@ -38,7 +38,7 @@ class ClassifyTests(unittest.TestCase):
         """ยกเลิก 是 editing 态的取消,不许升格成全局命令。"""
         from services.line_dms import cards
 
-        self.assertIsNone(commands.classify(cards.BTN_EDIT_CANCEL))
+        self.assertIsNone(commands.classify("ยกเลิก"))
 
 
 if __name__ == "__main__":

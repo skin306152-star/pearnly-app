@@ -2,6 +2,9 @@
     'use strict';
     var TEXT = {
         th: {
+            customerTitle: 'แก้ไขข้อมูลลูกค้า',
+            customerSub:
+                'บันทึกแล้วระบบจะส่งบัตรข้อมูลใหม่ไปที่ LINE กรุณาตรวจสอบและกดอัปเดตข้อมูลเพื่อบันทึกลง DMS',
             title: 'แก้ไขใบจอง',
             sub: 'แก้ข้อมูลแล้วบันทึก ระบบจะส่งสรุปใหม่กลับไปที่ LINE ก่อนบันทึกจริง',
             customer: 'ข้อมูลลูกค้า',
@@ -85,6 +88,9 @@
             other: 'อื่นๆ',
         },
         en: {
+            customerTitle: 'Edit customer details',
+            customerSub:
+                'Save to send a new customer card to LINE. Review it and tap Update details to write to DMS.',
             title: 'Edit booking',
             sub: 'Save your changes and a revised preview will be sent to LINE before anything is recorded.',
             customer: 'Customer',
@@ -170,6 +176,8 @@
             other: 'Other',
         },
         zh: {
+            customerTitle: '修改客户资料',
+            customerSub: '保存后会发送新版客户卡到 LINE；请核对后点击“更新资料”，才会写入 DMS。',
             title: '编辑订车单',
             sub: '保存修改后，系统会先把新版预览发回 LINE，确认后才真正录入。',
             customer: '客户资料',
@@ -252,6 +260,9 @@
             other: '其他',
         },
         ja: {
+            customerTitle: '顧客情報を編集',
+            customerSub:
+                '保存すると新しい確認カードを LINE に送信します。確認後に情報更新を押すと DMS に登録されます。',
             title: '予約票を編集',
             sub: '変更を保存すると、確定前に新しいプレビューが LINE に送信されます。',
             customer: '顧客情報',

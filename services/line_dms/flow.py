@@ -33,7 +33,7 @@ from services.line_dms import (
     booking_qa,
     cards,
     draft,
-    edit_flow,
+    customer_edit_entry as customer_editor,
     menu_flow,
     ocr_review,
     qa_cards,
@@ -144,9 +144,9 @@ async def handle_postback(
         await approval_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
         return
 
-    # 逐字段修正(DL-6):开菜单/选字段/取消。nonce 只校验不消费,写档仍由下方 consume_nonce 守卫。
-    if action in edit_flow.EDIT_ACTIONS:
-        await edit_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
+    # 历史编辑按钮只跳转网页编辑器。
+    if action in customer_editor.EDIT_ACTIONS:
+        await customer_editor.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
         return
 
     if action == cards.ACT_KEEP:
@@ -294,6 +294,8 @@ async def _run_dedup(
     field_diffs = res.get("field_diffs") or []
     geo = res.get("geo") or {}
     draft_vals = draft.build_draft(id_card, geo, res.get("prefixes") or [], phone)
+    field_diffs += draft.identity_diffs(res, draft_vals)
+    geo["prefixes"] = res.get("prefixes") or []
     summary = draft.build_summary(draft_vals, geo)
 
     nonce = secrets.token_hex(8)
@@ -303,7 +305,6 @@ async def _run_dedup(
         "endpoint_id": str(ep.get("id") or ""),
         "nonce": nonce,
         "field_diffs": [],  # 默认无差异;exact_diff 分支覆写为真实 diffs。
-        # 逐字段修正(DL-6)按此重跑查重:留原始 id_card/phone 作重放源,改值后回灌此路。
         "id_card": id_card,
         "phone": phone,
         "mode": mode,  # 写档后分叉(菜单层波2)靠它;编辑重跑经会话回读得以保留。

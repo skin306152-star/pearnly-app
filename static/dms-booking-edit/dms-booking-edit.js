@@ -19,6 +19,8 @@
     var form = document.getElementById('editor');
     var result = document.getElementById('result');
     var nonce = query('draft');
+    var customerMode = query('editor') === 'customer';
+    var editorQuery = customerMode ? 'editor=customer&' : '';
     var ERROR_KEYS = window.DMS_BOOKING_ERROR_KEYS;
     var portalMode = query('portal') === 'dms';
     var credentialsMode = query('credentials') === 'dms';
@@ -336,14 +338,17 @@
         try {
             await gateway.authenticate();
             model = await gateway.api(
-                '/api/line/dms-booking/draft?nonce=' + encodeURIComponent(nonce)
+                '/api/line/dms-booking/draft?' + editorQuery + 'nonce=' + encodeURIComponent(nonce)
             );
         } catch (e) {
             if (e.status === 401) {
                 try {
                     await gateway.authenticate();
                     model = await gateway.api(
-                        '/api/line/dms-booking/draft?nonce=' + encodeURIComponent(nonce)
+                        '/api/line/dms-booking/draft?' +
+                            editorQuery +
+                            'nonce=' +
+                            encodeURIComponent(nonce)
                     );
                 } catch (x) {
                     return showError(errorKey(x, 'failed'));
@@ -364,9 +369,9 @@
             adv = model.form.advisor || {};
         form.innerHTML =
             '<div class="intro"><h1>' +
-            t('title') +
+            t(customerMode ? 'customerTitle' : 'title') +
             '</h1><p>' +
-            t('sub') +
+            t(customerMode ? 'customerSub' : 'sub') +
             '</p></div>' +
             section(
                 'customer',
@@ -392,48 +397,50 @@
                     t('idWarn') +
                     '</p>'
             ) +
-            section(
-                'booking',
-                '<div class="grid"><div class="field wide"><label>' +
-                    t('advisor') +
-                    '</label><input readonly value="' +
-                    esc(adv.name || '') +
-                    '"></div>' +
-                    select('place_id', 'place', masters.places, (a.place || {}).id) +
-                    select('car_id', 'car', masters.cars, (a.car || {}).id) +
-                    select('paint_id', 'paint', masters.paints, (a.paint || {}).id) +
-                    field('delivery_date_be', 'delivery', a.delivery_date_be) +
-                    select('term_id', 'term', masters.terms, (a.term || {}).id) +
-                    select('regis_id', 'regis', masters.regis, (a.regis || {}).id) +
-                    field('regis_name', 'regisName', a.regis_name, 'wide') +
-                    '</div>'
-            ) +
-            section(
-                'payment',
-                '<div id="payment-list"></div><button id="add-payment" class="pu-btn add" type="button">' +
-                    t('addPayment') +
-                    '</button><div class="field wide"><label>' +
-                    t('total') +
-                    '</label><input id="total" readonly></div>'
-            ) +
-            section(
-                'files',
-                '<p class="hint">' +
-                    t('fileHint') +
-                    '</p><div class="file-row"><span>' +
-                    t('idCard') +
-                    '</span><label><input id="keep-id" class="switch" type="checkbox" ' +
-                    (f.id_card ? 'checked' : 'disabled') +
-                    '> ' +
-                    t('attached') +
-                    '</label></div><div class="file-row"><span>' +
-                    t('slip') +
-                    '</span><label><input id="keep-slip" class="switch" type="checkbox" ' +
-                    (f.slip ? 'checked' : 'disabled') +
-                    '> ' +
-                    t('attached') +
-                    '</label></div>'
-            ) +
+            (customerMode
+                ? ''
+                : section(
+                      'booking',
+                      '<div class="grid"><div class="field wide"><label>' +
+                          t('advisor') +
+                          '</label><input readonly value="' +
+                          esc(adv.name || '') +
+                          '"></div>' +
+                          select('place_id', 'place', masters.places, (a.place || {}).id) +
+                          select('car_id', 'car', masters.cars, (a.car || {}).id) +
+                          select('paint_id', 'paint', masters.paints, (a.paint || {}).id) +
+                          field('delivery_date_be', 'delivery', a.delivery_date_be) +
+                          select('term_id', 'term', masters.terms, (a.term || {}).id) +
+                          select('regis_id', 'regis', masters.regis, (a.regis || {}).id) +
+                          field('regis_name', 'regisName', a.regis_name, 'wide') +
+                          '</div>'
+                  ) +
+                  section(
+                      'payment',
+                      '<div id="payment-list"></div><button id="add-payment" class="pu-btn add" type="button">' +
+                          t('addPayment') +
+                          '</button><div class="field wide"><label>' +
+                          t('total') +
+                          '</label><input id="total" readonly></div>'
+                  ) +
+                  section(
+                      'files',
+                      '<p class="hint">' +
+                          t('fileHint') +
+                          '</p><div class="file-row"><span>' +
+                          t('idCard') +
+                          '</span><label><input id="keep-id" class="switch" type="checkbox" ' +
+                          (f.id_card ? 'checked' : 'disabled') +
+                          '> ' +
+                          t('attached') +
+                          '</label></div><div class="file-row"><span>' +
+                          t('slip') +
+                          '</span><label><input id="keep-slip" class="switch" type="checkbox" ' +
+                          (f.slip ? 'checked' : 'disabled') +
+                          '> ' +
+                          t('attached') +
+                          '</label></div>'
+                  )) +
             '<p id="form-error" class="error" role="alert"></p><div class="sticky-actions"><button id="cancel" class="pu-btn secondary" type="button">' +
             t('cancel') +
             '</button><button id="save" class="pu-btn primary" type="submit" disabled>' +
@@ -441,20 +448,22 @@
             '</button></div>';
         document.getElementById('loading').hidden = true;
         form.hidden = false;
-        renderPayments(model.form.payments);
-        document.getElementById('add-payment').onclick = function () {
-            var channel = nextChannel();
-            if (!channel) return;
-            var list = document.getElementById('payment-list');
-            list.insertAdjacentHTML(
-                'beforeend',
-                paymentRow({ channel: channel, amount: '', extra: {} })
-            );
-            wirePayments();
-            syncChannelOptions();
-            total();
-        };
-        document.getElementById('car_id').onchange = loadPaints;
+        if (!customerMode) {
+            renderPayments(model.form.payments);
+            document.getElementById('add-payment').onclick = function () {
+                var channel = nextChannel();
+                if (!channel) return;
+                var list = document.getElementById('payment-list');
+                list.insertAdjacentHTML(
+                    'beforeend',
+                    paymentRow({ channel: channel, amount: '', extra: {} })
+                );
+                wirePayments();
+                syncChannelOptions();
+                total();
+            };
+            document.getElementById('car_id').onchange = loadPaints;
+        }
         document.getElementById('province_id').onchange = function () {
             cascade('districts', this.value, 'district_id', true);
         };
@@ -469,7 +478,9 @@
     }
     async function geo(level, parent) {
         return gateway.api(
-            '/api/line/dms-booking/geo?nonce=' +
+            '/api/line/dms-booking/geo?' +
+                editorQuery +
+                'nonce=' +
                 encodeURIComponent(nonce) +
                 '&level=' +
                 level +
@@ -617,6 +628,7 @@
         customer.district_name = selectedLabel('district_id');
         customer.subdistrict_name = selectedLabel('subdistrict_id');
         customer.zipcode = selectedLabel('zipcode_id');
+        if (customerMode) return { customer: customer };
         return {
             customer: customer,
             answers: {
@@ -642,7 +654,7 @@
         btn.disabled = true;
         document.getElementById('form-error').textContent = '';
         try {
-            await gateway.api('/api/line/dms-booking/draft', {
+            await gateway.api('/api/line/dms-booking/draft?' + editorQuery, {
                 method: 'POST',
                 body: JSON.stringify({ nonce: nonce, form: payload() }),
             });

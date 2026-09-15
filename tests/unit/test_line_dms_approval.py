@@ -38,7 +38,7 @@ _APPROVERS = [
 
 
 def _btn_actions(card):
-    return [b["action"]["data"] for b in card["contents"]["footer"]["contents"]]
+    return [b["action"].get("data", "") for b in card["contents"]["footer"]["contents"]]
 
 
 _DISPLAY = [{"label": "ชื่อ", "old": "ก", "new": "ข"}]

@@ -46,7 +46,6 @@ BTN_UPDATE = "อัปเดตข้อมูล"
 BTN_KEEP = "ใช้ข้อมูลเดิม"
 BTN_NEW_CUSTOMER = "ลูกค้าใหม่"
 BTN_EDIT = "แก้ไข"
-BTN_EDIT_CANCEL = "ยกเลิก"
 
 # 菜单层(波2)文案:行卡布局照泰方认可的 mockup(编号+图标+标题+说明+箭头)。
 TXT_MENU_GREETING = "สวัสดีค่ะ 🙏\n" + TXT_MENU_TITLE + "\n" + TXT_MENU_SUBTITLE
@@ -66,39 +65,14 @@ TXT_MENU_HINT = "พิมพ์ เมนู เพื่อเรียกเ�
 BTN_CONTINUE_BOOKING = "ทำใบจองต่อ"
 BTN_SUBMIT_APPROVAL = "ส่งขออนุมัติ"
 
-# 逐字段修正(DL-6):可改字段与地道泰文标签(顺序 = quick reply 呈现顺序)。
-# 地理四级 id(จังหวัด/อำเภอ/ตำบล/รหัสไปรษณีย์)不进此表——改地址文本后由既有级联匹配重解。
-EDIT_FIELDS = (
-    ("name", "ชื่อ-นามสกุล"),
-    ("people_id", "เลขบัตรประชาชน"),
-    ("birthday_be", "วันเกิด"),
-    ("phone", "เบอร์โทร"),
-    ("house_no", "บ้านเลขที่"),
-    ("moo", "หมู่"),
-    ("soi", "ซอย"),
-    ("road", "ถนน"),
-)
-_EDIT_LABELS = dict(EDIT_FIELDS)
-
-TXT_EDIT_PICK = "ต้องการแก้ไขข้อมูลใด"
-TXT_EDIT_CANCELLED = "ยกเลิกการแก้ไขแล้ว"
-TXT_EDIT_BAD_ID = (
-    "เลขบัตรประชาชนไม่ถูกต้อง (เลขตรวจสอบท้ายบัตรไม่ผ่าน) กรุณาตรวจสอบและพิมพ์ใหม่อีกครั้ง"
-)
-TXT_EDIT_BAD_BIRTHDAY = "วันเกิดไม่ถูกต้อง กรุณาพิมพ์เป็น วว/ดด/ปปปป (พ.ศ.)"
-TXT_EDIT_BAD_PHONE = "กรุณาพิมพ์เบอร์โทรศัพท์"
-TXT_EDIT_EMPTY = "กรุณาพิมพ์ข้อมูลให้ครบถ้วน"
-
 # 动作名(flow 侧 dispatch 用同一常量,避免拼写漂移)
 ACT_CREATE = "create_new"
 ACT_UPDATE = "update"
 ACT_KEEP = "keep"
 ACT_RESET = "reset"
 ACT_PICK = "pick"
-# 逐字段修正(DL-6):卡上 [แก้ไข] 开菜单 → 选字段 → 收新值 → 重跑查重。
+# 历史卡入口只转网页编辑器。
 ACT_EDIT = "edit"
-ACT_EDIT_FIELD = "edit_field"
-ACT_EDIT_CANCEL = "edit_cancel"
 # 菜单层(波2):选菜单项 / 建档后继续订车 / 重拍身份证(重拍带 nonce 只验不消费)。
 ACT_MENU_CUSTOMER = "menu_customer"
 ACT_MENU_BOOKING = "menu_booking"
@@ -124,6 +98,10 @@ TXT_BOOKING_CANCELLED = "ทิ้งรายการแล้ว ไม่ม
 TXT_BOOKING_FAIL = "สร้างใบจองไม่สำเร็จ กรุณาลองใหม่"
 
 FIELD_LABELS_TH: Dict[str, str] = {
+    "building": "อาคาร",
+    "floor": "ชั้น",
+    "room": "ห้อง",
+    "village": "หมู่บ้าน",
     "prefix_id": "คำนำหน้า",
     "name": "ชื่อ",
     "birthday_be": "วันเกิด",
@@ -147,25 +125,11 @@ def _data(action: str, **kw: str) -> str:
 
 
 def _qr_item(label: str, data: str) -> Dict[str, Any]:
-    """quick reply 动作项(postback · data 编码 action+nonce+field)。"""
+    """Generic Quick Reply action used by the booking questionnaire."""
     return {
         "type": "action",
         "action": {"type": "postback", "label": label, "data": data, "displayText": label},
     }
-
-
-def edit_menu_message(nonce: str) -> Dict[str, Any]:
-    """[แก้ไข] 展开的字段选择(quick reply)· 每项带 field 键 + 当前 nonce,末项取消。"""
-    items = [
-        _qr_item(label, _data(ACT_EDIT_FIELD, nonce=nonce, field=key)) for key, label in EDIT_FIELDS
-    ]
-    items.append(_qr_item(BTN_EDIT_CANCEL, _data(ACT_EDIT_CANCEL, nonce=nonce)))
-    return {"type": "text", "text": TXT_EDIT_PICK, "quickReply": {"items": items}}
-
-
-def edit_prompt(field: str) -> str:
-    """选中字段后的输入提示:พิมพ์ค่าใหม่ของ<字段名>。"""
-    return f"พิมพ์ค่าใหม่ของ{_EDIT_LABELS.get(field, field)}"
 
 
 def _btn(label: str, data: str, style: str = "primary") -> Dict[str, Any]:
@@ -268,7 +232,7 @@ def new_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
     再发照片,重来=打 เมนู,不占按钮)。"""
     footer = [
         _btn(BTN_SAVE_NEW, _data(ACT_CREATE, nonce=nonce), "primary"),
-        _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"),
+        _edit_button(nonce),
     ]
     return _bubble(
         "ลูกค้าใหม่ ยืนยันข้อมูลเพื่อบันทึก",
@@ -283,7 +247,7 @@ def same_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
     只回一句「ตรงกัน」会把识别/手输出错的销售堵死——预览 + 修正入口必须在。"""
     footer = [
         _btn(BTN_KEEP, _data(ACT_KEEP, nonce=nonce), "primary"),
-        _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"),
+        _edit_button(nonce),
     ]
     return _bubble(TXT_SAME, _summary_rows(summary), footer, "ข้อมูลลูกค้าตรงกัน")
 
@@ -292,7 +256,7 @@ def booking_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]
     """菜单2认出资料一致的客户时，确认后进入订车逐问。"""
     footer = [
         _btn(BTN_CONTINUE_BOOKING, _data(ACT_KEEP, nonce=nonce), "primary"),
-        _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"),
+        _edit_button(nonce),
     ]
     return _bubble("พบข้อมูลลูกค้าในระบบ", _summary_rows(summary), footer, "พบข้อมูลลูกค้าในระบบ")
 
@@ -333,7 +297,7 @@ def diff_card(
             }
         )
     footer.append(_btn(BTN_KEEP, _data(ACT_KEEP, nonce=nonce), "secondary"))
-    footer.append(_btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"))
+    footer.append(_edit_button(nonce))
     return _bubble("พบข้อมูลเดิม มีบางส่วนไม่ตรงกัน", rows, footer, "พบข้อมูลลูกค้าที่ต่างกัน")
 
 
@@ -372,3 +336,16 @@ def booking_receipt_text(
         f"รุ่นรถ: {car or '—'}\nวันที่ส่งมอบ: {delivery_date_be or '—'}"
     )
     return f"{text}\nที่ปรึกษา: {advisor_name}" if advisor_name else text
+
+
+def _edit_button(nonce: str) -> Dict[str, Any]:
+    from services.line_dms import edit_link
+
+    uri = edit_link.url(nonce, customer=True)
+    if not uri:
+        return _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary")
+    return {
+        "type": "button",
+        "style": "secondary",
+        "action": {"type": "uri", "label": BTN_EDIT, "uri": uri},
+    }

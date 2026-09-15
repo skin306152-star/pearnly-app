@@ -18,6 +18,7 @@ from services.erp.erp_dms_push import _dms_resolve_admin_creds
 from services.line_dms import cards
 
 _GEO_LISTS = {
+    "prefix_id": "prefixes",
     "province_id": "provinces",
     "district_id": "districts",
     "subdistrict_id": "subdistricts",
@@ -51,7 +52,7 @@ _MASTER_DRAFT_KEYS = (
 _PREFIX_ALIASES = (
     frozenset({"mr", "นาย"}),
     frozenset({"mrs", "นาง"}),
-    frozenset({"miss", "ms", "นางสาว"}),
+    frozenset({"miss", "ms", "นางสาว", "นส"}),
     frozenset({"ดช", "เด็กชาย"}),
     frozenset({"ดญ", "เด็กหญิง"}),
 )
@@ -191,3 +192,15 @@ def has_admin_creds(ep: dict) -> bool:
     cfg = (ep or {}).get("config") or {}
     pu, pp, eu, ep_ = _dms_resolve_admin_creds(cfg)
     return bool((pu and pp) or (eu and ep_))
+
+
+def identity_diffs(lookup: dict, values: dict) -> list:
+    """Include OCR title and birthday omitted by the address/phone lookup contract."""
+    from services.erp.dms_customer_diff import diff_customer_fields
+
+    if lookup.get("scenario") != "exact":
+        return []
+    return diff_customer_fields(
+        (lookup.get("match") or {}).get("current_fields") or {},
+        {k: values.get(k) for k in ("prefix_id", "birthday_be")},
+    )

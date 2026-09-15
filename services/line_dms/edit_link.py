@@ -14,17 +14,21 @@ import urllib.parse
 from typing import Optional
 
 
-def url(nonce: str, channel_key: Optional[str] = None) -> str:
+def url(nonce: str, channel_key: Optional[str] = None, *, customer: bool = False) -> str:
     from services.line_dms import binding_guard
     from services.line_platform import channels
 
     key = channel_key or binding_guard.current_channel()
     liff_id = channels.liff_id(key)
     if liff_id:
-        query = urllib.parse.urlencode({"draft": nonce, "channel": key})
+        query = urllib.parse.urlencode(
+            {"draft": nonce, "channel": key, **({"editor": "customer"} if customer else {})}
+        )
         return f"https://liff.line.me/{liff_id}?{query}"
     if key != channels.DEFAULT_DMS_CHANNEL:
         return ""
     base = (os.getenv("PEARNLY_BASE_URL") or "https://pearnly.com").rstrip("/")
-    query = urllib.parse.urlencode({"draft": nonce, "channel": key})
+    query = urllib.parse.urlencode(
+        {"draft": nonce, "channel": key, **({"editor": "customer"} if customer else {})}
+    )
     return f"{base}/liff/dms-booking?{query}"

@@ -61,7 +61,11 @@ def _lookup(scenario, *, customer_id=None):
     return {
         "ok": True,
         "scenario": scenario,
-        "match": {"found": scenario == "exact", "customer_id": customer_id, "current_fields": {}},
+        "match": {
+            "found": scenario == "exact",
+            "customer_id": customer_id,
+            "current_fields": {"prefix_id": "17", "birthday_be": _RAW_ID["birthday_be"]},
+        },
         "field_diffs": [],
         "candidates": [],
         "geo": _GEO,

@@ -20,7 +20,7 @@ from services.line_dms import (
     booking_qa,
     cards,
     commands,
-    edit_flow,
+    customer_edit_entry,
     menu_cards,
     menu_flow,
     qa_cards,
@@ -45,16 +45,13 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
 
     if cmd in (commands.CMD_MENU, commands.CMD_GREETING):
         # 菜单命令覆盖任何进行中会话(含逐问):会话被覆写 = 放弃,与 เริ่มใหม่ 同语义。
-        if state == "editing":
-            # 编辑被菜单打断:就地结束编辑(半截新值作废、已收料留着),不把 editing 带进菜单。
-            sess = {"payload": edit_flow.exit_editing(sess)}
         await menu_flow.open_menu(
             binding, line_user_id, reply_token, sess, greet=cmd == commands.CMD_GREETING
         )
         return
 
-    if state == "editing":  # 逐字段修正:下一条文本 = 新值
-        await edit_flow.handle_text(binding, line_user_id, reply_token, sess, text)
+    if state == "editing":  # 退役会话只转新版编辑器，不读取文本作为字段值
+        await customer_edit_entry.retire_session(binding, line_user_id, reply_token, sess)
         return
 
     if await query_flow.handle_text(binding, line_user_id, reply_token, sess, text):

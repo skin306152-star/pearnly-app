@@ -122,12 +122,12 @@ def _booking_error(exc):
 
 
 @router.get("/api/line/dms-booking/draft")
-async def dms_booking_draft(request: Request, nonce: str):
+async def dms_booking_draft(request: Request, nonce: str, editor: str = "booking"):
     from services.line_dms import booking_edit
 
     user = await _authorize(request)
     try:
-        return ok(await asyncio.to_thread(browser_call, user, booking_edit.load, user, nonce))
+        return ok(await asyncio.to_thread(browser_call, user, _editor(editor).load, user, nonce))
     except booking_edit.BookingEditError as exc:
         _booking_error(exc)
 
@@ -146,14 +146,16 @@ async def dms_booking_paints(request: Request, nonce: str, car_id: str):
 
 
 @router.get("/api/line/dms-booking/geo")
-async def dms_booking_geo(request: Request, nonce: str, level: str, parent_id: str = ""):
+async def dms_booking_geo(
+    request: Request, nonce: str, level: str, parent_id: str = "", editor: str = "booking"
+):
     from services.line_dms import booking_edit
 
     user = await _authorize(request)
     try:
         return ok(
             await asyncio.to_thread(
-                browser_call, user, booking_edit.geo, user, nonce, level, parent_id
+                browser_call, user, _editor(editor).geo, user, nonce, level, parent_id
             )
         )
     except booking_edit.BookingEditError as exc:
@@ -161,14 +163,22 @@ async def dms_booking_geo(request: Request, nonce: str, level: str, parent_id: s
 
 
 @router.post("/api/line/dms-booking/draft")
-async def dms_booking_save(request: Request, req: DmsBookingSaveIn):
+async def dms_booking_save(request: Request, req: DmsBookingSaveIn, editor: str = "booking"):
     from services.line_dms import booking_edit
 
     user = await _authorize(request)
     try:
         next_nonce = await asyncio.to_thread(
-            browser_call, user, booking_edit.save, user, req.nonce, req.form
+            browser_call, user, _editor(editor).save, user, req.nonce, req.form
         )
         return ok({"nonce": next_nonce})
     except booking_edit.BookingEditError as exc:
         _booking_error(exc)
+
+
+def _editor(mode: str):
+    from services.line_dms import booking_edit, customer_edit
+
+    if mode not in {"booking", "customer"}:
+        raise PosError("dms_booking.expired", 400)
+    return customer_edit if mode == "customer" else booking_edit

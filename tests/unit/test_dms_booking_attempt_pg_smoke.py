@@ -64,6 +64,50 @@ class BookingAttemptPostgresTests(unittest.TestCase):
         self.payload = {"nonce": "N", "qa": {"customer": {"id": "C"}}}
         store.set_session(self.tenant, self.line, "booking_review", self.payload)
 
+    def test_customer_review_rotation_is_state_nonce_and_channel_scoped(self):
+        for channel in ("dms", "dms_a", "dms_b"):
+            store.set_session(
+                self.tenant, self.line, "reviewing", {"nonce": "old"}, channel_key=channel
+            )
+        self.assertTrue(
+            session_store.replace_review_payload(
+                self.tenant,
+                self.line,
+                "old",
+                {"nonce": "new"},
+                channel_key="dms_a",
+                state="reviewing",
+            )
+        )
+        self.assertFalse(
+            session_store.replace_review_payload(
+                self.tenant,
+                self.line,
+                "old",
+                {"nonce": "stale"},
+                channel_key="dms_a",
+                state="reviewing",
+            )
+        )
+        self.assertFalse(
+            session_store.replace_review_payload(
+                self.tenant, self.line, "old", {"nonce": "wrong-state"}, channel_key="dms_b"
+            )
+        )
+        self.assertEqual(
+            store.get_session(self.tenant, self.line, channel_key="dms")["payload"]["nonce"], "old"
+        )
+        self.assertEqual(
+            store.get_session(self.tenant, self.line, channel_key="dms_b")["payload"]["nonce"],
+            "old",
+        )
+        self.assertIsNone(
+            store.consume_nonce(self.tenant, self.line, "reviewing", "old", channel_key="dms_a")
+        )
+        self.assertIsNotNone(
+            store.consume_nonce(self.tenant, self.line, "reviewing", "new", channel_key="dms_a")
+        )
+
     def _claim(self):
         claimed = store.consume_nonce(self.tenant, self.line, "booking_review", "N")
         self.assertIsNotNone(claimed)

@@ -1180,3 +1180,76 @@ test('deleted master IDs stay unselected and cascades never choose the first row
     await page.locator('#save').click();
     expect(writes).toBe(0);
 });
+
+for (const channel of ['dms', 'dms_a', 'dms_b']) {
+    test(`customer editor saves only customer review in ${channel}`, async ({ page }) => {
+        let submitted;
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.addInitScript(() => {
+            const payload = btoa(
+                JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+            );
+            localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+            localStorage.setItem('pearnly_lang', 'zh');
+        });
+        await page.route('https://static.line-scdn.net/**', (route) =>
+            route.fulfill({
+                contentType: 'application/javascript',
+                body: liffMockScript('ios', true, true),
+            })
+        );
+        await page.route('**/api/line/dms-booking/**', async (route) => {
+            const url = new URL(route.request().url());
+            if (url.pathname.endsWith('/config'))
+                return route.fulfill({
+                    json: { ok: true, data: { liff_id: 'DMS-LIFF', channel_key: channel } },
+                });
+            if (url.pathname.endsWith('/auth')) {
+                expect(route.request().postDataJSON().channel).toBe(channel);
+                const token = Buffer.from(
+                    JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+                ).toString('base64url');
+                return route.fulfill({ json: { ok: true, data: { token: `e2e.${token}.sig` } } });
+            }
+            expect(url.searchParams.get('editor')).toBe('customer');
+            if (route.request().method() === 'POST') {
+                submitted = route.request().postDataJSON();
+                return route.fulfill({ json: { ok: true, data: { nonce: 'new' } } });
+            }
+            const data = url.pathname.endsWith('/draft')
+                ? {
+                      form: {
+                          customer: {
+                              ...PAYMENT_DRAFT.form.customer,
+                              prefix_id: '18',
+                              house_no: '1',
+                          },
+                      },
+                      masters: { prefixes: PREFIX_DRAFT.masters.prefixes },
+                      geo: {
+                          provinces: GEO.provinces,
+                          districts: GEO.districts['1'],
+                          subdistricts: GEO.subdistricts['18'],
+                          zipcodes: GEO.zipcodes['72'],
+                      },
+                  }
+                : [];
+            return route.fulfill({ json: { ok: true, data } });
+        });
+        await page.goto(
+            `${BASE}/liff/dms-booking?draft=customer-test&editor=customer&channel=${channel}`
+        );
+        await expect(page.locator('h1')).toHaveText('修改客户资料');
+        await expect(page.locator('#prefix_id')).toHaveValue('18');
+        await expect(page.locator('#car_id, #payment-list, #keep-slip')).toHaveCount(0);
+        await page.locator('#phone').click();
+        await page.locator('#phone').press('ControlOrMeta+A');
+        await page.locator('#phone').pressSequentially('0891234567');
+        await page.screenshot({ path: path.join(OUT, `customer-${channel}.png`), fullPage: true });
+        await page.locator('#save').click();
+        await expect(page.locator('#result')).toBeVisible();
+        expect(Object.keys(submitted.form)).toEqual(['customer']);
+        expect(submitted.form.customer.prefix_id).toBe('18');
+        expect(submitted.form.customer.phone).toBe('0891234567');
+    });
+}

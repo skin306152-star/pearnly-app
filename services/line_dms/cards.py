@@ -341,11 +341,8 @@ def booking_receipt_text(
 def _edit_button(nonce: str) -> Dict[str, Any]:
     from services.line_dms import edit_link
 
+    button = _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary")
     uri = edit_link.url(nonce, customer=True)
-    if not uri:
-        return _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary")
-    return {
-        "type": "button",
-        "style": "secondary",
-        "action": {"type": "uri", "label": BTN_EDIT, "uri": uri},
-    }
+    if uri:
+        button["action"] = {"type": "uri", "label": BTN_EDIT, "uri": uri}
+    return button

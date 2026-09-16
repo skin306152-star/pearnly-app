@@ -82,7 +82,11 @@
 
     function label(key) {
         if (key === 'date') {
-            return { th: 'วันที่ พ.ศ.', en: 'Date (B.E.)', zh: '日期（佛历）', ja: '日付（仏暦）' }[lang] || 'วันที่ พ.ศ.';
+            return (
+                { th: 'วันที่ พ.ศ.', en: 'Date (B.E.)', zh: '日期（佛历）', ja: '日付（仏暦）' }[
+                    lang
+                ] || 'วันที่ พ.ศ.'
+            );
         }
         return I.label(lang, key);
     }

@@ -24,6 +24,10 @@
     "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
   ],
   "stale_ack": {
+    "_stocktake_verify.cjs": {
+      "why": "2026-09-16 ERP收付款修复仅同步盘点mobile.html引用的共享词典缓存版本09150401至09161601；已用字节比较证明其余HTML完全一致，盘点JS/CSS/API均未变，词典仅新增ERP收付字段和金额错误键，四语检查通过。本次未重跑无关的盘点相机视频、扫码及LINE SDK模拟完整流程，不以ERP实测代替盘点验收；未来盘点行为变化必须重验。",
+      "until": "2026-09-16"
+    },
     "_erp_cowork_split_verify.cjs": {
       "why": "Google/LINE 登录握手改为每次点击带唯一参数并加 no-store,只动 landing.js 里两个 SSO 按钮拼 URL 的方式与响应缓存头,未改登录门 DOM、/login 302 或跨壳路由。本次已真跑该脚本:登录门全部 15 项通过(/login 302→/cowork、cowork=旧登录 UI+获焦键入、erp=独立门、两侧手机 390×844),刷新了 cowork-login-desktop/mobile 两张截图;脚本之后的超管 Cowork 与 ERP 菜单矩阵因本机无本地数据库、真 app 起不来而未跑完,该段仍欠验收。",
       "until": "2026-09-16"

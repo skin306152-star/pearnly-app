@@ -112,8 +112,8 @@ class SharedEditorSourceTests(unittest.TestCase):
         self.assertNotIn("/static/line-intake-review/target-select.js", erp)
         self.assertFalse((ROOT / "src/erp/line-editor.ts").exists())
         self.assertNotIn("/static/dist/erp-line-editor.js", erp)
-        for html in (cowork, erp):
-            self.assertIn("/static/line-intake-review/batch-review.js?v=3", html)
+        for html, version in ((cowork, "3"), (erp, "erp-fix-3")):
+            self.assertIn(f"/static/line-intake-review/batch-review.js?v={version}", html)
             self.assertIn("/static/line-intake-review/i18n.js?v=3", html)
             self.assertIn("/static/line-intake-review/document-viewer.js?v=1", html)
             self.assertIn("/static/line-intake-review/document-viewer.css?v=1", html)

@@ -157,10 +157,20 @@ function monthKey(doc: SalesDoc): string {
 
 function monthLabel(key: string): string {
     if (!/^\d{4}-\d{2}$/.test(key)) return t('sr-date-unknown');
-    return new Intl.DateTimeFormat(document.documentElement.lang || 'th', {
+    const formatter = new Intl.DateTimeFormat(document.documentElement.lang || 'th', {
+        ...(isErpEntry() ? { calendar: 'buddhist' } : {}),
         year: 'numeric',
         month: 'long',
-    }).format(new Date(`${key}-01T00:00:00`));
+    });
+    const date = new Date(`${key}-01T00:00:00`);
+    return isErpEntry()
+        ? formatter
+              .formatToParts(date)
+              .filter((part) => part.type !== 'era')
+              .map((part) => part.value)
+              .join('')
+              .trim()
+        : formatter.format(date);
 }
 
 function sourceChip(doc: SalesDoc): string {

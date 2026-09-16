@@ -36,7 +36,7 @@ def business_fields(fields):
     for key in KEYS:
         if result.get(key) or key == "date":
             result[key] = buddhist(result.get(key))
-    result["date_raw"] = result["date"]
+    result["date_raw"] = fields.get("date_raw") or fields.get("date") or result["date"]
     result["date_calendar"] = "buddhist"
     return result
 

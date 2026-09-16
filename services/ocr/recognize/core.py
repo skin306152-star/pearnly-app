@@ -214,7 +214,10 @@ def run_recognition_core(
             plan_code=_plan_code,
             is_exempt=bool(_billing.get("is_exempt")),
         )
+        from services.erp.ocr_fields import context as erp_ocr_context
+
         with (
+            erp_ocr_context(source in {"erp_web", "line_erp"}),
             ocr_request_context(str(user["id"]), _tid(user)),
             # 成本归因:网页上传是混料入口(document_type 不指定 → 管线自检),故 doc_type=auto
             usage_context("web_upload", doc_type="auto", pages=page_count),

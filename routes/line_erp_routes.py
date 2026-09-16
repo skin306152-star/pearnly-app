@@ -258,6 +258,9 @@ async def erp_draft_get(request: Request, draft_id: str):
             "direction": payload.get("mode"),
             "selection": payload,
             "internal_only": True,
+            "workspaces": await asyncio.to_thread(
+                internal_flow.manual_workspaces, binding, payload.get("mode")
+            ),
             "records": webhook.draft_records(
                 str(claims["user_id"]), str(binding["tenant_id"]), draft_id, history_ids
             ),
@@ -306,8 +309,16 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
     user, selection = await asyncio.to_thread(internal_flow.selection, binding, payload)
     if req.direction and req.direction != selection["direction"]:
         raise HTTPException(409, detail="line_erp.direction_changed")
+    previous_workspace_id = None
     if req.workspace_client_id and req.workspace_client_id != selection["workspace_client_id"]:
-        raise HTTPException(409, detail="erp.workspace_mismatch")
+        if len(expected_ids) != 1:
+            raise HTTPException(409, detail="erp.workspace_mismatch")
+        previous_workspace_id = selection["workspace_client_id"]
+        user, selection = await asyncio.to_thread(
+            internal_flow.selection,
+            binding,
+            {**payload, "workspace_client_id": req.workspace_client_id},
+        )
     for record in req.records:
         pages = record.get("pages") or []
         fields = (pages[0].get("fields") or {}) if pages else record.get("fields") or {}
@@ -319,6 +330,18 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
             direction=selection["direction"],
             fields=fields,
             source="line_erp",
+            **(
+                {"previous_workspace_id": previous_workspace_id}
+                if previous_workspace_id is not None
+                else {}
+            ),
+        )
+    if previous_workspace_id is not None:
+        store.set_session(
+            binding["tenant_id"],
+            str(claims["line_user_id"]),
+            session["state"],
+            {**payload, **selection},
         )
     return {
         "ok": True,

@@ -46,7 +46,7 @@
         'seller_addr',
         'seller_address',
     ];
-    var AMOUNT_ORDER = ['subtotal', 'vat', 'total_amount', 'notes'];
+    var AMOUNT_ORDER = ['subtotal', 'discount', 'vat', 'total_amount', 'payment_received', 'notes'];
     var HIDDEN_FIELDS = new Set([
         'document_number',
         'bill_number',
@@ -67,6 +67,12 @@
                 zh: '操作失败，内容已保留，请重试。',
                 ja: '操作できませんでした。入力内容は保持されています。再試行してください。',
             },
+            amountMismatch: {
+                th: 'ยอดสินค้า ส่วนลด และภาษีไม่ตรงกับยอดรวม กรุณาตรวจสอบก่อนบันทึก',
+                en: 'Items, discount and tax do not match the total. Review the amounts before saving.',
+                zh: '商品明细、折扣和税额与总额不一致，请核对后保存。',
+                ja: '明細・割引・税額と合計が一致しません。確認してから保存してください。',
+            },
             duplicate: {
                 th: 'เอกสารนี้บันทึกแล้ว กรุณาทิ้งรายการซ้ำ',
                 en: 'This invoice is already recorded. Discard this duplicate.',
@@ -81,6 +87,13 @@
     }
 
     function label(key) {
+        if (key === 'payment_received') {
+            return (
+                { th: 'ยอดชำระจริง', en: 'Amount paid', zh: '实际收付款金额', ja: '実際の支払額' }[
+                    lang
+                ] || 'Amount paid'
+            );
+        }
         if (key === 'date') {
             return (
                 { th: 'วันที่ พ.ศ.', en: 'Date (B.E.)', zh: '日期（佛历）', ja: '日付（仏暦）' }[
@@ -168,7 +181,30 @@
 
     function renderDetail(record, recordIndex) {
         var fields = fieldsOf(record);
-        if (record.filename === 'manual') return manual.manualHtml(fields, direction(), lang);
+        if (record.filename === 'manual') {
+            return (
+                '<label class="field"><span>' +
+                R.escape(t('workspace')) +
+                '</span><select data-manual-workspace>' +
+                (model.workspaces || [])
+                    .map(function (w) {
+                        return (
+                            '<option value="' +
+                            Number(w.id) +
+                            '"' +
+                            (Number(w.id) === Number(model.selection.workspace_client_id)
+                                ? ' selected'
+                                : '') +
+                            '>' +
+                            R.escape(w.name) +
+                            '</option>'
+                        );
+                    })
+                    .join('') +
+                '</select></label>' +
+                manual.manualHtml(fields, direction(), lang)
+            );
+        }
         var fieldGrid = preferredKeys(fields)
             .map(function (key) {
                 return F.render(
@@ -273,6 +309,39 @@
 
     function bindDetail(root, _recordIndex, changed) {
         if (rows()[_recordIndex].filename === 'manual') {
+            var workspaceSelect = root.querySelector('[data-manual-workspace]');
+            workspaceSelect.onchange = function () {
+                var previous = model.selection.workspace_client_id;
+                var unsavedFields = JSON.parse(JSON.stringify(fieldsOf(rows()[_recordIndex])));
+                model.selection.workspace_client_id = Number(workspaceSelect.value);
+                busy = true;
+                workspaceSelect.disabled = true;
+                review.setBusy(true);
+                save(true)
+                    .then(function () {
+                        var savedFields = fieldsOf(rows()[_recordIndex]);
+                        var party = direction() === 'purchase' ? 'buyer' : 'seller';
+                        unsavedFields[party + '_tax'] = savedFields[party + '_tax'];
+                        unsavedFields[party + '_name'] = savedFields[party + '_name'];
+                        unsavedFields.items.forEach(function (item) {
+                            delete item.product_id;
+                            delete item.code;
+                        });
+                        rows()[_recordIndex].pages[0].fields = unsavedFields;
+                        state.hidden = true;
+                        review.render();
+                    })
+                    .catch(function () {
+                        model.selection.workspace_client_id = previous;
+                        workspaceSelect.value = String(previous);
+                        show('failed', 'error');
+                    })
+                    .finally(function () {
+                        busy = false;
+                        workspaceSelect.disabled = false;
+                        review.setBusy(false);
+                    });
+            };
             var fieldRoot = root.querySelector('[data-manual-document]');
             manual.bindManual(
                 fieldRoot,
@@ -348,29 +417,16 @@
                     delete item.product_id;
                 }
                 applyField(element);
-                if (
-                    /:item:\d+:(qty|price)$/.test(element.dataset.field) ||
-                    /:field:vat$/.test(element.dataset.field)
-                ) {
+                if (/:item:\d+:(qty|price)$/.test(element.dataset.field)) {
                     var fields = fieldsOf(rows()[_recordIndex]);
-                    var total = 0;
                     fields.items.forEach(function (item, i) {
                         item.subtotal = (Number(item.qty || 0) * Number(item.price || 0)).toFixed(
                             2
                         );
-                        total += Number(item.subtotal);
                         var input = root.querySelector(
                             '[data-field="' + _recordIndex + ':item:' + i + ':subtotal"]'
                         );
                         if (input) input.value = item.subtotal;
-                    });
-                    fields.subtotal = total.toFixed(2);
-                    fields.total_amount = (total + Number(fields.vat || 0)).toFixed(2);
-                    ['subtotal', 'total_amount'].forEach(function (key) {
-                        var input = root.querySelector(
-                            '[data-field="' + _recordIndex + ':field:' + key + '"]'
-                        );
-                        if (input) input.value = fields[key];
                     });
                 }
                 changed();
@@ -394,7 +450,7 @@
         state.hidden = false;
     }
 
-    function save() {
+    function save(workspaceOnly) {
         return api('/api/line/erp/draft/' + encodeURIComponent(draftId), {
             method: 'PUT',
             body: JSON.stringify({
@@ -404,6 +460,7 @@
             }),
         }).then(function (updated) {
             if (updated) model = Object.assign(model, updated);
+            if (workspaceOnly) return updated;
             return Promise.all(
                 rows().map(function (record) {
                     var file = manualAttachments[record.id];
@@ -466,12 +523,16 @@
             })
             .catch(function (error) {
                 var duplicate = JSON.stringify(error.body || {}).indexOf('"duplicate"') >= 0;
+                var amountMismatch =
+                    JSON.stringify(error.body || {}).indexOf('amount_mismatch') >= 0;
                 show(
-                    duplicate
-                        ? 'duplicate'
-                        : error.status === 401 || error.status === 403
-                          ? 'expired'
-                          : 'failed',
+                    amountMismatch
+                        ? 'amountMismatch'
+                        : duplicate
+                          ? 'duplicate'
+                          : error.status === 401 || error.status === 403
+                            ? 'expired'
+                            : 'failed',
                     'error'
                 );
             })

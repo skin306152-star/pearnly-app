@@ -77,11 +77,23 @@ def book_from_history(
         calculated = compute_purchase_totals(draft["lines"])
         draft["rounding"] = str(Decimal(fields["total_amount"]) - calculated["grand_total"])
         draft["due_date"] = fields.get("due_date") or None
+    if source in {"erp_web", "line_erp"} and fields.get("manual_layout") != 1:
+        from services.erp.invoice_amounts import purchase_lines
+
+        draft["lines"], amounts = purchase_lines(fields)
+        draft["rounding"] = "0"
+        draft["amount_override"] = {
+            "override_on": True,
+            "subtotal": str(amounts["net"] + amounts["discount"]),
+            "discount_total": str(amounts["discount"]),
+            "vat_amount": str(amounts["vat"]),
+            "grand_total": str(amounts["total"]),
+        }
     if source in {"erp_web", "line_erp"}:
         for line, item in zip(draft.get("lines") or [], fields.get("items") or []):
             line["product_id"] = item.get("product_id")
             line["unit"] = item.get("unit")
-    if source in {"erp_web", "line_erp"} and fields.get("manual_layout") == 1:
+    if source in {"erp_web", "line_erp"}:
         draft["payment_status"] = "unpaid"
     draft["source"] = (
         "manual"
@@ -114,7 +126,7 @@ def book_from_history(
         auto_stock_in=bool(settings.get("auto_stock_in")),
         created_by=created_by,
     )
-    if source in {"erp_web", "line_erp"} and fields.get("manual_layout") == 1:
+    if source in {"erp_web", "line_erp"}:
         from services.erp.internal_payment import payment
 
         paid = payment(fields, "purchase")["paid_amount"]

@@ -59,6 +59,8 @@ def _invoice_to_legacy_fields(inv: ThaiInvoice) -> Dict[str, Any]:
     """
     fields = inv.model_dump(mode="json")
     fields.pop("additional_invoices", None)
+    if not fields.get("payment_received"):
+        fields.pop("payment_received", None)
     tax_ids: List[str] = []
     if inv.seller_tax:
         tax_ids.append(inv.seller_tax)

@@ -65,6 +65,7 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
     own_tax = re.sub(r"\D", "", str(subject.get("tax_id") or ""))
     if declared_tax and own_tax and declared_tax != own_tax:
         raise HTTPException(409, detail="erp.workspace_mismatch")
+    reviewed_ocr = result.get("manual_layout") != 1 and result.get("total_amount") not in (None, "")
     items = []
     for value in result.get("items") or []:
         if not isinstance(value, dict):
@@ -80,7 +81,11 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
                 "name": name,
                 "qty": str(qty),
                 "price": str(price),
-                "subtotal": str((qty * price).quantize(Decimal("0.01"))),
+                "subtotal": str(
+                    _decimal(value["subtotal"])
+                    if reviewed_ocr and value.get("subtotal") not in (None, "")
+                    else (qty * price).quantize(Decimal("0.01"))
+                ),
             }
         )
     if strict and not items:
@@ -91,6 +96,13 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
         from services.erp.manual_totals import apply
 
         subtotal, vat = apply(result, items, _decimal)
+    if reviewed_ocr:
+        from services.erp.invoice_amounts import resolve
+
+        result["items"] = items
+        if strict:
+            resolve(result)
+        subtotal = _decimal(result.get("subtotal") or "0")
     prefix = "buyer" if direction == "purchase" else "seller"
     result.update(
         {
@@ -98,29 +110,83 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
             "items": items,
             "subtotal": str(subtotal),
             "vat": str(vat),
-            "total_amount": str(subtotal + vat),
+            "total_amount": str(
+                _decimal(result["total_amount"]) if reviewed_ocr else subtotal + vat
+            ),
             "invoice_number": str(result.get("invoice_number") or f"REC-{history_id}").strip(),
             f"{prefix}_name": subject["name"],
             f"{prefix}_tax": subject.get("tax_id") or "",
         }
     )
-    if strict and result.get("manual_layout") == 1:
+    if strict:
         from services.erp.internal_payment import payment
 
         payment(result, direction)
     return result
 
 
-def save_draft(user, *, history_id, workspace_id, direction, fields, source="erp_web"):
+def save_draft(
+    user,
+    *,
+    history_id,
+    workspace_id,
+    direction,
+    fields,
+    source="erp_web",
+    previous_workspace_id=None,
+):
     """A client-generated id makes create/retry idempotent, without a new draft table."""
     from services.erp.business_dates import standard
 
     history_id = str(UUID(str(history_id)))
     authorize(user, workspace_id, direction)
+    if previous_workspace_id is not None:
+        authorize(user, previous_workspace_id, direction)
     if source not in SOURCES:
         raise HTTPException(403, detail="authz.entrance_scope")
     with db.get_cursor_rls(str(user["tenant_id"]), user_id=str(user["id"]), commit=True) as cur:
         subject = workspace(cur, user, workspace_id)
+        if previous_workspace_id is not None:
+            cur.execute(
+                "SELECT staged, filename, workspace_client_id, pages FROM ocr_history "
+                "WHERE id=%s::uuid AND tenant_id=%s::uuid AND user_id=%s::uuid "
+                "AND source='line_erp' FOR UPDATE",
+                (history_id, str(user["tenant_id"]), str(user["id"])),
+            )
+            existing = cur.fetchone()
+            if (
+                not existing
+                or not existing["staged"]
+                or existing["filename"] != "manual"
+                or int(existing["workspace_client_id"]) != int(previous_workspace_id)
+            ):
+                raise HTTPException(409, detail="erp.workspace_mismatch")
+            retained = existing.get("pages") or [{}]
+            fields = dict(retained[0].get("fields") or {})
+            if fields.get("direction") != direction:
+                raise HTTPException(409, detail="erp.direction_changed")
+            prefix = "buyer" if direction == "purchase" else "seller"
+            fields[prefix + "_tax"] = subject.get("tax_id") or ""
+            fields[prefix + "_name"] = subject["name"]
+            fields["items"] = [
+                {k: v for k, v in item.items() if k not in {"product_id", "code"}}
+                for item in fields.get("items") or []
+            ]
+            retained[0]["fields"] = fields
+            cur.execute(
+                "UPDATE ocr_history SET workspace_client_id=%s, pages=%s::jsonb, "
+                "seller_name=%s, updated_at=NOW() WHERE id=%s::uuid "
+                "AND tenant_id=%s::uuid AND user_id=%s::uuid",
+                (
+                    workspace_id,
+                    json.dumps(retained, ensure_ascii=False),
+                    fields.get("seller_name"),
+                    history_id,
+                    str(user["tenant_id"]),
+                    str(user["id"]),
+                ),
+            )
+            return {"history_id": history_id, "fields": fields, "status": "draft"}
         clean = normalized_fields(fields, direction, subject, history_id, strict=False)
         pages = json.dumps([{"page_number": 1, "fields": clean}], ensure_ascii=False)
         cur.execute(

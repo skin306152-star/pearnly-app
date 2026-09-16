@@ -18,6 +18,8 @@ const convertStatus = new Map<string, ConvertResult>();
 let confirmationErrorCode = '';
 
 const CONFIRM_ERROR_KEYS: Record<string, string> = {
+    'erp.amount_mismatch': 'dxi-err-amount-mismatch',
+    amount_mismatch: 'dxi-err-amount-mismatch',
     'history.date_unreadable': 'dxi-err-date-unreadable',
     'erp.workspace_mismatch': 'dxi-err-workspace-mismatch',
     'erp.formal_document_locked': 'dxi-err-formal-locked',

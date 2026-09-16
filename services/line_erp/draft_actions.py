@@ -51,6 +51,12 @@ async def act_draft(
     if not history_ids and payload.get("history_id"):
         history_ids = [str(payload["history_id"])]
     if not history_ids:
+        if reply_token:
+            line_client.reply_text(
+                reply_token,
+                "รายการนี้สิ้นสุดแล้ว กรุณาเปิดเมนูเพื่อเริ่มรายการใหม่",
+                channel=CHANNEL,
+            )
         return {"ok": False, "status": 409, "detail": "line_erp.draft_empty"}
     if session.get("state") not in ("draft", "editing") or history_id not in history_ids:
         if reply_token:
@@ -103,7 +109,11 @@ async def act_draft(
                     (
                         "เอกสารนี้บันทึกแล้ว กรุณาทิ้งรายการซ้ำครับ"
                         if duplicate
-                        else "บันทึกไม่สำเร็จ กรุณาเปิดแก้ไขรายการแล้วลองใหม่"
+                        else (
+                            "ยอดสินค้า ส่วนลด และภาษีไม่ตรงกับยอดรวม กรุณาเปิดแก้ไขก่อนบันทึก"
+                            if "amount_mismatch" in str(detail)
+                            else "บันทึกไม่สำเร็จ กรุณาเปิดแก้ไขรายการแล้วลองใหม่"
+                        )
                     ),
                     channel=CHANNEL,
                 )

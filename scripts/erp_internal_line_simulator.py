@@ -95,7 +95,6 @@ def install(app, *, line_user_id: str):
 
     @router.post("/__line_sim/event")
     async def event(body: Event):
-        messages.clear()
         envelope = {"source": {"userId": line_user_id}, "replyToken": "local-reply"}
         if body.postback:
             envelope.update(type="postback", postback={"data": body.postback})
@@ -106,7 +105,6 @@ def install(app, *, line_user_id: str):
 
     @router.post("/__line_sim/upload")
     async def upload(file: UploadFile = File(...), fixture: bool = Form(False)):
-        messages.clear()
         message_id = secrets.token_urlsafe(16)
         downloads[message_id] = await file.read()
         from services.line_erp import store

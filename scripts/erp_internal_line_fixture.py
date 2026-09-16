@@ -20,6 +20,7 @@ def install():
         invoice = ThaiInvoice(
             invoice_number=f"SIM-{uuid4().hex[:12]}",
             date="2026-09-15",
+            date_raw="15/09/2569",
             seller_name="Simulator supplier",
             buyer_name="Simulator customer",
             **{f"{own}_tax": "0105559999996"},

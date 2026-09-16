@@ -1,99 +1,215 @@
-<!doctype html>
-<html lang="zh">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>ERP LINE 本地模拟</title>
-    <link rel="stylesheet" href="/static/pearnly-ui.css" />
-    <link rel="stylesheet" href="/static/dist/main.css" />
-  </head>
-  <body>
-    <main class="er-entry">
-      <h2>ERP LINE 本地模拟对话</h2>
-      <p>模拟 LINE 收发与登录，草稿和保存使用本地真实接口与数据库。</p>
-      <div id="chat" aria-live="polite"></div>
-      <form id="send">
-        <input id="text" aria-label="消息" value="菜单" /><button class="btn primary">发送</button>
-      </form>
-      <button class="btn" id="menu">打开菜单</button>
-      <form id="upload">
-        <label
-          ><input type="checkbox" id="fixture" />使用固定识别样本（仅验证录入流程，不验证 OCR
-          准确率）</label
-        ><input type="file" id="file" required /><button class="btn">发送文件</button>
-      </form>
-    </main>
-    <script>
-      const chat = document.getElementById('chat');
-      function add(text) {
-        const p = document.createElement('p');
-        p.textContent = text;
-        chat.append(p);
+<!doctype html><meta charset="utf-8" /><title>LINE ERP 本地联调</title
+><style>
+  body {
+    font: 15px system-ui;
+    background: #dce6df;
+    margin: 0;
+    color: #232733;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    background: #253c31;
+    color: white;
+    padding: 15px;
+    z-index: 2;
+  }
+  main {
+    max-width: 600px;
+    margin: auto;
+    padding: 15px;
+  }
+  article {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 16px 0;
+    box-shadow: 0 2px 5px #0001;
+  }
+  .user {
+    text-align: right;
+    background: #adf7bd;
+  }
+  button {
+    padding: 10px 16px;
+    margin: 4px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+  }
+  input {
+    padding: 10px;
+  }
+  footer {
+    position: sticky;
+    bottom: 0;
+    background: #edf4ef;
+    padding: 10px;
+  }
+  small {
+    color: #697e72;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .row > * {
+    min-width: 0;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+  }
+  #chat img {
+    max-width: 100%;
+  }
+</style>
+<header>
+  LINE ERP 实操验收 · 隔离本地数据<br /><small style="color: #dae7de"
+    >真实业务处理器；模拟 LINE 传输与登录；卡片近似渲染，不代表手机像素验收</small
+  >
+</header>
+<main>
+  <div id="chat"></div>
+  <footer>
+    <form id="send">
+      <input id="text" aria-label="消息" placeholder="输入消息" /><button>发送</button>
+    </form>
+    <button id="menu">打开菜单</button>
+    <form id="upload">
+      <label><input type="checkbox" id="fixture" />固定 OCR 样本（默认关闭）</label><br /><input
+        type="file"
+        id="file"
+        required
+      /><button>发送文件</button>
+    </form>
+  </footer>
+</main>
+<script>
+  let seen = 0;
+  const chat = document.querySelector('#chat');
+  function log(text, cls = '') {
+    let a = document.createElement('article');
+    a.className = cls;
+    a.textContent = text;
+    chat.append(a);
+    return a;
+  }
+  async function act(a) {
+    if (a.type === 'uri') {
+      const u = new URL(a.uri);
+      window.open(
+        '/liff/erp?draft=' + encodeURIComponent(u.searchParams.get('draft')),
+        'audit-editor'
+      );
+      return;
+    }
+    if (a.type === 'postback') send({ postback: a.data });
+    if (a.type === 'message') send({ text: a.text });
+  }
+  function render(n) {
+    let e = document.createElement('div');
+    if (!n) return e;
+    if (n.type === 'separator') {
+      return document.createElement('hr');
+    }
+    if (n.type === 'text') {
+      e.textContent = n.text;
+      e.style.color = n.color || '';
+      e.style.fontWeight = n.weight === 'bold' ? '700' : '';
+      e.style.fontSize =
+        { xxs: '11px', xs: '12px', sm: '13px', lg: '19px', xl: '22px' }[n.size] || '15px';
+      e.style.padding = '3px 0';
+    } else if (n.type === 'button') {
+      e = document.createElement('button');
+      e.textContent = n.action?.label || '按钮';
+      e.onclick = () => act(n.action);
+      e.style.minHeight = n.height === 'sm' ? '40px' : '52px';
+      e.style.borderRadius = '8px';
+      if (n.style === 'link') {
+        e.style.background = 'transparent';
+        e.style.color = n.color || '#42659a';
       }
-      async function send(body) {
-        add(body.text || body.postback);
-        const r = await fetch('/__line_sim/event', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        const data = await r.json();
-        if (!r.ok) {
-          add(JSON.stringify(data));
-          return;
-        }
-        for (const message of data.messages) {
-          add(message.text || message.altText || '');
-          render(message);
-        }
+      if (n.style === 'secondary') {
+        e.style.background = '#dce0e5';
+        e.style.color = '#111';
       }
-      function render(node) {
-        if (!node || typeof node !== 'object') return;
-        if (node.action) {
-          const action = node.action;
-          const b = document.createElement('button');
-          b.className = 'btn';
-          b.textContent = action.label || action.displayText || '选择';
-          b.onclick = () => {
-            if (action.type === 'postback') send({ postback: action.data });
-            else if (action.type === 'uri') {
-              const url = new URL(action.uri);
-              const draft = url.searchParams.get('draft');
-              window.open(
-                '/liff/erp?draft=' + encodeURIComponent(draft) + '&lang=zh',
-                'erp-local-editor'
-              );
-            }
-          };
-          chat.append(b);
-        }
-        for (const [key, value] of Object.entries(node)) {
-          if (key === 'action') continue;
-          if (Array.isArray(value)) value.forEach(render);
-          else if (value && typeof value === 'object') render(value);
-        }
+      if (n.style === 'primary') {
+        e.style.background = n.color || '#06c755';
+        e.style.color = 'white';
       }
-      document.getElementById('send').onsubmit = (e) => {
-        e.preventDefault();
-        send({ text: document.getElementById('text').value });
-      };
-      document.getElementById('menu').onclick = () => send({ text: 'menu' });
-      document.getElementById('upload').onsubmit = async (e) => {
-        e.preventDefault();
-        const file = document.getElementById('file').files[0];
-        if (!file) return;
-        add(file.name + '：识别中…');
-        const form = new FormData();
-        form.append('file', file);
-        form.append('fixture', String(document.getElementById('fixture').checked));
-        const r = await fetch('/__line_sim/upload', { method: 'POST', body: form });
-        const data = await r.json();
-        for (const message of data.messages || []) {
-          add(message.text || message.altText || '');
-          render(message);
-        }
-        if (!r.ok) add(JSON.stringify(data));
-      };
-    </script>
-  </body>
-</html>
+    } else if (n.type === 'image') {
+      e = document.createElement('img');
+      e.src = n.url;
+      e.style.maxHeight = n.size === 'full' ? '220px' : '35px';
+    } else {
+      e.className = n.layout === 'horizontal' ? 'row' : 'col';
+      if (n.backgroundColor) e.style.background = n.backgroundColor;
+      for (const k of ['header', 'hero', 'body', 'footer']) if (n[k]) e.append(render(n[k]));
+      for (const c of n.contents || []) e.append(render(c));
+    }
+    if (n.action && n.type !== 'button') {
+      e.setAttribute('role', 'button');
+      e.tabIndex = 0;
+      e.onclick = () => act(n.action);
+    }
+    return e;
+  }
+  function show(m) {
+    const e = document.createElement('article');
+    const t = document.createElement('small');
+    t.textContent = new Date().toLocaleTimeString();
+    e.append(t);
+    if (m.text) {
+      const p = document.createElement('p');
+      p.textContent = m.text;
+      e.append(p);
+    }
+    if (m.contents) e.append(render(m.contents));
+    for (const q of m.quickReply?.items || []) {
+      let b = document.createElement('button');
+      b.textContent = q.action.label;
+      b.onclick = () => act(q.action);
+      e.append(b);
+    }
+    chat.append(e);
+  }
+  async function poll() {
+    let d = await (await fetch('/__line_sim/messages')).json();
+    while (seen < d.messages.length) show(d.messages[seen++]);
+  }
+  async function send(v) {
+    log(v.text || v.postback, 'user');
+    try {
+      let r = await fetch('/__line_sim/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(v),
+      });
+      if (!r.ok) log('错误 ' + r.status + ' ' + (await r.text()));
+      await poll();
+    } catch (e) {
+      log(e.message);
+    }
+  }
+  document.querySelector('#send').onsubmit = (e) => {
+    e.preventDefault();
+    send({ text: document.querySelector('#text').value });
+  };
+  document.querySelector('#menu').onclick = () => send({ text: 'menu' });
+  document.querySelector('#upload').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = document.querySelector('#file').files[0];
+    log('上传 ' + f.name, 'user');
+    const d = new FormData();
+    d.append('file', f);
+    d.append('fixture', document.querySelector('#fixture').checked);
+    const r = await fetch('/__line_sim/upload', { method: 'POST', body: d });
+    if (!r.ok) log('错误 ' + r.status + ' ' + (await r.text()));
+    await poll();
+  };
+  setInterval(poll, 1000);
+  poll();
+</script>

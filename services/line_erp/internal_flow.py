@@ -281,3 +281,23 @@ def refresh_draft_selection(binding, line_user_id, session):
         store.set_session(binding["tenant_id"], line_user_id, session["state"], payload)
         return {**session, "payload": payload}
     return session
+
+
+def manual_workspaces(binding, direction):
+    """Only expose active workspaces this LINE actor can create records in."""
+    user = actor(binding)
+    with db.get_cursor_rls(str(binding["tenant_id"]), user_id=str(binding["user_id"])) as cur:
+        cur.execute(
+            "SELECT id, name FROM workspace_clients WHERE tenant_id=%s::uuid "
+            "AND is_active=TRUE ORDER BY name",
+            (str(binding["tenant_id"]),),
+        )
+        rows = cur.fetchall()
+    allowed = []
+    for row in rows:
+        try:
+            internal_records.authorize(user, int(row["id"]), direction)
+        except HTTPException:
+            continue
+        allowed.append(dict(row))
+    return allowed

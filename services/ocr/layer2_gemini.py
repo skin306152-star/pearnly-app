@@ -243,5 +243,9 @@ def _call_gemini_with_retry(
         from services.ocr.feedback import fewshot
 
         fewshot_hint = fewshot.maybe_block_for_text(text)
+    if system_prompt_override is None:
+        from services.erp.ocr_fields import extend
+
+        sys_prompt = extend(sys_prompt)
     base_prompt = sys_prompt + "\n\n" + fewshot_hint + _USER_PROMPT_PREFIX + text
     return _call_l2_via_gateway(base_prompt, api_key, model_name, max_retries, timeout)

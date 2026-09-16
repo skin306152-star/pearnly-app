@@ -189,6 +189,10 @@ class ThaiInvoice(BaseModel):
         description="final net payable (Total / NET / ยอดสุทธิ / รวมสุทธิ / grand total), "
         "AFTER any discount. NEVER the cash tendered or change.",
     )
+    payment_received: str = Field(
+        default="",
+        description="Explicit net amount actually paid; empty when not printed. Never infer from payment method or total.",
+    )
     cash_amount: str = Field(
         default="",
         description="cash tendered / amount received (เงินสด/รับเงิน/รับมา/CASH), "
@@ -253,6 +257,7 @@ class ThaiInvoice(BaseModel):
         "wht_rate",
         "wht_amount",
         "discount",
+        "payment_received",
         "cash_amount",
         "change_amount",
         "notes",
@@ -315,6 +320,11 @@ class ThaiInvoice(BaseModel):
     @model_validator(mode="after")
     def _normalize_year(self):
         """年份确定性重算(不信 LLM 算术):2 位年消歧 + 4 位佛历减 543(治 2569 被误算成 2023)。"""
+        from services.erp.ocr_fields import enabled, printed_date
+
+        if enabled():
+            self.date = printed_date(self.date_raw)
+            return self
         ty = date.today().year
         self.date = _fix_two_digit_year_date(self.date_raw, self.date, ty)
         self.date = _fix_buddhist_year_date(self.date_raw, self.date, ty)

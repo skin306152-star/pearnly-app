@@ -314,6 +314,19 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
     async def test_failed_confirm_keeps_session(self):
         await self._assert_confirm({"ok": False, "status": 409, "detail": "erp.confirm_failed"})
 
+    async def test_finished_card_replies_without_confirming_again(self):
+        with (
+            mock.patch.object(webhook.store, "get_session", return_value=None),
+            mock.patch.object(webhook.line_client, "reply_text") as reply,
+            mock.patch.object(webhook, "_confirm") as confirm,
+        ):
+            result = await webhook.act_draft(
+                {"tenant_id": "t1", "user_id": "u1"}, "line-u1", "reply", "h1", "confirm"
+            )
+        self.assertFalse(result["ok"])
+        reply.assert_called_once()
+        confirm.assert_not_called()
+
     async def test_complete_confirm_saves_without_push(self):
         await self._assert_confirm(
             {"ok": True, "status": "saved", "converted": [{"history_id": "h1"}]}

@@ -8,6 +8,9 @@
 // ============================================================
 window.I18N = {
     zh: {
+        'erp-ocr-paid': '实收／实付金额',
+        'erp-ocr-tendered': '现金收付额（找零前）',
+        'erp-ocr-change': '找零',
         'nav-work': '工作协作',
         'st-scan-first': "直接扫描实物，匹配后输入本次数量。",
         'st-manual-code': "输入条形码、QR编号或商品编号",
@@ -2880,6 +2883,7 @@ window.I18N = {
         'dxi-rev-saved': '修改已保存',
         'dxi-rev-save-fail': '保存失败 · 请重试',
         'dxi-err-date-unreadable': '票面日期无法识别，请改为如 24 ธันวาคม 2568 或 24/12/2568',
+        'dxi-err-amount-mismatch': '商品金额、折扣、税额与总额不一致，请核对后再保存。',
         'dxi-err-workspace-mismatch': '单据归属与当前公司不一致，请先在上方归入/切换正确公司',
         'dxi-err-formal-locked': '该单据已生成正式记录，不能再修改；系统将按已确认状态继续',
         'dxi-err-confirm-status': '无法核验正式记录状态，请重试',
@@ -5353,6 +5357,9 @@ window.I18N = {
         'stc-op-save-fail': '保存失败,请重试',
     },
     en: {
+        'erp-ocr-paid': 'Amount paid',
+        'erp-ocr-tendered': 'Cash tendered (before change)',
+        'erp-ocr-change': 'Change',
         'nav-work': 'Work collaboration',
         'st-scan-first': "Scan the physical item, then enter the quantity counted this time.",
         'st-manual-code': "Enter barcode, QR ID or product code",
@@ -8222,6 +8229,7 @@ window.I18N = {
         'dxi-rev-saved': 'Changes saved',
         'dxi-rev-save-fail': 'Save failed, please retry',
         'dxi-err-date-unreadable': 'The invoice date could not be read. Use a format such as 24 ธันวาคม 2568 or 24/12/2568',
+        'dxi-err-amount-mismatch': 'Item amounts, discount and tax do not match the total. Review them before saving.',
         'dxi-err-workspace-mismatch': 'This document belongs to another company. Assign it above or switch to the correct company first',
         'dxi-err-formal-locked': 'A formal record already exists and cannot be edited. The confirmed record will be used',
         'dxi-err-confirm-status': 'Could not verify the formal record status. Please retry',
@@ -10678,6 +10686,9 @@ window.I18N = {
         'stc-op-save-fail': 'Failed to save, please retry',
     },
     th: {
+        'erp-ocr-paid': 'ยอดชำระจริง',
+        'erp-ocr-tendered': 'เงินสดที่รับ (ก่อนทอน)',
+        'erp-ocr-change': 'เงินทอน',
         'nav-work': 'การทำงานร่วมกัน',
         'st-scan-first': "สแกนสินค้าจริง แล้วกรอกจำนวนที่นับครั้งนี้",
         'st-manual-code': "กรอกบาร์โค้ด รหัส QR หรือรหัสสินค้า",
@@ -13543,6 +13554,7 @@ window.I18N = {
         'dxi-rev-saved': 'บันทึกการแก้ไขแล้ว',
         'dxi-rev-save-fail': 'บันทึกไม่สำเร็จ · ลองใหม่',
         'dxi-err-date-unreadable': 'อ่านวันที่บนเอกสารไม่ได้ โปรดแก้เป็นรูปแบบ เช่น 24 ธันวาคม 2568 หรือ 24/12/2568',
+        'dxi-err-amount-mismatch': 'ยอดสินค้า ส่วนลด และภาษีไม่ตรงกับยอดรวม กรุณาตรวจสอบก่อนบันทึก',
         'dxi-err-workspace-mismatch': 'เอกสารนี้เป็นของบริษัทอื่น โปรดกำหนดบริษัทด้านบนหรือสลับไปยังบริษัทที่ถูกต้องก่อน',
         'dxi-err-formal-locked': 'เอกสารนี้สร้างรายการทางการแล้วและแก้ไขไม่ได้ ระบบจะใช้รายการที่ยืนยันไว้',
         'dxi-err-confirm-status': 'ตรวจสอบสถานะรายการทางการไม่ได้ โปรดลองใหม่',
@@ -15996,6 +16008,9 @@ window.I18N = {
         'stc-op-save-fail': 'บันทึกไม่สำเร็จ กรุณาลองใหม่',
     },
     ja: {
+        'erp-ocr-paid': '支払済金額',
+        'erp-ocr-tendered': '現金受取額（釣銭前）',
+        'erp-ocr-change': '釣銭',
         'nav-work': '共同作業',
         'st-scan-first': "実物をスキャンして、今回数えた数量を入力します。",
         'st-manual-code': "バーコード・QR番号・商品コードを入力",
@@ -18856,6 +18871,7 @@ window.I18N = {
         'dxi-rev-saved': '変更を保存しました',
         'dxi-rev-save-fail': '保存に失敗 · 再試行してください',
         'dxi-err-date-unreadable': '伝票の日付を読み取れません。24 ธันวาคม 2568 または 24/12/2568 のように修正してください',
+        'dxi-err-amount-mismatch': '商品金額・割引・税額が合計と一致しません。確認してから保存してください。',
         'dxi-err-workspace-mismatch': 'この伝票は別の会社に属しています。上で振り分けるか、正しい会社に切り替えてください',
         'dxi-err-formal-locked': 'この伝票は正式記録を作成済みのため編集できません。確認済みの記録を使用します',
         'dxi-err-confirm-status': '正式記録の状態を確認できません。再試行してください',

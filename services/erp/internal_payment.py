@@ -1,4 +1,4 @@
-"""Carry explicit manual payment amounts into the existing document ledgers."""
+"""Carry explicit manual or printed OCR payments into existing document ledgers."""
 
 from decimal import Decimal, InvalidOperation
 
@@ -26,6 +26,12 @@ def payment(fields, direction):
             - amount("withholding_outstanding")
         )
     )
+    if fields.get("manual_layout") != 1:
+        paid = (
+            amount("payment_received")
+            if fields.get("payment_received") not in (None, "")
+            else amount("cash_amount") - amount("change_amount")
+        )
     total = amount("total_amount")
     if paid < 0 or paid > total:
         raise HTTPException(422, detail="erp.invalid_amount")

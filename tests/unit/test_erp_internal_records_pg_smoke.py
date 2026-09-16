@@ -112,6 +112,128 @@ class InternalRecordsPgSmoke(unittest.TestCase):
             self.user, history_ids=[hid], workspace_id=self.wid, direction=direction
         )
 
+    def test_manual_workspace_switch_is_atomic_and_scoped(self):
+        self.cur.execute(
+            "INSERT INTO workspace_clients(user_id,tenant_id,name,tax_id) VALUES(%s,%s,'Other company','0105558888888') RETURNING id",
+            (self.uid, self.tid),
+        )
+        target = self.cur.fetchone()["id"]
+        for direction in ("purchase", "sales"):
+            hid, fields = self.draft(direction, "line_erp")
+            fields["items"][0]["product_id"] = str(uuid.uuid4())
+            fields["items"][0]["code"] = "OLD"
+            result = internal_records.save_draft(
+                self.user,
+                history_id=hid,
+                workspace_id=target,
+                direction=direction,
+                fields=fields,
+                source="line_erp",
+                previous_workspace_id=self.wid,
+            )
+            self.assertNotIn("product_id", result["fields"]["items"][0])
+            prefix = "buyer" if direction == "purchase" else "seller"
+            self.assertEqual(result["fields"][prefix + "_tax"], "0105558888888")
+            self.cur.execute("SELECT workspace_client_id FROM ocr_history WHERE id=%s", (hid,))
+            self.assertEqual(self.cur.fetchone()["workspace_client_id"], target)
+            with self.assertRaises(HTTPException):
+                self.confirm(hid, direction)
+            internal_records.confirm(
+                self.user, history_ids=[hid], workspace_id=target, direction=direction
+            )
+            with self.assertRaises(HTTPException):
+                internal_records.save_draft(
+                    self.user,
+                    history_id=hid,
+                    workspace_id=self.wid,
+                    direction=direction,
+                    fields=result["fields"],
+                    source="line_erp",
+                    previous_workspace_id=target,
+                )
+
+    def test_ocr_cannot_be_reassigned_as_manual(self):
+        hid, fields = self.draft("purchase", "line_erp")
+        self.cur.execute("UPDATE ocr_history SET filename='receipt.pdf' WHERE id=%s", (hid,))
+        with self.assertRaises(HTTPException):
+            internal_records.save_draft(
+                self.user,
+                history_id=hid,
+                workspace_id=self.wid,
+                direction="purchase",
+                fields=fields,
+                source="line_erp",
+                previous_workspace_id=self.wid,
+            )
+
+    def test_reviewed_inclusive_purchase_preserves_total_and_net_stock_cost(self):
+        hid, fields = self.draft(
+            "purchase",
+            "line_erp",
+            invoice_number="OCR-P1125",
+            items=[{"name": "Dishwashing liquid", "qty": "45", "price": "25", "subtotal": "1125"}],
+            subtotal="1051.40",
+            vat="73.60",
+            total_amount="1125.00",
+        )
+        self.assertEqual(fields["total_amount"], "1125.00")
+        self.confirm(hid)
+        self.cur.execute(
+            "SELECT d.grand_total,d.vat_amount,l.qty,l.line_total FROM purchase_docs d "
+            "JOIN purchase_lines l ON l.purchase_doc_id=d.id WHERE d.ocr_history_id=%s",
+            (hid,),
+        )
+        row = self.cur.fetchone()
+        self.assertEqual(str(row["grand_total"]), "1125.00")
+        self.assertEqual(str(row["vat_amount"]), "73.60")
+        self.assertEqual(row["qty"], 45)
+        self.assertEqual(str(row["line_total"]), "1051.40")
+
+    def test_reviewed_walk_in_sale_discount_and_duplicate(self):
+        prices = [590, 590, 150, 50, 69, 150, 300, 189, 189, 50, 390, 290, 999]
+        data = dict(
+            invoice_number="02000131",
+            buyer_name="",
+            buyer_tax="",
+            subtotal="3757.01",
+            vat="248.99",
+            discount="200",
+            total_amount="3806.00",
+            items=[
+                {
+                    "name": "Sale item " + str(i),
+                    "qty": "1",
+                    "price": str(price),
+                    "subtotal": str(price),
+                }
+                for i, price in enumerate(prices)
+            ],
+        )
+        hid, fields = self.draft("sales", "line_erp", **data)
+        self.assertEqual(fields["total_amount"], "3806.00")
+        self.confirm(hid, "sales")
+        self.cur.execute(
+            "SELECT grand_total,vat_amount,header_discount_amount FROM sales_documents "
+            "WHERE ocr_history_id=%s",
+            (hid,),
+        )
+        row = self.cur.fetchone()
+        self.assertEqual(str(row["grand_total"]), "3806.00")
+        self.assertEqual(str(row["vat_amount"]), "248.99")
+        self.assertEqual(str(row["header_discount_amount"]), "200.00")
+        second, _ = self.draft("sales", "line_erp", **data)
+        with self.assertRaises(HTTPException) as caught:
+            self.confirm(second, "sales")
+        self.assertEqual(caught.exception.detail["histories"][0]["reason"], "duplicate")
+
+    def test_inconsistent_ocr_is_not_silently_recalculated(self):
+        hid, _ = self.draft("purchase", "line_erp", subtotal="200", vat="14", total_amount="500")
+        with self.assertRaises(HTTPException) as caught:
+            self.confirm(hid)
+        self.assertEqual(caught.exception.detail, "erp.amount_mismatch")
+        self.cur.execute("SELECT count(*) AS n FROM purchase_docs WHERE ocr_history_id=%s", (hid,))
+        self.assertEqual(self.cur.fetchone()["n"], 0)
+
     def test_manual_payment_reaches_formal_documents_once(self):
         for direction in ("purchase", "sales"):
             with self.subTest(direction=direction):
@@ -129,6 +251,23 @@ class InternalRecordsPgSmoke(unittest.TestCase):
                 row = self.cur.fetchone()
                 self.assertEqual(str(row["paid_amount"]), "50.00")
                 self.assertEqual(row["payment_status"], "partial")
+
+    def test_ocr_explicit_payment_reaches_both_ledgers_once(self):
+        for direction in ("purchase", "sales"):
+            with self.subTest(direction=direction):
+                hid, _ = self.draft(
+                    direction, "line_erp", payment_received="200", payment_method="card"
+                )
+                self.confirm(hid, direction)
+                self.confirm(hid, direction)
+                table = "purchase_docs" if direction == "purchase" else "sales_documents"
+                self.cur.execute(
+                    f"SELECT paid_amount,payment_status FROM {table} WHERE ocr_history_id=%s",
+                    (hid,),
+                )
+                row = self.cur.fetchone()
+                self.assertEqual(str(row["paid_amount"]), "200.00")
+                self.assertEqual(row["payment_status"], "paid")
 
     def test_duplicate_source_invoice_does_not_create_second_document(self):
         for direction in ("purchase", "sales"):

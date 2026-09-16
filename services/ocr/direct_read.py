@@ -34,6 +34,7 @@ from typing import List, Optional
 from pydantic import ValidationError
 
 from core.concurrency import submit_ctx
+from services.erp.ocr_fields import extend as erp_prompt
 from services.ocr.contracts import (
     DirectReadFallback,
 )  # noqa: F401 — 既有调用方(pipeline/qwen_direct/测试)从本模块 import,兼容再导出
@@ -172,6 +173,7 @@ def _call_model(
             _SYSTEM_PROMPT if document_type in ("auto", "invoice") else _DOC_PROMPTS[document_type]
         )
         sys_prompt = base_prompt + _IMAGE_INPUT_NOTE
+    sys_prompt = erp_prompt(sys_prompt) if document_type in ("auto", "invoice") else sys_prompt
     # 与 L2 同口径兜 env:aistudio provider 只认显式 key(vertex 走 SA 忽略此参)
     key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     request_options = {}

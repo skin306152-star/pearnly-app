@@ -415,12 +415,14 @@ def _call_gemini_with_retry(
     except Exception as e:
         raise TypeError(f"layer3: image_bytes not a valid image: {type(e).__name__}: {e}") from e
 
+    from services.erp.ocr_fields import extend
+
     base_user_prompt = _build_user_prompt(layer1_text, layer2_invoice, trigger_reasons)
     mime = f"image/{(pil_image.format or 'png').lower()}"
     return _call_l3_via_gateway(
         image_bytes,
         mime,
-        _SYSTEM_PROMPT,
+        extend(_SYSTEM_PROMPT),
         base_user_prompt,
         api_key,
         model_name,

@@ -143,7 +143,15 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
         );
     };
     const core = revCore(inv.fields).map(cell).join('');
-    const more = revMore(inv.fields).map(cell).join('');
+    const moreFields = revMore(inv.fields);
+    if (isErpEntry()) {
+        moreFields.push(
+            ['payment_received', 'erp-ocr-paid'],
+            ['cash_amount', 'erp-ocr-tendered'],
+            ['change_amount', 'erp-ocr-change']
+        );
+    }
+    const more = moreFields.map(cell).join('');
     // 包一层:右侧查看器要靠它知道"用户正在核对第几张",才能翻到那张票所在的物理页。
     // 分组号同时给反向高亮用(手动翻页 → 点亮该页第一张)。
     //

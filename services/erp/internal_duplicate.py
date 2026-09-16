@@ -12,10 +12,10 @@ def guard(cur, *, tenant_id, workspace_id, direction, fields, history_id):
         return
     party = "seller" if direction == "purchase" else "buyer"
     identity = str(fields.get(party + "_tax") or fields.get(party + "_name") or "").strip()
-    if not identity:
-        return
+    if direction == "sales":
+        identity = ""  # Seller workspace + bill/date identifies walk-in sales too.
     day = standard(fields.get("date"))
-    key = json.dumps([str(tenant_id), int(workspace_id), direction, bill, identity, day])
+    key = json.dumps([str(tenant_id), int(workspace_id), direction, bill, day])
     cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (key,))
     cur.execute(
         "SELECT h.pages FROM ocr_history h WHERE h.tenant_id=%s::uuid "
@@ -34,7 +34,7 @@ def guard(cur, *, tenant_id, workspace_id, direction, fields, history_id):
         other = str(existing.get(party + "_tax") or existing.get(party + "_name") or "").strip()
         if (
             existing.get("direction") == direction
-            and other == identity
+            and (direction == "sales" or other == identity)
             and standard(existing.get("date")) == day
         ):
             raise SkipConversion("duplicate")

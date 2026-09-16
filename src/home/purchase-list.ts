@@ -166,7 +166,7 @@ function groupsHtml(list: DocListItem[]): string {
 
 function shell(): string {
     return `<div class="pur pl"><div class="wrap">
-        <div class="ph"><div><div class="t">${escapeHtml(t('pur-title'))}</div><div class="sub">${escapeHtml(t('pur-subtitle'))}</div></div></div>
+        <div class="ph"><div><div class="t">${escapeHtml(t(isErpEntry() || window._entry === 'pos' ? 'nav-purchase-pos' : 'pur-title'))}</div><div class="sub">${escapeHtml(t('pur-subtitle'))}</div></div></div>
         <div class="panel">
             <div class="band">
                 <div class="star" id="pur-star">${starHtml(summary)}</div>

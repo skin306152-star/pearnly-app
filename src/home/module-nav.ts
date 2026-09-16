@@ -37,6 +37,7 @@ const POS_LABEL_KEYS: Record<string, string> = {
 };
 
 const ERP_LABEL_KEYS: Record<string, string> = {
+    'nav-purchase': 'nav-purchase-pos',
     'nav-sales-workbench': 'nav-sales-workbench-erp',
     'nav-sales-account': 'nav-sales-account-erp',
 };

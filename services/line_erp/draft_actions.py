@@ -54,7 +54,9 @@ async def act_draft(
         return {"ok": False, "status": 409, "detail": "line_erp.draft_empty"}
     if session.get("state") not in ("draft", "editing") or history_id not in history_ids:
         if reply_token:
-            line_client.reply_text(reply_token, "รายการหมดอายุ กรุณาเปิดรายการใหม่", channel=CHANNEL)
+            line_client.reply_text(
+                reply_token, "รายการหมดอายุ กรุณาเปิดรายการใหม่", channel=CHANNEL
+            )
         return {"ok": False, "status": 409, "detail": "line_erp.draft_expired"}
     mode = str(payload.get("mode") or "")
     if not team_access.mode_allowed(str(binding["tenant_id"]), str(binding["user_id"]), mode):
@@ -98,9 +100,11 @@ async def act_draft(
                 )
                 line_client.reply_text(
                     reply_token,
-                    "เอกสารนี้บันทึกแล้ว กรุณาทิ้งรายการซ้ำครับ"
-                    if duplicate
-                    else "บันทึกไม่สำเร็จ กรุณาเปิดแก้ไขรายการแล้วลองใหม่",
+                    (
+                        "เอกสารนี้บันทึกแล้ว กรุณาทิ้งรายการซ้ำครับ"
+                        if duplicate
+                        else "บันทึกไม่สำเร็จ กรุณาเปิดแก้ไขรายการแล้วลองใหม่"
+                    ),
                     channel=CHANNEL,
                 )
             return result

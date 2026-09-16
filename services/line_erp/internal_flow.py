@@ -93,7 +93,9 @@ async def begin_mode(binding, line_user_id, reply_token, mode):
                 }
             )
         store.set_session(binding["tenant_id"], line_user_id, "workspace", {"mode": mode})
-        text = "เลือกบริษัทที่ต้องการบันทึกครับ" if choices else "กรุณาสร้างบริษัทใน Pearnly ก่อนครับ"
+        text = (
+            "เลือกบริษัทที่ต้องการบันทึกครับ" if choices else "กรุณาสร้างบริษัทใน Pearnly ก่อนครับ"
+        )
         message = {"type": "text", "text": text}
         if choices:
             message["quickReply"] = {"items": choices[:13]}

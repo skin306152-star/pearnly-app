@@ -193,7 +193,9 @@ async def _handle_text(
         return
     if mode not in _allowed_modes(binding):
         if reply_token:
-            line_client.reply_text(reply_token, "บัญชีนี้ไม่มีสิทธิ์สำหรับรายการนี้", channel=CHANNEL)
+            line_client.reply_text(
+                reply_token, "บัญชีนี้ไม่มีสิทธิ์สำหรับรายการนี้", channel=CHANNEL
+            )
         return
     await internal_flow.begin_mode(binding, line_user_id, reply_token, mode)
 

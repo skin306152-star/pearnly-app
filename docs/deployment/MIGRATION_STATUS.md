@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-15 16:09（UTC+7）。状态：**ERP 网页/LINE 内部录入及 ERP/POS 客户导航整批已发布（`e342486d7deb`）。Web/Worker Ready、各 100% 流量；正式资源回读一致。用户线上网页及 LINE 真机业务验收待确认。**
+更新时间：2026-09-16 14:48（UTC+7）。状态：**ERP 手动录入、佛历日期、商品匹配、入出库与收发存整批已发布（`d307b5fdfd2e`）。Web/Worker Ready、各 100% 流量；历史迁移及正式资源回读通过。用户真机业务验收仍单独确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,6 +27,18 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- 完整 SHA：`d307b5fdfd2eaf92fc0c6a3b48dbaf6c429b8f00`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:711a450e46f03154f3eeb7653ace08da40b32eca3a2eed6c727ea76c5cb7e381`。
+- Web `pearnly-web-d307b5fdfd2e-s3`、Worker `pearnly-worker-d307b5fdfd2e-s3` 均 Ready、各 100% 流量，同 digest。
+- [Manual CD 35069660879](https://github.com/skin306152-star/pearnly-app/actions/runs/35069660879) success；schema `pearnly-schema-dzkvl` 成功，候选/正式健康、就绪、版本及完整安装包验证通过。首次参数填错的 35069633760 在 checkout 阶段取消，未进入认证、迁移或发布。
+- ERP 网页/LINE 原预览卡与编辑框修复、手动参考布局、佛历业务日期、PE/SI/IR/IS 编号、精确商品身份与关键词候选、独立 IR/IS 单据、收发存展开搜索及期初信息栏整批发布；Cowork 业务保留，未新增独立商品/库存管理页。
+- 全量 pre-push：1,194 模块 / 6 分片及机械闸通过；24 项本地真库测试通过。网页与 LINE 模拟器、Chromium/WebKit 证据见任务记录。
+- 历史迁移在串行 schema Job 中执行：12 条 ERP 历史转换佛历，51 份原始行保存在 `erp_history_upgrade_backups`（tenant RLS）；39 行原生单据/明细/期初数量、金额、计算日期与发布前逐项一致，正式采购/销售商品关联完整。上线前事务回滚演练及受限本地备份已完成。未改 Cowork 历史。
+- 正式 health/ready、ERP/LINE/Cowork/POS 入口 HTTP 200；main.js/main.css `09160102`、共享编辑器 JS/CSS `manual-layout-10`、LINE JS `20` 与候选逐字节一致。
+- 未向真实账套写测试单或发送真实 LINE 消息；HTTP/资源回读不代表用户手机业务验收。此后账本提交无需重发业务镜像。
+
+### 上一发布身份（2026-09-15 内部录入与客户导航）
 
 - 完整 SHA：`e342486d7deb214200b78de5e50f03f789a08ae4`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:fd106ccbc6e8e514805fedc0594aa1c632c6614e2e5d2c1bdd60b2c1b8f05fad`。

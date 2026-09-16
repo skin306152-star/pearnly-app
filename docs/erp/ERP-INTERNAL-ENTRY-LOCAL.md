@@ -138,3 +138,9 @@
 - 线上事务回滚演练通过：12 条记录、51 份原始行备份；事务已回滚未持久修改。受限备份 `.local/production-history-before-release.json`，不入 Git。
 - 真库 24 tests passed（内部录入、库存成本、迁移幂等及保留金额），完整 pre-push 与云端发布待执行。
 - 发布范围的净增长按原有 RATCHET-EXEMPT 机制逐文件记录：新增独立 IR/IS、日期、单据号、商品身份、历史迁移模块及 ERP 入口适配。未修改闸门阈值或关闭检查。临时本地浏览器脚本归档至 `/tmp/pearnly-erp-validation-20260916`，截图保留 `.local`。
+
+
+## 2026-09-16 正式发布完成
+- 已部署 `d307b5fdfd2eaf92fc0c6a3b48dbaf6c429b8f00`，Manual CD 35069660879 success，schema dzkvl success；Web/Worker d307b5fdfd2e-s3 Ready 各100%。digest 711a450e46f03154f3eeb7653ace08da40b32eca3a2eed6c727ea76c5cb7e381。
+- 生产历史51份备份、12条佛历历史；39行数量/金额/计算日期不变；商品关联完整；6个正式健康/页面入口200、5个运行资源字节一致。
+- `/tmp/erp-release-push.log` 完整闸通过；`/tmp/erp-cloud-deploy-final.log` 远程发布；`/tmp/erp-production-final-readback.log` 正式只读验证。真实手机业务验收不在自动发布结论中。

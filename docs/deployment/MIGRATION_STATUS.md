@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-16 17:42（UTC+7）。状态：**ERP LINE 流程修复及按钮逐行排版已发布（`8a3b06d82b9f`）。Web/Worker Ready、各100%流量；正式资源逐字节回读通过。真实手机业务验收仍单独确认。**
+更新时间：2026-09-16 19:34（UTC+7）。状态：**ERP原票日期、金额、明确收付款与账套编辑修复已发布（`c5fcee41785d`）。Web/Worker Ready、各100%流量；正式资源逐字节回读通过。线上旧单按用户要求未纠正。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,6 +27,19 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- 完整 SHA：`c5fcee41785d9d1ca6117e700da6aa3ae4008df9`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:85aa9fe0b698f7050cf461185b413b8dd2d76d45f52cc78d84db478c7ae94d1f`。
+- Web `pearnly-web-c5fcee41785d-s3`、Worker `pearnly-worker-c5fcee41785d-s3`，Ready、各100%流量。
+- [Manual CD 35095646269](https://github.com/skin306152-star/pearnly-app/actions/runs/35095646269) success；schema `pearnly-schema-8pkvw` success。候选与正式健康、就绪、运行SHA及完整安装包检查通过。
+- 本轮：ERP原票日期与明确实收读取、含税总额/折扣及库存净成本、散客票号防重、LINE授权账套选择、已完成卡片反馈；采购侧栏/页面改“采购记录”，月份去掉时代前缀而保留佛历年。Cowork识别逻辑保持。
+- 完整pre-push：1196模块/6分片与机械闸通过。初次测试依赖/模拟数据及缓存缺漏修复后重跑；盘点仅共享词典缓存版本变化，完整扫码E2E未重跑，按现有台账机制登记当日边界。
+- 本地真实OCR→LINE模拟器→正式数据库→网页/库存回读：采购1125、税73.60、已付1125、45件；销售3806、税248.99、已收3806、13件。134项定向测试/11subtests，后续21项unittest通过。真实手机LINE仍未验收；OCR泰文公司名称仍可能误读，需核对编辑。
+- 正式域名health/ready/ERP入口成功；home.html、main.js `09161602`、i18n `09161601`、LINE JS `24`与候选逐字节相同。未认证 `/erp` 返回登录门，未将其当作登录后业务验收。
+- 用户明确取消旧错单纠正：未执行更正采购日期/金额、作废销售重复单或冲回库存；历史错误不会因本次发布自动更正。
+- 证据：`/tmp/erp-receipt-push.log`、`/tmp/erp-receipt-cloud-final.log`、`/tmp/erp-receipt-production-readback.json`、`/tmp/erp-receipt-{web,worker}-state.json`。私有本地业务证据 `.local/incident-20260916/PAYMENT_VERIFICATION.md`。
+
+### 上一发布身份（2026-09-16 LINE流程修复）
 
 - 完整 SHA：`8a3b06d82b9fa9e2c17c1cfdd6ec22cb9feb0ce3`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:15350b178332823a936755d901991dad936b67c21aee0922fdf47be843d950e3`。

@@ -1,3 +1,6 @@
+import { isErpEntry } from './erp-intake.js';
+import { referenceReport, referenceHead } from './stock-card-reference.js';
+import type { StcCardTotals } from './stock-card-api.js';
 // ERP 门户 · 商品收发存报表(Stock Card · 路由 stock-card · window.loadStockCard)
 // 一份按商品连续排列的参考图原样 13 列表格(2026-08-27 拍板):所有商品默认同页、逐笔流水
 // 全露,不设「汇总→单品详情」两段式、未入账 tab、归并/规则/搜索/状态。唯一报表附加能力
@@ -21,12 +24,27 @@ import {
 import { openOpeningsModal } from './stock-card-modals.js';
 
 let groups: StcGroup[] = [];
+let grand: StcCardTotals | undefined;
+let searchTerm = '';
 let dateFrom = '';
 let dateTo = '';
 
 function defaultRange(): { from: string; to: string } {
     const now = new Date();
     return { from: ymdIso(new Date(now.getFullYear(), now.getMonth(), 1)), to: ymdIso(now) };
+}
+
+function searchLabel(): string {
+    return (
+        (
+            {
+                zh: '搜索商品名称或编码',
+                th: 'ค้นหาชื่อหรือรหัสสินค้า',
+                en: 'Search product name or code',
+                ja: '商品名・コードを検索',
+            } as Record<string, string>
+        )[String(window.currentLang || 'th')] || 'Search product name or code'
+    );
 }
 
 function esc(s: string): string {
@@ -42,11 +60,15 @@ function shellHtml(): string {
             </div>
         </div>
         <div class="stc-toolbar">
-            <div class="stc-daterange">
+            ${
+                isErpEntry()
+                    ? `<input type="search" id="stc-search" class="stc-search" aria-label="${esc(searchLabel())}" placeholder="${esc(searchLabel())}" value="${esc(searchTerm)}">`
+                    : `<div class="stc-daterange">
                 <label>${esc(t('stc-date-from-label'))} <input type="date" id="stc-date-from"></label>
                 <label>${esc(t('stc-date-to-label'))} <input type="date" id="stc-date-to"></label>
                 <button type="button" class="btn btn-secondary btn-sm" id="stc-apply">${esc(t('stc-btn-apply'))}</button>
-            </div>
+            </div>`
+            }
             <div class="stc-grow"></div>
             <button type="button" class="btn btn-ghost btn-sm" id="stc-btn-opening">${esc(t('stc-btn-opening'))}</button>
         </div>
@@ -66,7 +88,9 @@ function setReport(html: string): void {
 }
 
 function renderSkeleton(): void {
-    setReport(`<div class="stc-scroll"><table>${stc13Head()}${stcSkeletonBody(13)}</table></div>`);
+    setReport(
+        `<div class="stc-scroll"><table>${isErpEntry() ? referenceHead() : stc13Head()}${stcSkeletonBody(isErpEntry() ? 11 : 13)}</table></div>`
+    );
 }
 
 function renderReport(): void {
@@ -74,7 +98,30 @@ function renderReport(): void {
         setReport(stcEmptyState(t('stc-empty-list')));
         return;
     }
-    setReport(groups.map(stcGroupBlock).join(''));
+    const term = searchTerm.trim().normalize('NFKC').toLocaleLowerCase();
+    const visible = groups.filter(
+        (g) =>
+            !term ||
+            [g.product.name, g.product.code || ''].some((v) =>
+                v.normalize('NFKC').toLocaleLowerCase().includes(term)
+            )
+    );
+    setReport(
+        isErpEntry()
+            ? visible.length
+                ? referenceReport(visible, grand)
+                : stcEmptyState(
+                      (
+                          {
+                              zh: '没有匹配的商品',
+                              th: 'ไม่พบสินค้าที่ตรงกัน',
+                              en: 'No matching products',
+                              ja: '該当する商品はありません',
+                          } as Record<string, string>
+                      )[String(window.currentLang || 'th')] || 'No matching products'
+                  )
+            : groups.map(stcGroupBlock).join('')
+    );
 }
 
 async function loadReport(): Promise<void> {
@@ -84,6 +131,7 @@ async function loadReport(): Promise<void> {
     try {
         const resp = await stcGetReport(wsId, dateFrom, dateTo);
         groups = resp.groups;
+        grand = resp.totals;
         renderReport();
     } catch (_) {
         setReport(listErrorHtml('stc-error', 'data-stc-report-retry'));
@@ -96,19 +144,26 @@ async function loadReport(): Promise<void> {
 function bindShell(): void {
     const from = document.getElementById('stc-date-from') as HTMLInputElement;
     const to = document.getElementById('stc-date-to') as HTMLInputElement;
-    from.value = dateFrom;
-    to.value = dateTo;
-    document.getElementById('stc-apply')!.onclick = () => {
-        dateFrom = from.value || dateFrom;
-        dateTo = to.value || dateTo;
-        void loadReport();
-    };
+    if (isErpEntry()) {
+        document.getElementById('stc-search')!.oninput = (event) => {
+            searchTerm = (event.target as HTMLInputElement).value;
+            renderReport();
+        };
+    } else {
+        from.value = dateFrom;
+        to.value = dateTo;
+        document.getElementById('stc-apply')!.onclick = () => {
+            dateFrom = from.value || dateFrom;
+            dateTo = to.value || dateTo;
+            void loadReport();
+        };
+    }
     document.getElementById('stc-btn-opening')!.onclick = () =>
         openOpeningsModal({
             products: groups.map((g) => g.product),
             wsId: activeWsId()!,
             onSaved: () => void loadReport(),
-            defaultDate: dateFrom,
+            defaultDate: isErpEntry() ? defaultRange().to : dateFrom,
         });
 }
 
@@ -132,8 +187,8 @@ window.loadStockCard = function (): void {
         return;
     }
     const range = defaultRange();
-    dateFrom = dateFrom || range.from;
-    dateTo = dateTo || range.to;
+    dateFrom = isErpEntry() ? '0001-01-01' : dateFrom || range.from;
+    dateTo = isErpEntry() ? '9999-12-31' : dateTo || range.to;
     groups = [];
     setBody(shellHtml());
     bindShell();

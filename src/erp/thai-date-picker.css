@@ -1,0 +1,114 @@
+.thai-date-field {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+}
+.thai-date-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid var(--line, #ddd);
+  border-radius: 2px;
+  background: var(--card, #fff);
+  color: var(--ink, #242035);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.thai-date-trigger:disabled {
+  opacity: 1;
+  cursor: default;
+  background: var(--md-panel, #f1f1f1);
+}
+.thai-date-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  color: #242035;
+  background: white;
+  font: 16px sans-serif;
+  box-shadow: 0 12px 40px #0003;
+}
+.thai-date-dialog::backdrop {
+  background: #0005;
+}
+.thai-date-dialog button {
+  font: inherit;
+  border: 0;
+  border-radius: 6px;
+  background: #f4f1fa;
+  color: #242035;
+  min-height: 38px;
+  cursor: pointer;
+}
+.td-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.td-head select {
+  width: 110px;
+  min-width: 0;
+  font: inherit;
+}
+.td-head input {
+  width: 92px;
+  flex: 0 0 92px;
+  box-sizing: border-box;
+  padding: 4px;
+  min-width: 0;
+  font: inherit;
+}
+.td-head button {
+  flex: 1;
+}
+.td-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  text-align: center;
+}
+.td-grid span {
+  font-size: 13px;
+  padding: 6px 0;
+}
+.td-grid .selected {
+  background: #7c4dff;
+  color: white;
+}
+.td-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+}
+.td-footer button {
+  padding: 6px 12px;
+}
+.thai-date-trigger > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.thai-date-trigger > span:last-child {
+  flex-shrink: 0;
+}
+
+.thai-date-trigger > span:last-child {
+  display: inline-flex;
+  flex: 0 0 auto;
+}

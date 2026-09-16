@@ -16,6 +16,8 @@
     var draftId = '';
     var busy = false;
     var review = null;
+    var manual = null;
+    var manualAttachments = {};
 
     var COMMON_ORDER = ['invoice_number', 'date', 'document_type'];
     var PURCHASE_ORDER = [
@@ -44,6 +46,8 @@
     ];
     var AMOUNT_ORDER = ['subtotal', 'vat', 'total_amount', 'notes'];
     var HIDDEN_FIELDS = new Set([
+        'document_number',
+        'date_calendar',
         'items',
         'additional_invoices',
         'source_refs',
@@ -148,6 +152,7 @@
 
     function renderDetail(record, recordIndex) {
         var fields = fieldsOf(record);
+        if (record.filename === 'manual') return manual.manualHtml(fields, direction(), lang);
         var fieldGrid = preferredKeys(fields)
             .map(function (key) {
                 return F.render(
@@ -251,6 +256,57 @@
     }
 
     function bindDetail(root, _recordIndex, changed) {
+        if (rows()[_recordIndex].filename === 'manual') {
+            var fieldRoot = root.querySelector('[data-manual-document]');
+            manual.bindManual(
+                fieldRoot,
+                function () {
+                    return fieldsOf(rows()[_recordIndex]);
+                },
+                function (fields) {
+                    rows()[_recordIndex].pages[0].fields = fields;
+                    review.render();
+                }
+            );
+            var files = fieldRoot.querySelector('[data-md-files]');
+            files.innerHTML =
+                '<button type="button" class="pu-btn pu-btn--secondary" data-manual-choose>' +
+                R.escape(manual.manualLabel('choose', lang)) +
+                '</button><span data-manual-filename></span><input type="file" accept="application/pdf,image/*" hidden data-manual-file>';
+            files.querySelector('[data-manual-choose]').onclick = function () {
+                files.querySelector('[data-manual-file]').click();
+            };
+            files.querySelector('[data-manual-filename]').textContent =
+                (manualAttachments[rows()[_recordIndex].id] || {}).name || '';
+            files.querySelector('[data-manual-file]').onchange = function (event) {
+                var file = event.target.files[0];
+                if (file) {
+                    manualAttachments[rows()[_recordIndex].id] = file;
+                    files.querySelector('[data-manual-filename]').textContent = file.name;
+                }
+            };
+            fieldRoot.addEventListener('input', function () {
+                rows()[_recordIndex].pages[0].fields = manual.readManual(
+                    fieldRoot,
+                    fieldsOf(rows()[_recordIndex])
+                );
+                changed();
+            });
+            return;
+        }
+        root.querySelectorAll('[data-field]').forEach(function (input) {
+            if (!/:item:\d+:name$/.test(input.dataset.field)) return;
+            manual.bindProductInput(input, function (product) {
+                var index = Number(input.dataset.field.split(':')[2]);
+                Object.assign(fieldsOf(rows()[_recordIndex]).items[index], {
+                    code: product.code,
+                    unit: product.unit || '',
+                    product_id: product.product_id,
+                });
+                input.value = product.name_zh || product.name_th || product.name_en || '';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        });
         root.querySelector('[data-add-item]').onclick = function () {
             fieldsOf(rows()[_recordIndex]).items.push({
                 name: '',
@@ -267,7 +323,14 @@
             };
         });
         root.querySelectorAll('[data-field]').forEach(function (element) {
-            element.oninput = function () {
+            element.oninput = function (event) {
+                if (event.isTrusted && /:item:\d+:name$/.test(element.dataset.field)) {
+                    var item = fieldsOf(rows()[_recordIndex]).items[
+                        Number(element.dataset.field.split(':')[2])
+                    ];
+                    delete item.code;
+                    delete item.product_id;
+                }
                 applyField(element);
                 if (
                     /:item:\d+:(qty|price)$/.test(element.dataset.field) ||
@@ -323,7 +386,31 @@
             }),
         }).then(function (updated) {
             if (updated) model = Object.assign(model, updated);
-            return updated;
+            return Promise.all(
+                rows().map(function (record) {
+                    var file = manualAttachments[record.id];
+                    if (!file) return null;
+                    var data = new FormData();
+                    data.append('file', file);
+                    return fetch(
+                        '/api/line/erp/draft/' +
+                            encodeURIComponent(draftId) +
+                            '/attachment/' +
+                            encodeURIComponent(record.id),
+                        {
+                            method: 'POST',
+                            headers: { Authorization: 'Bearer ' + token() },
+                            body: data,
+                        }
+                    )
+                        .then(window.lineIntakeLiff.responseJson)
+                        .then(function () {
+                            delete manualAttachments[record.id];
+                        });
+                })
+            ).then(function () {
+                return updated;
+            });
         });
     }
 
@@ -420,6 +507,19 @@
     };
     show('loading');
     Promise.all([
+        import('/static/dist/erp-manual-document.js?v=manual-layout-10').then(function (module) {
+            manual = module;
+            manual.setProductLookup(function (query) {
+                return api(
+                    '/api/line/erp/draft/' +
+                        encodeURIComponent(draftId) +
+                        '/products?q=' +
+                        encodeURIComponent(query)
+                ).then(function (data) {
+                    return data.products || [];
+                });
+            });
+        }),
         window.lineIntakeReviewI18n.load(),
         window.lineIntakeLiff.boot({
             flow: 'erp-intake',
@@ -429,7 +529,7 @@
         }),
     ])
         .then(function (values) {
-            var auth = values[1];
+            var auth = values[2];
             draftId = auth.draftId;
             return api('/api/line/erp/draft/' + encodeURIComponent(draftId));
         })

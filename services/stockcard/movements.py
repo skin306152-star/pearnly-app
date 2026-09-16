@@ -108,6 +108,7 @@ def _classify_purchase(row: dict, out: MovementSet) -> None:
             direction="in",
             qty=qty_d,
             price=price,
+            amount=Decimal(row["line_total"]),
             sort_key=(row["doc_date"], row["doc_created_at"], row["line_no"] or 0),
         ),
     )
@@ -160,6 +161,7 @@ def load(
     workspace_client_id: int,
     date_to,
     created_by: str | None = None,
+    include_stock_documents: bool = False,
 ) -> MovementSet:
     """读到 date_to 为止的全部可入账流水(date_from 的切分留给 report.py:同一批流水在
     "期初结转"与"期间明细"两种视图间复用,不必按不同 date_from 重复查库)。"""
@@ -179,6 +181,17 @@ def load(
     cur.execute(sales_sql, tuple(sales_params))
     for row in cur.fetchall():
         _classify_sale(row, out)
+    if include_stock_documents:
+        from services.erp.stock_documents import add_movements
+
+        add_movements(
+            cur,
+            out,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            date_to=date_to,
+            created_by=created_by,
+        )
     for movs in out.by_key.values():
         movs.sort(key=lambda m: m.sort_key)
     return out
@@ -191,14 +204,14 @@ def product_names(cur, *, tenant_id: str, workspace_client_id: int, product_ids:
     # id 是 uuid 列:不转型的裸 ANY 会被 psycopg2 把入参适配成 text[] 去比 uuid,炸
     # "operator does not exist: uuid = text"(仓库血泪·同 test_workorder_uuid_any_cast.py)。
     cur.execute(
-        "SELECT id, name_th, name_en, name_zh, unit FROM products "
+        "SELECT id, code, name_th, name_en, name_zh, unit FROM products "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND id = ANY(%s::uuid[])",
         (tenant_id, workspace_client_id, product_ids),
     )
     out = {}
     for r in cur.fetchall():
         name = r["name_th"] or r["name_en"] or r["name_zh"] or ""
-        out[str(r["id"])] = {"name": name, "unit": r["unit"]}
+        out[str(r["id"])] = {"name": name, "unit": r["unit"], "code": r.get("code")}
     return out
 
 

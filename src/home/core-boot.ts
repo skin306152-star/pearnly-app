@@ -217,7 +217,7 @@ function _entryGuardRoute(route: string): string {
     const team = window._erpTeamAccess;
     if (entry === 'erp' && team && !team.is_owner) {
         const routes: Record<string, string[]> = {
-            product: ['stock-card'],
+            product: ['stock-card', 'stock-in', 'stock-out'],
             purchase: [
                 'purchase',
                 'purchase-form',

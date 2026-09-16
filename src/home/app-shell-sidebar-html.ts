@@ -104,6 +104,8 @@ export const SIDEBAR_HTML = `
             </svg>
         </div>
         <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="stock-in" data-erp-stock-nav style="display:none"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11v6h14v-6M10 2v10m-4-4 4 4 4-4"/></svg><span class="nav-label">入库</span></div>
+            <div class="nav-item nav-sub-item" data-route="stock-out" data-erp-stock-nav style="display:none"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11v6h14v-6M10 12V2m-4 4 4-4 4 4"/></svg><span class="nav-label">出库</span></div>
             <div class="nav-item nav-sub-item" data-route="stock-card">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 3.5h9a2 2 0 012 2V17l-3-2-3 2-3-2-2 2V3.5z"/>

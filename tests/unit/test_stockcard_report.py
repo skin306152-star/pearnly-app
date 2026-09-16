@@ -119,7 +119,9 @@ class GroupsReportTests(unittest.TestCase):
 
     def test_product_meta_is_minimal(self):
         for g in self._groups():
-            self.assertEqual(set(g["product"].keys()), {"key", "product_id", "name", "unit"})
+            self.assertEqual(
+                set(g["product"].keys()), {"key", "product_id", "name", "unit", "code"}
+            )
 
     def test_product_track_rows_and_totals(self):
         g = next(x for x in self._groups() if x["product"]["key"] == "p:PROD-1")

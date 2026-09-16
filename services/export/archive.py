@@ -99,6 +99,11 @@ def gather_items(
             cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=did
         )
         ev_url = f"/api/purchase/docs/{did}/bill-image?idx=0" if evidence_mode == "api" else ""
+        from services.erp.business_dates import internal_history
+
+        full["doc"]["buddhist_dates"] = internal_history(
+            cur, tenant_id, full["doc"].get("ocr_history_id")
+        )
         items.append(
             {
                 "doc": full["doc"],

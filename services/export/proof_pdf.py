@@ -311,9 +311,14 @@ def build_monthly_proof_pdf(
             continue
         doc = detail.get("doc") or {}
         sup = detail.get("supplier") or {}
+        from services.erp.business_dates import buddhist, internal_history
+
+        display_date = str(doc.get("doc_date") or "")
+        if display_date and internal_history(cur, tenant_id, doc.get("ocr_history_id")):
+            display_date = buddhist(display_date)
         info = {
             "seq": i + 1,
-            "date": str(doc.get("doc_date") or ""),
+            "date": display_date,
             "seller": (sup.get("name") or "—").strip() or "—",
             "category": cat_map.get(str(doc.get("category_id")), "") or "—",
             "amount": doc.get("grand_total"),

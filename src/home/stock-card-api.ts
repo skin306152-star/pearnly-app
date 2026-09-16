@@ -24,6 +24,7 @@ export interface StcCardRow {
 export interface StcGroupProduct {
     key: string;
     product_id: string | null;
+    code?: string | null;
     name: string;
     unit: string | null;
 }
@@ -44,6 +45,7 @@ export interface StcGroup {
 // /api/stockcard/report 信封:主视图只用这一次请求,不含汇总/未入账等旧视图。
 export interface StcReportResp {
     groups: StcGroup[];
+    totals?: StcCardTotals;
 }
 // 与 routes/stock_card_routes.py 的 OpeningIn 同形(product_id 或 name 二选一)。
 export interface StcOpeningRow {
@@ -113,6 +115,7 @@ export async function stcGetReport(
     const body = await stcFetch('/api/stockcard/report?' + q.toString());
     return {
         groups: (body.groups as StcGroup[]) || [],
+        totals: body.totals as StcCardTotals | undefined,
     };
 }
 

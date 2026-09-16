@@ -45,6 +45,7 @@ from routes.erp_agent import router as erp_agent_router
 from routes.erp_bridge_routes import router as erp_bridge_router
 from routes.erp_confirmation_status_routes import router as erp_confirmation_status_router
 from routes.erp_intake_routes import router as erp_intake_router
+from routes.erp_stock_routes import router as erp_stock_router
 from routes.erp_mappings_routes import router as erp_mappings_router
 from routes.erp_routes import router as erp_router
 from routes.erp_team_routes import router as erp_team_router
@@ -192,6 +193,7 @@ ROUTERS = (
     cowork_line_webhook_router,
     erp_router,  # ERP 推送
     erp_team_router,  # ERP 业主邀请采购/销售成员
+    erp_stock_router,
     erp_intake_router,  # ERP 商户 staged OCR 草稿丢弃
     erp_agent_router,  # Express Push · 本地 Agent 出站拉取 + token
     erp_bridge_router,  # ERP 桥 · 内网出站 + 管理端

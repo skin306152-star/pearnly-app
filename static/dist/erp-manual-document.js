@@ -1,0 +1,1 @@
+import{b as s,a as n,m as l,c as t,r as d,s as o,u as r}from"./manual-document-Bk9a3hux.js";export{s as bindManual,n as bindProductInput,l as manualHtml,t as manualLabel,d as readManual,o as setProductLookup,r as updateManual};

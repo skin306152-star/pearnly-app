@@ -168,7 +168,7 @@ interface ErpTeamAccess {
 }
 
 const ERP_MEMBER_ROUTES: Record<string, Set<string>> = {
-    product: new Set(['stock-card']),
+    product: new Set(['stock-card', 'stock-in', 'stock-out']),
     purchase: new Set([
         'purchase',
         'purchase-form',

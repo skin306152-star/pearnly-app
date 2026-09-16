@@ -1,0 +1,82 @@
+.erp-stock-page {
+  padding: 28px;
+  background: var(--card, #fff);
+  border: 1px solid var(--line, #e9e4f3);
+  border-radius: 14px;
+  margin: 24px;
+}
+.erp-stock-page header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.erp-stock-page h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.erp-stock-page footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+.erp-stock-scroll {
+  overflow-x: auto;
+}
+.erp-stock-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.erp-stock-page th,
+.erp-stock-page td {
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid var(--line, #e9e4f3);
+}
+.erp-stock-page th {
+  background: #f8f5ff;
+}
+.erp-stock-page .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.erp-stock-link {
+  border: 0;
+  background: none;
+  color: var(--primary, #7945ed);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.erp-stock-page [role='alert'] {
+  color: #ba3030;
+}
+@media (max-width: 600px) {
+  .erp-stock-page {
+    margin: 12px;
+    padding: 16px;
+  }
+  .erp-stock-page header {
+    align-items: flex-start;
+  }
+  .erp-stock-page h2 {
+    font-size: 18px;
+  }
+}
+
+.erp-stock-search {
+  width: min(100%, 480px);
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  border: 1px solid #e9e4f3;
+  border-radius: 8px;
+  font: inherit;
+  box-sizing: border-box;
+}
+.erp-stock-page td small {
+  display: block;
+  color: #88809b;
+  margin-top: 4px;
+}

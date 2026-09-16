@@ -382,3 +382,14 @@ async def erp_line_attachment(
     user = await asyncio.to_thread(internal_flow.actor, binding)
     content = await file.read(20 * 1024 * 1024 + 1)
     return await asyncio.to_thread(internal_attachments.attach, user, history_id, content)
+
+
+@router.get("/api/line/erp/draft/{draft_id}/products")
+def erp_draft_products(request: Request, draft_id: str, q: str = ""):
+    from services.erp.item_identity import search
+
+    claims, binding, session = _draft_token(request, draft_id)
+    user = dict(db.find_user_by_id(str(claims["user_id"])))
+    user["entry"] = "erp"
+    workspace_id = int((session.get("payload") or {}).get("workspace_client_id") or 0)
+    return {"ok": True, "data": {"products": search(user, workspace_id, q)}}

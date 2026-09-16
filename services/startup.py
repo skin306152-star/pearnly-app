@@ -253,6 +253,9 @@ def _boot_schema_ddl() -> None:
         from services.stockcard.schema import ensure_stock_card_schema
 
         ensure_stock_card_schema()
+        from services.erp.stock_documents import ensure_schema as ensure_erp_stock_schema
+
+        ensure_erp_stock_schema()
     except Exception as e:
         logger.warning(f"启动 商品收发存 schema 失败(等 alembic 0097): {e}")
 

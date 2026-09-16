@@ -66,6 +66,8 @@ class ConvertOrchestrationTests(unittest.TestCase):
     def _run(self, results, **patches):
         cur = _FakeCursor(results)
         with (
+            mock.patch("services.erp.item_identity.resolve_items"),
+            mock.patch("services.erp.document_numbers.allocate", return_value="PE-25690601-0001"),
             mock.patch.object(
                 purchase_leg, "book_from_history", return_value=("doc-1", "PO-1")
             ) as p_book,

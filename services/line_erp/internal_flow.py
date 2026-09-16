@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
-from datetime import date
+from services.sales.dates import bangkok_today
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -155,7 +155,7 @@ async def manual(binding, line_user_id, reply_token):
         workspace_id=payload["workspace_client_id"],
         direction=payload["direction"],
         fields={
-            "date": date.today().isoformat(),
+            "date": bangkok_today().isoformat(),
             "invoice_number": "",
             "seller_name": "",
             "buyer_name": "",

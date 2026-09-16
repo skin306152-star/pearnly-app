@@ -121,6 +121,11 @@ def _line_rows(item: dict, category_names: dict, lang: str) -> list:
     supplier = item.get("supplier") or {}
     posting = item.get("posting") or {}
     lines = item.get("lines") or []
+    from services.erp.business_dates import export_date
+
+    display_date = doc.get("doc_date")
+    if display_date and doc.get("buddhist_dates"):
+        display_date = export_date(display_date)
     rows = []
     for idx, ln in enumerate(lines):
         net = _d(ln.get("line_total"))
@@ -128,7 +133,7 @@ def _line_rows(item: dict, category_names: dict, lang: str) -> list:
         first = idx == 0
         rows.append(
             {
-                "doc_date": doc.get("doc_date"),
+                "doc_date": display_date,
                 "doc_id": doc.get("id"),
                 "doc_no": doc.get("doc_no"),
                 "doc_kind": _DOC_KIND[lang].get(doc.get("doc_kind"), doc.get("doc_kind") or ""),

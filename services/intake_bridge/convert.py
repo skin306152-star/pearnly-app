@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Optional
 
@@ -53,7 +54,7 @@ def validate_erp_histories(cur, *, tenant_id: str, history_ids: list) -> dict[st
     if not ids:
         return {}
     cur.execute(
-        "SELECT id, pages FROM ocr_history WHERE tenant_id = %s::uuid " "AND id = ANY(%s::uuid[])",
+        "SELECT id, pages FROM ocr_history WHERE tenant_id = %s::uuid AND id = ANY(%s::uuid[])",
         (tenant_id, ids),
     )
     found = {}
@@ -125,6 +126,35 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
         raise SkipConversion("no_direction")
     if not workspace_client_id:
         raise SkipConversion("no_workspace")
+
+    if history.get("source") in {"erp_web", "line_erp"}:
+        from services.erp.business_dates import calculation_fields
+
+        from services.erp.document_numbers import allocate
+
+        number = allocate(
+            cur, tenant_id=tenant_id, direction=direction, business_date=fields.get("date")
+        )
+        from services.erp.item_identity import resolve_items
+
+        resolve_items(
+            cur,
+            tenant_id=tenant_id,
+            workspace_id=workspace_client_id,
+            items=fields.get("items") or [],
+        )
+        fields = {**fields, "document_number": number}
+        original = str(fields.get("invoice_number") or "")
+        fields["bill_number"] = fields.get("bill_number") or (
+            "" if original.startswith("REC-") else original
+        )
+        pages = history["pages"]
+        pages[0]["fields"] = fields
+        cur.execute(
+            "UPDATE ocr_history SET pages=%s::jsonb WHERE id=%s::uuid AND tenant_id=%s::uuid",
+            (json.dumps(pages, ensure_ascii=False), history_id, tenant_id),
+        )
+        fields = calculation_fields(fields)
 
     if direction == "purchase":
         doc_id, doc_no = purchase_leg.book_from_history(

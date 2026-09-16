@@ -57,11 +57,11 @@ def _base_balance(opening_row: Optional[dict]) -> rolling.Balance:
     return rolling.opening_balance(opening_row["qty"], opening_row["unit_cost"])
 
 
-def _roll_key(movs: list, opening_row: Optional[dict], date_from, date_to):
+def _roll_key(movs: list, opening_row: Optional[dict], date_from, date_to, *, erp_costs=False):
     """→ (期初结转态, 期末结存态, 期间逐笔行)。"""
     before, period = _split(movs, opening_row, date_from, date_to)
-    carried, _ = rolling.roll(_base_balance(opening_row), before)
-    final, rows = rolling.roll(carried, period)
+    carried, _ = rolling.roll(_base_balance(opening_row), before, erp_costs=erp_costs)
+    final, rows = rolling.roll(carried, period, erp_costs=erp_costs)
     return carried, final, rows
 
 
@@ -126,6 +126,7 @@ def load_context(
     workspace_client_id: int,
     date_to,
     created_by: Optional[str] = None,
+    include_stock_documents: bool = False,
 ) -> tuple:
     """movements + openings 一次装载,供 summary()/card() 共用同一次全表扫描结果。
 
@@ -138,6 +139,7 @@ def load_context(
         workspace_client_id=workspace_client_id,
         date_to=date_to,
         created_by=created_by,
+        **({"include_stock_documents": True} if include_stock_documents else {}),
     )
     openings = opening_svc.load_by_key(
         cur,
@@ -178,6 +180,7 @@ def _product_meta(key: str, products: dict, name_units: dict) -> dict:
     return {
         "key": key,
         "product_id": grouping.key_product_id(key),
+        "code": (products.get(grouping.key_product_id(key)) or {}).get("code"),
         "name": name,
         "unit": unit,
     }
@@ -293,6 +296,7 @@ def groups(
     date_to,
     context: Optional[tuple] = None,
     created_by: Optional[str] = None,
+    erp_costs: bool = False,
 ) -> list:
     """网页主视图:一次装好 movements/openings,一次批量取商品名/名字轨单位,再逐 key
     纯计算,返回按商品连续排列的完整 13 列表格(每组的期初行 + 期间逐笔 + 该组合计)。
@@ -306,6 +310,7 @@ def groups(
         workspace_client_id=workspace_client_id,
         date_to=date_to,
         created_by=created_by,
+        include_stock_documents=erp_costs,
     )
 
     keys = sorted(set(data.by_key) | set(openings))
@@ -321,7 +326,7 @@ def groups(
     out = []
     for key in keys:
         carried, final, period_rows = _roll_key(
-            data.by_key.get(key, []), openings.get(key), date_from, date_to
+            data.by_key.get(key, []), openings.get(key), date_from, date_to, erp_costs=erp_costs
         )
         rows = [_opening_row(carried, date_from)]
         rows.extend(_fmt_row(r) for r in period_rows)
@@ -362,3 +367,15 @@ def excluded(cur, *, tenant_id: str, workspace_client_id: int, date_from, date_t
         }
         for r in rows
     ]
+
+
+def grand_totals(groups):
+    result = {}
+    for key in ("in_qty", "in_amount", "out_qty", "out_amount", "bal_qty", "bal_value"):
+        values = [g["totals"].get(key) for g in groups]
+        result[key] = (
+            None
+            if any(v is None for v in values)
+            else str(sum((Decimal(v) for v in values), Decimal("0")))
+        )
+    return result

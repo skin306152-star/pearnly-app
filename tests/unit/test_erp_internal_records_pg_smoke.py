@@ -152,13 +152,131 @@ class InternalRecordsPgSmoke(unittest.TestCase):
             self.cur, tenant_id=self.tid, workspace_client_id=self.wid, date_to=date(2026, 9, 15)
         )
         rows = [row for group in result.by_key.values() for row in group]
-        self.assertEqual({row.doc_no for row in rows}, {"LINE-BUY", "LINE-SELL"})
+        self.assertEqual({row.doc_no for row in rows}, {"PE-25690915-0001", "SI-25690915-0001"})
         self.assertEqual([row.qty for row in rows], [2, 2])
         self.cur.execute(
             "SELECT count(*) AS n FROM erp_push_logs WHERE history_id=ANY(%s::uuid[])",
             ([purchase, sale, unsaved],),
         )
         self.assertEqual(self.cur.fetchone()["n"], 0)
+
+    def test_business_numbers_preserve_bill_and_increment_once(self):
+        first, _ = self.draft("purchase", "line_erp", invoice_number="SUP-123")
+        second, _ = self.draft("purchase", "erp_web", invoice_number="SUP-456")
+        self.confirm(first, "purchase")
+        self.confirm(first, "purchase")
+        self.confirm(second, "purchase")
+        self.cur.execute(
+            "SELECT doc_no FROM purchase_docs WHERE tenant_id=%s ORDER BY doc_no", (self.tid,)
+        )
+        self.assertEqual(
+            [r["doc_no"] for r in self.cur.fetchall()], ["PE-25690915-0001", "PE-25690915-0002"]
+        )
+        self.cur.execute("SELECT pages FROM ocr_history WHERE id=%s", (first,))
+        fields = self.cur.fetchone()["pages"][0]["fields"]
+        self.assertEqual(fields["invoice_number"], "SUP-123")
+        self.assertEqual(fields["bill_number"], "SUP-123")
+        self.assertEqual(fields["document_number"], "PE-25690915-0001")
+
+    def test_manual_reference_fields_amounts_and_units_round_trip(self):
+        from decimal import Decimal
+
+        for direction in ("purchase", "sales"):
+            hid, fields = self.draft(
+                direction,
+                "line_erp",
+                manual_layout=1,
+                invoice_number="MANUAL-" + direction,
+                vat_rate="7",
+                department="B01",
+                project="00002",
+                bill_number="BILL-09",
+                cash_payment=True,
+                notes_2="second note",
+                items=[
+                    {
+                        "code": "123",
+                        "name": "Notebook",
+                        "qty": "1",
+                        "price": "15",
+                        "unit": "sheet",
+                        "warehouse": "0000",
+                    }
+                ],
+            )
+            self.assertEqual(Decimal(fields["total_amount"]), Decimal("16.05"))
+            result = self.confirm(hid, direction)
+            self.assertEqual(result["status"], "saved")
+            table = "purchase_docs" if direction == "purchase" else "sales_documents"
+            self.cur.execute(f"SELECT grand_total FROM {table} WHERE ocr_history_id=%s", (hid,))
+            self.assertEqual(self.cur.fetchone()["grand_total"], Decimal("16.05"))
+            self.cur.execute("SELECT pages FROM ocr_history WHERE id=%s", (hid,))
+            saved = self.cur.fetchone()["pages"][0]["fields"]
+            self.assertEqual(saved["department"], "B01")
+            self.assertEqual(saved["bill_number"], "BILL-09")
+            self.assertEqual(saved["items"][0]["warehouse"], "0000")
+            self.assertEqual(saved["items"][0]["unit"], "sheet")
+            self.assertEqual(saved["notes_2"], "second note")
+
+    def test_manual_discount_keeps_quantity_and_native_total(self):
+        from decimal import Decimal
+
+        for direction in ("purchase", "sales"):
+            hid, fields = self.draft(
+                direction,
+                manual_layout=1,
+                vat_rate="7",
+                discount="3",
+                deposit_deduction="2",
+                items=[{"name": "Notebook", "qty": "1", "price": "15", "unit": "sheet"}],
+            )
+            self.assertEqual(Decimal(fields["total_amount"]), Decimal("10.70"))
+            self.confirm(hid, direction)
+            table = "purchase_docs" if direction == "purchase" else "sales_documents"
+            self.cur.execute(f"SELECT grand_total FROM {table} WHERE ocr_history_id=%s", (hid,))
+            self.assertEqual(self.cur.fetchone()["grand_total"], Decimal("10.70"))
+
+    def test_buddhist_business_dates_keep_real_leap_day_for_reports(self):
+        from datetime import date
+
+        for direction in ("purchase", "sales"):
+            hid, fields = self.draft(
+                direction,
+                date="29/02/2567",
+                due_date="01/03/2567",
+                delivery_date="02/03/2567",
+                bill_date="29/02/2567",
+            )
+            self.assertEqual(fields["date"], "29/02/2567")
+            self.confirm(hid, direction)
+            self.cur.execute("SELECT pages, invoice_date FROM ocr_history WHERE id=%s", (hid,))
+            history = self.cur.fetchone()
+            self.assertEqual(history["invoice_date"], date(2024, 2, 29))
+            self.assertEqual(history["pages"][0]["fields"]["date"], "29/02/2567")
+            self.assertEqual(history["pages"][0]["fields"]["due_date"], "01/03/2567")
+            table, column = (
+                ("purchase_docs", "doc_date")
+                if direction == "purchase"
+                else ("sales_documents", "issue_date")
+            )
+            self.cur.execute(
+                f"SELECT {column} AS date FROM {table} WHERE ocr_history_id=%s", (hid,)
+            )
+            self.assertEqual(self.cur.fetchone()["date"], date(2024, 2, 29))
+            if direction == "purchase":
+                import io
+                from openpyxl import load_workbook
+                from services.export.archive import excel_bytes
+
+                content = excel_bytes(
+                    self.cur,
+                    tenant_id=self.tid,
+                    workspace_client_id=self.wid,
+                    date_from="2024-02-01",
+                    date_to="2024-02-29",
+                )
+                workbook = load_workbook(io.BytesIO(content))
+                self.assertEqual(workbook.active.cell(2, 1).value, "2567-02-29")
 
     def test_retry_query_excludes_internal_sources_and_keeps_cowork(self):
         from services.erp.push_retry import list_logs_due_for_retry

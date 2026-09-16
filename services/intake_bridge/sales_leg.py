@@ -53,6 +53,12 @@ def _build_lines(fields: dict) -> list:
         if price <= 0:
             continue
         line = {"description": name, "qty": qty, "unit_price": price, "vat_applicable": True}
+        if "internal_vat_rate" in fields:
+            line["product_id"] = it.get("product_id")
+            line["unit"] = it.get("unit")
+        if fields.get("manual_layout") == 1:
+            line["discount"] = it.get("manual_discount", "0")
+            line["unit"] = it.get("unit")
         posting_kind = str(it.get("posting_kind") or "").strip().lower()
         if posting_kind in ("stock", "service"):
             line["item_type"] = "service" if posting_kind == "service" else "goods"
@@ -70,7 +76,11 @@ def _buyer_type(tax_id: str, name: str) -> str:
 
 def issue_from_history(cur, *, tenant_id, workspace_client_id, created_by, fields: dict) -> tuple:
     """登记销项单据(status='issued')。返回 (doc_id, doc_no)。"""
-    doc_no = clean_invoice_no(fields.get("invoice_number"))
+    doc_no = clean_invoice_no(
+        fields.get("document_number")
+        if "internal_vat_rate" in fields
+        else fields.get("invoice_number")
+    )
     if not doc_no:
         raise SkipConversion("no_doc_no")
 

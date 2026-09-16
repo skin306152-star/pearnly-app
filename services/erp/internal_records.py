@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
@@ -53,16 +52,19 @@ def _decimal(value, *, positive=False):
 
 
 def normalized_fields(fields, direction, subject, history_id, *, strict=True):
-    result = dict(fields)
+    from services.erp.business_dates import business_fields
+
+    result = business_fields(fields)
+    result.pop("document_number", None)
+    original = str(result.get("invoice_number") or "")
+    result["bill_number"] = result.get("bill_number") or (
+        "" if original.startswith("REC-") else original
+    )
     prefix = "buyer" if direction == "purchase" else "seller"
     declared_tax = re.sub(r"\D", "", str(fields.get(f"{prefix}_tax") or ""))
     own_tax = re.sub(r"\D", "", str(subject.get("tax_id") or ""))
     if declared_tax and own_tax and declared_tax != own_tax:
         raise HTTPException(409, detail="erp.workspace_mismatch")
-    try:
-        date.fromisoformat(str(result.get("date") or ""))
-    except ValueError:
-        raise HTTPException(422, detail="history.date_unreadable") from None
     items = []
     for value in result.get("items") or []:
         if not isinstance(value, dict):
@@ -85,6 +87,10 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
         raise HTTPException(422, detail="erp.declaration_required")
     subtotal = sum((Decimal(item["subtotal"]) for item in items), Decimal("0"))
     vat = _decimal(result.get("vat") or "0")
+    if result.get("manual_layout") == 1:
+        from services.erp.manual_totals import apply
+
+        subtotal, vat = apply(result, items, _decimal)
     prefix = "buyer" if direction == "purchase" else "seller"
     result.update(
         {
@@ -103,6 +109,8 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
 
 def save_draft(user, *, history_id, workspace_id, direction, fields, source="erp_web"):
     """A client-generated id makes create/retry idempotent, without a new draft table."""
+    from services.erp.business_dates import standard
+
     history_id = str(UUID(str(history_id)))
     authorize(user, workspace_id, direction)
     if source not in SOURCES:
@@ -125,7 +133,7 @@ def save_draft(user, *, history_id, workspace_id, direction, fields, source="erp
                 pages,
                 source,
                 clean["invoice_number"],
-                clean["date"],
+                standard(clean["date"]),
                 clean.get("seller_name"),
                 clean["total_amount"],
             ),
@@ -146,8 +154,21 @@ def save_draft(user, *, history_id, workspace_id, direction, fields, source="erp
         if previous.get("direction") != direction:
             raise HTTPException(409, detail="erp.direction_changed")
         if not row["staged"]:
-            if previous == clean:
-                return {"history_id": history_id, "fields": clean, "status": "saved"}
+            comparable = {k: v for k, v in previous.items() if k != "document_number"}
+            old_items = comparable.get("items") or []
+            new_items = clean.get("items") or []
+            if len(old_items) != len(new_items):
+                raise HTTPException(409, detail="erp.formal_document_locked")
+            comparable["items"] = [
+                {
+                    k: (new.get(k) if k in {"product_id", "code", "unit"} and not new.get(k) else v)
+                    for k, v in old.items()
+                    if k not in {"product_id", "code", "unit"} or k in new
+                }
+                for old, new in zip(old_items, new_items)
+            ]
+            if comparable == clean:
+                return {"history_id": history_id, "fields": previous, "status": "saved"}
             raise HTTPException(409, detail="erp.formal_document_locked")
         retained_pages = row.get("pages") or [{}]
         retained_pages[0]["fields"] = clean
@@ -158,7 +179,7 @@ def save_draft(user, *, history_id, workspace_id, direction, fields, source="erp
             (
                 pages,
                 clean["invoice_number"],
-                clean["date"],
+                standard(clean["date"]),
                 clean.get("seller_name"),
                 clean["total_amount"],
                 history_id,

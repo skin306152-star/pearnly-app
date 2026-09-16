@@ -104,8 +104,9 @@ async def api_report(
             date_from=d_from,
             date_to=d_to,
             created_by=creator,
+            erp_costs=user.get("entry") == "erp",
         )
-    return {"ok": True, "groups": rows}
+    return {"ok": True, "groups": rows, "totals": report_svc.grand_totals(rows)}
 
 
 @router.get("/openings")

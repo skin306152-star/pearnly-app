@@ -34,6 +34,9 @@ def migrate() -> None:
         from services.stocktake.schema import migrate as migrate_stocktake
 
         migrate_stocktake()
+        from services.erp.history_upgrade import migrate as migrate_erp_history
+
+        migrate_erp_history()
     finally:
         root.removeHandler(failures)
     if failures.failures:

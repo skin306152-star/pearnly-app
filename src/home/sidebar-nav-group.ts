@@ -18,6 +18,8 @@
         'sales-account': 'sales',
         'sales-products': 'products',
         'expense-data': 'products',
+        'stock-in': 'firm-goods',
+        'stock-out': 'firm-goods',
         'stock-card': 'firm-goods',
         purchase: 'expense',
         'purchase-suppliers': 'expense',

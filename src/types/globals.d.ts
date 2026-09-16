@@ -337,6 +337,8 @@ interface Window {
     loadPosAudit?: () => void;
     loadInventoryPage?: () => void;
     // 事务所端 · 商品收发存报表(路由 stock-card · firm 业态专属)
+    loadStockIn?: () => void;
+    loadStockOut?: () => void;
     loadStockCard?: () => void;
     loadErpTeam?: () => void;
     _erpTeamAccess?: {

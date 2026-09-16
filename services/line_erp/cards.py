@@ -20,7 +20,10 @@ def preview_card(
 ) -> dict:
     card = review_cards.preview_card(
         draft_id=draft_id,
-        fields=fields,
+        fields={
+            **fields,
+            "invoice_number": fields.get("document_number") or fields.get("invoice_number"),
+        },
         target=target,
         direction=direction,
         mode="stock",

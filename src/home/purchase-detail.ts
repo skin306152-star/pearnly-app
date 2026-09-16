@@ -1,4 +1,5 @@
 import { isErpEntry } from './erp-intake.js';
+import { showErpOrderDetail } from './erp-order-detail.js';
 // 商户采购 · 屏6 单据详情(顶栏面包屑 + 摘要条 + 左主右栏 + 逐行税率税额 + 诚实时间线)。
 // 处理记录按真实 status/payment_status 诚实推导(无审计轨迹 · 不编造人名/时间)。四态。
 // 费用单(无 VAT)隐藏品项/进项税段;已作废 = 灰态 + 回冲提示。
@@ -422,6 +423,16 @@ async function load(id: string): Promise<void> {
         cur = normDetail(
             (await papi('GET', `/api/purchase/docs/${id}`)) as Record<string, unknown>
         );
+        if (isErpEntry()) {
+            const root = document.getElementById('page-purchase-detail');
+            if (root)
+                await showErpOrderDetail(
+                    root,
+                    'purchase',
+                    cur as unknown as Record<string, unknown>
+                );
+            return;
+        }
         erpState = await loadErpState(cur.ocr_history_id);
         const sec = document.getElementById('page-purchase-detail');
         if (sec) sec.innerHTML = shell(cur);

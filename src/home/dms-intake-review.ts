@@ -1,3 +1,4 @@
+import { bindProductInput } from '../erp/product-suggestions.js';
 // ============================================================
 // 录入工作台 · 步骤3 复核 · 就地手风琴展开 + 原图查看器
 //   点文件行「查看结果」→ 识别结果就地展开在该行下方(只开一行);
@@ -375,6 +376,22 @@ function bindOpenViewer() {
     const panel = openPanel();
     const r = IV.results[IV.openIdx];
     if (!panel || !r) return;
+    if (isErpEntry())
+        panel
+            .querySelectorAll<HTMLInputElement>('[data-iv-item$=":name"]:not(:disabled)')
+            .forEach((input) =>
+                bindProductInput(input, (product) => {
+                    const [fi, ii, ti] = input.dataset.ivItem!.split(':').map(Number);
+                    const item = (IV.results[fi].invoices[ii].fields.items as Dict[])[ti];
+                    Object.assign(item, {
+                        code: product.code,
+                        unit: product.unit || '',
+                        product_id: product.product_id,
+                    });
+                    input.value = product.name_zh || product.name_th || product.name_en || '';
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                })
+            );
     const pane = panel.querySelector('.dx-imgcard') as HTMLElement | null;
     if (pane?.querySelector('.pv-viewer')) {
         viewerCleanup = mountImageViewer(pane, r.history_ids[0] || null, {
@@ -392,6 +409,15 @@ function bindOpenViewer() {
             },
         });
     }
+    if (isErpEntry())
+        panel.addEventListener('input', (event) => {
+            const input = event.target as HTMLInputElement;
+            if (!event.isTrusted || !input.dataset.ivItem?.endsWith(':name')) return;
+            const [fi, ii, ti] = input.dataset.ivItem.split(':').map(Number);
+            const item = (IV.results[fi].invoices[ii].fields.items as Dict[])[ti];
+            delete item.code;
+            delete item.product_id;
+        });
     // focusin 而非 click:键盘 Tab 走到下一张的字段时同样该跟随。
     panel.addEventListener('focusin', onFieldFocus);
 }

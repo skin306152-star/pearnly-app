@@ -1,3 +1,5 @@
+import { thaiToday, thaiDateText } from './thai-date-picker.js';
+import { manualHtml, readManual, bindManual, updateManual } from './manual-document.js';
 import './record-form.css';
 export type Fields = Record<string, unknown>;
 export type Item = { name: string; qty: string; price: string };
@@ -112,83 +114,22 @@ export function esc(value: unknown): string {
     );
 }
 export function emptyFields(): Fields {
-    const now = new Date();
     return {
-        date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
+        date: thaiDateText(thaiToday()),
         items: [{ name: '', qty: '1', price: '' }],
         vat: '0',
+        vat_rate: '0',
+        manual_layout: 1,
+        branch: '00000',
+        cash_payment: true,
     };
 }
 export function formHtml(fields: Fields, direction: string, lang: string): string {
-    const label = (key: string) => esc(tr(key, lang));
-    const input = (key: string, title: string, type = 'text') =>
-        `<label>${label(title)}<input name="${key}" type="${type}" value="${esc(fields[key])}" ${type === 'date' ? 'required' : type === 'number' ? 'min="0" step="any"' : ''}></label>`;
-    const party = direction === 'purchase' ? 'seller_name' : 'buyer_name';
-    const items = (fields.items || []) as Item[];
-    return `<div class="er-grid">${input('date', 'date', 'date')}${input(party, direction === 'purchase' ? 'supplier' : 'customer')}${input('invoice_number', 'number')}</div>
-        <div class="er-lines">${items
-            .map(
-                (item, index) => `<div class="er-line" data-line="${index}">
-        <label>${label('name')}<input data-field="name" value="${esc(item.name)}" required></label>
-        <label>${label('qty')}<input data-field="qty" type="number" min="0.000001" step="any" value="${esc(item.qty)}" required></label>
-        <label>${label('price')}<input data-field="price" type="number" min="0.000001" step="any" value="${esc(item.price)}" required></label>
-        <button type="button" class="btn" data-remove="${index}">${label('remove')}</button></div>`
-            )
-            .join('')}</div>
-        <button type="button" class="btn" data-add>${label('add')}</button>
-        <div class="er-grid er-bottom">${input('vat', 'vat', 'number')}${input('notes', 'notes')}<strong>${label('total')}: <span data-total></span></strong></div>`;
+    return manualHtml(fields, direction, lang);
 }
-export function readFields(root: HTMLElement, base: Fields): Fields {
-    const fields = { ...base };
-    root.querySelectorAll<HTMLInputElement>('[name]').forEach((el) => (fields[el.name] = el.value));
-    fields.items = Array.from(root.querySelectorAll<HTMLElement>('[data-line]')).map(
-        (row, index) => {
-            const item: Record<string, unknown> = {
-                ...(((base.items as Fields[]) || [])[index] || {}),
-            };
-            row.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]').forEach(
-                (el) => (item[el.dataset.field!] = el.value)
-            );
-            return item;
-        }
-    );
-    return fields;
-}
-export function updateTotal(root: HTMLElement): void {
-    const fields = readFields(root, {});
-    const total =
-        ((fields.items || []) as Item[]).reduce(
-            (sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0),
-            0
-        ) + Number(fields.vat || 0);
-    const el = root.querySelector('[data-total]');
-    if (el)
-        el.textContent = Number.isFinite(total)
-            ? total.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-              })
-            : '—';
-}
-export function bindLines(
-    root: HTMLElement,
-    fields: () => Fields,
-    render: (value: Fields) => void
-): void {
-    root.oninput = () => updateTotal(root);
-    root.onclick = (event) => {
-        const target = event.target as HTMLElement;
-        const add = target.closest('[data-add]');
-        const remove = target.closest<HTMLElement>('[data-remove]');
-        if (!add && !remove) return;
-        const value = readFields(root, fields());
-        const items = value.items as Item[];
-        if (add) items.push({ name: '', qty: '1', price: '' });
-        else items.splice(Number(remove!.dataset.remove), 1);
-        render(value);
-    };
-    updateTotal(root);
-}
+export const readFields = readManual;
+export const updateTotal = updateManual;
+export const bindLines = bindManual;
 
 export function describeError(error: unknown, lang: string): string {
     const detail = String(error instanceof Error ? error.message : error);

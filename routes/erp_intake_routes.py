@@ -122,3 +122,10 @@ async def erp_internal_attachment(request: Request, history_id: UUID, file: Uplo
     user = _authorize(request)
     content = await file.read(20 * 1024 * 1024 + 1)
     return await asyncio.to_thread(internal_attachments.attach, user, history_id, content)
+
+
+@router.get("/api/erp/intake/products")
+def erp_product_suggestions(request: Request, workspace_client_id: int, q: str = ""):
+    from services.erp.item_identity import search
+
+    return {"products": search(_authorize(request), workspace_client_id, q)}

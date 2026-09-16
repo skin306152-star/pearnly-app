@@ -1,4 +1,5 @@
 import { isErpEntry } from './erp-intake.js';
+import { showErpOrderDetail } from './erp-order-detail.js';
 /* global t, escapeHtml, showToast */
 import { PURCHASE_DETAIL_CSS } from './purchase-detail-css.js';
 import { injectPurBase, injectStyle } from './purchase-common.js';
@@ -223,6 +224,10 @@ async function load(id: string): Promise<void> {
         const body = await response.json();
         if (!response.ok || !body.document) throw new Error('load');
         current = body.document as SalesDoc;
+        if (isErpEntry() && root) {
+            await showErpOrderDetail(root, 'sales', current as unknown as Record<string, unknown>);
+            return;
+        }
         if (root) root.innerHTML = shell(current);
         bind();
         await loadOriginal();

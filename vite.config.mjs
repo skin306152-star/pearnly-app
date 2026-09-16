@@ -16,13 +16,18 @@ export default defineConfig({
         minify: 'esbuild',
         target: 'es2020',
         rollupOptions: {
+            preserveEntrySignatures: 'strict',
             input: {
                 main: resolve(__dirname, 'src/main.js'),
+                'erp-manual-document': resolve(__dirname, 'src/erp/manual-document.ts'),
             },
             output: {
                 entryFileNames: '[name].js',
                 chunkFileNames: '[name]-[hash].js',
-                assetFileNames: '[name].[ext]',
+                assetFileNames: (asset) =>
+                    (asset.names || [asset.name]).includes('manual-document.css')
+                        ? 'erp-manual-document.css'
+                        : '[name].[ext]',
             },
         },
     },

@@ -59,6 +59,28 @@ def book_from_history(
             Decimal(str(fields.get("total_amount") or "0")) - calculated["grand_total"]
         )
         draft["note"] = fields.get("notes") or ""
+        draft["doc_no"] = fields.get("document_number") or draft.get("doc_no")
+    if source in {"erp_web", "line_erp"} and fields.get("manual_layout") == 1:
+        draft["lines"] = [
+            {
+                "item_type": "goods",
+                "description": item["name"],
+                "qty": item["qty"],
+                "unit": item.get("unit"),
+                "unit_price": item["price"],
+                "discount": item.get("manual_discount", "0"),
+                "vat_rate": fields.get("vat_rate", "0"),
+                "vat_applicable": True,
+            }
+            for item in fields["items"]
+        ]
+        calculated = compute_purchase_totals(draft["lines"])
+        draft["rounding"] = str(Decimal(fields["total_amount"]) - calculated["grand_total"])
+        draft["due_date"] = fields.get("due_date") or None
+    if source in {"erp_web", "line_erp"}:
+        for line, item in zip(draft.get("lines") or [], fields.get("items") or []):
+            line["product_id"] = item.get("product_id")
+            line["unit"] = item.get("unit")
     draft["source"] = (
         "manual"
         if manual_entry

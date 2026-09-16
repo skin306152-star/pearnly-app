@@ -50,6 +50,8 @@ class Movement:
     price: Optional[Decimal]  # 入库票面净单价;None = 按当前结存单价计(退货入/所有出库)
     sort_key: tuple  # (doc_date, doc_created_at, line_no) —— 查询侧算好的稳定排序键
 
+    amount: Optional[Decimal] = None  # Original net receipt amount, before unit-price rounding.
+
 
 ZERO_BALANCE = Balance(qty=Decimal("0"), value=None, unit=None)
 
@@ -123,13 +125,15 @@ def apply(bal: Balance, m: Movement) -> tuple[Balance, dict]:
     return issue(bal, m.qty)
 
 
-def roll(opening: Balance, movements: list[Movement]) -> tuple[Balance, list[dict]]:
+def roll(
+    opening: Balance, movements: list[Movement], *, erp_costs: bool = False
+) -> tuple[Balance, list[dict]]:
     """按调用方给定顺序逐笔滚存,返回 (期末结存态, 逐笔明细行)。movements 须已排好序
     (排序钥匙依赖数据库读出的 doc 时间戳,属查询职责,不下沉进这个纯函数)。"""
     bal = opening
     rows = []
     for m in movements:
-        bal, r = apply(bal, m)
+        bal, r = apply_erp(bal, m) if erp_costs else apply(bal, m)
         rows.append(
             {
                 "date": m.date,
@@ -141,3 +145,29 @@ def roll(opening: Balance, movements: list[Movement]) -> tuple[Balance, list[dic
             }
         )
     return bal, rows
+
+
+def apply_erp(bal: Balance, m: Movement) -> tuple[Balance, dict]:
+    """ERP report: retain receipt totals and absorb rounding on full depletion.
+
+    An unknown opening cost stays unknown; a later purchase cannot price earlier
+    stock or invent a negative average. Cowork retains its existing policy.
+    """
+    new_qty = bal.qty + (m.qty if m.direction == "in" else -m.qty)
+    if m.direction == "in" and m.price is not None:
+        amount = q2(m.amount if m.amount is not None else m.qty * m.price)
+        price = q2(amount / m.qty)
+        if bal.qty != 0 and bal.value is None:
+            new = Balance(new_qty, Decimal("0.00") if new_qty == 0 else None, None)
+        else:
+            value = q2((bal.value or Decimal("0")) + amount)
+            unit = q2(value / new_qty) if new_qty else None
+            if unit is not None and unit < 0:
+                new = Balance(new_qty, None, None)
+            else:
+                new = Balance(new_qty, value, unit)
+        return new, _row(new, price=price, amount=amount)
+    if m.direction == "out" and bal.unit is not None and m.qty == bal.qty:
+        new = Balance(Decimal("0"), Decimal("0.00"), bal.unit)
+        return new, _row(new, price=bal.unit, amount=bal.value)
+    return apply(bal, m)

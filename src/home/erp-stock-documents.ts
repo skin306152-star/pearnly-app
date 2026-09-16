@@ -49,7 +49,7 @@ const words: Record<string, string[]> = {
     saved: ['บันทึกแล้ว', 'Saved', '已保存', '保存済み'],
 };
 const lang = () => String(window.currentLang || 'th');
-const t = (key: string) =>
+const stockLabel = (key: string) =>
     words[key]?.[({ th: 0, en: 1, zh: 2, ja: 3 } as Record<string, number>)[lang()] ?? 0] || key;
 const e = (value: unknown) => escapeHtml(String(value ?? ''));
 const endpoint = '/api/erp/stock-documents';
@@ -78,7 +78,7 @@ async function list(direction: Direction): Promise<void> {
         window.requireWorkspace?.(() => void list(direction));
         return;
     }
-    host.innerHTML = `<div class="erp-stock-page"><header><h2>${e(t(direction))}</h2><button class="btn btn-primary" data-stock-new>${e(t('add'))}</button></header><input class="erp-stock-search" data-stock-search placeholder="${e(t('search'))}" aria-label="${e(t('search'))}"><div data-stock-list>…</div></div>`;
+    host.innerHTML = `<div class="erp-stock-page"><header><h2>${e(stockLabel(direction))}</h2><button class="btn btn-primary" data-stock-new>${e(stockLabel('add'))}</button></header><input class="erp-stock-search" data-stock-search placeholder="${e(stockLabel('search'))}" aria-label="${e(stockLabel('search'))}"><div data-stock-list>…</div></div>`;
     host.querySelector('[data-stock-new]')!.addEventListener('click', () => form(direction));
     try {
         const res = await api(`${endpoint}?workspace_client_id=${ws}&direction=${direction}`);
@@ -102,8 +102,8 @@ async function list(direction: Direction): Promise<void> {
                     )
                 );
             host.querySelector('[data-stock-list]')!.innerHTML = lines.length
-                ? `<div class="erp-stock-scroll"><table><thead><tr><th>${e(t('material'))}</th><th class="num">${e(t('qty'))}</th><th>${e(t('number'))}</th><th>${e(t('date'))}</th><th class="num">${e(t('total'))}</th></tr></thead><tbody>${lines.map(({ d, item }) => `<tr><td>${e(item.name)}<small>${e(item.code)}</small></td><td class="num">${e(item.qty)} ${e(item.unit)}</td><td><button class="erp-stock-link" data-stock-id="${e(d.id)}">${e(d.doc_no)}</button></td><td>${e(d.fields.date)}</td><td class="num">${e(item.subtotal == null ? '—' : Number(item.subtotal).toFixed(2))}</td></tr>`).join('')}</tbody></table></div>`
-                : `<p>${e(t('empty'))}</p>`;
+                ? `<div class="erp-stock-scroll"><table><thead><tr><th>${e(stockLabel('material'))}</th><th class="num">${e(stockLabel('qty'))}</th><th>${e(stockLabel('number'))}</th><th>${e(stockLabel('date'))}</th><th class="num">${e(stockLabel('total'))}</th></tr></thead><tbody>${lines.map(({ d, item }) => `<tr><td>${e(item.name)}<small>${e(item.code)}</small></td><td class="num">${e(item.qty)} ${e(item.unit)}</td><td><button class="erp-stock-link" data-stock-id="${e(d.id)}">${e(d.doc_no)}</button></td><td>${e(d.fields.date)}</td><td class="num">${e(item.subtotal == null ? '—' : Number(item.subtotal).toFixed(2))}</td></tr>`).join('')}</tbody></table></div>`
+                : `<p>${e(stockLabel('empty'))}</p>`;
             host.querySelectorAll<HTMLElement>('[data-stock-id]').forEach(
                 (el) =>
                     (el.onclick = () =>
@@ -116,7 +116,7 @@ async function list(direction: Direction): Promise<void> {
         host.querySelector('[data-stock-search]')!.addEventListener('input', draw);
         draw();
     } catch {
-        host.querySelector('[data-stock-list]')!.textContent = t('failed');
+        host.querySelector('[data-stock-list]')!.textContent = stockLabel('failed');
     }
 }
 function form(direction: Direction, doc?: StockDoc): void {
@@ -134,7 +134,7 @@ function form(direction: Direction, doc?: StockDoc): void {
     let attachment: File | undefined;
     const render = (next: ManualFields) => {
         fields = next;
-        host.innerHTML = `<div class="erp-stock-page"><header><h2>${e(t(direction))}${doc ? ' · ' + e(doc.doc_no) : ''}</h2><button type="button" class="btn" data-stock-back>${e(t(doc ? 'back' : 'cancel'))}</button></header><form data-stock-form><div data-stock-editor>${manualHtml(fields, direction, lang(), !!doc)}</div><p role="alert" data-stock-error></p>${doc ? '' : `<footer><button type="button" class="btn" data-stock-cancel>${e(t('cancel'))}</button><button class="btn btn-primary" type="submit">${e(t('save'))}</button></footer>`}</form></div>`;
+        host.innerHTML = `<div class="erp-stock-page"><header><h2>${e(stockLabel(direction))}${doc ? ' · ' + e(doc.doc_no) : ''}</h2><button type="button" class="btn" data-stock-back>${e(stockLabel(doc ? 'back' : 'cancel'))}</button></header><form data-stock-form><div data-stock-editor>${manualHtml(fields, direction, lang(), !!doc)}</div><p role="alert" data-stock-error></p>${doc ? '' : `<footer><button type="button" class="btn" data-stock-cancel>${e(stockLabel('cancel'))}</button><button class="btn btn-primary" type="submit">${e(stockLabel('save'))}</button></footer>`}</form></div>`;
         const editor = host.querySelector<HTMLElement>('[data-stock-editor]')!;
         bindManual(editor, () => fields, render);
         const files = editor.querySelector<HTMLElement>('[data-md-files]')!;
@@ -146,7 +146,7 @@ function form(direction: Direction, doc?: StockDoc): void {
             const choose = document.createElement('button');
             choose.type = 'button';
             choose.className = 'btn';
-            choose.textContent = t('choose');
+            choose.textContent = stockLabel('choose');
             choose.onclick = () => picker.click();
             const name = document.createElement('span');
             name.textContent = attachment?.name || '';
@@ -192,7 +192,7 @@ function form(direction: Direction, doc?: StockDoc): void {
             editor.addEventListener('input', pending);
             const hint = document.createElement('p');
             hint.className = 'erp-stock-cost-hint';
-            hint.textContent = t('cost');
+            hint.textContent = stockLabel('cost');
             editor.append(hint);
         }
         if (doc) {
@@ -241,7 +241,7 @@ function form(direction: Direction, doc?: StockDoc): void {
                     });
                 form(direction, result.document as StockDoc);
             } catch {
-                host.querySelector('[data-stock-error]')!.textContent = t('failed');
+                host.querySelector('[data-stock-error]')!.textContent = stockLabel('failed');
                 button.disabled = false;
             } finally {
                 busy = false;
@@ -256,14 +256,14 @@ window.loadStockOut = () => void list('out');
 function nav(): void {
     if (!isErpEntry()) return;
     const purchase = document.querySelector('[data-i18n=nav-purchase]');
-    if (purchase) purchase.textContent = t('purchase');
+    if (purchase) purchase.textContent = stockLabel('purchase');
     const heading = document.querySelector(
         '#nav-group-firm-goods [data-i18n=nav-group-firm-goods]'
     );
-    if (heading) heading.textContent = t('group');
+    if (heading) heading.textContent = stockLabel('group');
     document.querySelectorAll<HTMLElement>('[data-erp-stock-nav]').forEach((el) => {
         el.style.display = '';
-        el.querySelector('.nav-label')!.textContent = t(
+        el.querySelector('.nav-label')!.textContent = stockLabel(
             el.dataset.route === 'stock-in' ? 'in' : 'out'
         );
     });

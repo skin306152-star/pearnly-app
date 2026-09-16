@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-16 14:48（UTC+7）。状态：**ERP 手动录入、佛历日期、商品匹配、入出库与收发存整批已发布（`d307b5fdfd2e`）。Web/Worker Ready、各 100% 流量；历史迁移及正式资源回读通过。用户真机业务验收仍单独确认。**
+更新时间：2026-09-16 17:42（UTC+7）。状态：**ERP LINE 流程修复及按钮逐行排版已发布（`8a3b06d82b9f`）。Web/Worker Ready、各100%流量；正式资源逐字节回读通过。真实手机业务验收仍单独确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,6 +27,19 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- 完整 SHA：`8a3b06d82b9fa9e2c17c1cfdd6ec22cb9feb0ce3`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:15350b178332823a936755d901991dad936b67c21aee0922fdf47be843d950e3`。
+- Web `pearnly-web-8a3b06d82b9f-s3`、Worker `pearnly-worker-8a3b06d82b9f-s3`，Ready、各100%流量。
+- [Manual CD 35085622430](https://github.com/skin306152-star/pearnly-app/actions/runs/35085622430) success；schema `pearnly-schema-86dh8` success；候选与正式健康、就绪、运行SHA及完整安装包验证通过。
+- 本轮：手动录入直达编辑器、OCR自动建立账套后的会话归属、明确收付款落库、支票字段同步、精确原票号防重、非法数量校验、佛历/语言文案、单位及列表刷新、保存简要；ERP预览卡确定/编辑/丢弃各占一行，按钮本体及Cowork业务不变。共享组件Cowork缓存引用更新为4。
+- 1195模块/6分片及全部pre-push闸门通过；本地定向103测试、11subtests通过。实际浏览器与本地数据库证据 `.local/line-audit-20260916/FIX-REPORT.md`。
+- 正式域名health/ready/ERP/LIFF成功；main.js `09160201`、ERP LINE JS `22`、batch review `erp-fix-3`、manual JS `manual-layout-11`与候选逐字节相同。
+- 初次触发35085597048误填不完整SHA，checkout阶段已取消；云认证/构建/迁移/发布均未执行。
+- 本地Python urllib正式域名探针403，curl回读成功；没有放宽TLS或权限。未发送真实LINE测试消息、未向真实账套写测试单。新排版只影响新卡片；真实手机登录/唤起、并发/断网、所有权限身份不在本轮验收内。
+- 发布证据：`/tmp/erp-line-release-push.log`、`/tmp/erp-line-cloud-final.log`、`/tmp/erp-line-production-readback.json`、`/tmp/erp-line-{web,worker}-state.json`。
+
+### 上一发布身份（2026-09-16 库存与佛历整批）
 
 - 完整 SHA：`d307b5fdfd2eaf92fc0c6a3b48dbaf6c429b8f00`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:711a450e46f03154f3eeb7653ace08da40b32eca3a2eed6c727ea76c5cb7e381`。

@@ -144,3 +144,11 @@
 - 已部署 `d307b5fdfd2eaf92fc0c6a3b48dbaf6c429b8f00`，Manual CD 35069660879 success，schema dzkvl success；Web/Worker d307b5fdfd2e-s3 Ready 各100%。digest 711a450e46f03154f3eeb7653ace08da40b32eca3a2eed6c727ea76c5cb7e381。
 - 生产历史51份备份、12条佛历历史；39行数量/金额/计算日期不变；商品关联完整；6个正式健康/页面入口200、5个运行资源字节一致。
 - `/tmp/erp-release-push.log` 完整闸通过；`/tmp/erp-cloud-deploy-final.log` 远程发布；`/tmp/erp-production-final-readback.log` 正式只读验证。真实手机业务验收不在自动发布结论中。
+
+
+## 2026-09-16 LINE审计修复与逐行按钮正式发布
+- 用户授权“上线”，发布SHA `8a3b06d82b9fa9e2c17c1cfdd6ec22cb9feb0ce3`；Manual CD35085622430成功，Web/Worker同digest15350b178332、Ready各100%。部署账本记录完整身份。
+- 本轮修复与边界见 `.local/line-audit-20260916/FIX-REPORT.md`；原117观察点失败报告保留。实际新主体310两票采购合计428、库存4件/成本400；重复上传未增加正式单；明确收付款正式表验证；模拟器非真实手机验收。
+- 全量1195模块/6分片和机械闸通过。格式、缓存测试/引用问题均修正后过闸，未绕过。只更新Cowork共享脚本缓存引用，不变更Cowork业务。
+- 本地7870模拟器仍可用，7869原服务未动；保留本任务测试数据和证据。线上历史卡片不会更新，新卡片按钮逐行等宽。
+- 真实LINE首次授权/登录/手机唤起、断网与并发、全部权限身份仍需另行验收；无票号或往来方的文件不在精确票号防重范围；跨主体混合批次目前明确提示分开发送。

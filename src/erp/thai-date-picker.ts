@@ -31,14 +31,71 @@ export function thaiDateText(value: string): string {
     const [y, m, d] = iso.split('-');
     return `${d}/${m}/${Number(y) + 543}`;
 }
+function calendarText() {
+    const lang = (document.documentElement.lang || 'th').split('-')[0];
+    const words: Record<string, string[]> = {
+        th: [
+            'เลือกวันที่ พ.ศ.',
+            'เดือนก่อน',
+            'เดือนถัดไป',
+            'เดือน',
+            'ปี พ.ศ.',
+            'วันนี้',
+            'ล้าง',
+            'ปิด',
+            'วว/ดด/พ.ศ.',
+        ],
+        zh: [
+            '选择佛历日期',
+            '上个月',
+            '下个月',
+            '月份',
+            '佛历年份',
+            '今天',
+            '清空',
+            '关闭',
+            '日/月/佛历年',
+        ],
+        en: [
+            'Choose date (BE)',
+            'Previous month',
+            'Next month',
+            'Month',
+            'Year (BE)',
+            'Today',
+            'Clear',
+            'Close',
+            'DD/MM/BE',
+        ],
+        ja: [
+            '仏暦の日付を選択',
+            '前月',
+            '翌月',
+            '月',
+            '仏暦年',
+            '今日',
+            'クリア',
+            '閉じる',
+            '日/月/仏暦年',
+        ],
+    };
+    return {
+        locale:
+            ({ zh: 'zh-CN', en: 'en-GB', ja: 'ja-JP', th: 'th-TH' } as Record<string, string>)[
+                lang
+            ] || 'th-TH',
+        words: words[lang] || words.th,
+    };
+}
 function openPicker(input: HTMLInputElement, trigger: HTMLButtonElement) {
+    const { locale, words } = calendarText();
     const iso = thaiDateIso(input.value);
     const date = new Date((iso || thaiToday()) + 'T12:00:00');
     let year = date.getFullYear(),
         month = date.getMonth();
     const dialog = document.createElement('dialog');
     dialog.className = 'thai-date-dialog';
-    dialog.setAttribute('aria-label', 'เลือกวันที่ พ.ศ.');
+    dialog.setAttribute('aria-label', words[0]);
     const close = () => {
         dialog.close();
         dialog.remove();
@@ -64,16 +121,16 @@ function openPicker(input: HTMLInputElement, trigger: HTMLButtonElement) {
         const prev = document.createElement('button');
         prev.type = 'button';
         prev.textContent = '‹';
-        prev.setAttribute('aria-label', 'เดือนก่อน');
+        prev.setAttribute('aria-label', words[1]);
         const next = document.createElement('button');
         next.type = 'button';
         next.textContent = '›';
-        next.setAttribute('aria-label', 'เดือนถัดไป');
+        next.setAttribute('aria-label', words[2]);
         const months = document.createElement('select');
-        months.setAttribute('aria-label', 'เดือน');
+        months.setAttribute('aria-label', words[3]);
         for (let i = 0; i < 12; i++) {
             const option = new Option(
-                new Intl.DateTimeFormat('th-TH', { month: 'long' }).format(new Date(2026, i, 1)),
+                new Intl.DateTimeFormat(locale, { month: 'long' }).format(new Date(2026, i, 1)),
                 String(i)
             );
             months.add(option);
@@ -84,7 +141,7 @@ function openPicker(input: HTMLInputElement, trigger: HTMLButtonElement) {
         years.min = '2443';
         years.max = '2743';
         years.value = String(year + 543);
-        years.setAttribute('aria-label', 'ปี พ.ศ.');
+        years.setAttribute('aria-label', words[4]);
         months.onchange = () => {
             month = Number(months.value);
             render();
@@ -112,7 +169,9 @@ function openPicker(input: HTMLInputElement, trigger: HTMLButtonElement) {
         header.append(prev, months, years, next);
         const grid = document.createElement('div');
         grid.className = 'td-grid';
-        ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].forEach((text) => {
+        Array.from({ length: 7 }, (_, day) =>
+            new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(new Date(2026, 0, 4 + day))
+        ).forEach((text) => {
             const el = document.createElement('span');
             el.textContent = text;
             grid.append(el);
@@ -137,13 +196,13 @@ function openPicker(input: HTMLInputElement, trigger: HTMLButtonElement) {
         footer.className = 'td-footer';
         for (const [label, action] of [
             [
-                'วันนี้',
+                words[5],
                 () => {
                     choose(thaiToday());
                 },
             ],
-            ['ล้าง', () => choose('')],
-            ['ปิด', close],
+            [words[6], () => choose('')],
+            [words[7], close],
         ] as const) {
             const b = document.createElement('button');
             b.type = 'button';
@@ -190,7 +249,7 @@ export function installThaiDates(root: ParentNode = document) {
             '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h2M14 15h2M8 18h2"/></svg>';
         icon.setAttribute('aria-hidden', 'true');
         const sync = () => {
-            text.textContent = thaiDateText(input.value) || 'วว/ดด/พ.ศ.';
+            text.textContent = thaiDateText(input.value) || calendarText().words[8];
             trigger.disabled = input.disabled;
         };
         trigger.append(text, icon);

@@ -18,6 +18,8 @@
     var review = null;
     var manual = null;
     var manualAttachments = {};
+    var stateKey = 'loading';
+    var stateKind = '';
 
     var COMMON_ORDER = ['invoice_number', 'date', 'document_type'];
     var PURCHASE_ORDER = [
@@ -47,6 +49,7 @@
     var AMOUNT_ORDER = ['subtotal', 'vat', 'total_amount', 'notes'];
     var HIDDEN_FIELDS = new Set([
         'document_number',
+        'bill_number',
         'date_calendar',
         'items',
         'additional_invoices',
@@ -64,6 +67,12 @@
                 zh: '操作失败，内容已保留，请重试。',
                 ja: '操作できませんでした。入力内容は保持されています。再試行してください。',
             },
+            duplicate: {
+                th: 'เอกสารนี้บันทึกแล้ว กรุณาทิ้งรายการซ้ำ',
+                en: 'This invoice is already recorded. Discard this duplicate.',
+                zh: '这张票据已经入账，请丢弃重复单据。',
+                ja: 'この伝票は登録済みです。重複分を破棄してください。',
+            },
             saved: { th: 'บันทึกแล้ว', en: 'Saved', zh: '已保存', ja: '保存しました' },
             addItem: { th: 'เพิ่มรายการ', en: 'Add a line', zh: '添加一行', ja: '行を追加' },
             removeItem: { th: 'ลบ', en: 'Remove', zh: '移除', ja: '削除' },
@@ -72,6 +81,9 @@
     }
 
     function label(key) {
+        if (key === 'date') {
+            return { th: 'วันที่ พ.ศ.', en: 'Date (B.E.)', zh: '日期（佛历）', ja: '日付（仏暦）' }[lang] || 'วันที่ พ.ศ.';
+        }
         return I.label(lang, key);
     }
 
@@ -371,6 +383,8 @@
     }
 
     function show(key, kind) {
+        stateKey = key;
+        stateKind = kind || '';
         state.className = 'state ' + (kind || '');
         state.textContent = t(key);
         state.hidden = false;
@@ -447,7 +461,15 @@
                 show('saved');
             })
             .catch(function (error) {
-                show(error.status === 401 || error.status === 403 ? 'expired' : 'failed', 'error');
+                var duplicate = JSON.stringify(error.body || {}).indexOf('"duplicate"') >= 0;
+                show(
+                    duplicate
+                        ? 'duplicate'
+                        : error.status === 401 || error.status === 403
+                          ? 'expired'
+                          : 'failed',
+                    'error'
+                );
             })
             .finally(function () {
                 busy = false;
@@ -472,11 +494,27 @@
             },
             issues: function (record) {
                 fieldsOf(record);
-                return R.documentIssues(record, direction(), { requirePostingKind: false }).filter(
-                    function (issue) {
-                        return ['invoice_number', 'seller_name', 'total_amount'].indexOf(issue) < 0;
-                    }
-                );
+                var invalidItems = (fieldsOf(record).items || []).some(function (item) {
+                    return (
+                        !Number.isFinite(Number(item.qty)) ||
+                        Number(item.qty) <= 0 ||
+                        !Number.isFinite(Number(item.price)) ||
+                        Number(item.price) <= 0
+                    );
+                });
+                var problems = R.documentIssues(record, direction(), {
+                    requirePostingKind: false,
+                }).filter(function (issue) {
+                    return ['invoice_number', 'seller_name', 'total_amount'].indexOf(issue) < 0;
+                });
+                if (invalidItems && problems.indexOf('items') < 0) problems.push('items');
+                return problems;
+            },
+            previewPlaceholder: function (record) {
+                return record.filename === 'manual'
+                    ? { th: 'กรอกเอง', zh: '手动录入', en: 'Manual entry', ja: '手動入力' }[lang] ||
+                          'กรอกเอง'
+                    : t('loadingPreview');
             },
             globalReady: function () {
                 return true;
@@ -503,11 +541,11 @@
         document.documentElement.lang = lang;
         localStorage.setItem('pearnly_lang', lang);
         if (review) review.render();
-        else show('loading');
+        if (!state.hidden) show(stateKey, stateKind);
     };
     show('loading');
     Promise.all([
-        import('/static/dist/erp-manual-document.js?v=manual-layout-10').then(function (module) {
+        import('/static/dist/erp-manual-document.js?v=manual-layout-11').then(function (module) {
             manual = module;
             manual.setProductLookup(function (query) {
                 return api(

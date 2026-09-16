@@ -198,7 +198,7 @@ class ErpFlowTests(unittest.TestCase):
                 self.assertIn("Local Company", json.dumps(card))
                 footer = card["contents"]["footer"]["contents"]
                 actions = [footer[0]["action"], *[item["action"] for item in footer[1]["contents"]]]
-                self.assertEqual(footer[1]["layout"], "horizontal")
+                self.assertEqual(footer[1]["layout"], "vertical")
                 self.assertEqual(footer[1]["contents"][0]["style"], "secondary")
                 self.assertEqual(footer[1]["contents"][1]["style"], "link")
                 self.assertEqual(
@@ -271,8 +271,8 @@ class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
     async def test_confirm_uses_shared_internal_service(self):
         with (
             mock.patch(
-                "services.line_erp.internal_flow.selection",
-                return_value=({}, {"workspace_client_id": 7}),
+                "services.line_erp.internal_flow.recognized_selection",
+                return_value={"workspace_client_id": 7},
             ),
             mock.patch(
                 "services.erp.internal_records.confirm",
@@ -300,8 +300,8 @@ class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
             with (
                 self.subTest(code=code),
                 mock.patch(
-                    "services.line_erp.internal_flow.selection",
-                    return_value=({}, {"workspace_client_id": 7}),
+                    "services.line_erp.internal_flow.recognized_selection",
+                    return_value={"workspace_client_id": 7},
                 ),
                 mock.patch(
                     "services.erp.internal_records.confirm",

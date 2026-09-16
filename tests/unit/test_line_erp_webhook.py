@@ -228,6 +228,9 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 return_value={"history_ids": ["h1"], "raw_pages": []},
             ) as recognize,
             mock.patch.object(webhook.intake, "generate_and_save_pdf") as pdf,
+            mock.patch.object(
+                webhook.internal_flow, "recognized_selection", return_value=selection
+            ),
         ):
             await webhook._handle_document(
                 {"id": "m1", "fileName": "invoice.pdf"}, binding, "line-u1", "reply"

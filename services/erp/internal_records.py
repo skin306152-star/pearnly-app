@@ -104,6 +104,10 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
             f"{prefix}_tax": subject.get("tax_id") or "",
         }
     )
+    if strict and result.get("manual_layout") == 1:
+        from services.erp.internal_payment import payment
+
+        payment(result, direction)
     return result
 
 

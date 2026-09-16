@@ -54,9 +54,7 @@ async def act_draft(
         return {"ok": False, "status": 409, "detail": "line_erp.draft_empty"}
     if session.get("state") not in ("draft", "editing") or history_id not in history_ids:
         if reply_token:
-            line_client.reply_text(
-                reply_token, "รายการหมดอายุ กรุณาเปิดรายการใหม่", channel=CHANNEL
-            )
+            line_client.reply_text(reply_token, "รายการหมดอายุ กรุณาเปิดรายการใหม่", channel=CHANNEL)
         return {"ok": False, "status": 409, "detail": "line_erp.draft_expired"}
     mode = str(payload.get("mode") or "")
     if not team_access.mode_allowed(str(binding["tenant_id"]), str(binding["user_id"]), mode):
@@ -94,8 +92,16 @@ async def act_draft(
         )
         if not result["ok"]:
             if reply_token:
+                detail = result.get("detail") or {}
+                duplicate = isinstance(detail, dict) and any(
+                    row.get("reason") == "duplicate" for row in detail.get("histories", [])
+                )
                 line_client.reply_text(
-                    reply_token, "บันทึกไม่สำเร็จ กรุณาเปิดแก้ไขรายการแล้วลองใหม่", channel=CHANNEL
+                    reply_token,
+                    "เอกสารนี้บันทึกแล้ว กรุณาทิ้งรายการซ้ำครับ"
+                    if duplicate
+                    else "บันทึกไม่สำเร็จ กรุณาเปิดแก้ไขรายการแล้วลองใหม่",
+                    channel=CHANNEL,
                 )
             return result
         text = "บันทึกแล้ว"
@@ -180,8 +186,11 @@ async def confirm(
     from services.line_erp import internal_flow
 
     try:
-        _, selection = await asyncio.to_thread(
-            internal_flow.selection, binding, {**selection_values, "mode": mode}
+        selection = await asyncio.to_thread(
+            internal_flow.recognized_selection,
+            binding,
+            {**selection_values, "mode": mode},
+            history_ids,
         )
         return await asyncio.to_thread(
             internal_records.confirm,

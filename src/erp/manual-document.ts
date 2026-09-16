@@ -76,6 +76,18 @@ export function readManual(root: HTMLElement, base: ManualFields): ManualFields 
             return item;
         }
     );
+    const totals = f as ManualFields;
+    const gross = (totals.items as ManualFields[]).reduce(
+        (sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0),
+        0
+    );
+    const baseAmount = Math.max(
+        0,
+        gross - Number(totals.discount || 0) - Number(totals.deposit_deduction || 0)
+    );
+    totals.subtotal = baseAmount.toFixed(2);
+    totals.vat = ((baseAmount * Number(totals.vat_rate || 0)) / 100).toFixed(2);
+    totals.total_amount = (baseAmount + Number(totals.vat)).toFixed(2);
     return f;
 }
 export function updateManual(root: HTMLElement): void {
@@ -130,6 +142,15 @@ export function bindManual(
     );
     root.oninput = (event) => {
         const target = event.target as HTMLInputElement;
+        const linked: Record<string, string> = {
+            cheque_total: 'cheque_payment',
+            cheque_payment: 'cheque_total',
+        };
+        const sibling = linked[target.name];
+        if (sibling) {
+            const other = root.querySelector<HTMLInputElement>(`[name="${sibling}"]`);
+            if (other) other.value = target.value;
+        }
         if (['department', 'project'].includes(target.name)) {
             root.querySelectorAll<HTMLInputElement>(`[data-field="${target.name}"]`).forEach(
                 (input) => {
@@ -153,6 +174,17 @@ export function bindManual(
         const el = e.target as HTMLElement;
         const tab = el.closest<HTMLElement>('[data-md-tab]');
         if (tab) {
+            if (tab.dataset.mdTab === 'units') {
+                const panel = root.querySelector<HTMLElement>('[data-md-panel="units"]');
+                const items = readManual(root, fields()).items as ManualFields[];
+                if (panel)
+                    panel.innerHTML =
+                        '<p>' +
+                        items
+                            .map((item) => `${esc(item.name)} · ${esc(item.unit || '—')}`)
+                            .join('<br>') +
+                        '</p>';
+            }
             root.querySelectorAll<HTMLElement>('[data-md-panel]').forEach(
                 (p) => (p.hidden = p.dataset.mdPanel !== tab.dataset.mdTab)
             );

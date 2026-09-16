@@ -3,6 +3,7 @@
 // 文档类型/付款状态/分类客户端过滤(后端列表暂不开这三参 · 见 docs/smart-intake/05 §1.1)。
 /* global t, escapeHtml */
 import type { DocListItem, Category } from './purchase-common.js';
+import { isErpEntry } from './erp-intake.js';
 
 const CHECK_SVG =
     '<svg viewBox="0 0 24 24" fill="none" stroke-width="3"><path d="M5 12l5 5 9-11"/></svg>';
@@ -278,5 +279,8 @@ export function groupByMonth(list: DocListItem[]): MonthGroup[] {
 export function monthLabel(key: string): string {
     if (key === 'unknown') return t('pur-month-unknown');
     const [y, m] = key.split('-');
-    return t('pur-month-fmt', { year: y, month: String(Number(m)) });
+    return t('pur-month-fmt', {
+        year: isErpEntry() && Number(y) < 2400 ? String(Number(y) + 543) : y,
+        month: String(Number(m)),
+    });
 }

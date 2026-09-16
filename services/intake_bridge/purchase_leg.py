@@ -81,6 +81,8 @@ def book_from_history(
         for line, item in zip(draft.get("lines") or [], fields.get("items") or []):
             line["product_id"] = item.get("product_id")
             line["unit"] = item.get("unit")
+    if source in {"erp_web", "line_erp"} and fields.get("manual_layout") == 1:
+        draft["payment_status"] = "unpaid"
     draft["source"] = (
         "manual"
         if manual_entry
@@ -112,4 +114,16 @@ def book_from_history(
         auto_stock_in=bool(settings.get("auto_stock_in")),
         created_by=created_by,
     )
+    if source in {"erp_web", "line_erp"} and fields.get("manual_layout") == 1:
+        from services.erp.internal_payment import payment
+
+        paid = payment(fields, "purchase")["paid_amount"]
+        if paid:
+            posting_svc.pay_doc(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                doc_id=doc_id,
+                amount=paid,
+            )
     return doc_id, posted["doc"].get("doc_no")

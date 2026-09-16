@@ -18,6 +18,7 @@ from core.workspace_context import WS_HEADER
 from services.erp import team_access
 from services.auth.entrance import require_erp_portal
 from services.line_erp import (
+    internal_flow,
     route_contract,
     store,
     webhook,
@@ -69,6 +70,14 @@ async def erp_liff_auth(req: LiffAuthIn):
     draft_id = str(req.draft_id or "").strip()
     session = store.get_session(binding["tenant_id"], line_user_id)
     payload = (session or {}).get("payload") or {}
+    if (
+        session
+        and session.get("state") == "receiving"
+        and draft_id == payload.get("manual_history_id")
+    ):
+        await internal_flow.create_manual(binding, line_user_id, draft_id)
+        session = store.get_session(binding["tenant_id"], line_user_id)
+        payload = (session or {}).get("payload") or {}
     history_ids = [str(value) for value in payload.get("history_ids") or []]
     nonce = str(payload.get("nonce") or "")
     if not draft_id or not session or draft_id not in history_ids or not nonce:
@@ -205,6 +214,7 @@ def _draft_token(request: Request, draft_id: str) -> tuple[dict, dict, dict]:
         str(binding["tenant_id"]), str(binding["user_id"]), mode
     ):
         raise HTTPException(403, detail="line_erp.draft_forbidden")
+    session = internal_flow.refresh_draft_selection(binding, line_user_id, session)
     return claims, binding, session
 
 

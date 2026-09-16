@@ -59,6 +59,9 @@ class _FakeCursor:
     def fetchone(self):
         return self._results.pop(0) if self._results else None
 
+    def fetchall(self):
+        return []
+
 
 class ConvertOrchestrationTests(unittest.TestCase):
     """convert.py 逐口径:方向判定 / 幂等 / 无方向 / 无账套 / 无行项。"""

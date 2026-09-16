@@ -154,7 +154,11 @@
                 '"><span class="review-thumb"' +
                 (url ? ' data-review-preview="' + esc(url) + '"' : '') +
                 '><span>' +
-                esc(t('loadingPreview')) +
+                esc(
+                    options.previewPlaceholder
+                        ? options.previewPlaceholder(entry.record)
+                        : t('loadingPreview')
+                ) +
                 '</span></span><span class="review-row__body"><span class="review-row__head"><strong>' +
                 esc(info.number) +
                 '</strong>' +

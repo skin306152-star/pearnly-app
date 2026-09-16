@@ -112,6 +112,44 @@ class InternalRecordsPgSmoke(unittest.TestCase):
             self.user, history_ids=[hid], workspace_id=self.wid, direction=direction
         )
 
+    def test_manual_payment_reaches_formal_documents_once(self):
+        for direction in ("purchase", "sales"):
+            with self.subTest(direction=direction):
+                values = (
+                    {"cash_amount": "50"} if direction == "purchase" else {"payment_received": "50"}
+                )
+                hid, _ = self.draft(direction, "line_erp", manual_layout=1, vat_rate="0", **values)
+                self.confirm(hid, direction)
+                self.confirm(hid, direction)
+                table = "purchase_docs" if direction == "purchase" else "sales_documents"
+                self.cur.execute(
+                    f"SELECT paid_amount,payment_status FROM {table} WHERE ocr_history_id=%s",
+                    (hid,),
+                )
+                row = self.cur.fetchone()
+                self.assertEqual(str(row["paid_amount"]), "50.00")
+                self.assertEqual(row["payment_status"], "partial")
+
+    def test_duplicate_source_invoice_does_not_create_second_document(self):
+        for direction in ("purchase", "sales"):
+            first, _ = self.draft(direction, "line_erp", invoice_number="DUP-TEST")
+            second, _ = self.draft(direction, "line_erp", invoice_number="DUP-TEST")
+            self.confirm(first, direction)
+            with self.assertRaises(HTTPException) as caught:
+                self.confirm(second, direction)
+            self.assertEqual(caught.exception.detail["histories"][0]["reason"], "duplicate")
+            table = "purchase_docs" if direction == "purchase" else "sales_documents"
+            self.cur.execute(
+                f"SELECT count(*) AS n FROM {table} WHERE ocr_history_id=ANY(%s::uuid[])",
+                ([first, second],),
+            )
+            self.assertEqual(self.cur.fetchone()["n"], 1)
+
+    def test_manual_overpayment_does_not_save(self):
+        hid, _ = self.draft("sales", "line_erp", manual_layout=1, payment_received="201")
+        with self.assertRaises(HTTPException):
+            self.confirm(hid, "sales")
+
     def test_web_and_line_both_directions_are_internal_and_idempotent(self):
         for direction in ["purchase", "sales"]:
             for source in ["erp_web", "line_erp"]:

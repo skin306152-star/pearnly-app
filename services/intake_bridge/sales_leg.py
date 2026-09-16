@@ -159,4 +159,9 @@ def issue_from_history(cur, *, tenant_id, workspace_client_id, created_by, field
     # 头金额已在上面的 INSERT 里一次写齐(与 write_header_totals 同口径的 t 字典),此处只补
     # 明细行;write_header_totals 是 update 场景用的整替写法,建单场景不必再调一次。
     replace_lines(cur, tenant_id, doc_id, t["lines"])
+    if "internal_vat_rate" in fields and fields.get("manual_layout") == 1:
+        from services.erp.internal_payment import payment
+        from services.sales.document import _write_buyer_payment
+
+        _write_buyer_payment(cur, tenant_id, doc_id, None, payment(fields, "sales"))
     return doc_id, doc_no

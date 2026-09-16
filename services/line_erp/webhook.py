@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import secrets
 from types import SimpleNamespace
 from urllib.parse import parse_qs
+
+from fastapi import HTTPException
 
 from core import db  # noqa: F401 - compatibility seam for route tests
 from core.feature_flags import erp_line_enabled_for
@@ -184,14 +187,13 @@ async def _handle_text(
                 channel=CHANNEL,
             )
         return
-    if text not in ("1", "2"):
+    modes = {"1": "purchase", "ซื้อ": "purchase", "2": "sales", "ขาย": "sales"}
+    mode = modes.get(text)
+    if not mode:
         return
-    mode = "purchase" if text == "1" else "sales"
     if mode not in _allowed_modes(binding):
         if reply_token:
-            line_client.reply_text(
-                reply_token, "บัญชีนี้ไม่มีสิทธิ์สำหรับรายการนี้", channel=CHANNEL
-            )
+            line_client.reply_text(reply_token, "บัญชีนี้ไม่มีสิทธิ์สำหรับรายการนี้", channel=CHANNEL)
         return
     await internal_flow.begin_mode(binding, line_user_id, reply_token, mode)
 
@@ -292,6 +294,8 @@ async def _handle_document(
         _restore_receiving(binding, line_user_id, session_payload)
         _notify(line_user_id, reply_token, "กรุณาเลือกบริษัทใน Pearnly ใหม่ครับ")
         return
+    if session_payload.get("manual_history_id"):
+        selection["manual_history_id"] = session_payload["manual_history_id"]
     message_id = message.get("id")
     content = await asyncio.to_thread(
         line_client.download_message_content, message_id, channel=CHANNEL
@@ -335,8 +339,9 @@ async def _handle_document(
             source="line_erp",
         )
     except Exception:
+        logging.getLogger(__name__).exception("ERP LINE recognition failed")
         _restore_receiving(binding, line_user_id, selection)
-        _notify(line_user_id, reply_token, "อ่านเอกสารไม่สำเร็จหรือเครดิตไม่พอ กรุณาลองใหม่")
+        _notify(line_user_id, reply_token, "อ่านเอกสารไม่สำเร็จ กรุณาลองใหม่")
         return
     history_ids = [str(value) for value in result.get("history_ids") or [] if value]
     if not history_ids:
@@ -351,6 +356,19 @@ async def _handle_document(
         str(user["id"]),
         str(binding["tenant_id"]),
     )
+    try:
+        selection = await asyncio.to_thread(
+            internal_flow.recognized_selection, binding, selection, history_ids
+        )
+    except HTTPException as exc:
+        _restore_receiving(binding, line_user_id, selection)
+        text = (
+            "เอกสารชุดนี้มีหลายบริษัท กรุณาส่งแยกตามบริษัทครับ"
+            if exc.detail == "line_erp.multiple_workspaces"
+            else "ไม่สามารถเข้าถึงบริษัทของเอกสารนี้ได้ กรุณาตรวจสอบบริษัทครับ"
+        )
+        _notify(line_user_id, reply_token, text)
+        return
     target = {
         "label": selection["target_label"],
         "workspace_client_id": selection["workspace_client_id"],

@@ -13,6 +13,16 @@ def records(user_id: str, tenant_id: str, draft_id: str, history_ids: list[str])
         detail = get_ocr_history_detail(user_id, history_id, tenant_id=tenant_id)
         if detail is None:
             raise HTTPException(403, detail="line_erp.draft_forbidden")
+        from services.erp.business_dates import KEYS, buddhist
+
+        for page in detail.get("pages") or []:
+            fields = page.get("fields") or {}
+            for key in (*KEYS, "date_raw"):
+                if fields.get(key):
+                    try:
+                        fields[key] = buddhist(fields[key])
+                    except HTTPException:
+                        pass
         if detail.get("filename") == "manual":
             for page in detail.get("pages") or []:
                 fields = page.get("fields") or {}
@@ -35,6 +45,9 @@ def records(user_id: str, tenant_id: str, draft_id: str, history_ids: list[str])
             for page in page_numbers
         ]
         detail["preview_url"] = detail["preview_urls"][0]
+        if detail.get("filename") == "manual":
+            detail["preview_urls"] = []
+            detail["preview_url"] = ""
         result.append(detail)
     return result
 

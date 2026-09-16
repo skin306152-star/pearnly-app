@@ -137,3 +137,4 @@
 - 串行 Cloud Run schema Job 加入 `services/erp/history_upgrade.py`：仅 erp_web/line_erp 历史，原始行保存 tenant RLS 备份表；佛历 JSON、内部业务号、商品身份及唯一匹配期初；不改原生数量/金额/计算日期。歧义或行数异常阻断并回滚。
 - 线上事务回滚演练通过：12 条记录、51 份原始行备份；事务已回滚未持久修改。受限备份 `.local/production-history-before-release.json`，不入 Git。
 - 真库 24 tests passed（内部录入、库存成本、迁移幂等及保留金额），完整 pre-push 与云端发布待执行。
+- 发布范围的净增长按原有 RATCHET-EXEMPT 机制逐文件记录：新增独立 IR/IS、日期、单据号、商品身份、历史迁移模块及 ERP 入口适配。未修改闸门阈值或关闭检查。临时本地浏览器脚本归档至 `/tmp/pearnly-erp-validation-20260916`，截图保留 `.local`。

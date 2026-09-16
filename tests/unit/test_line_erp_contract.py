@@ -93,11 +93,16 @@ class ErpChannelTests(unittest.TestCase):
                 ),
             ),
             mock.patch.object(routes.webhook, "draft_records", return_value=[{"id": "h1"}]),
+            mock.patch.object(
+                routes.internal_flow, "manual_workspaces", return_value=[{"id": 7}]
+            ) as workspaces,
             mock.patch("services.line_erp.target_preflight.inspect_targets") as external,
         ):
             result = asyncio.run(routes.erp_draft_get(None, "h1"))
         self.assertTrue(result["data"]["internal_only"])
         self.assertEqual(result["data"]["records"], [{"id": "h1"}])
+        self.assertEqual(result["data"]["workspaces"], [{"id": 7}])
+        workspaces.assert_called_once_with({"tenant_id": "t1"}, "purchase")
         self.assertNotIn("targets", result["data"])
         external.assert_not_called()
 

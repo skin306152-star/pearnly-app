@@ -49,6 +49,7 @@ class CloudImportSchemaTests(unittest.TestCase):
             patch("services.erp.dms_master_shared.migrate_lock_table"),
             patch("services.cloud_runtime.schema.migrate_queue_schema"),
             patch("services.stocktake.schema.migrate"),
+            patch("services.erp.history_upgrade.migrate"),
             patch("builtins.__import__", side_effect=warned_import),
         ):
             with self.assertRaisesRegex(RuntimeError, "Schema gate reported failures"):
@@ -66,6 +67,7 @@ class CloudImportSchemaTests(unittest.TestCase):
             patch("services.erp.dms_master_shared.migrate_lock_table") as lock_table,
             patch("services.cloud_runtime.schema.migrate_queue_schema"),
             patch("services.stocktake.schema.migrate"),
+            patch("services.erp.history_upgrade.migrate"),
         ):
             schema.migrate()
         boot.assert_called_once_with()

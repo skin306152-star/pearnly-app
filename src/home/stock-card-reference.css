@@ -1,7 +1,7 @@
 .stc-reference .stc-ref-group {
-  border: 1px solid var(--line, #e9e4f3);
+  border: 1px solid var(--line);
   margin: 0 0 10px;
-  background: var(--card, #fff);
+  background: var(--card);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -12,14 +12,14 @@
   padding: 17px 18px;
   cursor: pointer;
   list-style: none;
-  background: var(--card, #fff);
+  background: var(--card);
   color: var(--ink);
 }
 .stc-ref-group summary:hover {
-  background: #faf8ff;
+  background: var(--bg);
 }
 .stc-ref-group summary:focus-visible {
-  outline: 2px solid #8050ff;
+  outline: 2px solid var(--accent);
   outline-offset: -3px;
 }
 .stc-ref-group summary::-webkit-details-marker {
@@ -33,8 +33,8 @@
   height: 24px;
   flex-shrink: 0;
   border-radius: 6px;
-  background: #f3eeff;
-  color: #7545df;
+  background: var(--accent-weak);
+  color: var(--accent);
   font-size: 21px;
   line-height: 1;
   transition: transform 0.15s;
@@ -43,11 +43,11 @@
   transform: rotate(90deg);
 }
 .stc-ref-group[open] summary {
-  border-bottom: 1px solid var(--line, #e9e4f3);
+  border-bottom: 1px solid var(--line);
 }
 .stc-ref-unit {
   margin-left: auto;
-  color: var(--muted, #827b91);
+  color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -63,42 +63,42 @@
 .stc-reference .stc-ref-table th,
 .stc-reference .stc-ref-table td {
   border: 0;
-  border-bottom: 1px solid #eeeaf4;
+  border-bottom: 1px solid var(--line);
   padding: 12px 10px;
   text-align: left;
   white-space: nowrap;
   color: var(--ink);
-  background: var(--card, #fff);
+  background: var(--card);
   line-height: 1.5;
 }
 .stc-reference .stc-ref-table thead th {
-  background: #faf9fc;
+  background: var(--bg);
   font-weight: 600;
-  color: #756c89;
+  color: var(--ink2);
   font-size: 12px;
 }
 .stc-reference .stc-ref-table thead tr:first-child th {
   text-align: center;
-  background: #f6f3fb;
-  color: #4f4169;
-  border-right: 1px solid #eae4f2;
+  background: var(--bg);
+  color: var(--ink2);
+  border-right: 1px solid var(--line);
 }
 .stc-reference .stc-ref-table .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 .stc-reference .stc-ref-table tbody tr:hover td {
-  background: #fcfaff;
+  background: var(--bg);
 }
 .stc-reference .stc-ref-table tfoot td,
 .stc-reference .stc-ref-grand td {
-  background: #f8f5ff;
+  background: var(--bg);
   font-weight: 600;
   border-bottom: 0;
 }
 .stc-ref-grand {
   margin-top: 20px;
-  border: 1px solid var(--line, #e9e4f3);
+  border: 1px solid var(--line);
   border-radius: 10px;
 }
 .stc-reference .stc-ref-table td:not(.num) {
@@ -117,23 +117,23 @@
 
 .stc-reference .stc-ref-table th,
 .stc-reference .stc-ref-table td {
-  border: 1px solid #d9d2e5;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, var(--ink3));
 }
 .stc-reference .stc-ref-table tfoot td {
-  border: 1px solid #d9d2e5;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, var(--ink3));
 }
 .stc-search {
   width: min(420px, 100%);
   min-height: 42px;
-  border: 1px solid var(--line, #e9e4f3);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px 14px;
   font: inherit;
   color: var(--ink);
-  background: white;
+  background: var(--card);
 }
 .stc-search:focus {
-  outline: 2px solid #c8b3ff;
+  outline: 2px solid var(--accent-weak);
   outline-offset: 1px;
 }
 
@@ -144,7 +144,7 @@
   gap: 16px;
   margin: 16px;
   padding: 16px;
-  background: #f5f1fc;
+  background: var(--bg);
   border-radius: 8px;
   color: var(--ink);
 }

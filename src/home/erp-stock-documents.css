@@ -1,7 +1,7 @@
 .erp-stock-page {
   padding: 28px;
-  background: var(--card, #fff);
-  border: 1px solid var(--line, #e9e4f3);
+  background: var(--card);
+  border: 1px solid var(--line);
   border-radius: 14px;
   margin: 24px;
 }
@@ -33,10 +33,10 @@
 .erp-stock-page td {
   padding: 12px 14px;
   text-align: left;
-  border: 1px solid var(--line, #e9e4f3);
+  border: 1px solid var(--line);
 }
 .erp-stock-page th {
-  background: #f8f5ff;
+  background: var(--bg);
 }
 .erp-stock-page .num {
   text-align: right;
@@ -45,13 +45,13 @@
 .erp-stock-link {
   border: 0;
   background: none;
-  color: var(--primary, #7945ed);
+  color: var(--primary);
   font: inherit;
   cursor: pointer;
   padding: 0;
 }
 .erp-stock-page [role='alert'] {
-  color: #ba3030;
+  color: var(--bad);
 }
 @media (max-width: 600px) {
   .erp-stock-page {
@@ -70,13 +70,13 @@
   width: min(100%, 480px);
   padding: 12px 14px;
   margin-bottom: 20px;
-  border: 1px solid #e9e4f3;
+  border: 1px solid var(--line);
   border-radius: 8px;
   font: inherit;
   box-sizing: border-box;
 }
 .erp-stock-page td small {
   display: block;
-  color: #88809b;
+  color: var(--ink3);
   margin-top: 4px;
 }

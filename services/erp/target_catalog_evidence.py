@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import ntpath
 import uuid
 from typing import Any, Mapping
 
@@ -26,10 +25,6 @@ def _account_identity(adapter: str, value: Any) -> str:
 
 def _root_identity(value: Any) -> str:
     return normalize_express_account_key(value)
-
-
-def _account_root(account_set_key: str) -> str:
-    return _root_identity(ntpath.dirname(account_set_key.rstrip("\\/")))
 
 
 def _revision(value: Any) -> int | None:
@@ -110,6 +105,17 @@ def _selected_account(
     return None
 
 
+def _normalized_roots(account_roots: Mapping[str, Any] | None) -> dict[str, str]:
+    """数据目录 → 程序目录(两侧都归一化)· 只保留成对给出的行。"""
+    roots: dict[str, str] = {}
+    for key, value in (account_roots or {}).items():
+        normalized_key = _account_identity("express", key)
+        normalized_root = _root_identity(value)
+        if normalized_key and normalized_root:
+            roots.setdefault(normalized_key, normalized_root)
+    return roots
+
+
 def _validate_proof_with_cursor(
     cur,
     *,
@@ -118,6 +124,7 @@ def _validate_proof_with_cursor(
     adapter: str,
     selected_key: str,
     selected_root: str,
+    expected_root: str = "",
     request_id: str,
     revision: int,
 ) -> dict[str, Any]:
@@ -201,10 +208,17 @@ def _validate_proof_with_cursor(
                     else {}
                 )
                 snapshot_root = _root_identity(attributes.get("root"))
+                # 快照里的 root 就是这条账套上报的程序目录;客户端声明与本连接绑定的程序目录
+                # 都只是"已知才比",任一侧缺失就不拿它判死(数据目录的上一层不是程序目录)。
+                root_result = selected_root or snapshot_root or expected_root or None
                 if attributes.get("writable", True) is False:
                     reason = "account_not_writable"
+                elif snapshot_root and selected_root and snapshot_root != selected_root:
+                    reason = "root_mismatch"
+                elif snapshot_root and expected_root and snapshot_root != expected_root:
+                    reason = "root_mismatch"
                 else:
-                    reason = "" if snapshot_root == selected_root else "root_mismatch"
+                    reason = ""
             else:
                 reason = ""
     if reason:
@@ -241,19 +255,24 @@ def validate_selection(
     bound_root_key: Any = None,
     request_id: Any = None,
     revision: Any = None,
+    account_roots: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Validate with a supplied RLS cursor, or open one read-only when omitted."""
+    """Validate with a supplied RLS cursor, or open one read-only when omitted.
+
+    account_roots:本连接上报的"数据目录 → 程序目录"配对
+    (express_target_projection.reported_account_set_roots)。数据目录的上一层不是程序目录,
+    所以缺配对时不做任何路径推断;只有两侧都已知才拿程序目录判死。
+    """
     adapter = _adapter(adapter)
     selected_key = _account_identity(adapter, selected_account_set_key)
     bound_key = _account_identity(adapter, bound_account_set_key)
     selected_root = _root_identity(selected_root_key) if adapter == "express" else ""
     bound_root = _root_identity(bound_root_key) if adapter == "express" else ""
     if adapter == "express":
-        selected_root = selected_root or _account_root(selected_key)
-        expected_bound_root = bound_root or _account_root(bound_key)
-        root_matches_default = (
-            selected_root == expected_bound_root if expected_bound_root else not selected_root
-        )
+        reported_roots = _normalized_roots(account_roots)
+        selected_root = selected_root or reported_roots.get(selected_key, "")
+        bound_root = bound_root or reported_roots.get(bound_key, "")
+        root_matches_default = not (selected_root and bound_root and selected_root != bound_root)
     else:
         root_matches_default = True
     is_bound_default = bool(selected_key and selected_key == bound_key and root_matches_default)
@@ -314,6 +333,7 @@ def validate_selection(
         "adapter": adapter,
         "selected_key": selected_key,
         "selected_root": selected_root,
+        "expected_root": bound_root,
         "request_id": validated_request_id,
         "revision": validated_revision,
     }

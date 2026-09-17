@@ -103,6 +103,31 @@ def normalize_express_account_key(value: Any) -> str:
     return ntpath.normcase(ntpath.normpath(raw))[:500] if raw else ""
 
 
+def reported_account_set_roots(rows: Any) -> dict[str, str]:
+    """账套配对(数据目录 → 程序目录)· 键与值都已 normalize_express_account_key。
+
+    数据目录与程序目录是两个独立字段:事务所常把数据放在盘符(S:\\2569\\EXP69\\69SINCER),
+    Express 程序却装在网络共享(\\\\accserver\\ACCOUNT\\69EXP)· 两者的字符串形态甚至可能不同
+    (同一目录既可用映射盘符、也可用 UNC 描述)。所以只认上报里成对给出的 root,
+    **绝不从数据目录的路径反推父目录** —— 反推出来的"上一层"跟程序目录不是一回事。
+
+    兼容两种行形状:Agent 心跳的 {path, root} 与投影快照的 {source_id, attributes:{path, root}}。
+    只给出数据目录、没给出程序目录的行不入表(caller 自己决定缺配对时是放行还是拦)。
+    """
+    roots: dict[str, str] = {}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, Mapping):
+            continue
+        attributes = row.get("attributes") if isinstance(row.get("attributes"), Mapping) else {}
+        key = normalize_express_account_key(
+            row.get("path") or attributes.get("path") or row.get("source_id")
+        )
+        root = normalize_express_account_key(row.get("root") or attributes.get("root"))
+        if key and root:
+            roots.setdefault(key, root)
+    return roots
+
+
 def _selected_account_set(body: Mapping[str, Any]) -> str:
     return normalize_express_account_key(body.get("account_set") or body.get("account_dir"))
 

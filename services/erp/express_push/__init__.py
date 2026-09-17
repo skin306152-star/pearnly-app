@@ -18,6 +18,8 @@ import ntpath
 import os
 from typing import Any, Dict, Optional
 
+from services.erp.express_target_projection import reported_account_set_roots
+
 
 def express_push_enabled() -> bool:
     """特性开关 · 默认 off。off 时 express 推送分支与 Agent 路由全短路,对现有零影响。"""
@@ -54,13 +56,20 @@ def account_set_allowed(
     if selected == default:
         return True
     requested_root = _path(account_root)
+    reported_root = reported_account_set_roots(config.get("reported_account_sets")).get(
+        selected, ""
+    )
+    if reported_root:
+        return bool(requested_root and requested_root == reported_root)
+    # 老 Agent 只报数据目录、不报程序目录时才用数据目录的上一层兜底。这条 fallback 只属于本
+    # 白名单(放行侧、缺配对时尽量不误拦);证据闸门不这样推断 —— 见 target_catalog_evidence。
     for row in config.get("reported_account_sets") or []:
         if not isinstance(row, dict) or row.get("writable") is not True:
             continue
         if _path(row.get("path")) != selected:
             continue
-        reported_root = _path(row.get("root")) or _path(ntpath.dirname(str(row.get("path") or "")))
-        return bool(requested_root and requested_root == reported_root)
+        legacy_root = _path(ntpath.dirname(str(row.get("path") or "")))
+        return bool(requested_root and requested_root == legacy_root)
     return False
 
 

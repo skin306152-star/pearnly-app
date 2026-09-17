@@ -168,30 +168,56 @@ class TargetCatalogEvidenceTests(unittest.TestCase):
         self.assertTrue(result["proof_required"])
         self.assertEqual(result["error_code"], evidence.CATALOG_REFRESH_REQUIRED)
 
-    def test_express_default_infers_missing_bound_root_from_account_path(self):
+    def test_express_default_mapped_drive_data_dir_matches_reported_program_root(self):
+        """数据目录在盘符、程序目录在网络共享(事务所常态)不得被当成目标不符。"""
         with mock.patch.object(evidence.db, "get_cursor_rls") as get_cursor:
-            valid = _validate(
+            result = _validate(
                 adapter="express",
-                selected_account_set_key=r"C:\68EXP\TEST",
-                bound_account_set_key=r"C:\68EXP\TEST",
-                selected_root_key=r"C:\68EXP",
-                bound_root_key=None,
-                request_id=None,
-                revision=None,
-            )
-            tampered = _validate(
-                adapter="express",
-                selected_account_set_key=r"C:\68EXP\TEST",
-                bound_account_set_key=r"C:\68EXP\TEST",
-                selected_root_key=r"C:\69EXP",
-                bound_root_key=None,
+                selected_account_set_key=r"S:\2569\EXP69\69SINCER",
+                bound_account_set_key=r"S:\2569\EXP69\69SINCER",
+                bound_root_key=r"\\accserver\ACCOUNT\69EXP",
+                account_roots={r"S:\2569\EXP69\69SINCER": r"\\accserver\ACCOUNT\69EXP"},
                 request_id=None,
                 revision=None,
             )
 
-        self.assertTrue(valid["ok"])
-        self.assertFalse(tampered["ok"])
-        self.assertEqual(tampered["error_code"], evidence.CATALOG_REFRESH_REQUIRED)
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["proof_required"])
+        self.assertEqual(result["reason"], "bound_default")
+        self.assertEqual(result["root_key"], r"\\accserver\account\69exp")
+        get_cursor.assert_not_called()
+
+    def test_express_default_with_conflicting_reported_root_needs_proof(self):
+        result = _validate(
+            adapter="express",
+            selected_account_set_key=r"S:\2569\EXP69\69SINCER",
+            bound_account_set_key=r"S:\2569\EXP69\69SINCER",
+            bound_root_key=r"\\accserver\ACCOUNT\69EXP",
+            account_roots={r"S:\2569\EXP69\69SINCER": r"\\accserver\ACCOUNT\68EXP"},
+            request_id=None,
+            revision=None,
+        )
+
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["proof_required"])
+        self.assertEqual(result["error_code"], evidence.CATALOG_REFRESH_REQUIRED)
+
+    def test_express_default_without_pairing_is_not_rejected_by_parent_path(self):
+        """没有配对可判时不做路径推断:绑定账套本身不再被"上一层 ≠ 程序目录"拦下。"""
+        with mock.patch.object(evidence.db, "get_cursor_rls") as get_cursor:
+            result = _validate(
+                adapter="express",
+                selected_account_set_key=r"S:\2569\EXP69\69SINCER",
+                bound_account_set_key=r"S:\2569\EXP69\69SINCER",
+                bound_root_key=None,
+                selected_root_key=None,
+                account_roots=None,
+                request_id=None,
+                revision=None,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["reason"], "bound_default")
         get_cursor.assert_not_called()
 
     def test_non_default_requires_both_request_and_revision(self):
@@ -343,7 +369,7 @@ class TargetCatalogEvidenceTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["reason"], "validated_snapshot")
 
-    def test_express_snapshot_can_derive_root_from_selected_account_path(self):
+    def test_express_snapshot_supplies_root_when_request_has_none(self):
         cursor = _Cursor(
             [
                 _refresh(adapter="express"),
@@ -368,6 +394,77 @@ class TargetCatalogEvidenceTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["root_key"], r"c:\69exp")
+
+    def test_express_mapped_drive_choice_proves_against_reported_root(self):
+        """盘符数据目录 + 网络程序目录:非默认账套按上报配对判,不再拿"上一层"当程序目录。"""
+        cursor = _Cursor(
+            [
+                _refresh(adapter="express"),
+                _snapshot(
+                    [
+                        {
+                            "source_id": r"s:\2569\exp69\69branch",
+                            "attributes": {
+                                "path": r"S:\2569\EXP69\69BRANCH",
+                                "root": r"\\accserver\ACCOUNT\69EXP",
+                                "writable": True,
+                            },
+                        }
+                    ],
+                    adapter="express",
+                ),
+            ]
+        )
+        with mock.patch.object(evidence.db, "get_cursor_rls", return_value=_Context(cursor)):
+            result = _validate(
+                adapter="express",
+                selected_account_set_key=r"S:\2569\EXP69\69BRANCH",
+                bound_account_set_key=r"S:\2569\EXP69\69SINCER",
+                bound_root_key=r"\\accserver\ACCOUNT\69EXP",
+                account_roots={
+                    r"S:\2569\EXP69\69BRANCH": r"\\accserver\ACCOUNT\69EXP",
+                    r"S:\2569\EXP69\69SINCER": r"\\accserver\ACCOUNT\69EXP",
+                },
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["reason"], "validated_snapshot")
+
+    def test_express_choice_from_another_program_root_is_invalid(self):
+        """同机多套程序(68EXP/69EXP):选了别套账套 = 不属于本连接,必须拦下。"""
+        cursor = _Cursor(
+            [
+                _refresh(adapter="express"),
+                _snapshot(
+                    [
+                        {
+                            "source_id": r"s:\2568\exp68\68sincer",
+                            "attributes": {
+                                "path": r"S:\2568\EXP68\68SINCER",
+                                "root": r"\\accserver\ACCOUNT\68EXP",
+                                "writable": True,
+                            },
+                        }
+                    ],
+                    adapter="express",
+                ),
+            ]
+        )
+        with mock.patch.object(evidence.db, "get_cursor_rls", return_value=_Context(cursor)):
+            result = _validate(
+                adapter="express",
+                selected_account_set_key=r"S:\2568\EXP68\68SINCER",
+                bound_account_set_key=r"S:\2569\EXP69\69SINCER",
+                bound_root_key=r"\\accserver\ACCOUNT\69EXP",
+                account_roots={
+                    r"S:\2568\EXP68\68SINCER": r"\\accserver\ACCOUNT\68EXP",
+                    r"S:\2569\EXP69\69SINCER": r"\\accserver\ACCOUNT\69EXP",
+                },
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "root_mismatch")
+        self.assertEqual(result["error_code"], evidence.CATALOG_REFRESH_INVALID)
 
     def test_express_code_choice_needs_no_root_when_snapshot_has_none(self):
         cursor = _Cursor(

@@ -195,6 +195,66 @@ class SelectedAccountTests(unittest.TestCase):
 
         self.assertEqual(choice["key"], "datat")
 
+    def test_express_mapped_drive_bound_default_passes_without_proof(self):
+        """线上事故回归:数据目录在 S:\\、程序目录在 \\\\accserver\\ 的连接必须能推。"""
+        endpoint = {
+            "id": "endpoint-1",
+            "adapter": "express",
+            "config": {
+                "account_set": r"S:\2569\EXP69\69SINCER",
+                "express_root": r"\\accserver\ACCOUNT\69EXP",
+                "reported_account_sets": [
+                    {
+                        "path": r"S:\2569\EXP69\69SINCER",
+                        "root": r"\\accserver\ACCOUNT\69EXP",
+                        "writable": True,
+                    }
+                ],
+            },
+        }
+        result = selected_account.require_catalog_evidence(
+            endpoint,
+            tenant_id="tenant",
+            user_id="user",
+            account_set_key=r"s:\2569\exp69\69sincer",
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["reason"], "bound_default")
+
+    def test_express_reported_pairing_is_passed_to_the_evidence_gate(self):
+        endpoint = {
+            "id": "endpoint-1",
+            "adapter": "express",
+            "config": {
+                "account_set": r"S:\2569\EXP69\69SINCER",
+                "express_root": r"\\accserver\ACCOUNT\69EXP",
+                "reported_account_sets": [
+                    {
+                        "path": r"S:\2569\EXP69\69BRANCH",
+                        "root": r"\\accserver\ACCOUNT\69EXP",
+                        "writable": True,
+                    }
+                ],
+            },
+        }
+        with mock.patch.object(
+            selected_account.target_catalog_evidence,
+            "validate_selection",
+            return_value={"ok": True},
+        ) as validate:
+            selected_account.require_catalog_evidence(
+                endpoint,
+                tenant_id="tenant",
+                user_id="user",
+                account_set_key=r"S:\2569\EXP69\69BRANCH",
+            )
+
+        self.assertEqual(
+            validate.call_args.kwargs["account_roots"],
+            {r"s:\2569\exp69\69branch": r"\\accserver\account\69exp"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

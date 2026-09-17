@@ -7,7 +7,10 @@ from typing import Any
 from fastapi import HTTPException
 
 from services.erp import line_target_projection, target_catalog_evidence
-from services.erp.express_target_projection import normalize_express_account_key
+from services.erp.express_target_projection import (
+    normalize_express_account_key,
+    reported_account_set_roots,
+)
 from services.erp.line_target_choice import endpoint_with_account_choice
 from services.erp.target_projection_store import load_state, load_state_with_cursor
 
@@ -164,6 +167,7 @@ def require_catalog_evidence(
         bound_root_key=config.get("express_root"),
         request_id=request_id,
         revision=revision,
+        account_roots=reported_account_set_roots(config.get("reported_account_sets")),
     )
     if result.get("ok") is not True:
         raise HTTPException(

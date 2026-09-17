@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-16 19:34（UTC+7）。状态：**ERP原票日期、金额、明确收付款与账套编辑修复已发布（`c5fcee41785d`）。Web/Worker Ready、各100%流量；正式资源逐字节回读通过。线上旧单按用户要求未纠正。**
+更新时间：2026-09-17 10:06（UTC+7）。状态：**ERP原POS组件复用、商品库存整合、冗余清理及WHT结清修复已发布（`4f1cbab9f740`）。Web/Worker Ready、各100%流量；正式28项资源逐字节回读通过。线上旧单未纠正。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -27,6 +27,21 @@
 Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保守配置。min=0允许空闲缩零，并不保证请求结束立即归零；正在运行的小助手轮询和定时探针仍会产生调用。
 
 ## 正在服务的发布身份
+
+- 完整 SHA：`4f1cbab9f740ebf381f31d1c3eabdd5864e88916`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:224f0f8099f621b39c664e2e840b1c7f26eeb5b9b697a915ff400ba411ecc702`。
+- Web `pearnly-web-4f1cbab9f740-s3`、Worker `pearnly-worker-4f1cbab9f740-s3`，Ready、各100%流量，同一不可变digest。
+- [Manual CD 35176391558](https://github.com/skin306152-star/pearnly-app/actions/runs/35176391558) success；schema `pearnly-schema-q8mv5` success。容器编译/Chromium、候选与正式健康/就绪/运行SHA及完整安装包验证通过。
+- 本轮：ERP采购/销售/IR/IS及LINE手工录入复用原POS表单；接入原商品、库存组件与统一商品身份和编号；商品匹配带出单位、条码及对应成本/售价；库存与收发存同源，盘点差额生成IR/IS且重试幂等；ERP隐藏旧入库/调拨，原POS路径保留。销售WHT文案纠正，ERP分类字段移除。
+- 清理：移除旧编辑器布局CSS、空更新函数、网页保存隐藏按钮转发和重复库存锁、旧构建分块；本地模拟器/验收目录不打入生产镜像。仍被历史单据使用的manual_layout=1计算分支保留。
+- 发布前发现并修复WHT结清判断：新表单按net_payable判断已收付，销售原生grand_total遵循既有销售计算器的扣WHT后应收口径；历史/预览total_amount继续保留含税总额。真库覆盖网页/LINE×采购/销售×已收付/未收付8个子场景：含税107、VAT7、WHT5、应收付102，明确已收付时paid_amount102且paid，未收付时0且unpaid。
+- 完整pre-push通过：1198模块/6分片、类型/构建/缓存/视觉/权限等机械闸。49项整合定向测试及6subtests；后续27项结清相关定向测试通过。原库存扫码3组、入口隔离67项和手机盘点EAN/QR/LINE壳等浏览器验收通过；这批扫码脚本的API为桩，真库证据独立，不等于真实LINE手机验收。
+- 正式域名28项资源逐字节与候选相同（含home、ERP壳、main JS/CSS、手工编辑器、LINE脚本和手机盘点词典引用）；health/ready/ERP/POS/LIFF入口通过。main JS/CSS `09170010`，手工编辑器/LINE `pos-profile-3`。未认证入口回读不等于登录后业务验收。
+- 第一候选`52fd7586`的[Manual CD 35175979848](https://github.com/skin306152-star/pearnly-app/actions/runs/35175979848)为补WHT结清修复主动取消，未切换Web/Worker；已启动的schema `pearnly-schema-fdfcm`独立成功结束，确认无并行初始化后启动最终发布。
+- 边界：未批量迁移POS历史库存/批次，未编造缺失商品条码/成本，未纠正线上旧错单。保留本地7872供验收；没有向真实账套写测试单、没有发送真实LINE测试消息，真实手机验收仍待用户。
+- 证据：本任务工作树`.local/cleanup-cloud-final.log`、`.local/cleanup-{web,worker}-state.json`、`.local/cleanup-production-readback.json`、`.local/cleanup-push-final.log`、`.local/wht-push.log`、`.local/wht-pg-check.log`；[任务记录](../erp/ERP-INTERNAL-ENTRY-LOCAL.md)。
+
+### 上一发布身份（2026-09-16 原票与收付款修复）
 
 - 完整 SHA：`c5fcee41785d9d1ca6117e700da6aa3ae4008df9`。
 - 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:85aa9fe0b698f7050cf461185b413b8dd2d76d45f52cc78d84db478c7ae94d1f`。

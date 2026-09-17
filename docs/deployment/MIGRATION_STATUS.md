@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-17 10:06（UTC+7）。状态：**ERP原POS组件复用、商品库存整合、冗余清理及WHT结清修复已发布（`4f1cbab9f740`）。Web/Worker Ready、各100%流量；正式28项资源逐字节回读通过。线上旧单未纠正。**
+更新时间：2026-09-17 21:50（UTC+7）。状态：**Express账套"数据目录↔程序目录"配对修复已发布（`23fd23d127aa`）。Web/Worker Ready、各100%流量，正式域名请求命中新 revision；真机推送验收待用户确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -28,9 +28,14 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`4f1cbab9f740ebf381f31d1c3eabdd5864e88916`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:224f0f8099f621b39c664e2e840b1c7f26eeb5b9b697a915ff400ba411ecc702`。
-- Web `pearnly-web-4f1cbab9f740-s3`、Worker `pearnly-worker-4f1cbab9f740-s3`，Ready、各100%流量，同一不可变digest。
+- 完整 SHA：`23fd23d127aa9172c95dafe741aae8455db4a7c8`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:0223ac0087fbfa0f62f435f2e000e538afc300a34cf337b525629e3e6f8ec813`。
+- Web `pearnly-web-23fd23d127aa-s3`、Worker `pearnly-worker-23fd23d127aa-s3`，Ready、各100%流量，同一不可变digest。
+- [Manual CD 35234851060](https://github.com/skin306152-star/pearnly-app/actions/runs/35234851060) success；schema execution `pearnly-schema-7wpdq` success（14:42:03Z）；容器编译/Chromium、候选与正式健康/就绪及运行SHA验证随流程通过。正式域名 `health`/`ready` 200；nonce `erp_pairing_check_23fd23d1` 的请求日志命中新 Web revision `pearnly-web-23fd23d127aa-s3`。
+- 本轮修复：Express账套的程序目录不再由数据目录的上一层推断——账套数据常放在盘符（`S:\2569\EXP69\69SINCER`）、Express 程序装在网络共享（`\\accserver\ACCOUNT\69EXP`），旧口径必然 `root_mismatch`，导致该类连接一律 409 `catalog_refresh_invalid`。现在统一按 Companion 上报的"数据目录 → 程序目录"配对判定（`express_target_projection.reported_account_set_roots`），客户端声明、连接绑定与上报配对三者"已知才比"；快照 root 与本连接程序目录不一致仍拦（同机 68EXP/69EXP 不得串用）。
+- 触发本次修复的线上现象：KORN 那台（`mrerp@outlook.co.th`）13 张发票在 2026-09-17 20:36/20:39/20:50/20:56（UTC+7）共 4 轮 52 次 `/api/erp/push` 全部 409，`erp_push_logs` 一行未落。发布后用同账号真实配置只读复验：原 `root_mismatch` 请求现为 `bound_default`（`ok`）；`68SINCER` 等别套账套仍被拒。
+- 已知收紧：`fc60647b`（Pearnly 内部测试连接，`express_root=P:\69EXP` 与上报根不一致、自 2026-06-24 起无心跳）现在会被闸门拦下，属预期；如需继续使用须先把该连接的 `express_root` 改为上报值。其余 Express 连接（含 68EXP/70EXP 与内部测试）root 一致，不受影响。
+- 真机验收：本次仅完成本地全闸、发布流水线与正式域名回读；用户在 Cowork 端重新推送那 13 张、并在 Express 侧确认入账之前，不视为业务验收通过。
 - [Manual CD 35176391558](https://github.com/skin306152-star/pearnly-app/actions/runs/35176391558) success；schema `pearnly-schema-q8mv5` success。容器编译/Chromium、候选与正式健康/就绪/运行SHA及完整安装包验证通过。
 - 本轮：ERP采购/销售/IR/IS及LINE手工录入复用原POS表单；接入原商品、库存组件与统一商品身份和编号；商品匹配带出单位、条码及对应成本/售价；库存与收发存同源，盘点差额生成IR/IS且重试幂等；ERP隐藏旧入库/调拨，原POS路径保留。销售WHT文案纠正，ERP分类字段移除。
 - 清理：移除旧编辑器布局CSS、空更新函数、网页保存隐藏按钮转发和重复库存锁、旧构建分块；本地模拟器/验收目录不打入生产镜像。仍被历史单据使用的manual_layout=1计算分支保留。

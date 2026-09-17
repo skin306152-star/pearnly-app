@@ -206,7 +206,10 @@ async function probeStockCardNav(): Promise<void> {
         window._stockCardDisabled = false; // 探针本身失败(网络抖动)≠ 关闭,不误杀入口
     }
     if (window._stockCardDisabled) {
-        const nav = document.getElementById('nav-group-firm-goods');
+        const nav =
+            window._entry === 'erp'
+                ? document.querySelector<HTMLElement>('[data-route=stock-card]')
+                : document.getElementById('nav-group-firm-goods');
         if (nav) nav.style.display = 'none';
     }
 }

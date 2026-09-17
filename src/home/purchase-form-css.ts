@@ -120,4 +120,11 @@ export const PURCHASE_FORM_CSS = `
   .pur .ph{flex-direction:column;} .pur .igrid{grid-template-columns:repeat(2,1fr);}
   .pur .irow1{flex-wrap:wrap;} .pur .irow1 .seg{flex:0 0 100%;order:3;} .pur .irow1 .iname{order:1;} .pur .irow1 .x{order:2;}
 }
+@container(max-width:760px){
+  .pur.f .sheet{display:block;border:0;border-radius:0;box-shadow:none;}
+  .pur.f .preview-pane{position:static;max-height:none;overflow:visible;border-right:0;border-bottom:1px solid var(--line);border-radius:0;}
+  .pur.f .etabs{top:var(--topbar-h);border-radius:0;} .pur.f .scroll{padding:0 16px 92px;}
+  .pur .ph{flex-direction:column;} .pur .igrid{grid-template-columns:repeat(2,1fr);}
+  .pur .irow1{flex-wrap:wrap;} .pur .irow1 .seg{flex:0 0 100%;order:3;} .pur .irow1 .iname{order:1;} .pur .irow1 .x{order:2;}
+}
 `;

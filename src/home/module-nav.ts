@@ -169,7 +169,7 @@ interface ErpTeamAccess {
 }
 
 const ERP_MEMBER_ROUTES: Record<string, Set<string>> = {
-    product: new Set(['stock-card', 'stock-in', 'stock-out']),
+    product: new Set(['stock-card', 'stock-in', 'stock-out', 'sales-products', 'inventory']),
     purchase: new Set([
         'purchase',
         'purchase-form',

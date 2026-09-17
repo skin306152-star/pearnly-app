@@ -326,7 +326,7 @@
           try {
             localStorage.setItem('pearnly_entry', 'erp');
           } catch (e5) {}
-          window.location.replace('/home?canonical=erp');
+          window.location.replace('/home?canonical=erp' + location.hash);
           return;
         }
         async function submit(e) {

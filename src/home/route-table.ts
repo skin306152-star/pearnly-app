@@ -119,6 +119,8 @@ export const COWORK_ALLOWED_ROUTES = new Set<string>([
 ]);
 
 export const ERP_ALLOWED_ROUTES = new Set<string>([
+    'sales-products',
+    'inventory',
     'buyer-clients',
     'dashboard',
     'dms-intake',

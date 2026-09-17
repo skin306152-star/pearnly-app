@@ -112,6 +112,45 @@ class InternalRecordsPgSmoke(unittest.TestCase):
             self.user, history_ids=[hid], workspace_id=self.wid, direction=direction
         )
 
+    def test_original_pos_form_amounts_reach_native_documents(self):
+        from decimal import Decimal
+
+        for direction in ("purchase", "sales"):
+            with self.subTest(direction=direction):
+                hid, fields = self.draft(
+                    direction,
+                    manual_layout=2,
+                    price_mode="inclusive",
+                    pos_form={
+                        "paymentStatus": "paid",
+                        "doc_kind": "purchase_invoice",
+                        "currency": "THB",
+                        "hasVat": True,
+                    },
+                    items=[
+                        {
+                            "name": "Original POS " + direction,
+                            "qty": "2",
+                            "price": "107",
+                            "discount": "0",
+                            "vat_rate": "7",
+                            "wht_rate": "0",
+                            "posting_kind": "stock",
+                        }
+                    ],
+                )
+                self.assertEqual(Decimal(fields["total_amount"]), Decimal("214"))
+                self.confirm(hid, direction)
+                table = "purchase_docs" if direction == "purchase" else "sales_documents"
+                self.cur.execute(
+                    f"SELECT subtotal,vat_amount,grand_total FROM {table} WHERE ocr_history_id=%s",
+                    (hid,),
+                )
+                row = self.cur.fetchone()
+                self.assertEqual(row["subtotal"], Decimal("200"))
+                self.assertEqual(row["vat_amount"], Decimal("14"))
+                self.assertEqual(row["grand_total"], Decimal("214"))
+
     def test_manual_workspace_switch_is_atomic_and_scoped(self):
         self.cur.execute(
             "INSERT INTO workspace_clients(user_id,tenant_id,name,tax_id) VALUES(%s,%s,'Other company','0105558888888') RETURNING id",

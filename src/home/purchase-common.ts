@@ -73,25 +73,8 @@ export interface PurchaseSettings {
     auto_book: boolean;
 }
 
-export interface DocLine {
-    id?: string;
-    item_type: ItemType;
-    product_id: string | null;
-    product_matched?: boolean;
-    description: string;
-    name_unclear?: boolean; // P2C:OCR 整名读不出·description 已清空·前端显「รายการที่ N」占位
-    qty: number;
-    unit: string | null;
-    unit_price: number;
-    discount: number;
-    vat_rate: number;
-    wht_rate: number;
-    category_label?: string | null;
-    category_id?: string | null;
-    subcategory_id?: string | null;
-    stock_in?: boolean;
-    discountOn?: boolean; // 行折扣开关(UI 态 · 控制是否显示/计折扣输入)
-}
+export type { DocLine } from './purchase-line-types.js';
+import type { DocLine } from './purchase-line-types.js';
 
 export interface DocAttachment {
     id: string;
@@ -172,7 +155,17 @@ function unwrap(body: Envelope): unknown {
 // 仅当路由「不存在」(HTTP 404)才落本地 mock —— 这只发生在离线视觉闸/冒烟 harness(stub 回 404);
 // 线上路由存在(鉴权失败回 401 等),走真信封/真错误,绝不静默吞成 mock(状态诚实)。
 // payload 传 FormData = multipart 上传(拍进项票真传图):浏览器自带边界,不塞 Content-Type。
+export type PurchaseTransport = (
+    method: string,
+    path: string,
+    payload?: unknown
+) => Promise<unknown>;
+let purchaseTransport: PurchaseTransport | undefined;
+export function setPurchaseTransport(transport?: PurchaseTransport): void {
+    purchaseTransport = transport;
+}
 export async function papi(method: string, path: string, payload?: unknown): Promise<unknown> {
+    if (purchaseTransport) return purchaseTransport(method, path, payload);
     const isForm = payload instanceof FormData;
     let status = 0;
     let body: Envelope | null = null;

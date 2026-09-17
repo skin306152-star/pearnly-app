@@ -1,5 +1,4 @@
 import { manualHtml, bindManual, type ManualFields } from '../erp/manual-document.js';
-import { manualLabel } from '../erp/manual-labels.js';
 import { salesFetch } from './sales-common.js';
 export async function showErpOrderDetail(
     root: HTMLElement,
@@ -36,45 +35,20 @@ export async function showErpOrderDetail(
         }
     }
     fields.document_number = doc.doc_no || doc.doc_number;
-    const frame = document.createElement('div');
-    frame.className = 'er-entry md-detail';
-    const back = document.createElement('button');
-    back.className = 'btn';
-    back.textContent = manualLabel('back', lang);
-    back.onclick = () => window.routeTo?.(direction === 'purchase' ? 'purchase' : 'sales-records');
-    const heading = document.createElement('h2');
-    heading.textContent = manualLabel(direction, lang);
+    if (historyId) {
+        const preview = await salesFetch(`/api/history/${historyId}/page/1.png`);
+        if (preview.ok) fields.bill_image_local = URL.createObjectURL(await preview.blob());
+    }
     const content = document.createElement('div');
     content.innerHTML = manualHtml(fields, direction, lang, true);
-    frame.append(back, heading, content);
-    root.replaceChildren(frame);
+    root.replaceChildren(content);
     bindManual(
         content,
         () => fields,
-        () => {}
+        () => {},
+        {
+            save: async () => {},
+            cancel: () => window.routeTo?.(direction === 'purchase' ? 'purchase' : 'sales-records'),
+        }
     );
-    const total = content.querySelector('[data-total]');
-    if (total) total.textContent = Number(doc.grand_total || fields.total_amount || 0).toFixed(2);
-    const vat = content.querySelector('[data-md-vat]');
-    if (vat) vat.textContent = Number(doc.vat_amount || fields.vat || 0).toFixed(2);
-    const panel = content.querySelector('[data-md-files]')!;
-    if (historyId) {
-        const button = document.createElement('button');
-        button.className = 'btn';
-        button.textContent = manualLabel('files', lang);
-        button.onclick = async () => {
-            const response = await salesFetch(`/api/history/${doc.ocr_history_id}/pdf`);
-            if (response.ok) window.open(URL.createObjectURL(await response.blob()), '_blank');
-        };
-        const preview = await salesFetch(`/api/history/${historyId}/page/1.png`);
-        if (preview.ok) {
-            const img = document.createElement('img');
-            const url = URL.createObjectURL(await preview.blob());
-            img.onload = () => URL.revokeObjectURL(url);
-            img.src = url;
-            img.alt = manualLabel('files', lang);
-            img.style.cssText = 'display:block;max-width:100%;max-height:420px;margin:12px 0';
-            panel.append(button, img);
-        } else panel.textContent = '—';
-    } else panel.textContent = '—';
 }

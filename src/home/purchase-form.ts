@@ -1,7 +1,8 @@
-// 商户采购 · 复核/录入屏(★唯一录入表单 · 照搬 docs/smart-intake 原型)。桌面左票图右信息/明细/汇总三卡常驻;
-// 手机三段连续滚 + 吸顶 Tab + scroll-spy。需复核 banner 消费 confidence_band/field_confidence;字段三态、
-// 图查看器拖拽缩放旋转、多文件相册、币种汇率、小类联动、行折扣、手动改额+价内外、硬必填——见各子模块。
-// 入口:intake OCR 落此(预填 draft)/ 主屏手动新建 / 详情编辑草稿。存草稿 / 确认入账 → POST /docs(+/post)。
+import { openPartyPicker } from './purchase-modals.js';
+import { inventoryForm } from './purchase-form-profile.js';
+import { manualLabel } from '../erp/manual-labels.js';
+import { lockPurchasePreview } from './purchase-form-preview.js';
+import { purchaseState } from './purchase-form-state.js';
 /* global t, escapeHtml, showToast */
 import {
     papi,
@@ -22,12 +23,10 @@ import {
     validateInfo,
     markErrors,
     isReqEmpty,
-    mapConf,
     type MissingField,
 } from './purchase-form-info.js';
 import {
     linesHtml,
-    blankLine,
     computeForm,
     mountLines,
     mergeLines,
@@ -41,60 +40,37 @@ let pending: DraftIn | null = null;
 let settings: PurchaseSettings | null = null;
 let cats: Category[] = [];
 
-function todayIso(): string {
-    const n = new Date();
-    return (
-        n.getFullYear() +
-        '-' +
-        String(n.getMonth() + 1).padStart(2, '0') +
-        '-' +
-        String(n.getDate()).padStart(2, '0')
-    );
+export interface PurchaseFormAdapter {
+    save: (body: unknown, status: 'draft' | 'posted') => Promise<void>;
+    cancel: () => void;
+    mounted?: (state: FormState) => void;
+    readonly?: boolean;
+    inventoryOnly?: boolean;
 }
-
-function fromDraft(d: DraftIn): FormState {
-    const sup = d.supplier || null;
-    const urls: string[] = [];
-    if (d.bill_image_local) urls.push(d.bill_image_local);
-    else if (d.bill_image_url) urls.push(d.bill_image_url);
-    (d.attachments || []).forEach((a) => {
-        if (a.kind === 'bill' && a.url && !urls.includes(a.url)) urls.push(a.url);
+let adapter: PurchaseFormAdapter | null = null;
+let mountedRoot: HTMLElement | null = null;
+export function originalPurchaseHtml(state: FormState): string {
+    st = state;
+    return shell();
+}
+export function mountOriginalPurchase(
+    root: HTMLElement,
+    state: FormState,
+    hooks: PurchaseFormAdapter
+): void {
+    if (mountedRoot && mountedRoot !== root) mountedRoot.replaceChildren();
+    st = state;
+    adapter = hooks;
+    mountedRoot = root;
+    injectPurBase();
+    injectStyle('pur-form-css', PURCHASE_FORM_CSS);
+    bindShell();
+    settings = null;
+    cats = [];
+    void ensureRefs().then(() => {
+        if (mountedRoot === root && st === state && root.isConnected) rerender();
     });
-    return {
-        id: d.id || null,
-        doc_kind: d.doc_kind || (sup ? 'purchase_invoice' : 'expense'),
-        supplierName: (sup && sup.name) || '',
-        taxId: (sup && sup.tax_id) || '',
-        branchType: (sup && sup.branch_type) || 'none',
-        branchNo: (sup && sup.branch_no) || '',
-        branchName: '',
-        address: (sup && sup.address) || '',
-        docNo: d.doc_no || '',
-        docDate: d.doc_date || todayIso(),
-        dueLabel: d.due_date || '',
-        hasVat: d.has_vat !== false,
-        paymentStatus: d.payment_status === 'paid' ? 'paid' : 'unpaid',
-        requester: d.requester || '',
-        currency: d.currency || 'THB',
-        fxRate: d.fx_rate != null ? String(d.fx_rate) : '',
-        lines: (d.lines && d.lines.length
-            ? d.lines
-            : [blankLine(settings ? Number(settings.default_vat_rate) || 7 : 7)]
-        ).map((l) => ({ ...l })),
-        mergeMode: false,
-        priceMode: 'exclusive',
-        manualOn: false,
-        override: { subtotal: 0, discount: 0, vat: 0, grand: 0 },
-        aiFields: d.ai_fields || 0,
-        dedupeHit: !!d.dedupe_hit,
-        confidenceBand: d.confidence_band || 'auto',
-        fieldConf: mapConf(d.field_confidence),
-        billRef: d.bill_image_ref || '',
-        billUrls: urls,
-        billIdx: 0,
-    };
 }
-
 const WARN_SVG =
     '<svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
 
@@ -129,7 +105,7 @@ function shell(): string {
     const badge = st!.aiFields ? `<span class="badge">${escapeHtml(t('pur-tag-read'))}</span>` : '';
     return `<div class="pur f"><div class="wrap">
         <div class="ph">
-            <div class="phl"><span class="back" id="pur-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span><div><div class="t">${escapeHtml(t('pur-review-title'))}</div><div class="sub">${escapeHtml(t('pur-form-sub'))}</div></div></div>
+            <div class="phl"><span class="back" id="pur-back" title="${escapeHtml(st!.direction ? manualLabel('back', document.documentElement.lang) : t('pur-back'))}" aria-label="${escapeHtml(st!.direction ? manualLabel('back', document.documentElement.lang) : t('pur-back'))}">‹</span><div><div class="t">${escapeHtml(st!.direction ? manualLabel(st!.direction!, document.documentElement.lang) : t('pur-review-title'))}</div><div class="sub">${st!.direction ? '' : escapeHtml(t('pur-form-sub'))}</div></div></div>
             ${badge}
         </div>
         ${dup}
@@ -142,14 +118,18 @@ function shell(): string {
                     <section class="section" id="pane-info">${infoCardHtml(st!)}</section>
                     <section class="section" id="pane-items">
                         <div class="card"><div class="hd">${escapeHtml(t('pur-lines'))}</div><div class="bd">
-                            <div class="seg sm2" id="pur-linemode" style="margin-bottom:12px;"><div class="o ${st!.mergeMode ? '' : 'on'}" data-merge="0">${escapeHtml(t('pur-line-split'))}</div><div class="o ${st!.mergeMode ? 'on' : ''}" data-merge="1">${escapeHtml(t('pur-line-merge'))}</div></div>
-                            <div class="infonote">${escapeHtml(t('pur-lines-note'))}</div>
+                            ${
+                                inventoryForm(st!)
+                                    ? ''
+                                    : `<div class="seg sm2" id="pur-linemode" style="margin-bottom:12px;"><div class="o ${st!.mergeMode ? '' : 'on'}" data-merge="0">${escapeHtml(t('pur-line-split'))}</div><div class="o ${st!.mergeMode ? 'on' : ''}" data-merge="1">${escapeHtml(t('pur-line-merge'))}</div></div>
+                            ${st!.direction ? '' : `<div class="infonote">${escapeHtml(t('pur-lines-note'))}</div>`}`
+                            }
                             <div id="pur-lines">${linesHtml(st!, cats)}</div>
                         </div></div>
                         ${totalsCardHtml(st!)}
                     </section>
                 </div>
-                <div class="editfoot"><button class="btn danger" id="pur-delete">${escapeHtml(t('pur-delete'))}</button><button class="btn" id="pur-save-draft2">${escapeHtml(t('pur-save-draft'))}</button><button class="btn primary save" id="pur-post2">${escapeHtml(t('pur-post'))}</button></div>
+                <div class="editfoot"><button class="btn danger" id="pur-delete">${escapeHtml(t(st!.direction ? 'pur-cancel' : 'pur-delete'))}</button>${inventoryForm(st!) ? '' : `<button class="btn" id="pur-save-draft2">${escapeHtml(t('pur-save-draft'))}</button>`}<button class="btn primary save" id="pur-post2">${escapeHtml(inventoryForm(st!) ? manualLabel('save', document.documentElement.lang) : t('pur-post'))}</button></div>
             </section>
         </div>
     </div></div>`;
@@ -161,7 +141,7 @@ function refreshTotals(): void {
 }
 
 function rerender(): void {
-    const sec = document.getElementById('page-purchase-form');
+    const sec = mountedRoot || document.getElementById('page-purchase-form');
     if (!sec) return;
     sec.innerHTML = shell();
     bindShell();
@@ -173,15 +153,17 @@ function setTop(key: string, val: string): void {
 
 function bindShell(): void {
     // 复核屏与详情屏 DOM 里都有 #pur-back · 限定本 section 取(否则靠 DOM 顺序撞运气)。
-    document.querySelector<HTMLElement>('#page-purchase-form #pur-back')!.onclick = () =>
-        window.routeTo?.('purchase');
+    (mountedRoot || document.getElementById('page-purchase-form'))!.querySelector<HTMLElement>(
+        '#pur-back'
+    )!.onclick = () => (adapter ? adapter.cancel() : window.routeTo?.('purchase'));
     mountViewer(st!, rerender);
     mountLines(
         st!,
         cats,
         settings ? Number(settings.default_vat_rate) || 7 : 7,
         settings ? Number(settings.default_wht_service_rate) || 3 : 3,
-        refreshTotals
+        refreshTotals,
+        () => adapter?.mounted?.(st!)
     );
     bindTotals(st!, rerender);
     // 明细 拆分多条/合并记一条:合并 = 不逐项记一条(多行折成单行·净额求和)· 默认拆分。
@@ -207,7 +189,7 @@ function bindShell(): void {
     const supPick = document.getElementById('pur-supplier-pick');
     if (supPick)
         supPick.onclick = () =>
-            window.openPurchaseSupplierPicker?.((s) => {
+            openPartyPicker((s) => {
                 const sp = s as {
                     name?: string;
                     tax_id?: string;
@@ -221,7 +203,7 @@ function bindShell(): void {
                 st!.branchNo = sp.branch_no || '';
                 st!.address = sp.address || st!.address;
                 rerender();
-            });
+            }, st!.direction === 'sales');
     document.querySelectorAll<HTMLElement>('#pur-kind [data-kind]').forEach((el) => {
         el.onclick = () => {
             st!.doc_kind = el.dataset.kind as DocKind;
@@ -276,8 +258,16 @@ function bindShell(): void {
     bindBannerJumps();
     bindMobileTabs();
     document.getElementById('pur-delete')!.onclick = () => onDelete();
-    document.getElementById('pur-save-draft2')!.onclick = () => submit('draft');
+    const draftButton = document.getElementById('pur-save-draft2');
+    if (draftButton) draftButton.onclick = () => submit('draft');
     document.getElementById('pur-post2')!.onclick = () => onPost();
+    (mountedRoot || document.getElementById('page-purchase-form'))
+        ?.querySelectorAll<HTMLButtonElement>('button')
+        .forEach((button) => {
+            button.type = 'button';
+        });
+    adapter?.mounted?.(st!);
+    if (adapter?.readonly) lockPurchasePreview(mountedRoot);
 }
 
 function bindGenReceipt(): void {
@@ -350,7 +340,9 @@ function onPost(): void {
         showToast(t('pur-consist-block'), 'error');
         return;
     }
-    const miss = validateInfo(st!);
+    const miss = validateInfo(st!).filter(
+        (field) => !adapter?.inventoryOnly || field.field === 'f-docdate'
+    );
     markErrors(miss);
     if (miss.length) {
         const vb = document.getElementById('pur-vbanner');
@@ -366,6 +358,7 @@ function onPost(): void {
 }
 
 async function onDelete(): Promise<void> {
+    if (adapter) return adapter.cancel();
     if (!st!.id) return window.routeTo?.('purchase');
     if (typeof window.showConfirm === 'function') {
         const okc = await window.showConfirm(t('pur-delete-confirm'));
@@ -436,6 +429,10 @@ async function submit(status: 'draft' | 'posted'): Promise<void> {
     foot.forEach((b) => (b.disabled = true));
     try {
         const body = payload(status);
+        if (adapter) {
+            await adapter.save(body, status);
+            return;
+        }
         const path = st!.id ? `/api/purchase/docs/${st!.id}` : '/api/purchase/docs';
         // 已存在草稿走 PUT 原地更新(防保存时新建重复单),新单才 POST。
         const res = (await papi(st!.id ? 'PUT' : 'POST', path, body)) as { doc?: { id?: string } };
@@ -476,6 +473,8 @@ window.openPurchaseForm = function (id, draft) {
 };
 
 window.loadPurchaseForm = async function () {
+    adapter = null;
+    mountedRoot = null;
     const sec = document.getElementById('page-purchase-form');
     if (!sec) return;
     injectPurBase();
@@ -487,12 +486,13 @@ window.loadPurchaseForm = async function () {
             ? papi('GET', `/api/purchase/docs/${draft.id}`).catch(() => null)
             : Promise.resolve(null);
     const [, det] = await Promise.all([ensureRefs(), detailP]);
-    st = fromDraft(
+    st = purchaseState(
         draft.id && !draft.lines
             ? det
                 ? (normDetail(det as Record<string, unknown>) as unknown as DraftIn)
                 : {}
-            : draft
+            : draft,
+        settings
     );
     sec.innerHTML = shell();
     bindShell();

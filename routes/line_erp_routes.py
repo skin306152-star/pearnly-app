@@ -426,3 +426,69 @@ def erp_draft_products(request: Request, draft_id: str, q: str = ""):
     user["entry"] = "erp"
     workspace_id = int((session.get("payload") or {}).get("workspace_client_id") or 0)
     return {"ok": True, "data": {"products": search(user, workspace_id, q)}}
+
+
+@router.api_route("/api/line/erp/draft/{draft_id}/form-reference/{kind}", methods=["GET", "POST"])
+async def erp_form_reference(request: Request, draft_id: str, kind: str):
+    """Original POS selectors, constrained to this live LINE draft's workspace."""
+    _, binding, session = _draft_token(request, draft_id)
+    user, selection = internal_flow.selection(binding, session.get("payload") or {})
+    from services.erp.internal_records import authorize
+    from services.purchase import suppliers, categories, settings
+
+    workspace_id = selection["workspace_client_id"]
+    authorize(user, workspace_id, selection["direction"])
+    if kind not in {"suppliers", "customers", "categories", "settings"} or (
+        request.method == "POST" and kind not in {"suppliers", "customers"}
+    ):
+        raise HTTPException(404, detail="erp.reference_not_found")
+    body = await request.json() if request.method == "POST" else {}
+    if kind == "customers":
+        from routes.clients_routes import ClientCreateRequest, _serialize_client
+
+        if selection["direction"] != "sales":
+            raise HTTPException(403, detail="erp.reference_forbidden")
+        if request.method == "POST":
+            payload = ClientCreateRequest(**body).model_dump()
+            client_id = db.create_client(
+                user_id=str(user["id"]), tenant_id=str(user["tenant_id"]), **payload
+            )
+            if not client_id:
+                raise HTTPException(400, detail="client.create_failed")
+            client = db.get_client(str(user["id"]), client_id, tenant_id=str(user["tenant_id"]))
+            return {"ok": True, "data": {"supplier": _serialize_client(client)}}
+        clients = db.list_clients(str(user["id"]), tenant_id=str(user["tenant_id"]))
+        visible = db.get_visible_client_ids_for_user(user)
+        if visible is not None:
+            clients = [c for c in clients if int(c["id"]) in set(visible)]
+        return {
+            "ok": True,
+            "data": {"suppliers": [{**_serialize_client(c), "id": str(c["id"])} for c in clients]},
+        }
+    with db.get_cursor_rls(
+        str(user["tenant_id"]),
+        user_id=str(user["id"]),
+        workspace_client_id=workspace_id,
+        commit=True,
+    ) as cur:
+        scope = dict(tenant_id=str(user["tenant_id"]), workspace_client_id=workspace_id)
+        if kind == "suppliers":
+            if request.method == "POST":
+                data = {
+                    "supplier": suppliers.create_supplier(
+                        cur,
+                        **scope,
+                        **{
+                            key: body[key]
+                            for key in ("name", "tax_id", "branch_type", "branch_no", "address")
+                            if key in body
+                        },
+                    )
+                }
+            else:
+                data = {"suppliers": suppliers.list_suppliers(cur, **scope)}
+        elif kind == "categories":
+            data = {"categories": categories.get_tree(cur, **scope)}
+        else:
+            data = settings.get_settings(cur, **scope)
+    return {"ok": True, "data": data}

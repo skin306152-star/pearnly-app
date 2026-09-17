@@ -23,11 +23,6 @@
   justify-content: center;
   margin: 0;
 }
-.er-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
 .er-entry label {
   display: flex;
   flex-direction: column;
@@ -48,23 +43,6 @@
   border-radius: 8px;
   font: inherit;
 }
-.er-lines {
-  margin: 24px 0 14px;
-}
-.er-line {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
-  gap: 10px;
-  align-items: end;
-  margin-bottom: 14px;
-}
-.er-line button {
-  min-height: 42px;
-}
-.er-bottom {
-  margin: 24px 0;
-  align-items: end;
-}
 .er-actions {
   justify-content: flex-end;
   border-top: 1px solid var(--line);
@@ -73,13 +51,6 @@
 .er-message {
   margin: 16px 0;
   white-space: pre-wrap;
-}
-.er-upload {
-  padding: 36px 16px;
-  margin-bottom: 24px;
-  text-align: center;
-  border: 1px dashed var(--line);
-  border-radius: 12px;
 }
 .er-entry button {
   cursor: pointer;
@@ -92,15 +63,6 @@
   .er-entry {
     margin: 12px;
     padding: 16px;
-  }
-  .er-grid {
-    grid-template-columns: 1fr;
-  }
-  .er-line {
-    grid-template-columns: 1fr 1fr;
-  }
-  .er-line label:first-child {
-    grid-column: 1/-1;
   }
   .er-actions button {
     flex: 1;

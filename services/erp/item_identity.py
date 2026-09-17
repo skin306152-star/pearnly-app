@@ -12,7 +12,10 @@ def resolve_items(cur, *, tenant_id, workspace_id, items):
         code = str(item.get("code") or "").strip()
         unit = str(item.get("unit") or "").strip()
         base = "SELECT id,code,unit FROM products WHERE tenant_id=%s AND workspace_client_id=%s AND is_active=TRUE "
-        if code:
+        product_id = item.get("product_id")
+        if product_id:
+            cur.execute(base + "AND id::text=%s", (tenant_id, workspace_id, str(product_id)))
+        elif code:
             cur.execute(base + "AND code=%s", (tenant_id, workspace_id, code))
         else:
             cur.execute(
@@ -20,24 +23,32 @@ def resolve_items(cur, *, tenant_id, workspace_id, items):
                 (tenant_id, workspace_id, name, name, name, unit),
             )
         rows = cur.fetchall()
+        if product_id and not rows:
+            raise HTTPException(409, "erp.product_not_found")
         if len(rows) > 1:
             raise HTTPException(409, "erp.product_ambiguous")
         if rows:
             product = rows[0]
-            if code and unit and (product.get("unit") or "") != unit:
+            if (code or product_id) and unit and (product.get("unit") or "") != unit:
                 raise HTTPException(409, "erp.product_unit_mismatch")
         else:
             if not code:
-                cur.execute(
-                    "SELECT COALESCE(MAX(substring(code from 3)::bigint),0) AS n FROM products WHERE tenant_id=%s AND code ~ '^P-[0-9]+$'",
-                    (tenant_id,),
-                )
-                code = "P-" + str(int(cur.fetchone()["n"]) + 1).zfill(6)
+                from services.erp.product_numbers import allocate
+
+                code = allocate(cur, tenant_id)
             cur.execute(
                 "INSERT INTO products(tenant_id,workspace_client_id,code,name_th,unit,base_unit) VALUES(%s,%s,%s,%s,%s,%s) RETURNING id,code,unit",
                 (tenant_id, workspace_id, code, name, unit, unit),
             )
             product = cur.fetchone()
+        if not product.get("code"):
+            from services.erp.product_numbers import allocate
+
+            product["code"] = allocate(cur, tenant_id)
+            cur.execute(
+                "UPDATE products SET code=%s WHERE id=%s AND tenant_id=%s AND workspace_client_id=%s",
+                (product["code"], product["id"], tenant_id, workspace_id),
+            )
         item["product_id"] = str(product["id"])
         item["code"] = product["code"]
         item["unit"] = product.get("unit") or ""
@@ -59,12 +70,17 @@ def search(user, workspace_id, query):
     ) as cur:
         workspace(cur, user, workspace_id)
         cur.execute(
-            "SELECT id::text AS product_id,code,name_th,name_en,name_zh,unit FROM products "
+            "SELECT id::text AS product_id,code,name_th,name_en,name_zh,unit,barcode,unit_price,default_cost,vat_applicable FROM products "
             "WHERE tenant_id=%s AND workspace_client_id=%s AND is_active=TRUE "
             "AND (strpos(lower(COALESCE(code,'')),lower(%s))>0 "
             "OR strpos(lower(COALESCE(name_th,'')),lower(%s))>0 "
             "OR strpos(lower(COALESCE(name_en,'')),lower(%s))>0 "
-            "OR strpos(lower(COALESCE(name_zh,'')),lower(%s))>0) ORDER BY code LIMIT 20",
-            (str(user["tenant_id"]), workspace_id, query, query, query, query),
+            "OR strpos(lower(COALESCE(name_zh,'')),lower(%s))>0 "
+            "OR strpos(lower(COALESCE(barcode,'')),lower(%s))>0) ORDER BY code LIMIT 20",
+            (str(user["tenant_id"]), workspace_id, query, query, query, query, query),
         )
-        return [dict(row) for row in cur.fetchall()]
+        rows = [dict(row) for row in cur.fetchall()]
+        if not actor_has_perm(None, user, "field.cost.view"):
+            for row in rows:
+                row["default_cost"] = None
+        return rows

@@ -543,6 +543,116 @@
     }
 
     function buildReview() {
+        if (rows().length === 1 && rows()[0].filename === 'manual') {
+            window.t = function (key, values) {
+                var text = ((window.I18N || {})[lang] || {})[key] || key;
+                Object.keys(values || {}).forEach(function (name) {
+                    text = text.replace('{' + name + '}', values[name]);
+                });
+                return text;
+            };
+            window.escapeHtml = R.escape;
+            window.showToast = function (message) {
+                state.textContent = message;
+                state.hidden = false;
+            };
+            manual.setPurchaseTransport(function (method, path, body) {
+                if (path.indexOf('/api/sales/products') === 0) {
+                    return api(
+                        '/api/line/erp/draft/' +
+                            encodeURIComponent(draftId) +
+                            '/products' +
+                            (path.split('?')[1] ? '?' + path.split('?')[1] : '')
+                    ).then(function (data) {
+                        return {
+                            products: (data.products || []).map(function (p) {
+                                return Object.assign({}, p, { id: p.product_id, sku: p.code });
+                            }),
+                        };
+                    });
+                }
+                var kind = path.replace('/api/purchase/', '').split('?')[0];
+                return api(
+                    '/api/line/erp/draft/' +
+                        encodeURIComponent(draftId) +
+                        '/form-reference/' +
+                        encodeURIComponent(kind),
+                    {
+                        method: method,
+                        body: body === undefined ? undefined : JSON.stringify(body),
+                    }
+                );
+            });
+            review = {
+                render: function () {
+                    form.innerHTML = renderDetail(rows()[0], 0);
+                    manual.bindManual(
+                        form,
+                        function () {
+                            return fieldsOf(rows()[0]);
+                        },
+                        function () {},
+                        {
+                            cancel: function () {
+                                act('discard');
+                            },
+                            save: async function (fields, status) {
+                                rows()[0].pages[0].fields = fields;
+                                act(status === 'posted' ? 'confirm' : 'save');
+                            },
+                        }
+                    );
+                    form.addEventListener(
+                        'document-attachment',
+                        function (event) {
+                            manualAttachments[rows()[0].id] = event.detail;
+                        },
+                        { once: true }
+                    );
+                    form.querySelector('[data-manual-workspace]').onchange = async function (
+                        event
+                    ) {
+                        var previous = model.selection.workspace_client_id;
+                        var unsaved = manual.readManual(form, fieldsOf(rows()[0]));
+                        model.selection.workspace_client_id = Number(event.target.value);
+                        try {
+                            await save(true);
+                            var own = direction() === 'purchase' ? 'buyer' : 'seller';
+                            var saved = fieldsOf(rows()[0]);
+                            unsaved[own + '_tax'] = saved[own + '_tax'];
+                            unsaved[own + '_name'] = saved[own + '_name'];
+                            (unsaved.items || []).forEach(function (item) {
+                                delete item.product_id;
+                                delete item.code;
+                            });
+                            ((unsaved.pos_form || {}).lines || []).forEach(function (line) {
+                                line.product_id = null;
+                                line.code = '';
+                                line.product_matched = false;
+                            });
+                            rows()[0].pages[0].fields = unsaved;
+                            review.render();
+                        } catch (_) {
+                            model.selection.workspace_client_id = previous;
+                            event.target.value = String(previous);
+                            show('failed', 'error');
+                        }
+                    };
+                    form.hidden = false;
+                    state.hidden = true;
+                },
+                canConfirm: function () {
+                    return true;
+                },
+                setBusy: function (on) {
+                    form.querySelectorAll('button,input,select').forEach(function (el) {
+                        el.disabled = on;
+                    });
+                },
+            };
+            review.render();
+            return;
+        }
         review = R.create({
             root: form,
             records: rows,
@@ -602,6 +712,8 @@
     document.documentElement.lang = lang;
     document.getElementById('lang').value = lang;
     document.getElementById('lang').onchange = function (event) {
+        if (manual && rows().length === 1 && rows()[0].filename === 'manual' && !form.hidden)
+            rows()[0].pages[0].fields = manual.readManual(form, fieldsOf(rows()[0]));
         lang = event.target.value;
         document.documentElement.lang = lang;
         localStorage.setItem('pearnly_lang', lang);
@@ -610,7 +722,7 @@
     };
     show('loading');
     Promise.all([
-        import('/static/dist/erp-manual-document.js?v=manual-layout-11').then(function (module) {
+        import('/static/dist/erp-manual-document.js?v=pos-profile-3').then(function (module) {
             manual = module;
             manual.setProductLookup(function (query) {
                 return api(

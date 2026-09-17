@@ -65,7 +65,10 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
     own_tax = re.sub(r"\D", "", str(subject.get("tax_id") or ""))
     if declared_tax and own_tax and declared_tax != own_tax:
         raise HTTPException(409, detail="erp.workspace_mismatch")
-    reviewed_ocr = result.get("manual_layout") != 1 and result.get("total_amount") not in (None, "")
+    reviewed_ocr = result.get("manual_layout") not in (1, 2) and result.get("total_amount") not in (
+        None,
+        "",
+    )
     items = []
     for value in result.get("items") or []:
         if not isinstance(value, dict):
@@ -96,6 +99,11 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
         from services.erp.manual_totals import apply
 
         subtotal, vat = apply(result, items, _decimal)
+    if result.get("manual_layout") == 2:
+        from services.erp.pos_form import normalize
+
+        result["items"] = items
+        subtotal, vat = normalize(result, _decimal)
     if reviewed_ocr:
         from services.erp.invoice_amounts import resolve
 
@@ -111,7 +119,9 @@ def normalized_fields(fields, direction, subject, history_id, *, strict=True):
             "subtotal": str(subtotal),
             "vat": str(vat),
             "total_amount": str(
-                _decimal(result["total_amount"]) if reviewed_ocr else subtotal + vat
+                _decimal(result["total_amount"])
+                if reviewed_ocr or result.get("manual_layout") == 2
+                else subtotal + vat
             ),
             "invoice_number": str(result.get("invoice_number") or f"REC-{history_id}").strip(),
             f"{prefix}_name": subject["name"],

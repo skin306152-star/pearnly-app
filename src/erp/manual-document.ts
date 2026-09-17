@@ -1,214 +1,155 @@
+// Compatibility facade: renders and mounts the ORIGINAL POS form, not a second editor.
+import { originalPurchaseHtml, mountOriginalPurchase } from '../home/purchase-form.js';
+import { toPos, fromPos, type Fields } from './pos-form-adapter.js';
+import { reLines } from '../home/purchase-form-lines.js';
 import { bindProductInput } from './product-suggestions.js';
-export { setProductLookup, bindProductInput } from './product-suggestions.js';
+import '../home/purchase-modals.js';
+export { setPurchaseTransport } from '../home/purchase-common.js';
+import type { FormState } from '../home/purchase-form-types.js';
 import './thai-date-picker.js';
 import './manual-document.css';
-import { manualLabel } from './manual-labels.js';
+export { setProductLookup, bindProductInput } from './product-suggestions.js';
 export { manualLabel } from './manual-labels.js';
-export type ManualFields = Record<string, unknown>;
-const esc = (v: unknown) =>
-    String(v ?? '').replace(
-        /[&<>"']/g,
-        (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
-    );
+export type ManualFields = Fields;
+type Context = { state: FormState; fields: Fields; direction: string; readonly: boolean };
+let pending: Context;
+const mounted = new WeakMap<HTMLElement, Context>();
 export function manualHtml(
-    f: ManualFields,
+    fields: Fields,
     direction: string,
-    lang: string,
+    _lang: string,
     readonly = false
 ): string {
-    f = { branch: '00000', cash_payment: true, vat_rate: '0', ...f };
-    const fieldLabel = (k: string) => esc(manualLabel(k, lang));
-    const input = (key: string, label: string, type = 'text', read = false) =>
-        `<label><span>${fieldLabel(label)}</span><input name="${key}" type="${type}" value="${esc(f[key])}" ${type === 'number' ? 'min="0" step="any"' : ''} ${readonly || read ? 'readonly' : ''} ${key === 'date' ? 'required placeholder="YYYY-MM-DD"' : ''}></label>`;
-    const check = (key: string, label: string) =>
-        `<label class="md-check"><span>${fieldLabel(label)}</span><input name="${key}" type="checkbox" ${f[key] ? 'checked' : ''} ${readonly ? 'disabled' : ''}></label>`;
-    const purchase = direction === 'purchase';
-    const party = purchase ? 'seller' : 'buyer';
-    const name = purchase ? 'supplier' : 'customer';
-    const items = (f.items || []) as ManualFields[];
-    const columns = [
-        'code',
-        'name',
-        'department',
-        'project',
-        'warehouse',
-        'qty',
-        'unit',
-        'price',
-        'subtotal',
-    ];
-    const headers = [
-        'code',
-        'name',
-        'department',
-        'project',
-        'warehouse',
-        'qty',
-        'unit',
-        'price',
-        'amount',
-    ];
-    const table = `<div class="md-table-scroll"><table class="md-table ${readonly ? 'md-readonly' : ''}"><thead><tr><th>${fieldLabel('row')}</th>${headers.map((k) => `<th>${fieldLabel(k)}</th>`).join('')}${readonly ? '' : `<th>${fieldLabel('remove')}</th>`}</tr></thead><tbody>${items.map((item, i) => `<tr data-line><td>${i + 1}</td>${columns.map((key) => `<td><input data-field="${key}" aria-label="${fieldLabel(headers[columns.indexOf(key)])}" value="${esc(key === 'subtotal' ? ((Number(item.qty) || 0) * (Number(item.price) || 0)).toFixed(2) : item[key])}" ${['qty', 'price'].includes(key) ? 'type="number" min="0.000001" step="any" required' : 'type="text"'} ${key === 'name' ? 'required' : ''} ${readonly || key === 'subtotal' ? 'readonly' : ''}></td>`).join('')}${readonly ? '' : `<td><button type="button" class="md-remove" data-remove="${i}" aria-label="${fieldLabel('remove')}">×</button></td>`}</tr>`).join('')}</tbody></table></div>`;
-    if (direction === 'in' || direction === 'out') {
-        const prefix = direction === 'in' ? 'IR' : 'IS';
-        return `<div class="manual-document md-stock" data-manual-document><div class="md-stock-head"><label><span>${fieldLabel('number')}</span><input name="document_number" value="${esc(f.document_number)}" placeholder="${prefix} · ${fieldLabel('autoNumber')}" readonly></label>${input('date', 'date')}${input('branch', 'branch')}${check('data_transferred', 'transferred')}</div><nav class="md-tabs">${['data', 'units', 'files'].map((k, i) => `<button type="button" data-md-tab="${k}" class="${i === 0 ? 'active' : ''}">${fieldLabel(k)}</button>`).join('')}</nav><section data-md-panel="data">${table}${readonly ? '' : `<button type="button" class="btn md-add" data-add>${fieldLabel('add')}</button>`}</section><section data-md-panel="units" hidden><p>${items.map((item) => `${esc(item.name)} · ${esc(item.unit || '—')}`).join('<br>')}</p></section><section data-md-panel="files" hidden data-md-files></section><div class="md-bottom"><section class="md-notes">${input('notes', 'notes')}${input('notes_2', 'notes')}${input('notes_3', 'notes')}</section><section class="md-totals"><label class="md-net"><span>${fieldLabel('gross')}</span><output data-total>0.00</output></label></section></div></div>`;
-    }
-    const tabs = [
-        'data',
-        'units',
-        'deposit',
-        ...(purchase ? ['cheque', 'withholding'] : ['payment']),
-        'files',
-    ];
-    return `<div class="manual-document" data-manual-document><div class="md-header"><section class="md-head-left"><div class="md-meta-grid"><label class="md-number"><span>${fieldLabel('number')}</span><div><b>${purchase ? 'PE' : 'SI'}</b><input name="document_number" value="${esc(String(f.document_number || '').replace(/^(PE|SI)-/, ''))}" placeholder="${fieldLabel('autoNumber')}" readonly></div></label>${input('branch', 'branch')}${input('date', 'date')}${input('credit_days', 'credit', 'number')}${input('due_date', 'due')}${input('vat_rate', 'rate', 'number')}${input('department', 'department')}${input('project', 'project')}${input('employee', purchase ? 'employee' : 'salesperson')}${input('delivery_date', 'delivery')}</div><div class="md-flags">${check('data_transferred', 'transferred')}${check('cash_payment', 'cash')}</div></section><section class="md-party"><div class="md-party-row">${input(party + '_code', name + 'Code')}${input(party + '_name', name)}</div><div class="md-party-row">${input('bill_party_code', purchase ? 'billSupplier' : 'billCustomer')}${input('bill_party_name', name)}</div><div class="md-party-row">${input('bill_number', 'bill')}${input('bill_date', 'date')}${input('bill_branch', 'branch')}</div><div class="md-party-row">${purchase ? input('seller_tax', 'taxId') : input('sales_area', 'area')}${purchase ? '' : input('transport_type', 'transport')}</div></section></div><nav class="md-tabs">${tabs.map((k, i) => `<button type="button" data-md-tab="${k}" class="${i === 0 ? 'active' : ''}">${fieldLabel(k)}</button>`).join('')}</nav><section data-md-panel="data">${table}${readonly ? '' : `<button type="button" class="btn md-add" data-add>${fieldLabel('add')}</button>`}</section><section data-md-panel="units" hidden><p>${items.map((item) => `${esc(item.name)} · ${esc(item.unit || '—')}`).join('<br>') || '—'}</p></section><section data-md-panel="deposit" hidden>${input('deposit', 'deposit', 'number')}</section>${purchase ? `<section data-md-panel="cheque" hidden>${input('cheque_total', 'chequeTotal', 'number')}</section><section data-md-panel="withholding" hidden>${input('wht_amount', 'withholding', 'number')}</section>` : `<section data-md-panel="payment" hidden>${input('payment_received', 'payment', 'number')}</section>`}<section data-md-panel="files" hidden data-md-files></section><div class="md-bottom"><section class="md-notes">${input('notes', 'notes')}${input('notes_2', 'notes')}${input('notes_3', 'notes')}</section>${purchase ? `<section class="md-payments">${input('cash_amount', 'cash', 'number')}${input('cheque_payment', 'chequeTotal', 'number')}${input('bank_interest', 'interest', 'number')}${input('received_discount', 'receivedDiscount', 'number')}${input('withholding_outstanding', 'withheld', 'number')}<label><span>${fieldLabel('paid')}</span><output data-md-paid>0.00</output></label></section>` : ''}<section class="md-totals"><label><span>${fieldLabel('gross')}</span><output data-md-gross>0.00</output></label>${input('discount', 'discount', 'number')}${input('deposit_deduction', 'lessDeposit', 'number')}<label><span>${fieldLabel('base')}</span><output data-md-base>0.00</output></label><label><span>${fieldLabel('vat')}</span><output data-md-vat>0.00</output></label><label class="md-net"><span>${fieldLabel('net')}</span><output data-total>0.00</output></label></section></div></div>`;
+    pending = { state: { ...toPos(fields, direction), readonly }, fields, direction, readonly };
+    return `<div data-manual-document>${originalPurchaseHtml(pending.state)}</div><div data-md-files hidden></div>`;
 }
-export function readManual(root: HTMLElement, base: ManualFields): ManualFields {
-    const f = { ...base, manual_layout: 1 };
-    root.querySelectorAll<HTMLInputElement>('[name]').forEach(
-        (el) => ((f as ManualFields)[el.name] = el.type === 'checkbox' ? el.checked : el.value)
-    );
-    (f as ManualFields).items = Array.from(root.querySelectorAll<HTMLElement>('[data-line]')).map(
-        (row, i) => {
-            const item = { ...((base.items as ManualFields[]) || [])[i] };
-            row.querySelectorAll<HTMLInputElement>('[data-field]').forEach(
-                (el) => (item[el.dataset.field!] = el.value)
-            );
-            return item;
-        }
-    );
-    const totals = f as ManualFields;
-    const gross = (totals.items as ManualFields[]).reduce(
-        (sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0),
-        0
-    );
-    const baseAmount = Math.max(
-        0,
-        gross - Number(totals.discount || 0) - Number(totals.deposit_deduction || 0)
-    );
-    totals.subtotal = baseAmount.toFixed(2);
-    totals.vat = ((baseAmount * Number(totals.vat_rate || 0)) / 100).toFixed(2);
-    totals.total_amount = (baseAmount + Number(totals.vat)).toFixed(2);
-    return f;
-}
-export function updateManual(root: HTMLElement): void {
-    const f = readManual(root, {});
-    const n = (k: string) => Number((f as ManualFields)[k] || 0);
-    let gross = 0;
-    root.querySelectorAll<HTMLElement>('[data-line]').forEach((row) => {
-        const value =
-            Number(row.querySelector<HTMLInputElement>('[data-field=qty]')?.value || 0) *
-            Number(row.querySelector<HTMLInputElement>('[data-field=price]')?.value || 0);
-        gross += value;
-        const out = row.querySelector<HTMLInputElement>('[data-field=subtotal]');
-        if (out) out.value = value.toFixed(2);
-    });
-    const base = Math.max(0, gross - n('discount') - n('deposit_deduction'));
-    const vat = (base * n('vat_rate')) / 100;
-    const values: Record<string, number> = {
-        'data-md-gross': gross,
-        'data-md-base': base,
-        'data-md-vat': vat,
-        'data-total': base + vat,
-        'data-md-paid':
-            n('cash_amount') +
-            n('cheque_payment') +
-            n('bank_interest') -
-            n('received_discount') -
-            n('withholding_outstanding'),
-    };
-    Object.entries(values).forEach(([key, value]) => {
-        const el = root.querySelector(`[${key}]`);
-        if (el) el.textContent = Number.isFinite(value) ? value.toFixed(2) : '—';
-    });
+export function readManual(root: HTMLElement, base: Fields): Fields {
+    const context =
+        mounted.get(root) ||
+        mounted.get(root.querySelector<HTMLElement>('[data-manual-document]')!);
+    return context ? fromPos(context.state, base, context.direction) : base;
 }
 export function bindManual(
     root: HTMLElement,
-    fields: () => ManualFields,
-    render: (f: ManualFields) => void
+    fields: () => Fields,
+    _render: (f: Fields) => void,
+    actions?: {
+        save: (fields: Fields, status: 'draft' | 'posted') => Promise<void>;
+        cancel: () => void;
+    }
 ): void {
-    root.querySelectorAll<HTMLInputElement>('[data-field=name], [data-field=code]').forEach(
-        (input) =>
-            bindProductInput(input, (product) => {
-                const row = input.closest<HTMLElement>('[data-line]')!;
-                for (const [key, value] of Object.entries({
-                    code: product.code,
-                    name: product.name_zh || product.name_th || product.name_en || '',
-                    unit: product.unit || '',
-                })) {
-                    row.querySelector<HTMLInputElement>(`[data-field=${key}]`)!.value = value;
-                }
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-            })
-    );
-    root.oninput = (event) => {
-        const target = event.target as HTMLInputElement;
-        const linked: Record<string, string> = {
-            cheque_total: 'cheque_payment',
-            cheque_payment: 'cheque_total',
-        };
-        const sibling = linked[target.name];
-        if (sibling) {
-            const other = root.querySelector<HTMLInputElement>(`[name="${sibling}"]`);
-            if (other) other.value = target.value;
-        }
-        if (['department', 'project'].includes(target.name)) {
-            root.querySelectorAll<HTMLInputElement>(`[data-field="${target.name}"]`).forEach(
-                (input) => {
-                    if (!input.value || input.dataset.inherited === 'true') {
-                        input.value = target.value;
-                        input.dataset.inherited = 'true';
+    const context = pending;
+    const host = root.matches('[data-manual-document]')
+        ? root
+        : root.querySelector<HTMLElement>('[data-manual-document]')!;
+    mounted.set(root, context);
+    mounted.set(host, context);
+    const scope =
+        root.closest<HTMLElement>('.erp-pos-entry,.er-entry,.erp-stock-page,#editor') ||
+        root.parentElement!;
+    mountOriginalPurchase(host, context.state, {
+        readonly: context.readonly,
+        inventoryOnly: context.direction === 'in' || context.direction === 'out',
+        cancel: () =>
+            actions
+                ? actions.cancel()
+                : scope
+                      .querySelector<HTMLButtonElement>(
+                          '[data-entry-cancel],[data-stock-cancel],[data-stock-back],[data-records]'
+                      )
+                      ?.click(),
+        save: async (_body, status) => {
+            Object.assign(fields(), fromPos(context.state, fields(), context.direction));
+            if (actions) return actions.save(fields(), status);
+            const button = scope.querySelector<HTMLButtonElement>(
+                status === 'draft'
+                    ? '[data-draft]'
+                    : '[data-confirm],[data-entry-save],footer button[type=submit]'
+            );
+            button?.click();
+        },
+        mounted: (state) => {
+            context.state = state;
+            if (context.readonly) return;
+            if (context.direction === 'out')
+                host.querySelectorAll<HTMLInputElement>(
+                    '#pur-lines [data-fld$=":unit_price"]'
+                ).forEach((el) => {
+                    el.readOnly = true;
+                });
+            host.querySelectorAll<HTMLInputElement>(
+                '#pur-lines [data-fld$=":description"]'
+            ).forEach((input) => {
+                if (!input.dataset.productBound)
+                    input.addEventListener('input', () => {
+                        const index = Number(input.dataset.fld!.split(':')[0]);
+                        state.lines[index].product_id = null;
+                        state.lines[index].code = '';
+                        state.lines[index].product_matched = false;
+                        const items = fields().items as Fields[] | undefined;
+                        if (items?.[index]) {
+                            delete items[index].code;
+                            delete items[index].product_id;
+                        }
+                    });
+                bindProductInput(input, (product) => {
+                    const index = Number(input.dataset.fld!.split(':')[0]);
+                    input.value = product.name_zh || product.name_th || product.name_en || '';
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    Object.assign(state.lines[index], {
+                        product_id: product.product_id,
+                        code: product.code,
+                        barcode: product.barcode || '',
+                        product_matched: true,
+                        description: product.name_zh || product.name_th || product.name_en || '',
+                        unit: product.unit || '',
+                    });
+                    const price =
+                        context.direction === 'sales' ? product.unit_price : product.default_cost;
+                    if (context.direction !== 'out') {
+                        const priceInput = host.querySelector<HTMLInputElement>(
+                            `[data-fld="${index}:unit_price"]`
+                        );
+                        if (priceInput) {
+                            priceInput.value = price == null ? '' : String(price);
+                            priceInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
                     }
-                }
-            );
-        }
-        if (target.dataset.field === 'name' && event.isTrusted) {
-            const code = target
-                .closest('[data-line]')
-                ?.querySelector<HTMLInputElement>('[data-field=code]');
-            if (code) code.value = '';
-        }
-        if (target.dataset.field) delete target.dataset.inherited;
-        updateManual(root);
-    };
-    root.onclick = (e) => {
-        const el = e.target as HTMLElement;
-        const tab = el.closest<HTMLElement>('[data-md-tab]');
-        if (tab) {
-            if (tab.dataset.mdTab === 'units') {
-                const panel = root.querySelector<HTMLElement>('[data-md-panel="units"]');
-                const items = readManual(root, fields()).items as ManualFields[];
-                if (panel)
-                    panel.innerHTML =
-                        '<p>' +
-                        items
-                            .map((item) => `${esc(item.name)} · ${esc(item.unit || '—')}`)
-                            .join('<br>') +
-                        '</p>';
-            }
-            root.querySelectorAll<HTMLElement>('[data-md-panel]').forEach(
-                (p) => (p.hidden = p.dataset.mdPanel !== tab.dataset.mdTab)
-            );
-            root.querySelectorAll<HTMLElement>('[data-md-tab]').forEach((b) =>
-                b.classList.toggle('active', b === tab)
-            );
-            return;
-        }
-        const add = el.closest('[data-add]');
-        const remove = el.closest<HTMLElement>('[data-remove]');
-        if (!add && !remove) return;
-        const f = readManual(root, fields());
-        const items = f.items as ManualFields[];
-        if (add)
-            items.push({
-                name: '',
-                qty: '1',
-                price: '',
-                department: f.department || '',
-                project: f.project || '',
-                warehouse: '',
+                    const vatInput = host.querySelector<HTMLSelectElement>(
+                        `[data-fld="${index}:vat_rate"]`
+                    );
+                    if (vatInput && product.vat_applicable != null) {
+                        vatInput.value = product.vat_applicable ? '7' : '0';
+                        vatInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    input.value = state.lines[index].description;
+                    const unit = host.querySelector<HTMLInputElement>(`[data-fld="${index}:unit"]`);
+                    if (unit) unit.value = state.lines[index].unit || '';
+                    const barcode = host.querySelector<HTMLInputElement>(
+                        `[data-fld="${index}:barcode"]`
+                    );
+                    if (barcode) barcode.value = product.barcode || '';
+                    const items = fields().items as Fields[];
+                    if (items?.[index]) items[index].code = product.code;
+                    reLines();
+                });
             });
-        else items.splice(Number(remove!.dataset.remove), 1);
-        render(f);
-    };
-    updateManual(root);
+            // Keep original footer. Legacy controllers remain hidden persistence adapters.
+            scope.querySelectorAll<HTMLElement>('.er-actions,form > footer').forEach((el) => {
+                el.hidden = true;
+                el.style.display = 'none';
+            });
+        },
+    });
+    host.addEventListener(
+        'change',
+        (event) => {
+            const target = event.target as HTMLInputElement;
+            if (target.id === 'pur-addfile-input' && target.files?.[0])
+                root.dispatchEvent(
+                    new CustomEvent('document-attachment', { detail: target.files[0] })
+                );
+        },
+        true
+    );
 }

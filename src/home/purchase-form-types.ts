@@ -31,6 +31,11 @@ export interface DraftIn {
 }
 
 export interface FormState {
+    direction?: 'purchase' | 'sales' | 'in' | 'out';
+    readonly?: boolean;
+    unvalued?: boolean;
+    systemNumber?: string;
+    numberPrefix?: string;
     id: string | null;
     doc_kind: DocKind;
     supplierName: string;

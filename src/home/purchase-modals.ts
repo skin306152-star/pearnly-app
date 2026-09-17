@@ -1,8 +1,10 @@
+import { manualLabel } from '../erp/manual-labels.js';
 // 商户采购 · 屏7 记付款 / 屏8 商品匹配 / 屏9 供应商选择器。
 // 照搬设计稿 07/08/09/03。桌面居中 .modal / 手机底部抽屉(媒体查询)。挂 home.html 四个 mask 空壳。
 /* global t, escapeHtml, showToast */
 import {
     papi,
+    authHeaders,
     purchaseErrMsg,
     fmtMoney,
     injectStyle,
@@ -277,11 +279,50 @@ window.openPurchaseMatch = function (lineArg, onDone) {
 };
 
 // ── 屏9 供应商选择器 ──────────────────────────────────────────────────
-window.openPurchaseSupplierPicker = function (onPick) {
-    const inner = `<div class="purm"><div class="mh"><div class="t">${escapeHtml(t('pur-supplier-pick-title'))}</div><div class="x" data-close>×</div></div>
+window.openPurchaseSupplierPicker = (onPick) => openPartyPicker(onPick);
+export function openPartyPicker(onPick: (party: unknown) => void, customer = false): void {
+    const label = (key: string) =>
+        customer
+            ? manualLabel(
+                  key === 'pur-supplier-new'
+                      ? 'newCustomer'
+                      : key === 'pur-supplier-search'
+                        ? 'searchCustomer'
+                        : 'selectCustomer',
+                  document.documentElement.lang
+              )
+            : t(key);
+    const request = async (
+        method: string,
+        body?: unknown
+    ): Promise<{ suppliers?: Supplier[]; supplier?: Supplier }> => {
+        if (!customer)
+            return (await papi(method, '/api/purchase/suppliers', body)) as {
+                suppliers?: Supplier[];
+                supplier?: Supplier;
+            };
+        // LINE uses its draft-scoped transport; web uses the existing authorized customer directory.
+        if (location.pathname.startsWith('/liff/'))
+            return (await papi(method, '/api/purchase/customers', body)) as {
+                suppliers?: Supplier[];
+                supplier?: Supplier;
+            };
+        const response = await fetch('/api/clients', {
+            method,
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        if (!response.ok) throw new Error('customer request failed');
+        const data = await response.json();
+        return {
+            suppliers: (data.clients || []).map((c: Supplier) => ({ ...c, id: String(c.id) })),
+            supplier: data.client,
+        };
+    };
+    const inner = `<div class="purm"><div class="mh"><div class="t">${escapeHtml(label('pur-supplier-pick-title'))}</div><div class="x" data-close>×</div></div>
         <div class="mb">
-            <div class="hint">${escapeHtml(t('pur-supplier-pick-hint'))}</div>
-            <div class="search"><input id="purm-ssearch" placeholder="${escapeHtml(t('pur-supplier-search'))}"></div>
+            <div class="hint">${escapeHtml(label('pur-supplier-pick-hint'))}</div>
+            <div class="search"><input id="purm-ssearch" placeholder="${escapeHtml(label('pur-supplier-search'))}"></div>
             <div class="list" id="purm-slist"><div class="state" style="padding:18px;color:var(--ink3);">${escapeHtml(t('pur-loading'))}</div></div>
         </div></div>`;
     const mask = openMask('purchase-supplier-mask', inner);
@@ -301,14 +342,14 @@ window.openPurchaseSupplierPicker = function (onPick) {
                         `<div class="row" data-sid="${escapeHtml(s.id)}"><div class="av">${escapeHtml((s.name || '?').slice(0, 1))}</div><div><div class="nm">${escapeHtml(s.name)}</div><div class="meta tnum">${s.tax_id ? escapeHtml(t('pur-tax-id')) + ' ' + escapeHtml(s.tax_id) : escapeHtml(t('pur-no-tax'))}</div></div></div>`
                 )
                 .join('') +
-            `<div class="row new" data-sid="__new__">+ ${escapeHtml(t('pur-supplier-new'))}${kw ? '「' + escapeHtml(search.value) + '」' : ''}</div>`;
+            `<div class="row new" data-sid="__new__">+ ${escapeHtml(label('pur-supplier-new'))}${kw ? '「' + escapeHtml(search.value) + '」' : ''}</div>`;
         listEl.querySelectorAll<HTMLElement>('[data-sid]').forEach((el) => {
             el.onclick = async () => {
                 const sid = el.dataset.sid!;
                 if (sid === '__new__') {
                     try {
-                        const res = (await papi('POST', '/api/purchase/suppliers', {
-                            name: search.value.trim() || t('pur-supplier-new'),
+                        const res = (await request('POST', {
+                            name: search.value.trim() || label('pur-supplier-new'),
                         })) as { supplier?: Supplier };
                         onPick(res.supplier);
                     } catch (e) {
@@ -323,7 +364,7 @@ window.openPurchaseSupplierPicker = function (onPick) {
         });
     };
     search.oninput = render;
-    papi('GET', '/api/purchase/suppliers')
+    request('GET')
         .then((d) => {
             all = (d as { suppliers?: Supplier[] }).suppliers || [];
             render();
@@ -331,4 +372,4 @@ window.openPurchaseSupplierPicker = function (onPick) {
         .catch(() => {
             listEl.innerHTML = `<div class="state" style="padding:18px;color:var(--ink3);">${escapeHtml(t('pur-error'))}</div>`;
         });
-};
+}

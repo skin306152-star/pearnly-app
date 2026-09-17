@@ -191,9 +191,19 @@ def add_movements(cur, out, *, tenant_id, workspace_client_id, date_to, created_
                     item["name"],
                     doc["direction"],
                     Decimal(item["qty"]),
-                    Decimal(item["price"]) if doc["direction"] == "in" else None,
+                    (
+                        Decimal(item["price"])
+                        if doc["direction"] == "in"
+                        and doc["fields"].get("source") != "inventory_count"
+                        and item.get("price") is not None
+                        else None
+                    ),
                     (doc["doc_date"], doc["created_at"], i),
-                    Decimal(item["subtotal"]) if doc["direction"] == "in" else None,
+                    (
+                        Decimal(item["subtotal"])
+                        if doc["direction"] == "in" and item.get("subtotal") is not None
+                        else None
+                    ),
                 ),
             )
 

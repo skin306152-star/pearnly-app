@@ -1,1 +1,1 @@
-import{b as s,a as n,m as l,c as t,r as d,s as o,u as r}from"./manual-document-DoIYCDrw.js";export{s as bindManual,n as bindProductInput,l as manualHtml,t as manualLabel,d as readManual,o as setProductLookup,r as updateManual};
+import{d as n,e as u,m as r,n as t,v as e,x as o,y as d}from"./manual-document-C1h-Se_4.js";export{n as bindManual,u as bindProductInput,r as manualHtml,t as manualLabel,e as readManual,o as setProductLookup,d as setPurchaseTransport};

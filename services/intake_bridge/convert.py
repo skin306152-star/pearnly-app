@@ -128,6 +128,10 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
         raise SkipConversion("no_workspace")
 
     if history.get("source") in {"erp_web", "line_erp"}:
+        cur.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
+            ("erp-stock:" + str(tenant_id) + ":" + str(workspace_client_id),),
+        )
         from services.erp.business_dates import calculation_fields
         from services.erp.internal_duplicate import guard
 

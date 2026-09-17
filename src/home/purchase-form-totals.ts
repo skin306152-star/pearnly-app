@@ -1,3 +1,5 @@
+import { inventoryForm, formLabel } from './purchase-form-profile.js';
+import { manualLabel } from '../erp/manual-labels.js';
 // 商户采购 · 复核屏汇总卡(价内外切换 + 手动改额四项 + 一致性校验)。从 purchase-form 抽出保 <500。
 // 手动改额(高风险兜底):开关打开后可改 小计/折扣/VAT/合计 对齐票面 + 实时一致性(净+VAT+WHT=合计±0.01);
 // 过账权威仍在后端(amount_override 再校验借贷平)· 前端只做即时反馈 + 拦明显不平。
@@ -7,6 +9,8 @@ import { computeForm, overrideConsistent } from './purchase-form-lines.js';
 import { BAHT } from './money.js';
 
 export function totalsCardHtml(st: FormState): string {
+    if (inventoryForm(st))
+        return `<div class="card"><div class="hd">${escapeHtml(t('pur-totals'))}</div><div class="bd" id="pur-totals">${totalsHtml(st)}</div></div>`;
     return `<div class="card"><div class="hd">${escapeHtml(t('pur-totals'))}
         <span class="swrow" id="pur-manual-tog" style="font-size:12px;"><span>${escapeHtml(t('pur-manual-edit'))}</span><span class="sw ${st.manualOn ? 'on' : ''}"></span></span>
     </div><div class="bd">
@@ -16,18 +20,27 @@ export function totalsCardHtml(st: FormState): string {
 }
 
 export function totalsHtml(st: FormState): string {
+    if (inventoryForm(st)) {
+        const label = (key: string) => escapeHtml(manualLabel(key, document.documentElement.lang));
+        const amount = st.lines.reduce(
+            (sum, line) => sum + Number(line.qty) * Number(line.unit_price),
+            0
+        );
+        return `<div class="sum"><span>${label('qty')}</span><span class="tnum">${st.lines.reduce((sum, line) => sum + Number(line.qty), 0)}</span></div><div class="sum tot"><span>${label('amount')}</span><span class="tnum">${st.direction === 'out' && (!st.systemNumber || st.unvalued) ? label(st.systemNumber ? 'unknownCost' : 'inventoryCost') : BAHT + amount.toFixed(2)}</span></div>`;
+    }
     const r = computeForm(st);
     const m = st.manualOn;
     const cell = (key: keyof FormState['override'], val: string) =>
         m
             ? `<input class="medit tnum" type="number" data-ov="${key}" value="${st.override[key]}">`
             : `<span class="tnum">${BAHT}${val}</span>`;
-    const vatRow = st.hasVat
-        ? `<div class="sum"><span>${escapeHtml(t('pur-vat-in'))} <span class="pill ok">${escapeHtml(t('pur-creditable'))}</span></span>${cell('vat', r.vat_amount)}</div>`
-        : '';
+    const vatRow =
+        st.hasVat || Number(r.vat_amount) !== 0
+            ? `<div class="sum"><span>${escapeHtml(formLabel(st, 'pur-vat-in'))} ${st.direction === 'sales' ? '' : `<span class="pill ok">${escapeHtml(t('pur-creditable'))}</span>`}</span>${cell('vat', r.vat_amount)}</div>`
+            : '';
     const whtRow =
         Number(r.wht_amount) > 0
-            ? `<div class="sum"><span>${escapeHtml(t('pur-wht'))} <span class="pill warn">${escapeHtml(t('pur-withheld'))}</span></span><span class="tnum wht">−${BAHT}${r.wht_amount}</span></div>`
+            ? `<div class="sum"><span>${escapeHtml(formLabel(st, 'pur-wht'))} <span class="pill warn">${escapeHtml(formLabel(st, 'pur-withheld'))}</span></span><span class="tnum wht">−${BAHT}${r.wht_amount}</span></div>`
             : '';
     const consist = m
         ? overrideConsistent(st)
@@ -39,7 +52,7 @@ export function totalsHtml(st: FormState): string {
         ${vatRow}
         <div class="sum mid"><span>${escapeHtml(t('pur-grand'))}</span>${cell('grand', r.grand_total)}</div>
         ${whtRow}
-        <div class="sum tot"><span>${escapeHtml(t('pur-net-payable'))}</span><span class="tnum">${BAHT}${r.net_payable}</span></div>
+        <div class="sum tot"><span>${escapeHtml(formLabel(st, 'pur-net-payable'))}</span><span class="tnum">${BAHT}${r.net_payable}</span></div>
         ${consist}`;
 }
 

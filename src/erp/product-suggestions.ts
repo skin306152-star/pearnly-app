@@ -5,6 +5,10 @@ export type Product = {
     name_en?: string;
     name_zh?: string;
     unit?: string;
+    barcode?: string;
+    unit_price?: number | string | null;
+    default_cost?: number | string | null;
+    vat_applicable?: boolean;
 };
 export type Lookup = (query: string) => Promise<Product[]>;
 let lookup: Lookup | undefined;

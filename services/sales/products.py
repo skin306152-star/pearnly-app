@@ -180,9 +180,9 @@ def list_products(
     if not include_inactive:
         sql += " AND is_active = TRUE"
     if query:
-        sql += " AND (name_th ILIKE %s OR name_en ILIKE %s OR name_zh ILIKE %s OR code ILIKE %s)"
+        sql += " AND (name_th ILIKE %s OR name_en ILIKE %s OR name_zh ILIKE %s OR code ILIKE %s OR barcode ILIKE %s)"
         like = f"%{query}%"
-        params += [like, like, like, like]
+        params += [like, like, like, like, like]
     sql += " ORDER BY name_th LIMIT %s"
     params.append(limit)
     cur.execute(sql, params)

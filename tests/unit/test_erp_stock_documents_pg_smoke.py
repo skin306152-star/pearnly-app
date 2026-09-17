@@ -169,6 +169,17 @@ class StockDocumentsPgSmoke(unittest.TestCase):
                 items=[{"name": "Identity", "code": items[0]["code"], "unit": "piece"}],
             )
 
+    def test_explicit_product_id_never_creates_or_crosses_workspace(self):
+        from services.erp.item_identity import resolve_items
+
+        items = [{"name": "Exact selected product", "unit": "box"}]
+        resolve_items(self.cur, tenant_id=self.tid, workspace_id=self.wid, items=items)
+        chosen = [{"name": "Display alias", "product_id": items[0]["product_id"], "unit": "box"}]
+        resolve_items(self.cur, tenant_id=self.tid, workspace_id=self.wid, items=chosen)
+        self.assertEqual(chosen[0]["code"], items[0]["code"])
+        with self.assertRaises(HTTPException):
+            resolve_items(self.cur, tenant_id=self.tid, workspace_id=self.wid + 99999, items=chosen)
+
     def test_backdated_receipt_replays_issue_detail_like_report(self):
         original = self.save("in", "10", "10")
         self.cur.execute(

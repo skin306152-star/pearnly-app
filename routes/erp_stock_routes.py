@@ -1,6 +1,7 @@
 """ERP-only native stock receipts/issues."""
 
 from typing import Literal
+from decimal import Decimal
 from uuid import UUID
 from fastapi import APIRouter, Request, File, Form, UploadFile, HTTPException
 from fastapi.responses import Response
@@ -92,3 +93,60 @@ def get_attachment(
         media_type="application/octet-stream",
         headers={"Content-Disposition": 'attachment; filename="attachment"'},
     )
+
+
+@router.get("/inventory")
+def inventory_overview(request: Request, workspace_client_id: int, q: str = ""):
+    from core import db
+    from services.erp import inventory, internal_records
+    from services.erp.team_access import record_creator_scope
+    from services.authz import field_mask
+    from services.authz.deps import require_perm
+
+    user = _authorize(request)
+    require_perm(request, "stockcard.report.view")
+    stock_documents.authorize(user, workspace_client_id, "in")
+    with db.get_cursor_rls(str(user["tenant_id"]), user_id=str(user["id"])) as cur:
+        internal_records.workspace(cur, user, workspace_client_id)
+        data = inventory.overview(
+            cur,
+            tenant_id=str(user["tenant_id"]),
+            workspace_id=workspace_client_id,
+            query=q,
+            mask_cost=not field_mask.cost_visible(request),
+            created_by=record_creator_scope(request, user),
+        )
+    return {"ok": True, "data": data}
+
+
+class InventoryCountLine(BaseModel):
+    product_id: UUID
+    counted_qty: Decimal = Field(ge=0, allow_inf_nan=False)
+    batch_id: UUID | None = None
+
+
+class InventoryCount(BaseModel):
+    request_id: UUID
+    workspace_client_id: int = Field(gt=0)
+    lines: list[InventoryCountLine] = Field(min_length=1, max_length=500)
+
+
+@router.post("/inventory/count")
+def inventory_count(req: InventoryCount, request: Request):
+    from core import db
+    from services.erp import inventory, internal_records
+    from services.authz.deps import require_perm
+
+    user = _authorize(request)
+    require_perm(request, "inv.approve")
+    stock_documents.authorize(user, req.workspace_client_id, "in")
+    with db.get_cursor_rls(str(user["tenant_id"]), user_id=str(user["id"]), commit=True) as cur:
+        internal_records.workspace(cur, user, req.workspace_client_id)
+        data = inventory.count(
+            cur,
+            user,
+            req.workspace_client_id,
+            [line.model_dump() for line in req.lines],
+            request_id=str(req.request_id),
+        )
+    return {"ok": True, "data": data}

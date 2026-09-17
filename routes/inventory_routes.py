@@ -48,6 +48,10 @@ def _write(request: Request, req, fn, code: str):
     (docs/10 §5.1)。POS 售卖扣库存走服务层(不经此路由),不受影响。
     InventoryError → PosError(422) 收口在此一处(各 handler 不再各写 try/except)。
     """
+    from core.auth import get_current_user_from_request
+
+    if get_current_user_from_request(request).get("entry") == "erp":
+        raise PosError("pos.forbidden", 403)
     tid, uid = require_perm_pos_tid(request, code)
     try:
         with db.get_cursor_rls(tid, commit=True) as cur:

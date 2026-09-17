@@ -1,5 +1,5 @@
 import { thaiToday, thaiDateText } from './thai-date-picker.js';
-import { manualHtml, readManual, bindManual, updateManual } from './manual-document.js';
+import { manualHtml, readManual, bindManual } from './manual-document.js';
 import './record-form.css';
 export type Fields = Record<string, unknown>;
 export type Item = { name: string; qty: string; price: string };
@@ -128,7 +128,6 @@ export function formHtml(fields: Fields, direction: string, lang: string): strin
     return manualHtml(fields, direction, lang);
 }
 export const readFields = readManual;
-export const updateTotal = updateManual;
 export const bindLines = bindManual;
 
 export function describeError(error: unknown, lang: string): string {

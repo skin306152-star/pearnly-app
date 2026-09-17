@@ -212,9 +212,14 @@ async def api_create_product(req: ProductCreate, request: Request):
         translate_unique_violation("sales.product_code_exists", _PRODUCT_UNIQUE_CODES),
     ):
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
-        row = products_dal.create_product(
-            cur, tenant_id=tid, workspace_client_id=ws, fields=_dump(req)
-        )
+        fields = _dump(req)
+        from core.auth import get_current_user_from_request
+
+        if get_current_user_from_request(request).get("entry") == "erp":
+            from services.erp.product_numbers import prepare
+
+            fields = prepare(cur, tid, fields)
+        row = products_dal.create_product(cur, tenant_id=tid, workspace_client_id=ws, fields=fields)
     return {"ok": True, "product": _out(row, cost_visible=cost_visible)}
 
 
@@ -266,6 +271,12 @@ async def api_import_products(request: Request, file: UploadFile = File(...)):
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         for rec in valid:
             try:
+                from core.auth import get_current_user_from_request
+
+                if get_current_user_from_request(request).get("entry") == "erp":
+                    from services.erp.product_numbers import prepare
+
+                    rec = prepare(cur, tid, rec)
                 products_dal.create_product(cur, tenant_id=tid, workspace_client_id=ws, fields=rec)
                 created += 1
             except Exception as e:  # 单行入库失败不连累整批
@@ -301,6 +312,21 @@ async def api_update_product(product_id: str, req: ProductUpdate, request: Reque
         translate_unique_violation("sales.product_code_exists", _PRODUCT_UNIQUE_CODES),
     ):
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        from core.auth import get_current_user_from_request
+
+        if get_current_user_from_request(request).get("entry") == "erp":
+            old = products_dal.get_product(
+                cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id
+            )
+            if old:
+                from services.erp.product_numbers import guard_change
+
+                guard_change(cur, tid, ws, product_id, raw)
+                from services.erp.product_numbers import allocate
+
+                raw["code"] = old.get("code") or allocate(cur, tid)
+                if raw.get("unit"):
+                    raw["base_unit"] = raw["unit"]
         row = products_dal.update_product(
             cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id, fields=raw
         )
@@ -314,6 +340,12 @@ async def api_delete_product(product_id: str, request: Request):
     tid, _ = require_perm_tid(request, "sales.product.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        from core.auth import get_current_user_from_request
+
+        if get_current_user_from_request(request).get("entry") == "erp":
+            from services.erp.product_numbers import guard_change
+
+            guard_change(cur, tid, ws, product_id, {"is_active": False})
         ok = products_dal.deactivate_product(
             cur, tenant_id=tid, workspace_client_id=ws, product_id=product_id
         )

@@ -17,22 +17,25 @@ export interface InvBatch {
     expiry_date: string | null;
     qty: number | null;
 }
+export const erpInventory = () => window._entry === 'erp' || location.pathname === '/erp';
+
 export interface InvItem {
+    code?: string;
     product_id: string;
     name: InvName;
     image_url: string | null;
     barcode: string | null;
     base_unit: string | null;
-    qty_on_hand: number | null;
+    qty_on_hand: number | string | null;
     min_stock: number | null;
-    avg_cost: number | null;
+    avg_cost: number | string | null;
     status: 'ok' | 'low' | 'out';
     track_batch: boolean;
     batches: InvBatch[];
 }
 export interface InvSummary {
     sku_count: number;
-    stock_value: number | null;
+    stock_value: number | string | null;
     low_count: number;
     out_count: number;
 }
@@ -140,13 +143,17 @@ export function activeWsId(): number | null {
 
 // 最近一次 stock 结果缓存:入库/盘点弹窗的商品下拉直接复用(都是本账套在售商品)。
 let lastItems: InvItem[] = [];
+let pendingCount: { key: string; id: string } | undefined;
 
 export const invApi = {
     async getStock(wsId: number, filter: StockFilter, q: string): Promise<StockResp> {
         const params = new URLSearchParams({ workspace_client_id: String(wsId), filter });
         const kw = q.trim();
         if (kw) params.set('q', kw);
-        const data = (await invGet('/api/inventory/stock?' + params.toString())) as StockResp;
+        const data = (await invGet(
+            (erpInventory() ? '/api/erp/stock-documents/inventory?' : '/api/inventory/stock?') +
+                params.toString()
+        )) as StockResp;
         lastItems = data.items || [];
         return data;
     },
@@ -160,7 +167,14 @@ export const invApi = {
     },
 
     async postCount(wsId: number, lines: CountLine[]): Promise<void> {
-        await invPost('/api/inventory/count', { workspace_client_id: wsId, lines });
+        const key = JSON.stringify([wsId, lines]);
+        if (!pendingCount || pendingCount.key !== key)
+            pendingCount = { key, id: crypto.randomUUID() };
+        await invPost(
+            erpInventory() ? '/api/erp/stock-documents/inventory/count' : '/api/inventory/count',
+            { workspace_client_id: wsId, lines, request_id: pendingCount.id }
+        );
+        pendingCount = undefined;
     },
 
     async getNearExpiry(wsId: number, days: number): Promise<NearExpiryItem[]> {
@@ -185,7 +199,7 @@ export const invApi = {
         product_id: string;
         name: string;
         track_batch: boolean;
-        avg_cost: number | null;
+        avg_cost: number | string | null;
         batches: InvBatch[];
     }[] {
         return lastItems.map((it) => ({

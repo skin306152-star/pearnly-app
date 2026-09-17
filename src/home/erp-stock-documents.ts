@@ -102,7 +102,7 @@ async function list(direction: Direction): Promise<void> {
                     )
                 );
             host.querySelector('[data-stock-list]')!.innerHTML = lines.length
-                ? `<div class="erp-stock-scroll"><table><thead><tr><th>${e(stockLabel('material'))}</th><th class="num">${e(stockLabel('qty'))}</th><th>${e(stockLabel('number'))}</th><th>${e(stockLabel('date'))}</th><th class="num">${e(stockLabel('total'))}</th></tr></thead><tbody>${lines.map(({ d, item }) => `<tr><td>${e(item.name)}<small>${e(item.code)}</small></td><td class="num">${e(item.qty)} ${e(item.unit)}</td><td><button class="erp-stock-link" data-stock-id="${e(d.id)}">${e(d.doc_no)}</button></td><td>${e(d.fields.date)}</td><td class="num">${e(item.subtotal == null ? '—' : Number(item.subtotal).toFixed(2))}</td></tr>`).join('')}</tbody></table></div>`
+                ? `<div class="erp-stock-scroll"><table><thead><tr><th>${e(stockLabel('material'))}</th><th class="num">${e(stockLabel('qty'))}</th><th>${e(stockLabel('number'))}</th><th>${e(stockLabel('date'))}</th><th class="num">${e(stockLabel('total'))}</th></tr></thead><tbody>${lines.map(({ d, item }) => `<tr><td>${e(item.name)}<small>${e(item.code)}</small></td><td class="num">${e(item.qty)} ${e(item.unit)}</td><td><button class="erp-stock-link" data-stock-id="${e(d.id)}">${e(d.doc_no)}</button>${d.fields.source === 'inventory_count' ? `<small>${e(t('inv-act-count'))}: ${e(d.fields.before_qty)} → ${e(d.fields.counted_qty)}</small>` : ''}</td><td>${e(d.fields.date)}</td><td class="num">${e(item.subtotal == null ? '—' : Number(item.subtotal).toFixed(2))}</td></tr>`).join('')}</tbody></table></div>`
                 : `<p>${e(stockLabel('empty'))}</p>`;
             host.querySelectorAll<HTMLElement>('[data-stock-id]').forEach(
                 (el) =>
@@ -123,20 +123,36 @@ function form(direction: Direction, doc?: StockDoc): void {
     const host = root(direction),
         ws = activeWsId()!;
     const id = doc?.id || crypto.randomUUID();
-    let fields: ManualFields = doc?.fields || {
-        date: thaiDateText(thaiToday()),
-        branch: '00000',
-        items: [
-            { name: '', qty: '1', price: '', unit: '', department: '', project: '', warehouse: '' },
-        ],
-    };
+    let fields: ManualFields = doc
+        ? { ...doc.fields, document_number: doc.doc_no }
+        : {
+              date: thaiDateText(thaiToday()),
+              branch: '00000',
+              items: [
+                  {
+                      name: '',
+                      qty: '1',
+                      price: '',
+                      unit: '',
+                      department: '',
+                      project: '',
+                      warehouse: '',
+                  },
+              ],
+          };
     let busy = false;
     let attachment: File | undefined;
     const render = (next: ManualFields) => {
         fields = next;
-        host.innerHTML = `<div class="erp-stock-page"><header><h2>${e(stockLabel(direction))}${doc ? ' · ' + e(doc.doc_no) : ''}</h2><button type="button" class="btn" data-stock-back>${e(stockLabel(doc ? 'back' : 'cancel'))}</button></header><form data-stock-form><div data-stock-editor>${manualHtml(fields, direction, lang(), !!doc)}</div><p role="alert" data-stock-error></p>${doc ? '' : `<footer><button type="button" class="btn" data-stock-cancel>${e(stockLabel('cancel'))}</button><button class="btn btn-primary" type="submit">${e(stockLabel('save'))}</button></footer>`}</form></div>`;
+        host.innerHTML = `<div class="erp-pos-entry"><button type="button" data-stock-back hidden>${e(stockLabel('back'))}</button><form data-stock-form><div data-stock-editor>${manualHtml(fields, direction, lang(), !!doc)}</div><p role="alert" data-stock-error></p></form></div>`;
         const editor = host.querySelector<HTMLElement>('[data-stock-editor]')!;
-        bindManual(editor, () => fields, render);
+        bindManual(editor, () => fields, render, {
+            save: async () => saveStock(),
+            cancel: () => void list(direction),
+        });
+        editor.addEventListener('document-attachment', (event) => {
+            attachment = (event as CustomEvent<File>).detail;
+        });
         const files = editor.querySelector<HTMLElement>('[data-md-files]')!;
         if (!doc) {
             const picker = document.createElement('input');
@@ -175,51 +191,15 @@ function form(direction: Direction, doc?: StockDoc): void {
             };
             files.append(download);
         }
-        if (direction === 'out' && !doc)
-            editor.querySelectorAll<HTMLInputElement>('[data-field=price]').forEach((input) => {
-                input.readOnly = true;
-                input.placeholder = '—';
-            });
-        if (direction === 'out' && !doc) {
-            const pending = () => {
-                const total = editor.querySelector('[data-total]');
-                if (total) total.textContent = '—';
-                editor
-                    .querySelectorAll<HTMLInputElement>('[data-field=subtotal]')
-                    .forEach((el) => (el.value = '—'));
-            };
-            pending();
-            editor.addEventListener('input', pending);
-            const hint = document.createElement('p');
-            hint.className = 'erp-stock-cost-hint';
-            hint.textContent = stockLabel('cost');
-            editor.append(hint);
-        }
-        if (doc) {
-            editor.querySelectorAll<HTMLInputElement>('[data-field=subtotal]').forEach((el, i) => {
-                const item = (fields.items as ManualFields[])[i];
-                el.value = item.subtotal == null ? '—' : Number(item.subtotal).toFixed(2);
-            });
-            const total = editor.querySelector('[data-total]');
-            if (total)
-                total.textContent =
-                    fields.total_amount == null ? '—' : Number(fields.total_amount).toFixed(2);
-        }
-
         host.querySelector('[data-stock-back]')!.addEventListener(
             'click',
             () => void list(direction)
         );
-        host.querySelector('[data-stock-cancel]')?.addEventListener(
-            'click',
-            () => void list(direction)
-        );
-        host.querySelector<HTMLFormElement>('[data-stock-form]')!.onsubmit = async (event) => {
+        host.querySelector<HTMLFormElement>('[data-stock-form]')!.onsubmit = (event) =>
             event.preventDefault();
+        const saveStock = async () => {
             if (busy) return;
             busy = true;
-            const button = host.querySelector<HTMLButtonElement>('button[type=submit]')!;
-            button.disabled = true;
             try {
                 const payload = {
                     document_id: id,
@@ -242,7 +222,6 @@ function form(direction: Direction, doc?: StockDoc): void {
                 form(direction, result.document as StockDoc);
             } catch {
                 host.querySelector('[data-stock-error]')!.textContent = stockLabel('failed');
-                button.disabled = false;
             } finally {
                 busy = false;
             }

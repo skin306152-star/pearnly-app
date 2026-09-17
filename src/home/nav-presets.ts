@@ -146,10 +146,20 @@ export function applyNavPreset(preset: NavPreset): void {
     // 商品收发存报表:清单只回答「这个业态可能有」,真开没开还要看后端 entitlement 探针
     // (stock-card.ts probeStockCardStatus)。探针与本函数谁先跑到不定——探针那边算完也会
     // 直接把元素收起,这里再按已知结果收一遍,两处双写但只收不显,顺序不影响收敛结果。
-    if (window._stockCardDisabled) show(document.getElementById('nav-group-firm-goods'), false);
+    if (window._stockCardDisabled && preset !== ERP_PRESET)
+        show(document.getElementById('nav-group-firm-goods'), false);
     if (preset === ERP_PRESET) {
+        const group = document.querySelector('#nav-group-firm-goods .nav-sub');
+        ['inventory', 'sales-products'].forEach((route) => {
+            const item = document.querySelector<HTMLElement>(`.nav-item[data-route="${route}"]`);
+            if (group && item) {
+                group.prepend(item);
+                show(item, true);
+            }
+        });
         show(document.querySelector('.nav-item[data-route="sales-invoices"]'), false);
         show(document.querySelector('.nav-item[data-route="sales-account"]'), false);
     }
-    redirectOffHidden(preset.home);
+    // ERP uses its route allowlist and member guard; menu visibility settles asynchronously.
+    if (preset !== ERP_PRESET) redirectOffHidden(preset.home);
 }

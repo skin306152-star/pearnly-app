@@ -55,10 +55,10 @@ function reset() {
 }
 function render() {
     const record = records[index];
-    host.innerHTML = `<div class="er-entry"><div class="er-head"><h2>${esc(label(direction))}</h2><div class="er-tabs"><button class="btn primary" data-method="manual">${esc(label('manual'))}</button><button class="btn" data-method="upload">${esc(label('upload'))}</button></div><button class="btn" data-records>${esc(label('records'))}</button></div>
+    host.innerHTML = `<div class="erp-pos-entry"><button type="button" data-records hidden>${esc(label('records'))}</button>
     ${records.length > 1 ? `<select data-select-record>${records.map((_, i) => `<option value="${i}" ${i === index ? 'selected' : ''}>${i + 1} / ${records.length}</option>`).join('')}</select>` : ''}
     <form data-record-form>${record ? formHtml(record.fields, direction, lang()) : ''}</form>
-    <div data-attachment-picker hidden><button type="button" class="btn" data-choose-file>${esc(label('choose'))}</button><span data-file-name></span><input type="file" data-attachment accept="application/pdf,image/*" hidden></div><div class="er-message" data-message role="status"></div><div class="er-actions"><button class="btn" data-draft>${esc(label('draft'))}</button><button class="btn primary" data-confirm>${esc(label('confirm'))}</button></div>
+    <div data-attachment-picker hidden><button type="button" class="btn" data-choose-file>${esc(label('choose'))}</button><span data-file-name></span><input type="file" data-attachment accept="application/pdf,image/*" hidden></div><div class="er-message" data-message role="status"></div>
     <div data-drafts></div></div>`;
     const root = host.querySelector<HTMLElement>('[data-record-form]')!;
     root.onsubmit = (e) => e.preventDefault();
@@ -68,8 +68,15 @@ function render() {
         (fields) => {
             records[index].fields = fields;
             render();
+        },
+        {
+            save: async (_fields, status) => save(status === 'posted'),
+            cancel: () => window.routeTo?.(direction === 'purchase' ? 'purchase' : 'sales-records'),
         }
     );
+    root.addEventListener('document-attachment', (event) => {
+        attachments.set(records[index].id, (event as CustomEvent<File>).detail);
+    });
     host.querySelectorAll<HTMLButtonElement>('[data-method]').forEach(
         (button) =>
             (button.onclick = () => {
@@ -79,8 +86,6 @@ function render() {
     );
     host.querySelector<HTMLElement>('[data-records]')!.onclick = () =>
         window.routeTo?.(direction === 'purchase' ? 'purchase' : 'sales-records');
-    host.querySelector<HTMLElement>('[data-draft]')!.onclick = () => void save(false);
-    host.querySelector<HTMLElement>('[data-confirm]')!.onclick = () => void save(true);
     const selector = host.querySelector<HTMLSelectElement>('[data-select-record]');
     if (selector)
         selector.onchange = () => {

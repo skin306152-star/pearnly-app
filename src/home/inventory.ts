@@ -5,6 +5,7 @@
 /* global t, escapeHtml, showToast */
 import {
     invApi,
+    erpInventory,
     activeWsId,
     localizedName,
     fmtMoney,
@@ -53,7 +54,7 @@ function rowHtml(it: InvItem): string {
         ? `<span class="thumb"><img data-aimg="${escapeHtml(it.image_url)}" alt="" style="width:100%;height:100%;border-radius:inherit;object-fit:cover"></span>`
         : `<span class="thumb">${IC_BOX}</span>`;
     return `<tr>
-        <td><span class="nm">${thumb}${escapeHtml(localizedName(it.name))}${near}</span></td>
+        <td><span class="nm">${thumb}${escapeHtml((it.code ? it.code + ' · ' : '') + localizedName(it.name))}${near}</span></td>
         <td class="tnum">${escapeHtml(it.barcode || '')}</td>
         <td>${escapeHtml(it.base_unit || '')}</td>
         <td class="num qty${qtyBad}">${fmtQty(it.qty_on_hand)}</td>
@@ -115,12 +116,12 @@ function shellHtml(): string {
             <div class="t">${escapeHtml(t('inv-title'))}</div>
             <div class="acts">
                 <button class="btn" id="inv-btn-count">${escapeHtml(t('inv-act-count'))}</button>
-                <button class="btn primary" id="inv-btn-in">${IC_PLUS}${escapeHtml(t('inv-act-in'))}</button>
+                ${erpInventory() ? '' : `<button class="btn primary" id="inv-btn-in">${IC_PLUS}${escapeHtml(t('inv-act-in'))}</button>`}
                 <div class="more">
                     <button class="btn more-btn" id="inv-btn-more" aria-haspopup="true" aria-expanded="false">⋯</button>
                     <div class="menu" id="inv-more-menu" hidden>
                         <div class="mi" id="inv-btn-export" role="button" tabindex="0">${escapeHtml(t('inv-act-export'))}</div>
-                        <div class="mi" id="inv-btn-transfer" role="button" tabindex="0">${escapeHtml(t('inv-act-transfer'))}</div>
+                        ${erpInventory() ? '' : `<div class="mi" id="inv-btn-transfer" role="button" tabindex="0">${escapeHtml(t('inv-act-transfer'))}</div>`}
                     </div>
                 </div>
             </div>
@@ -138,6 +139,13 @@ function rerenderRows() {
     const tb = document.getElementById('inv-tbody');
     if (tb) tb.innerHTML = tbodyHtml();
     hydrateThumbs();
+    const stats = document.querySelector('#inv-body .stats');
+    if (stats) {
+        const template = document.createElement('template');
+        template.innerHTML = bodyHtml();
+        const next = template.content.querySelector('.stats');
+        if (next) stats.replaceWith(next);
+    }
 }
 
 // 缩略图经鉴权取图(行内 <img> 不能直接 src 鉴权 URL,否则 401)。
@@ -158,7 +166,7 @@ function exportCsv() {
         t('inv-col-status'),
     ];
     const rows = list.map((it) => [
-        localizedName(it.name),
+        (it.code ? it.code + ' · ' : '') + localizedName(it.name),
         it.barcode || '',
         it.base_unit || '',
         fmtQty(it.qty_on_hand),

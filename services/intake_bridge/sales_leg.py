@@ -117,7 +117,7 @@ def issue_from_history(cur, *, tenant_id, workspace_client_id, created_by, field
     )
     cols = buyer_mod.to_columns(buyer)
     t = compute_totals(lines, vat_rate=vat_rate, wht_rate=0, price_includes_vat=False)
-    if "internal_vat_rate" in fields and fields.get("manual_layout") != 1:
+    if "internal_vat_rate" in fields and fields.get("manual_layout") not in (1, 2):
         from services.erp.invoice_amounts import resolve, line_amount
 
         amounts = resolve(fields)
@@ -133,6 +133,21 @@ def issue_from_history(cur, *, tenant_id, workspace_client_id, created_by, field
         if t["grand_total"] != amounts["total"] or t["vat_amount"] != amounts["vat"]:
             raise SkipConversion("amount_mismatch")
 
+    if "internal_vat_rate" in fields and fields.get("manual_layout") == 2:
+        from services.erp.pos_form import calculate
+        from services.erp.internal_records import _decimal
+
+        calc, pos_lines, _ = calculate(fields, _decimal)
+        t = compute_totals(pos_lines, vat_rate=0, wht_rate=0, price_includes_vat=False)
+        t.update(
+            subtotal=calc["subtotal"],
+            vat_amount=calc["vat_amount"],
+            wht_amount=calc["wht_amount"],
+            grand_total=calc["grand_total"],
+            header_discount_amount=calc["discount_total"],
+            vat_rate=(calc["vat_amount"] * 100 / calc["subtotal"] if calc["subtotal"] else 0),
+        )
+
     try:
         cur.execute(
             "INSERT INTO sales_documents ("
@@ -141,7 +156,7 @@ def issue_from_history(cur, *, tenant_id, workspace_client_id, created_by, field
             "header_discount_pct, price_includes_vat, vat_rate, vat_amount, wht_rate, "
             "wht_amount, grand_total, buyer_type, buyer_name, buyer_address, buyer_tax_id, "
             "buyer_branch_type, buyer_branch_no, created_by"
-            ") VALUES (%s,%s,%s,'issued',%s,%s,now(),'THB',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"
+            ") VALUES (%s,%s,%s,'issued',%s,%s,now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"
             "%s,%s,%s,%s,%s,%s,%s) RETURNING id",
             (
                 tenant_id,
@@ -149,6 +164,7 @@ def issue_from_history(cur, *, tenant_id, workspace_client_id, created_by, field
                 doc_no,
                 workspace_client_id,
                 issue_date,
+                fields.get("currency") or "THB",
                 t["subtotal"],
                 t["discount_total"],
                 t["header_discount_amount"],

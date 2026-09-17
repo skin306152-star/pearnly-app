@@ -176,6 +176,13 @@ function openEdit(p: Product | null, barcodePrefill?: string) {
             <button class="btn btn-ghost" id="sx-p-cancel">${escapeHtml(t('sx-cancel'))}</button>
             <button class="btn btn-primary" id="sx-p-save">${escapeHtml(t('sx-p-save'))}</button>
         </div></div>`;
+    if (window._entry === 'erp') {
+        const code = document.getElementById('sx-pf-code') as HTMLInputElement;
+        code.readOnly = true;
+        code.placeholder = t('onbf-acct-prefix-auto');
+        const hint = code.parentElement?.querySelector('.sx-field-hint');
+        if (hint) hint.textContent = '';
+    }
     mask.style.display = 'flex';
     document.getElementById('sx-p-close')!.onclick = closeProdModal;
     document.getElementById('sx-p-cancel')!.onclick = closeProdModal;

@@ -1,3 +1,5 @@
+import { inventoryForm, formLabel } from './purchase-form-profile.js';
+import { manualLabel } from '../erp/manual-labels.js';
 // 商户采购 · 复核屏单据信息卡(字段三态 + 分店/税票/币种联动 + 硬必填校验)。从 purchase-form 抽出保 <500。
 // 三态:已识别绿(ok·field_confidence 高)/ 请确认琥珀(fix·低)/ 需补红(need·必填且空·主动显红)。
 // 税票号 = doc_no(docs §十三#3,无独立列);分店名派生不存独立列(拍板#3)。
@@ -66,6 +68,7 @@ function req(): string {
 
 export function infoCardHtml(st: FormState): string {
     const k = st.doc_kind;
+    if (inventoryForm(st)) return inventoryInfo(st);
     const isBranch = st.branchType === 'branch';
     const nonThb = st.currency !== 'THB';
     const curOpts = CURRENCIES.map(
@@ -76,11 +79,16 @@ export function infoCardHtml(st: FormState): string {
         ? `<div class="${cls(st, 'doc_no')}" id="f-taxno"><label>${escapeHtml(t('pur-tax-no'))}${req()} ${tag(st, 'doc_no')}</label><div class="inp"><input class="fin" data-fld="docNo" value="${escapeHtml(st.docNo)}"></div><div class="et">${escapeHtml(t('pur-req-taxno'))}</div></div>`
         : `<div class="field"><label>${escapeHtml(t('pur-doc-no'))}</label><div class="inp"><input class="fin" data-fld="docNo" value="${escapeHtml(st.docNo)}"></div></div>`;
     return `<div class="card"><div class="hd">${escapeHtml(t('pur-doc-info'))}</div><div class="bd">
-        <div class="field"><label>${escapeHtml(t('pur-type'))}</label><div class="seg" id="pur-kind">
+        ${st.numberPrefix ? `<div class="field"><label>${escapeHtml(manualLabel('number', document.documentElement.lang))}</label><div class="inp ro"><input class="fin" readonly data-system-number value="${escapeHtml(st.systemNumber || '')}" placeholder="${escapeHtml(st.numberPrefix)} · ${escapeHtml(manualLabel('autoNumber', document.documentElement.lang))}"></div></div>` : ''}
+        ${
+            st.direction === 'sales'
+                ? ''
+                : `<div class="field"><label>${escapeHtml(t('pur-type'))}</label><div class="seg" id="pur-kind">
             <div class="o ${k === 'purchase_invoice' ? 'on' : ''}" data-kind="purchase_invoice">${escapeHtml(t('pur-kind-invoice'))}</div>
             <div class="o ${k === 'expense' ? 'on' : ''}" data-kind="expense">${escapeHtml(t('pur-kind-expense'))}</div>
-            <div class="o ${k === 'purchase_order' ? 'on' : ''}" data-kind="purchase_order">${escapeHtml(t('pur-kind-order'))}</div></div></div>
-        <div class="${cls(st, 'supplier')}" id="f-supplier"><label>${escapeHtml(t('pur-supplier'))}${req()} ${tag(st, 'supplier')}</label><div class="inp pick" id="pur-supplier-pick">${escapeHtml(st.supplierName || t('pur-supplier-choose'))} <span style="color:var(--ink3)">${escapeHtml(t('pur-switch'))} ▾</span></div><div class="et">${escapeHtml(t('pur-req-supplier'))}</div></div>
+            <div class="o ${k === 'purchase_order' ? 'on' : ''}" data-kind="purchase_order">${escapeHtml(t('pur-kind-order'))}</div></div></div>`
+        }
+        <div class="${cls(st, 'supplier')}" id="f-supplier"><label>${escapeHtml(formLabel(st, 'pur-supplier'))}${req()} ${tag(st, 'supplier')}</label><div class="inp pick" id="pur-supplier-pick">${escapeHtml(st.supplierName || formLabel(st, 'pur-supplier-choose'))} <span style="color:var(--ink3)">${escapeHtml(t('pur-switch'))} ▾</span></div><div class="et">${escapeHtml(formLabel(st, 'pur-req-supplier'))}</div></div>
         <div class="two">
             <div class="${cls(st, 'tax_id')}"><label>${escapeHtml(t('pur-tax-id'))} ${tag(st, 'tax_id')}</label><div class="inp"><input class="fin tnum" data-fld="taxId" value="${escapeHtml(st.taxId)}" placeholder=""></div></div>
             <div class="field"><label>${escapeHtml(t('pur-branch'))}</label><div class="inp"><select class="fsel" id="pur-branchtype" data-fld="branchType"><option value="head_office" ${st.branchType === 'head_office' ? 'selected' : ''}>${escapeHtml(t('pur-branch-head'))}</option><option value="branch" ${st.branchType === 'branch' ? 'selected' : ''}>${escapeHtml(t('pur-branch-sub'))}</option><option value="none" ${st.branchType === 'none' ? 'selected' : ''}>${escapeHtml(t('pur-branch-na'))}</option></select></div></div>
@@ -89,14 +97,14 @@ export function infoCardHtml(st: FormState): string {
             <div class="${cls(st, 'branchNo')}" id="f-branchcode"><label>${escapeHtml(t('pur-branch-code'))}${req()} ${tag(st, 'branchNo')}</label><div class="inp"><input class="fin tnum" data-fld="branchNo" value="${escapeHtml(st.branchNo)}" placeholder="00000"></div><div class="et">${escapeHtml(t('pur-req-branchcode'))}</div></div>
             <div class="field"><label>${escapeHtml(t('pur-branch-name'))}</label><div class="inp"><input class="fin" data-fld="branchName" value="${escapeHtml(st.branchName)}"></div></div>
         </div>
-        <div class="field"><label>${escapeHtml(t('pur-address'))}</label><div class="inp"><input class="fin" data-fld="address" value="${escapeHtml(st.address)}" placeholder="—"></div></div>
+        <div class="field"><label>${escapeHtml(formLabel(st, 'pur-address'))}</label><div class="inp"><input class="fin" data-fld="address" value="${escapeHtml(st.address)}" placeholder="—"></div></div>
         <div class="two">
             <div class="${cls(st, 'doc_date')}" id="f-docdate"><label>${escapeHtml(t('pur-doc-date'))}${req()} ${tag(st, 'doc_date')}</label><div class="inp"><input class="fin tnum" type="date" data-fld="docDate" value="${escapeHtml(st.docDate)}"></div><div class="et">${escapeHtml(t('pur-req-docdate'))}</div></div>
             ${docNoField}
         </div>
         <div class="field"><label>${escapeHtml(t('pur-has-vat'))}</label><div class="seg sm2" id="pur-hasvat"><div class="o ${st.hasVat ? 'on' : ''}" data-vat="1">${escapeHtml(t('pur-yes'))}</div><div class="o ${st.hasVat ? '' : 'on'}" data-vat="0">${escapeHtml(t('pur-no'))}</div></div></div>
         <div class="two">
-            <div class="field"><label>${escapeHtml(t('pur-pay-status'))}</label><div class="seg sm2" id="pur-pay"><div class="o ${st.paymentStatus === 'paid' ? 'on' : ''}" data-pay="paid">${escapeHtml(t('pur-pay-paid'))}</div><div class="o ${st.paymentStatus === 'unpaid' ? 'on' : ''}" data-pay="unpaid">${escapeHtml(t('pur-pay-ap'))}</div></div></div>
+            <div class="field"><label>${escapeHtml(formLabel(st, 'pur-pay-status'))}</label><div class="seg sm2" id="pur-pay"><div class="o ${st.paymentStatus === 'paid' ? 'on' : ''}" data-pay="paid">${escapeHtml(formLabel(st, 'pur-pay-paid'))}</div><div class="o ${st.paymentStatus === 'unpaid' ? 'on' : ''}" data-pay="unpaid">${escapeHtml(formLabel(st, 'pur-pay-ap'))}</div></div></div>
             <div class="field"><label>${escapeHtml(t('pur-currency'))}</label><div class="inp"><select class="fsel" id="pur-cur" data-fld="currency">${curOpts}</select></div></div>
         </div>
         <div class="${cls(st, 'fx')} ${nonThb ? '' : 'hide'}" id="f-fx"><label>${escapeHtml(t('pur-fx-rate'))}${req()}</label><div class="inp"><input class="fin tnum" type="number" data-fld="fxRate" value="${st.fxRate}" placeholder="36.5"></div><div class="et">${escapeHtml(t('pur-req-fx'))}</div></div>
@@ -107,7 +115,9 @@ export function infoCardHtml(st: FormState): string {
 export function validateInfo(st: FormState): MissingField[] {
     const miss: MissingField[] = [];
     if (!st.docDate.trim()) miss.push({ field: 'f-docdate', label: t('pur-doc-date') });
-    if (!st.supplierName.trim()) miss.push({ field: 'f-supplier', label: t('pur-supplier') });
+    if (inventoryForm(st)) return miss;
+    if (!st.supplierName.trim())
+        miss.push({ field: 'f-supplier', label: formLabel(st, 'pur-supplier') });
     if (st.branchType === 'branch' && !st.branchNo.trim())
         miss.push({ field: 'f-branchcode', label: t('pur-branch-code') });
     if (st.hasVat && !st.docNo.trim()) miss.push({ field: 'f-taxno', label: t('pur-tax-no') });
@@ -120,4 +130,12 @@ export function validateInfo(st: FormState): MissingField[] {
 export function markErrors(miss: MissingField[]): void {
     document.querySelectorAll('.pur .field.err').forEach((e) => e.classList.remove('err'));
     miss.forEach((m) => document.getElementById(m.field)?.classList.add('err'));
+}
+
+function inventoryInfo(st: FormState): string {
+    const label = (key: string) => escapeHtml(manualLabel(key, document.documentElement.lang));
+    return `<div class="card"><div class="hd">${escapeHtml(t('pur-doc-info'))}</div><div class="bd">
+        <div class="field"><label>${label('number')}</label><div class="inp ro"><input class="fin" readonly data-system-number value="${escapeHtml(st.systemNumber || '')}" placeholder="${st.numberPrefix} · ${label('autoNumber')}"></div></div>
+        <div class="field" id="f-docdate"><label>${label('date')} ${req()}</label><div class="inp"><input class="fin tnum" type="date" data-fld="docDate" value="${escapeHtml(st.docDate)}"></div></div>
+    </div></div>`;
 }

@@ -1,3 +1,4 @@
+import { manualLabel } from '../erp/manual-labels.js';
 // 商户采购 · 复核屏左栏(票图查看器 + 多文件相册 + 凭据卡)。从 purchase-form 抽出保 <500。
 // 查看器:拖拽平移 + 滚轮缩放 + 旋转/复位 + 实时百分比(原生 transform,不自造图片编辑器)。
 // 多文件 1/N:billUrls 相册(翻页 + 缩略图 + 加附件);鉴权 serving url 取 blob 显示,本地 blob 直接用。
@@ -35,18 +36,23 @@ export function leftColHtml(st: FormState): string {
         )
         .join('');
     return `<aside class="preview-pane" id="pane-doc">
-        <div class="card"><div class="hd">${escapeHtml(t('pur-bill'))}</div><div class="bd">
+        <div class="card"><div class="hd">${escapeHtml(st.direction && st.direction !== 'purchase' ? manualLabel('files', document.documentElement.lang) : t('pur-bill'))}</div><div class="bd">
             <div class="viewer" id="pur-viewer">${inner}
                 <span class="vhint">${escapeHtml(t('pur-viewer-hint'))}</span>${fileTag}
                 <div class="vtools"><span class="vzoom" id="pur-vzoom">100%</span><button data-z="in" title="+">${I_PLUS}</button><button data-z="out" title="-">${I_MINUS}</button><button data-z="rot" title="rotate">${I_ROT}</button><button data-z="reset" title="reset">${I_RESET}</button><button data-z="full" title="${escapeHtml(t('pur-viewer-full'))}">${I_FULL}</button></div>
             </div>
             <div class="thumbs">${thumbs}<div class="add" id="pur-add-file">${I_PLUS}</div></div>
         </div></div>
-        <div class="card"><div class="hd">${escapeHtml(t('pur-vouchers-hd'))}</div><div class="bd">
+        ${
+            st.direction && st.direction !== 'purchase'
+                ? ''
+                : `<div class="card"><div class="hd">${escapeHtml(t('pur-vouchers-hd'))}</div><div class="bd">
             <div class="hint">${escapeHtml(t('pur-sub-receipt-hint'))}</div>
             <button class="btn full ghost mt" id="pur-gen-receipt">+ ${escapeHtml(t('pur-gen-receipt'))}</button>
         </div></div>
-        <input type="file" id="pur-addfile-input" accept="image/*,application/pdf" multiple style="display:none">
+        `
+        }
+        <input type="file" id="pur-addfile-input" accept="image/*,application/pdf" ${st.direction ? '' : 'multiple'} style="display:none">
     </aside>`;
 }
 
@@ -68,11 +74,12 @@ export async function mountViewer(st: FormState, refresh: () => void): Promise<v
     });
     const addBtn = document.getElementById('pur-add-file');
     const addInput = document.getElementById('pur-addfile-input') as HTMLInputElement | null;
-    if (addBtn && addInput) addBtn.onclick = () => addInput.click();
-    if (addInput)
+    if (addBtn && addInput && !st.readonly) addBtn.onclick = () => addInput.click();
+    if (addInput && !st.readonly)
         addInput.onchange = () => {
             const files = addInput.files ? Array.from(addInput.files) : [];
             addInput.value = '';
+            if (st.direction && files.length) st.billUrls = [];
             files.forEach((f) => st.billUrls.push(URL.createObjectURL(f)));
             if (files.length) st.billIdx = st.billUrls.length - 1;
             refresh();

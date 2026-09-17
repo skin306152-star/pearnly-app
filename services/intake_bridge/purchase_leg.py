@@ -77,7 +77,7 @@ def book_from_history(
         calculated = compute_purchase_totals(draft["lines"])
         draft["rounding"] = str(Decimal(fields["total_amount"]) - calculated["grand_total"])
         draft["due_date"] = fields.get("due_date") or None
-    if source in {"erp_web", "line_erp"} and fields.get("manual_layout") != 1:
+    if source in {"erp_web", "line_erp"} and fields.get("manual_layout") not in (1, 2):
         from services.erp.invoice_amounts import purchase_lines
 
         draft["lines"], amounts = purchase_lines(fields)
@@ -89,6 +89,25 @@ def book_from_history(
             "vat_amount": str(amounts["vat"]),
             "grand_total": str(amounts["total"]),
         }
+    if source in {"erp_web", "line_erp"} and fields.get("manual_layout") == 2:
+        from services.erp.pos_form import calculate
+        from services.erp.internal_records import _decimal
+
+        calculated, lines, override = calculate(fields, _decimal)
+        form = fields.get("pos_form") or {}
+        draft.update(
+            lines=lines,
+            doc_kind=form.get("doc_kind", "purchase_invoice"),
+            currency=form.get("currency", "THB"),
+            fx_rate=form.get("fxRate") or 1,
+            has_vat=bool(form.get("hasVat")),
+            requester=form.get("requester") or "",
+            rounding="0",
+            price_mode="exclusive",
+        )
+        draft.pop("amount_override", None)
+        if override:
+            draft["amount_override"] = override
     if source in {"erp_web", "line_erp"}:
         for line, item in zip(draft.get("lines") or [], fields.get("items") or []):
             line["product_id"] = item.get("product_id")

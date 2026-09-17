@@ -38,6 +38,7 @@ def permission_codes(modules: Iterable[str]) -> list[str]:
     codes: set[str] = set()
     if PRODUCT in selected:
         codes.update(STOCKCARD_CODES[:1])
+        codes.add("sales.product.view")
     if PURCHASE in selected:
         codes.update(_PURCHASE_MEMBER_CODES)
         codes.add("intake.upload")

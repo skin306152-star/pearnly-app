@@ -77,3 +77,9 @@ coverage*
 htmlcov
 test_data_*
 static/companion
+
+# Local ERP acceptance harness and artifacts never ship.
+.local
+scripts/erp_internal_line_simulator.py
+scripts/erp_internal_line_simulator.html
+scripts/erp_internal_line_fixture.py

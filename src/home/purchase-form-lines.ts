@@ -1,3 +1,5 @@
+import { inventoryForm } from './purchase-form-profile.js';
+import { manualLabel } from '../erp/manual-labels.js';
 // 商户采购 · 复核屏明细卡(明细行 + 大类→小类联动 + 行折扣开关)+ 合计计算(价内外 + 手动改额)。
 // 从 purchase-form 抽出保 <500。computeForm 复用金标 purchase-calc(价内反算 net 后调金标 · 不动金标),
 // 手动改额时以票面四项(小计/折扣/VAT/合计)为准 · 一致性校验对齐后端 净+VAT+WHT=合计(±0.01)。
@@ -84,8 +86,7 @@ export function computeForm(st: FormState): FormTotals {
 // 一致性(对齐后端 override 校验):净 + VAT + WHT = 合计(容差 ±0.01)。
 export function overrideConsistent(st: FormState): boolean {
     const o = st.override;
-    const base = computePurchaseTotals(st.lines, {});
-    const lhs = num(o.subtotal) - num(o.discount) + num(o.vat) + num(base.wht_amount);
+    const lhs = num(o.subtotal) - num(o.discount) + num(o.vat);
     return Math.abs(lhs - num(o.grand)) <= 0.01;
 }
 
@@ -149,13 +150,15 @@ function whtRow(l: DocLine, i: number): string {
     </div>`;
 }
 
-function lineHtml(l: DocLine, i: number, cats: Category[]): string {
+function lineHtml(l: DocLine, i: number, cats: Category[], st: FormState): string {
+    const stock = inventoryForm(st);
+    const label = (key: string) => escapeHtml(manualLabel(key, document.documentElement.lang));
     const isSvc = l.item_type === 'service';
     // 商品行显示配 SKU 状态;服务行的 WHT 已移入下方 whtRow(此处不再重复标识)。
     const extra = isSvc
         ? ''
         : l.product_matched
-          ? `<span class="pill ok">${escapeHtml(t('pur-matched'))}</span> · <span class="link" data-stock="${i}">${escapeHtml(t('pur-stock-in'))} ✓</span>`
+          ? `<span class="pill ok">${escapeHtml(t('pur-matched'))}</span>${st.direction ? '' : ` · <span class="link" data-stock="${i}">${escapeHtml(t('pur-stock-in'))} ✓</span>`}`
           : `<span class="pill warn">${escapeHtml(t('pur-unmatched'))}</span> · <span class="link" data-match="${i}">${escapeHtml(t('pur-match'))}</span>`;
     const discOn = !!l.discountOn || Number(l.discount) > 0;
     const discRow = `<div class="swrow idisc" data-disc="${i}"><span class="sw ${discOn ? 'on' : ''}"></span> ${escapeHtml(t('pur-line-discount'))}${
@@ -165,20 +168,30 @@ function lineHtml(l: DocLine, i: number, cats: Category[]): string {
     }</div>`;
     return `<div class="item" data-line="${i}">
         <div class="irow1">
-            <div class="seg sm2"><div class="o ${isSvc ? '' : 'on'}" data-it="${i}:goods">${escapeHtml(t('pur-goods'))}</div><div class="o ${isSvc ? 'on' : ''}" data-it="${i}:service">${escapeHtml(t('pur-service'))}</div></div>
+            ${stock ? '' : `<div class="seg sm2"><div class="o ${isSvc ? '' : 'on'}" data-it="${i}:goods">${escapeHtml(t('pur-goods'))}</div><div class="o ${isSvc ? 'on' : ''}" data-it="${i}:service">${escapeHtml(t('pur-service'))}</div></div>`}
             <div class="iname"><input class="fin" data-fld="${i}:description" value="${escapeHtml(l.description)}" placeholder="${escapeHtml(t('pur-line-name'))}"></div>
             <span class="x" data-del="${i}">×</span>
         </div>
         <div class="igrid">
+            ${st.direction ? `<div class="f"><label>${escapeHtml(t('sx-p-f-barcode'))}</label><div class="inp sm"><input class="fin" readonly data-fld="${i}:barcode" value="${escapeHtml(l.barcode || '')}"></div></div>` : ''}
+            ${st.direction && !stock ? `<div class="f"><label>${label('unit')}</label><div class="inp sm"><input class="fin" data-fld="${i}:unit" value="${escapeHtml(l.unit || '')}"></div></div>` : ''}
             <div class="f"><label>${escapeHtml(t('pur-qty'))}</label><div class="inp sm"><input class="fin tnum" type="number" data-fld="${i}:qty" value="${l.qty}"></div></div>
-            <div class="f"><label>${escapeHtml(t('pur-price'))}</label><div class="inp sm"><input class="fin tnum" type="number" data-fld="${i}:unit_price" value="${l.unit_price}"></div></div>
-            <div class="f"><label>${escapeHtml(t('pur-cat-big'))}</label><div class="inp sm"><select class="fsel" data-fld="${i}:category_id">${bigCatOptions(cats, l.category_id)}</select></div></div>
-            <div class="f"><label>${escapeHtml(t('pur-cat-sub'))}</label><div class="inp sm"><select class="fsel" data-fld="${i}:subcategory_id">${subCatOptions(cats, l.category_id, l.subcategory_id)}</select></div></div>
-            <div class="f"><label>VAT</label><div class="inp sm"><select class="fsel" data-fld="${i}:vat_rate"><option value="0" ${l.vat_rate == 0 ? 'selected' : ''}>0%</option><option value="7" ${l.vat_rate == 7 ? 'selected' : ''}>7%</option></select></div></div>
+            <div class="f"><label>${stock ? label('cost') : escapeHtml(t('pur-price'))}</label><div class="inp sm"><input class="fin tnum" type="number" data-fld="${i}:unit_price" ${st.direction === 'out' ? 'readonly' : ''} value="${st.direction === 'out' && (!st.systemNumber || st.unvalued) ? '' : l.unit_price}" placeholder="${st.direction === 'out' ? label(st.systemNumber ? 'unknownCost' : 'inventoryCost') : ''}"></div></div>
+            ${
+                stock
+                    ? `<div class="f"><label>${label('unit')}</label><div class="inp sm"><input class="fin" data-fld="${i}:unit" value="${escapeHtml(l.unit || '')}"></div></div>`
+                    : `${
+                          st.direction
+                              ? ''
+                              : `<div class="f"><label>${escapeHtml(t('pur-cat-big'))}</label><div class="inp sm"><select class="fsel" data-fld="${i}:category_id">${bigCatOptions(cats, l.category_id)}</select></div></div>
+            <div class="f"><label>${escapeHtml(t('pur-cat-sub'))}</label><div class="inp sm"><select class="fsel" data-fld="${i}:subcategory_id">${subCatOptions(cats, l.category_id, l.subcategory_id)}</select></div></div>`
+                      }
+            <div class="f"><label>VAT</label><div class="inp sm"><select class="fsel" data-fld="${i}:vat_rate"><option value="0" ${l.vat_rate == 0 ? 'selected' : ''}>0%</option><option value="7" ${l.vat_rate == 7 ? 'selected' : ''}>7%</option></select></div></div>`
+            }
         </div>
-        <div class="iextra"><span data-lt="${i}">${escapeHtml(t('pur-line-total'))} ${BAHT}${fmtMoney(lineTotal(l))}</span>${extra ? ' · ' + extra : ''}</div>
-        ${whtRow(l, i)}
-        ${discRow}
+        <div class="iextra"><span data-lt="${i}">${escapeHtml(t('pur-line-total'))} ${st.direction === 'out' && (!st.systemNumber || st.unvalued) ? label(st.systemNumber ? 'unknownCost' : 'inventoryCost') : BAHT + fmtMoney(lineTotal(l))}</span>${extra ? ' · ' + extra : ''}</div>
+        ${stock ? '' : whtRow(l, i)}
+        ${stock ? '' : discRow}
     </div>`;
 }
 
@@ -187,7 +200,7 @@ export function linesHtml(st: FormState, cats: Category[]): string {
     const add = st.mergeMode
         ? ''
         : `<button class="addline" id="pur-add-line">+ ${escapeHtml(t('pur-add-line'))}</button>`;
-    return st.lines.map((l, i) => lineHtml(l, i, cats)).join('') + add;
+    return st.lines.map((l, i) => lineHtml(l, i, cats, st)).join('') + add;
 }
 
 // 明细绑定:数字/文本即时算 · 大类改→小类联动重渲 · 商品/服务切 WHT · 加/删/折扣开关重渲。
@@ -196,26 +209,31 @@ let LCATS: Category[] = [];
 let LWHT = 3;
 let LVAT = 7;
 let LREFRESH: () => void = () => {};
+let LBOUND: () => void = () => {};
 
 export function mountLines(
     st: FormState,
     cats: Category[],
     vatDefault: number,
     whtDefault: number,
-    refreshTotals: () => void
+    refreshTotals: () => void,
+    afterBind: () => void = () => {}
 ): void {
     LST = st;
     LCATS = cats;
-    LVAT = vatDefault;
+    LVAT = inventoryForm(st) ? 0 : vatDefault;
     LWHT = whtDefault;
     LREFRESH = refreshTotals;
+    LBOUND = afterBind;
     bindLines();
+    LBOUND();
 }
 
-function reLines(): void {
+export function reLines(): void {
     const box = document.getElementById('pur-lines');
     if (box && LST) box.innerHTML = linesHtml(LST, LCATS);
     bindLines();
+    LBOUND();
     LREFRESH();
 }
 
@@ -254,7 +272,7 @@ function bindLines(): void {
             }
             if (key === 'wht_rate') markWhtChips(Number(iS));
             const lt = document.querySelector<HTMLElement>(`[data-lt="${iS}"]`);
-            if (lt)
+            if (lt && !(LST!.direction === 'out' && (!LST!.systemNumber || LST!.unvalued)))
                 lt.textContent =
                     t('pur-line-total') + ' ' + BAHT + fmtMoney(lineTotal(LST!.lines[Number(iS)]));
             LREFRESH();
@@ -306,8 +324,8 @@ function bindLines(): void {
             const i = Number(el.dataset.match);
             window.openPurchaseMatch?.(LST!.lines[i], (res) => {
                 const r = res as { product_id?: string };
-                LST!.lines[i].product_id = r.product_id || 'matched';
-                LST!.lines[i].product_matched = true;
+                LST!.lines[i].product_id = r.product_id || null;
+                LST!.lines[i].product_matched = !!r.product_id;
                 reLines();
             });
         };

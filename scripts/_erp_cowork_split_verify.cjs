@@ -29,7 +29,7 @@ const DESKTOP = { width: 1280, height: 900 };
 const MOBILE = { width: 390, height: 844 };
 
 const COWORK_MENU = ['首页', 'Pearnly Cowork', '主数据', '使用教程'];
-const ERP_MENU = ['首页', '商品', '采购系统', '销售系统', '主数据'];
+const ERP_MENU = ['首页', '商品与库存', '采购系统', '销售系统', '主数据'];
 
 // 桩的账号/账套内容(验收对象是导航壳,不是数据;但主体列表要给几个可搜的,才会触发内部搜索过滤)。
 const ME = {

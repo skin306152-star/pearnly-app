@@ -146,8 +146,8 @@ async function readTwoRulers(page) {
  *
  * 不能直接打 8 位数字:段的顺序跟浏览器 locale 走,同一串 '12312027' 在 en-US 下是 12/31/2027,
  * 在 ISO 那一档里年份段会一口气吃掉六位,留下 123120-02-07 —— 断言于是在验 locale,不在验产品。
- * 顺序现场从 Intl.DateTimeFormat 取,段间按 ArrowRight(那不是可打印键,楔子会跳过它,
- * 这一串在楔子眼里仍是一发)。
+ * 顺序现场从 Intl.DateTimeFormat 取。Chromium 输入满两位月/日会自动移到下一段,
+ * 每段输入前用方向键重新定位,避免再按一次右键跳过日期段。仍然只发真实键盘事件。
  */
 async function typeDateByHand(page, iso, delayMs) {
     const order = await page.evaluate(() =>
@@ -158,8 +158,9 @@ async function typeDateByHand(page, iso, delayMs) {
     );
     const seg = { year: iso.slice(0, 4), month: iso.slice(5, 7), day: iso.slice(8, 10) };
     for (let i = 0; i < order.length; i++) {
+        for (let n = 0; n < order.length; n++) await page.keyboard.press('ArrowLeft');
+        for (let n = 0; n < i; n++) await page.keyboard.press('ArrowRight');
         await page.keyboard.type(seg[order[i]], { delay: delayMs });
-        if (i < order.length - 1) await page.keyboard.press('ArrowRight');
     }
 }
 

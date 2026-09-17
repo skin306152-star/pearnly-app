@@ -109,6 +109,7 @@ _ENTRY_ASSETS = {
         "/static/dms-booking-edit/dms-booking-edit.js",
     ),
     "static/erp-line-intake/index.html": (
+        "/static/i18n-data.js",
         "/static/dist/erp-manual-document.css",
         "/static/pearnly-ui.css",
         "/static/line-intake-review/batch-review.css",

@@ -9,7 +9,7 @@
     "afterScan": [
       {
         "product": "p-yog",
-        "label": "酸奶杯",
+        "label": "โยเกิร์ต / 酸奶杯",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -27,7 +27,7 @@
     "afterReselect": [
       {
         "product": "p-yog",
-        "label": "酸奶杯",
+        "label": "โยเกิร์ต / 酸奶杯",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -58,7 +58,7 @@
     ]
   },
   "gunFromDateField": {
-    "ok": false,
+    "ok": true,
     "focusDate": {
       "k": "expiry_date",
       "type": "date"
@@ -74,7 +74,7 @@
     "before": [
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -92,7 +92,7 @@
     "afterGun": [
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -100,7 +100,7 @@
       },
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -115,7 +115,7 @@
     "afterSlow": [
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -123,7 +123,7 @@
       },
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -131,7 +131,7 @@
       },
       {
         "product": "p-cola",
-        "label": "可乐 325ml",
+        "label": "โค้ก 325ml / 可乐 325ml",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -141,15 +141,15 @@
     "afterHuman": [
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "",
-        "expiry": "",
+        "expiry": "2027-05-20",
         "batchCellShown": true
       },
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -157,7 +157,7 @@
       },
       {
         "product": "p-cola",
-        "label": "可乐 325ml",
+        "label": "โค้ก 325ml / 可乐 325ml",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -167,15 +167,15 @@
     "afterBatchField": [
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "L-2026",
-        "expiry": "",
+        "expiry": "2027-05-20",
         "batchCellShown": true
       },
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -183,7 +183,7 @@
       },
       {
         "product": "p-cola",
-        "label": "可乐 325ml",
+        "label": "โค้ก 325ml / 可乐 325ml",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -191,7 +191,7 @@
       },
       {
         "product": "p-yog",
-        "label": "酸奶杯",
+        "label": "โยเกิร์ต / 酸奶杯",
         "qty": "1",
         "batchNo": "",
         "expiry": "",
@@ -202,7 +202,7 @@
   "failuresSurvive": {
     "ok": true,
     "msg": {
-      "text": "2 件没加进这张收货单\n知道了\n扫到 9999999999992,但这个条码还没建成商品\n用这个码建商品\n扫到 9999999999991,但这个条码还没建成商品\n用这个码建商品\n可乐 325ml 数量 +1",
+      "text": "2 件没加进这张收货单\n知道了\n扫到 9999999999992,但这个条码还没建成商品\n用这个码建商品\n扫到 9999999999991,但这个条码还没建成商品\n用这个码建商品\nโค้ก 325ml / 可乐 325ml 数量 +1",
       "tone": "inv-scan-msg warn",
       "codes": [
         "9999999999992",
@@ -210,13 +210,13 @@
       ],
       "lines": 4
     },
-    "wantHit": "可乐 325ml 数量 +1",
+    "wantHit": "โค้ก 325ml / 可乐 325ml 数量 +1",
     "wantCount": "2 件没加进这张收货单",
     "afterFix": {
       "codes": [
         "9999999999992"
       ],
-      "text": "1 件没加进这张收货单\n知道了\n扫到 9999999999992,但这个条码还没建成商品\n用这个码建商品\n已加入 酸奶杯"
+      "text": "1 件没加进这张收货单\n知道了\n扫到 9999999999992,但这个条码还没建成商品\n用这个码建商品\n已加入 โยเกิร์ต / 酸奶杯"
     }
   },
   "badExpiryBlocked": {
@@ -225,7 +225,7 @@
     "beforeFill": [
       {
         "product": "p-milk",
-        "label": "鲜奶 1L",
+        "label": "นมสด 1L / 鲜奶 1L",
         "qty": "1",
         "batchNo": "",
         "expiry": "",

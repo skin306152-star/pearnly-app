@@ -36,7 +36,7 @@
     "counted": true,
     "nagged": false,
     "err": false,
-    "text": "可乐 325ml 数量 +1",
+    "text": "โค้ก 325ml / Coke 325ml / 可乐 325ml 数量 +1",
     "lookups": [
       "8850999320014",
       "8850999320014"
@@ -47,7 +47,7 @@
     "first": true,
     "appeared": 1,
     "vanished": 0,
-    "samples": 146,
+    "samples": 145,
     "rearms": 2,
     "qty": "3",
     "rows": 2,
@@ -148,12 +148,12 @@
     "msg": {
       "found": true,
       "w": 300,
-      "h": 17,
+      "h": 18,
       "display": "flex",
       "visibility": "visible",
       "opacity": "1",
       "inView": true,
-      "text": "可乐 325ml 数量 +1"
+      "text": "โค้ก 325ml / Coke 325ml / 可乐 325ml 数量 +1"
     }
   },
   "barcodeAsCostStopped": {

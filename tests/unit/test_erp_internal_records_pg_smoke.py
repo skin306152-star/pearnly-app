@@ -151,6 +151,49 @@ class InternalRecordsPgSmoke(unittest.TestCase):
                 self.assertEqual(row["vat_amount"], Decimal("14"))
                 self.assertEqual(row["grand_total"], Decimal("214"))
 
+    def test_pos_wht_settlement_matches_native_receivable_for_web_and_line(self):
+        from decimal import Decimal
+
+        for source in ("erp_web", "line_erp"):
+            for direction in ("purchase", "sales"):
+                for status in ("paid", "unpaid"):
+                    with self.subTest(source=source, direction=direction, status=status):
+                        hid, fields = self.draft(
+                            direction,
+                            source,
+                            manual_layout=2,
+                            price_mode="exclusive",
+                            pos_form={"paymentStatus": status, "hasVat": True},
+                            items=[
+                                {
+                                    "name": "WHT settlement " + source + direction + status,
+                                    "qty": "1",
+                                    "price": "100",
+                                    "vat_rate": "7",
+                                    "wht_rate": "5",
+                                    "posting_kind": "service",
+                                }
+                            ],
+                        )
+                        self.assertEqual(Decimal(fields["total_amount"]), Decimal("107"))
+                        self.assertEqual(Decimal(fields["net_payable"]), Decimal("102"))
+                        self.confirm(hid, direction)
+                        table = "purchase_docs" if direction == "purchase" else "sales_documents"
+                        due_col = "net_payable" if direction == "purchase" else "grand_total"
+                        self.cur.execute(
+                            f"SELECT {due_col} AS due, vat_amount, wht_amount, paid_amount, "
+                            f"payment_status FROM {table} WHERE ocr_history_id=%s",
+                            (hid,),
+                        )
+                        row = self.cur.fetchone()
+                        self.assertEqual(row["due"], Decimal("102"))
+                        self.assertEqual(row["vat_amount"], Decimal("7"))
+                        self.assertEqual(row["wht_amount"], Decimal("5"))
+                        self.assertEqual(
+                            row["paid_amount"], Decimal("102" if status == "paid" else "0")
+                        )
+                        self.assertEqual(row["payment_status"], status)
+
     def test_manual_workspace_switch_is_atomic_and_scoped(self):
         self.cur.execute(
             "INSERT INTO workspace_clients(user_id,tenant_id,name,tax_id) VALUES(%s,%s,'Other company','0105558888888') RETURNING id",

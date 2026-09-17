@@ -143,7 +143,7 @@ def issue_from_history(cur, *, tenant_id, workspace_client_id, created_by, field
             subtotal=calc["subtotal"],
             vat_amount=calc["vat_amount"],
             wht_amount=calc["wht_amount"],
-            grand_total=calc["grand_total"],
+            grand_total=calc["net_payable"],  # Native sales total is after WHT.
             header_discount_amount=calc["discount_total"],
             vat_rate=(calc["vat_amount"] * 100 / calc["subtotal"] if calc["subtotal"] else 0),
         )

@@ -32,7 +32,7 @@ def payment(fields, direction):
             if fields.get("payment_received") not in (None, "")
             else amount("cash_amount") - amount("change_amount")
         )
-    total = amount("total_amount")
+    total = amount("net_payable" if fields.get("manual_layout") == 2 else "total_amount")
     if paid < 0 or paid > total:
         raise HTTPException(422, detail="erp.invalid_amount")
     return {

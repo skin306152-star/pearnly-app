@@ -54,6 +54,8 @@ const CHECKS = [
         key: '小固定max-width(查是否@media)',
         re: /max-width:\s*[1-9]\d{2}px|(?<![-\w])(?:max-)?width:\s*min\(\s*(?:100%\s*,\s*[1-9]\d{2}px|[1-9]\d{2}px\s*,\s*100%)\s*\)/gi,
         skipLineRe: /@media/i,
+        // 容器查询也是响应式断点；只去掉查询头，同一行内的固定宽度仍要检查。
+        stripQueryRe: /@container\b[^{}]*\{/gi,
     },
     // `.drawer\b` 会误匹配 `.drawer-decision-zone` 等子元素选择器(已存在抽屉的内部结构,
     // 非新弹窗)→ 收紧成"drawer 作为完整类名"(后面不接 - 或字母数字),只抓真正的抽屉容器。
@@ -158,7 +160,8 @@ for (const f of files) {
         } else {
             lines.forEach((ln, i) => {
                 if (c.skipLineRe && c.skipLineRe.test(ln)) return;
-                const m = ln.match(c.re);
+                const checked = c.stripQueryRe ? ln.replace(c.stripQueryRe, '{') : ln;
+                const m = checked.match(c.re);
                 if (m) {
                     cnt += m.length;
                     if (samples.length < 2) samples.push(i + 1 + ': ' + ln.trim().slice(0, 90));

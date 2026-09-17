@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 610 个源文件全扫
+# UI 设计合规扫描报告 · 638 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 2(2 文件)
@@ -81,8 +81,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 192(25 文件)
     96  static/i18n-data.js
-        └ 1396: 'billing-accuracy-good': '✅ 准',
-        └ 1397: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1505: 'billing-accuracy-good': '✅ 准',
+        └ 1506: 'billing-accuracy-fair': '⚠ 一般',
     35  static/erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -90,8 +90,8 @@
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
      8  static/admin/admin-i18n.js
-        └ 432: 'tn-status-overdraft': '⚠ 透支',
-        └ 474: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 446: 'tn-status-overdraft': '⚠ 透支',
+        └ 488: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      5  static/admin/admin.js
         └ 1938: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
         └ 2005: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
@@ -107,14 +107,14 @@
         └ 8: * ⚠ 覆盖 NAV-IA 旧视觉铁律「主按钮纯黑 #111111」(2026-05-29 Zihao 改蓝 · 已同步改铁律)。
         └ 141: /* ── 禁用态(:disabled 原生 + .is-disabled 类)· 置灰 + 🚫 · hover 无反馈 ── */
      2  static/landing/landing.js
-        └ 140: <div class="check-heart" aria-hidden="true">♥</div>
-        └ 242: <div class="copyright">© 2026 PEARNLY Co., Ltd. All rights reserved.</div>
+        └ 139: <div class="check-heart" aria-hidden="true">♥</div>
+        └ 241: <div class="copyright">© 2026 PEARNLY Co., Ltd. All rights reserved.</div>
      2  static/pos/pos-restaurant-ops.js
         └ 85: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
      1  src/home/app-shell-sidebar-html.ts
-        └ 378: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
+        └ 393: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src/home/dms-intake-invoice-submit.ts
-        └ 120: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
+        └ 143: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src/home/erp-log-card.ts
         └ 160: statusIcon = '⏭';
      1  src/home/erp-log-detail.ts
@@ -140,7 +140,7 @@
      1  static/home-37-html-inline.css
         └ 153: /* v102 · 统一「需复核」⚠ icon · 替代原「缺金额 → 补金额」黄按钮 */
 
-## 小固定max-width(查是否@media) — 命中 147(80 文件)
+## 小固定max-width(查是否@media) — 命中 153(85 文件)
      8  src/home/sales-detail.ts
         └ 116: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
         └ 161: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
@@ -163,11 +163,11 @@
         └ 245: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
         └ 265: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      3  src/home/purchase-modals.ts
-        └ 16: .purm{background:var(--card);border-radius:16px;width:100%;max-width:440px;box-shadow:var(
-        └ 17: .purm.w480{max-width:480px;} .purm.w560{max-width:560px;}
+        └ 19: .purm{background:var(--card);border-radius:16px;width:100%;max-width:440px;box-shadow:var(
+        └ 20: .purm.w480{max-width:480px;} .purm.w560{max-width:560px;}
      3  src/home/sales-products.ts
         └ 153: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
-        └ 316: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 323: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      3  src/home/sales-settings.ts
         └ 75: mask().innerHTML = `<div class="modal" role="dialog" style="max-width:720px">
         └ 222: mask().innerHTML = `<div class="modal" role="dialog" style="max-width:560px"><div class="m
@@ -205,8 +205,8 @@
         └ 37: .onb-pane{width:100%;max-width:min(600px,100%);}
         └ 39: .onb-steps{display:flex;align-items:center;margin:6px auto 30px;max-width:min(440px,100%);
      2  src/home/sales-wizard-steps.ts
-        └ 253: <div class="sw-row" style="max-width:580px">
-        └ 256: ${st.paper !== 'pos' ? `<div class="sw-field" style="max-width:580px;margin-top:4px"><labe
+        └ 246: <div class="sw-row" style="max-width:580px">
+        └ 249: ${st.paper !== 'pos' ? `<div class="sw-field" style="max-width:580px;margin-top:4px"><labe
      2  static/ai/ai-client.css
         └ 417: max-width: min(420px, 100%);
         └ 423: max-width: min(560px, 100%);
@@ -243,12 +243,17 @@
      2  static/recon-mapping.js
         └ 127: '.rmap-box{background:#fff;border-radius:12px;max-width:920px;width:100%;max-height:88vh;d
         └ 134: '.rmap-tbl th,.rmap-tbl td{border:1px solid #e8e8e3;padding:5px 8px;text-align:left;white-
+     2  static/stocktake/stocktake.css
+        └ 95: max-width: 520px;
+        └ 122: max-width: 540px;
      1  src/home/bank-client-picker-html.ts
         └ 12: <div class="modal" style="max-width: 420px;">
      1  src/home/company-profile.ts
         └ 17: .cprof{color:var(--ink);font-size:13.5px;max-width:min(760px,100%);}
      1  src/home/core.ts
         └ 185: '<div style="background:var(--card);border-radius:14px;padding:32px 24px 24px;max-width:36
+     1  src/home/erp-stock-documents.css
+        └ 70: width: min(100%, 480px);
      1  src/home/erp-team.css
         └ 216: width: min(680px, 100%);
      1  src/home/line-email-modal.ts
@@ -265,6 +270,8 @@
         └ 42: .pur.cap .rhint{font-size:12.5px;color:var(--ink2);max-width:320px;line-height:1.6;}
      1  src/home/sales-wizard.ts
         └ 319: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+     1  src/home/stock-card-reference.css
+        └ 126: width: min(420px, 100%);
      1  src/home/workspace-gate-html.ts
         └ 106: .wsg-empty-d{color:var(--ink2);font-size:13px;line-height:1.7;max-width:min(380px,100%);ma
      1  static/ai/ai-client-empty.css
@@ -279,6 +286,10 @@
         └ 521: max-width: min(380px, 100%);
      1  static/ai/ai-steward-attach.css
         └ 175: max-width: 220px;
+     1  static/cowork-connect/index.html
+        └ 17: max-width: 440px;
+     1  static/cowork-live/style.css
+        └ 8: max-width: 860px;
      1  static/dms/dms-billing.css
         └ 9: max-width: min(900px, 100%);
      1  static/dms/dms-connect.js
@@ -345,7 +356,7 @@
         └ 161: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
      3  src/home/sales-products.ts
         └ 153: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
-        └ 316: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 323: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      3  src/home/sales-settings.ts
         └ 75: mask().innerHTML = `<div class="modal" role="dialog" style="max-width:720px">
         └ 222: mask().innerHTML = `<div class="modal" role="dialog" style="max-width:560px"><div class="m
@@ -379,7 +390,7 @@
      1  src/home/sales-detail.ts
         └ 437: : confirm(t('sx-del-draft-confirm'));
      1  src/home/sales-products.ts
-        └ 297: } else if (!confirm(t('sx-p-del-confirm'))) return;
+        └ 304: } else if (!confirm(t('sx-p-del-confirm'))) return;
      1  src/home/session-heartbeat.ts
         └ 52: alert('Session expired');
 
@@ -412,11 +423,11 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static/i18n-data.js
-        └ 1203: 'time-min-ago-suffix': ' 分钟前',
-        └ 1204: 'time-hour-ago-suffix': ' 小时前',
+        └ 1312: 'time-min-ago-suffix': ' 分钟前',
+        └ 1313: 'time-hour-ago-suffix': ' 小时前',
      4  static/admin/admin-i18n.js
-        └ 556: 'time-hours-ago': '{n} 小时前',
-        └ 557: 'time-days-ago': '{n} 天前',
+        └ 570: 'time-hours-ago': '{n} 小时前',
+        └ 571: 'time-days-ago': '{n} 天前',
 
 ## table-align-right — 命中 21(13 文件)
 > DESIGN_SYSTEM §21 表格对齐规范:表头居中、短内容格居中、长文本格靠左,禁止 th/td 右对齐

@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from services.erp import line_target_projection, target_catalog_evidence
-from services.erp.express_target_projection import (
+from services.erp.express_account_identity import (
     normalize_express_account_key,
     reported_account_set_roots,
 )

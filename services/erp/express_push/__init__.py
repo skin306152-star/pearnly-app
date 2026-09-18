@@ -18,7 +18,7 @@ import ntpath
 import os
 from typing import Any, Dict, Optional
 
-from services.erp.express_target_projection import reported_account_set_roots
+from services.erp.express_account_identity import reported_account_set_roots
 
 
 def express_push_enabled() -> bool:

@@ -151,6 +151,55 @@ def _has_party_identity(fields: dict) -> bool:
     )
 
 
+def _subject_of(plan: dict) -> dict:
+    subject = plan.get("subject")
+    return subject if isinstance(subject, dict) else {}
+
+
+def _subject_name(plan: dict) -> str:
+    """公司名归一(大小写/空白折叠)· 同名 = 同一家公司,用于本批内归组。"""
+    return " ".join(str(_subject_of(plan).get("name") or "").casefold().split())
+
+
+def _subject_tax(plan: dict) -> str:
+    return str(_subject_of(plan).get("tax_id") or "")
+
+
+def _same_company(left: str, right: str) -> bool:
+    """税号相同、或任一方没读到(税号读不出来的页)时视作同一家公司。
+
+    两家真不同的公司各有非空且不同的税号 → 不收拢(该分开建就分开建)。
+    """
+    return left == right or not left or not right
+
+
+def _canonical_create_plans(plans: list) -> dict[int, int]:
+    """本批 create 计划按公司名归组 → {同组计划序号: 组内规范计划序号}。
+
+    同一份 PDF 里,同一家公司的税号有可能某页读得出来、某页读不出来。旧行为按
+    ("tax")/("name") 两个不同身份键各建一个账套,同一家公司于是出现两个账套;下次上传时
+    名字匹配到两个 → 整批 409 workspace_ambiguous。这里让同组统一用规范计划
+    (优先带税号的那个)的建账结果。
+    """
+    groups: dict[str, list[int]] = {}
+    for index, plan in enumerate(plans):
+        if not isinstance(plan, dict) or plan.get("action") != "create":
+            continue
+        name = _subject_name(plan)
+        if name:
+            groups.setdefault(name, []).append(index)
+    followers: dict[int, int] = {}
+    for indexes in groups.values():
+        with_tax = [index for index in indexes if _subject_tax(plans[index])]
+        head = with_tax[0] if with_tax else indexes[0]
+        for index in indexes:
+            if index == head:
+                continue
+            if _same_company(_subject_tax(plans[index]), _subject_tax(plans[head])):
+                followers[index] = head
+    return followers
+
+
 def resolve_batch(
     assignments: list[tuple[dict, str | None]],
     user: dict,
@@ -190,29 +239,47 @@ def resolve_batch(
     decisions: list[dict | None] = []
     created_ids: list[int] = []
     missing_cache: dict[tuple[str, str], dict] = {}
+    by_name: dict[str, dict] = {}
+    canonical_create = _canonical_create_plans(plans)
+
+    def _materialize(plan: dict) -> dict:
+        decision = document_assignment.materialize_assignment(
+            plan,
+            str(user["id"]),
+            _tid(user),
+            authorize_workspace=authorize,
+        )
+        if plan.get("action") == "create":
+            name = _subject_name(plan)
+            tax_id = _subject_tax(plan)
+            missing_cache[("tax", tax_id) if tax_id else ("name", name)] = decision
+            if name:
+                by_name.setdefault(name, decision)
+        if decision.get("action") == "created":
+            created_ids.append(int(decision["workspace_client_id"]))
+            _log_created(user, decision, source, str(plan.get("direction") or ""))
+        return decision
+
     try:
-        for plan in plans:
+        for index, plan in enumerate(plans):
             if plan is None:
                 decisions.append(None)
                 continue
-            subject = plan.get("subject") or {}
-            tax_id = str(subject.get("tax_id") or "")
-            normalized_name = " ".join(str(subject.get("name") or "").casefold().split())
+            tax_id = _subject_tax(plan)
+            normalized_name = _subject_name(plan)
             cache_key = ("tax", tax_id) if tax_id else ("name", normalized_name)
-            if plan.get("action") == "create" and cache_key in missing_cache:
+            if plan.get("action") != "create":
+                decision = _materialize(plan)
+            elif cache_key in missing_cache:
                 decision = missing_cache[cache_key]
             else:
-                decision = document_assignment.materialize_assignment(
-                    plan,
-                    str(user["id"]),
-                    _tid(user),
-                    authorize_workspace=authorize,
-                )
-                if plan.get("action") == "create":
+                head_index = canonical_create.get(index)
+                if head_index is None:
+                    decision = _materialize(plan)
+                else:
+                    # 同名同公司:复用本批已定下的那个账套,不再建第二个
+                    decision = dict(by_name.get(normalized_name) or _materialize(plans[head_index]))
                     missing_cache[cache_key] = decision
-                if decision.get("action") == "created":
-                    created_ids.append(int(decision["workspace_client_id"]))
-                    _log_created(user, decision, source, str(plan.get("direction") or ""))
             decisions.append(decision)
     except Exception:
         _archive_empty_created(user, created_ids)

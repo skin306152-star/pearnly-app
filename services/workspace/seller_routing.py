@@ -148,6 +148,13 @@ def _decide(rows: List[Dict[str, Any]], source: str) -> Optional[Dict[str, Any]]
     if not rows:
         return None
     if len(rows) > 1:
+        # 同名/同税号命中多个账套 → 无法自动判定归属。留日志便于排查是哪几个账套打架
+        # (OCR 读不到税号时会退到名字匹配,重复账套就是在这里暴露的)。
+        logger.warning(
+            "workspace match ambiguous · source=%s candidates=%s",
+            source,
+            [(int(row["id"]), str(row.get("name") or "")[:60]) for row in rows],
+        )
         return {
             "action": "multi",
             "workspace_client_id": None,

@@ -2220,6 +2220,11 @@ window.I18N = {
         'err.ocr.engine_not_configured': '识别服务暂不可用',
         'err.ocr.plan_not_supported': '当前套餐不支持',
         'err.ocr.not_invoice': '这不像发票 · 请重选文件',
+        'err.ocr.workspace_ambiguous': '这张票的公司匹配到多个账套 · 请先合并或停用重复账套',
+        'err.ocr.workspace_subject_missing': '票面读不到公司名称 · 无法归属账套 · 请在识别记录里手动指定',
+        'err.ocr.direction_required': '无法判定这张票是进项还是销项 · 请先选择方向',
+        'err.ocr.workspace_lookup_failed': '查询账套失败 · 请稍后重试',
+        'err.ocr.workspace_create_failed': '账套创建失败 · 请稍后重试',
         'err.export.empty_records': '没有可导出的记录',
         'err.export.template_locked': '此模板需 Plus 套餐',
         'err.export.build_failed': 'Excel 生成失败',
@@ -7571,6 +7576,14 @@ window.I18N = {
         'err.ocr.engine_not_configured': 'Service temporarily unavailable',
         'err.ocr.plan_not_supported': 'Not supported on your plan',
         'err.ocr.not_invoice': 'This doesn\'t look like an invoice · please re-select',
+        'err.ocr.workspace_ambiguous':
+            'This invoice company matches more than one account set · merge or deactivate the duplicate',
+        'err.ocr.workspace_subject_missing':
+            'Company name not readable · cannot assign an account set · set it manually in the record',
+        'err.ocr.direction_required':
+            'Cannot tell whether this is a purchase or a sale · choose the direction first',
+        'err.ocr.workspace_lookup_failed': 'Account set lookup failed · please retry',
+        'err.ocr.workspace_create_failed': 'Failed to create the account set · please retry',
         'err.export.empty_records': 'No records',
         'err.export.template_locked': 'Requires Plus',
         'err.export.build_failed': 'Build failed',
@@ -12898,6 +12911,14 @@ window.I18N = {
         'err.ocr.engine_not_configured': 'บริการไม่พร้อมใช้งาน',
         'err.ocr.plan_not_supported': 'แพ็กเกจไม่รองรับ',
         'err.ocr.not_invoice': 'ไฟล์นี้ไม่ใช่ใบกำกับภาษี · กรุณาเลือกใหม่',
+        'err.ocr.workspace_ambiguous':
+            'บริษัทในใบนี้ตรงกับชุดบัญชีมากกว่าหนึ่ง · กรุณารวมหรือปิดชุดบัญชีที่ซ้ำ',
+        'err.ocr.workspace_subject_missing':
+            'อ่านชื่อบริษัทไม่ได้ · ระบุชุดบัญชีไม่ได้ · กรุณากำหนดเองในรายการ',
+        'err.ocr.direction_required':
+            'ตัดสินไม่ได้ว่าเป็นรายจ่ายหรือรายรับ · กรุณาเลือกทิศทางก่อน',
+        'err.ocr.workspace_lookup_failed': 'ค้นหาชุดบัญชีไม่สำเร็จ · กรุณาลองใหม่',
+        'err.ocr.workspace_create_failed': 'สร้างชุดบัญชีไม่สำเร็จ · กรุณาลองใหม่',
         'err.export.empty_records': 'ไม่มีข้อมูล',
         'err.export.template_locked': 'ต้อง Plus',
         'err.export.build_failed': 'สร้างไม่สำเร็จ',
@@ -18217,6 +18238,13 @@ window.I18N = {
         'err.ocr.engine_not_configured': 'サービス一時利用不可',
         'err.ocr.plan_not_supported': 'プラン非対応',
         'err.ocr.not_invoice': 'これは請求書ではないようです · 再選択してください',
+        'err.ocr.workspace_ambiguous':
+            'この請求書の会社が複数の帳簿に一致しました · 重複帳簿を統合または無効化してください',
+        'err.ocr.workspace_subject_missing':
+            '会社名を読み取れません · 帳簿を特定できません · 記録で手動指定してください',
+        'err.ocr.direction_required': '仕入か売上か判定できません · 先に区分を選択してください',
+        'err.ocr.workspace_lookup_failed': '帳簿の検索に失敗しました · 後ほど再試行してください',
+        'err.ocr.workspace_create_failed': '帳簿の作成に失敗しました · 後ほど再試行してください',
         'err.export.empty_records': 'データなし',
         'err.export.template_locked': 'Plus 必要',
         'err.export.build_failed': '生成失敗',

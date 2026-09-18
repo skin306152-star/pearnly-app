@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-17 21:50（UTC+7）。状态：**Express账套"数据目录↔程序目录"配对修复已发布（`23fd23d127aa`）。Web/Worker Ready、各100%流量，正式域名请求命中新 revision；真机推送验收待用户确认。**
+更新时间：2026-09-18 14:25（UTC+7）。状态：**OCR重复账套修复与 express_push 循环import修复已发布（`7bc387048726`）。Web/Worker Ready、各100%流量，正式域名请求命中新 revision；商户端推送与真机验收待用户确认。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -28,9 +28,14 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`23fd23d127aa9172c95dafe741aae8455db4a7c8`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:0223ac0087fbfa0f62f435f2e000e538afc300a34cf337b525629e3e6f8ec813`。
-- Web `pearnly-web-23fd23d127aa-s3`、Worker `pearnly-worker-23fd23d127aa-s3`，Ready、各100%流量，同一不可变digest。
+- 完整 SHA：`7bc3870487263009722297cf4ec327f3c96ba715`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:8d05314bd11a574d5e80d1b5e3e58a8186cf9e10f82540cbbf80f863f3dbac11`。
+- Web `pearnly-web-7bc387048726-s3`、Worker `pearnly-worker-7bc387048726-s3`，Ready、各100%流量，同一不可变digest。
+- [Manual CD 35318328170](https://github.com/skin306152-star/pearnly-app/actions/runs/35318328170) success（同镜像 schema Job、候选与正式健康/就绪随流程通过）。正式域名 `health`/`ready` 200；nonce `ocr_dedupe_7bc38704` 的请求日志命中新 Web revision。前一运行 35317948365 因传入的错误完整 SHA 在 checkout 阶段 fail-closed（`not our ref`），未进入任何云端变更；同内容后一次运行 35317300289 已成功切流至 `39dfd867f9d0`。
+- 本轮 OCR 修复：一份 PDF 里同一家公司的税号可能某页读得出、某页读不出。旧行为按 ("tax")/("name") 两个身份键各自处理 → 同一家公司建出两个账套 → 下次上传名字匹配到两个 → 整批 409 `ocr.workspace_ambiguous`，整个上传不可用。现在同批按公司名归组、统一用"带税号那页"的结论；同名但税号互不相同（真两家公司）照旧分开建；兄弟页命中已有账套时同样复用，不再新建。触发事故：用户账号建出 122/123、商户账号建出 107/121，均源于同一份 13 页 PDF 的 `IV69/08-007`（卖方税号读空）。
+- 本轮另修：`23fd23d1` 给 `express_push/__init__.py` 加的一行 import 把 `core.db` 拉进 `push_exception_classify` 的首引链，形成循环 import；`import app` 看不见（导入顺序不同），线上运行未受影响，但"先引该模块"的进程会直接崩、分片跑单测随机整片红。已抽出叶子模块 `services/erp/express_account_identity.py` 解开，并新增首引顺序冒烟测试（已验证旧写法下会变红）。
+- 已知仍未修（历史遗留、与本轮无关）：`services/erp/push_log_queries` 作为首个 import 仍会循环 import 失败（基线 `ecdacdba` 同样失败，非本窗口引入）。
+- 数据清理（2026-09-18，用户已授权"3"）：重复账套 `123`（用户账号，名下 1 条）→ 记录并入 `122` 后停用；`121`（商户账号，名下 4 条）→ 记录并入 `107` 后停用。清理前原始行已备份到 `/Users/skin/.config/pearnly-migration/20260918/workspace-dedupe-backup.json`。清理后复验：两账号按名/按税号匹配均为唯一命中；商户账号仍存在 `IV69/08-007` 同单号 4 条历史记录（3 条为早期重复上传），未删除，留待用户决定。
 - [Manual CD 35234851060](https://github.com/skin306152-star/pearnly-app/actions/runs/35234851060) success；schema execution `pearnly-schema-7wpdq` success（14:42:03Z）；容器编译/Chromium、候选与正式健康/就绪及运行SHA验证随流程通过。正式域名 `health`/`ready` 200；nonce `erp_pairing_check_23fd23d1` 的请求日志命中新 Web revision `pearnly-web-23fd23d127aa-s3`。
 - 本轮修复：Express账套的程序目录不再由数据目录的上一层推断——账套数据常放在盘符（`S:\2569\EXP69\69SINCER`）、Express 程序装在网络共享（`\\accserver\ACCOUNT\69EXP`），旧口径必然 `root_mismatch`，导致该类连接一律 409 `catalog_refresh_invalid`。现在统一按 Companion 上报的"数据目录 → 程序目录"配对判定（`express_target_projection.reported_account_set_roots`），客户端声明、连接绑定与上报配对三者"已知才比"；快照 root 与本连接程序目录不一致仍拦（同机 68EXP/69EXP 不得串用）。
 - 触发本次修复的线上现象：KORN 那台（`mrerp@outlook.co.th`）13 张发票在 2026-09-17 20:36/20:39/20:50/20:56（UTC+7）共 4 轮 52 次 `/api/erp/push` 全部 409，`erp_push_logs` 一行未落。发布后用同账号真实配置只读复验：原 `root_mismatch` 请求现为 `bound_default`（`ok`）；`68SINCER` 等别套账套仍被拒。

@@ -1,6 +1,6 @@
 # Pearnly 部署与迁移状态账本
 
-更新时间：2026-09-18 14:25（UTC+7）。状态：**OCR重复账套修复与 express_push 循环import修复已发布（`7bc387048726`）。Web/Worker Ready、各100%流量，正式域名请求命中新 revision；商户端推送与真机验收待用户确认。**
+更新时间：2026-09-18 15:00（UTC+7）。状态：**OCR页级限流退避已发布（`ec2e5c957e6b`）。Web/Worker Ready、各100%流量，正式域名请求命中新 revision；单页失败仍会带走整份、100页仍被50页硬顶拒收，见本轮遗留。**
 2026-09-05 用户暂停后已明确回复“可以继续了”；已完成恢复后的大文件传输和安装包发布验证，历史检查点见[暂停与恢复记录](RESUME_MIGRATION.md)。
 本文件是部署状态唯一正本；[CLOUD_RUN.md](CLOUD_RUN.md) 是操作规范。历史 STATE、RUNBOOK 和聊天中的“当前部署”不覆盖本页。每次发布、切流或回退须更新本页；不把配置完成当作已运行或用户验收。
 
@@ -28,9 +28,13 @@ Web 使用1 GiB而非早期讨论的512 MiB，max=2而非3；是开发阶段保�
 
 ## 正在服务的发布身份
 
-- 完整 SHA：`7bc3870487263009722297cf4ec327f3c96ba715`。
-- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:8d05314bd11a574d5e80d1b5e3e58a8186cf9e10f82540cbbf80f863f3dbac11`。
-- Web `pearnly-web-7bc387048726-s3`、Worker `pearnly-worker-7bc387048726-s3`，Ready、各100%流量，同一不可变digest。
+- 完整 SHA：`ec2e5c957e6b4be7dee93ffdd2dae9fa83f69188`。
+- 镜像：`asia-southeast1-docker.pkg.dev/pearnly/pearnly-app/app@sha256:178af2ed94d406c33929290a47c27c11e96451cb79940c47e96adad0073d7226`。
+- Web `pearnly-web-ec2e5c957e6b-s3`、Worker `pearnly-worker-ec2e5c957e6b-s3`，Ready、各100%流量，同一不可变digest。
+- [Manual CD 35321281376](https://github.com/skin306152-star/pearnly-app/actions/runs/35321281376) success（同镜像 schema Job、候选与正式健康/就绪随流程通过）。正式域名 `health`/`ready` 200；nonce `ocr_quota_pacing_ec2e5c95` 的请求日志命中新 Web revision `pearnly-web-ec2e5c957e6b-s3`。
+- 本轮修复（限流不再致命）：Vertex 按项目每分钟限流，一张 N 页票 = N 次模型调用、4 路并发一次打完（13 页 ≈ 11 秒），而 L2 这条路径此前**没有任何退避或降速**——任一页撞 429 即抛穿 → 整份 500「引擎错误」，已成功的 N-1 页一起作废（2026-09-18 15:27 实测 12 页成功、1 页被限流，用户拿到「识别结果为空」）。现新增 `services/ocr/quota_pacing.py`：判据 + 指数退避 + 抖动 + 跨线程共享暂停窗 + 等待硬上限；`page_runner` 的 L2 调用改走 `call_with_backoff`（默认 3 次）。只对配额类退避，鉴权/坏 JSON 立即上抛。
+- 本轮遗留（**未做**，需另立单独变更）：① 单页退避用尽后仍会带走整份文件——要改 `PipelinePageResult.invoice` 必填的数据模型及下游约 6 处，才能做到「12 页入库 + 第 7 页标待重试」；② 页数硬顶仍是 `pipeline.DEFAULT_MAX_PAGES = 50`，100 页在入口即被 `ocr.too_many_pages` 拒收；③ 异步路（`ocr_jobs` · flag `OCR_ASYNC_WEB` 默认 off）把上传文件暂存在**本地磁盘** `/opt/mrpilot/var/ocr_jobs/<job_id>/` 并把本地路径写入数据库队列，Cloud Run `max=2` 实例下另一实例认领该任务会找不到文件——开启前必须先改成 GCS（或对象存储）暂存。前端同步路仍有 90s 超时（`dms-intake-invoice-recognize.ts`），50 页 ≈ 40s + 退避已接近该上限。
+- 跑批路径不受本轮影响：它早有同款治理（`services/workorder/steps/ocr_quota.py` · QuotaGovernor，2026-07-16 建），本轮只是把该口径接到网页上传这条从未接入的路径上。
 - [Manual CD 35318328170](https://github.com/skin306152-star/pearnly-app/actions/runs/35318328170) success（同镜像 schema Job、候选与正式健康/就绪随流程通过）。正式域名 `health`/`ready` 200；nonce `ocr_dedupe_7bc38704` 的请求日志命中新 Web revision。前一运行 35317948365 因传入的错误完整 SHA 在 checkout 阶段 fail-closed（`not our ref`），未进入任何云端变更；同内容后一次运行 35317300289 已成功切流至 `39dfd867f9d0`。
 - 本轮 OCR 修复：一份 PDF 里同一家公司的税号可能某页读得出、某页读不出。旧行为按 ("tax")/("name") 两个身份键各自处理 → 同一家公司建出两个账套 → 下次上传名字匹配到两个 → 整批 409 `ocr.workspace_ambiguous`，整个上传不可用。现在同批按公司名归组、统一用"带税号那页"的结论；同名但税号互不相同（真两家公司）照旧分开建；兄弟页命中已有账套时同样复用，不再新建。触发事故：用户账号建出 122/123、商户账号建出 107/121，均源于同一份 13 页 PDF 的 `IV69/08-007`（卖方税号读空）。
 - 本轮另修：`23fd23d1` 给 `express_push/__init__.py` 加的一行 import 把 `core.db` 拉进 `push_exception_classify` 的首引链，形成循环 import；`import app` 看不见（导入顺序不同），线上运行未受影响，但"先引该模块"的进程会直接崩、分片跑单测随机整片红。已抽出叶子模块 `services/erp/express_account_identity.py` 解开，并新增首引顺序冒烟测试（已验证旧写法下会变红）。

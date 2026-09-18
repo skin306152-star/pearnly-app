@@ -173,17 +173,20 @@ def _same_company(left: str, right: str) -> bool:
     return left == right or not left or not right
 
 
-def _canonical_create_plans(plans: list) -> dict[int, int]:
-    """本批 create 计划按公司名归组 → {同组计划序号: 组内规范计划序号}。
+def _canonical_by_name(plans: list) -> dict[int, int]:
+    """按公司名归组 → {同组待建账套的计划序号: 组内规范计划序号}。
 
     同一份 PDF 里,同一家公司的税号有可能某页读得出来、某页读不出来。旧行为按
-    ("tax")/("name") 两个不同身份键各建一个账套,同一家公司于是出现两个账套;下次上传时
-    名字匹配到两个 → 整批 409 workspace_ambiguous。这里让同组统一用规范计划
-    (优先带税号的那个)的建账结果。
+    ("tax")/("name") 两个不同身份键各自处理,同一家公司于是出现两个账套;下次上传时
+    名字匹配到两个 → 整批 409 workspace_ambiguous。
+
+    这里让"要新建账套"的计划先看同批同名的其他计划:同组已有结论(无论是刚建还是命中了
+    某个已有账套)就复用,不再建第二个。组内规范计划优先取带税号的那页 —— 用它的税号
+    命中的账套最可靠。同名但各自有不同非空税号 = 两家公司,不归组。
     """
     groups: dict[str, list[int]] = {}
     for index, plan in enumerate(plans):
-        if not isinstance(plan, dict) or plan.get("action") != "create":
+        if not isinstance(plan, dict):
             continue
         name = _subject_name(plan)
         if name:
@@ -193,7 +196,7 @@ def _canonical_create_plans(plans: list) -> dict[int, int]:
         with_tax = [index for index in indexes if _subject_tax(plans[index])]
         head = with_tax[0] if with_tax else indexes[0]
         for index in indexes:
-            if index == head:
+            if index == head or plans[index].get("action") != "create":
                 continue
             if _same_company(_subject_tax(plans[index]), _subject_tax(plans[head])):
                 followers[index] = head
@@ -240,7 +243,7 @@ def resolve_batch(
     created_ids: list[int] = []
     missing_cache: dict[tuple[str, str], dict] = {}
     by_name: dict[str, dict] = {}
-    canonical_create = _canonical_create_plans(plans)
+    canonical_by_name = _canonical_by_name(plans)
 
     def _materialize(plan: dict) -> dict:
         decision = document_assignment.materialize_assignment(
@@ -249,12 +252,13 @@ def resolve_batch(
             _tid(user),
             authorize_workspace=authorize,
         )
+        name = _subject_name(plan)
+        tax_id = _subject_tax(plan)
         if plan.get("action") == "create":
-            name = _subject_name(plan)
-            tax_id = _subject_tax(plan)
             missing_cache[("tax", tax_id) if tax_id else ("name", name)] = decision
-            if name:
-                by_name.setdefault(name, decision)
+        if name:
+            # 命中已有账套的计划也要登记:同批同名、但税号读不出来的那页靠它复用,不再新建
+            by_name.setdefault(name, decision)
         if decision.get("action") == "created":
             created_ids.append(int(decision["workspace_client_id"]))
             _log_created(user, decision, source, str(plan.get("direction") or ""))
@@ -273,7 +277,7 @@ def resolve_batch(
             elif cache_key in missing_cache:
                 decision = missing_cache[cache_key]
             else:
-                head_index = canonical_create.get(index)
+                head_index = canonical_by_name.get(index)
                 if head_index is None:
                     decision = _materialize(plan)
                 else:

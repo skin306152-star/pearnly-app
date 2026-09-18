@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional
 
 from core.concurrency import submit_ctx
-from . import escalation_budget, gemini_models, image_first, totals_rescue
+from . import escalation_budget, gemini_models, image_first, quota_pacing, totals_rescue
 from .confidence import check_field_in_l1_text, find_field_min_word_conf
 from .gl_balance_chain import repair_gl_document
 from .layer1_vision import extract_from_image_bytes as _l1_extract_image
@@ -175,8 +175,12 @@ def _process_one_page(
     # import 期冻结的 env 值)。实际用了哪个模型记进 PageResult,成本按它计价。
     t_l2 = time.time()
     l2_model = gemini_models.flash_lite()
-    l2_result = _l2_extract_page(
-        l1_page, api_key=api_key, model_name=l2_model, document_type=document_type
+    # L2 是必经层:撞限流必须退避重试,否则任一页撞一次整份作废(2026-09-18 线上)。
+    l2_result = quota_pacing.call_with_backoff(
+        lambda: _l2_extract_page(
+            l1_page, api_key=api_key, model_name=l2_model, document_type=document_type
+        ),
+        label=f"page {page_number} L2",
     )
     l2_ms = int((time.time() - t_l2) * 1000)
     l2_invoice = l2_result.invoice
